@@ -26,6 +26,14 @@ import { SeededRandom } from '../util/random';
 import { CameraController } from './cameraController';
 import { EventPresenter } from './eventPresenter';
 import { NetworkController } from './networkController';
+import { TutorialDirector, type TutorialHost } from './tutorialDirector';
+import { STEP_CONFIG, skillPulseStep } from '../game/tutorial/tutorialSteps';
+import {
+  buildTutorialMap,
+  buildTutorialPlayers,
+  TUTORIAL_CAPITAL,
+  TUTORIAL_ENEMY_WARRIOR_ID,
+} from '../game/tutorial/tutorialMap';
 
 const HEX_SIZE = 40;
 const VILLAGE_START_OFFSET = 200;
@@ -47,6 +55,7 @@ class GameController {
   private startVillageIntroPending = false;
   private camera: CameraController | null = null;
   private events: EventPresenter | null = null;
+  private tutorial: TutorialDirector | null = null;
   private lastTap = 0;
 
   init(app: Application, root: Container): void {
@@ -90,6 +99,7 @@ class GameController {
     this.overlayItems = [];
     this.mapRoot = null;
     this.app = null;
+    this.tutorial = null;
   }
 
   getMap(): GameMap | null {
@@ -110,6 +120,33 @@ class GameController {
     store.setWinnerIndex(this.sim.winnerIndex);
     store.setExpectedTurns(this.sim.expectedTurns);
     store.setBonusAwarded(this.sim.bonusAwarded);
+  }
+
+  private syncTutorialStore(): void {
+    const store = useGameStore.getState();
+    if (!this.tutorial) {
+      store.setTutorialStep(null);
+      store.setTutorialHighlightSkills([]);
+      store.setTutorialHighlightEndTurn(false);
+      return;
+    }
+    const step = this.tutorial.currentStep();
+    const def = STEP_CONFIG[step];
+    store.setTutorialStep(step);
+    store.setTutorialHighlightSkills(def.highlightSkills);
+    store.setTutorialHighlightEndTurn(def.highlightEndTurn);
+  }
+
+  private tutorialMarkerKeys(): Set<string> {
+    if (!this.tutorial || !this.sim) return new Set<string>();
+    const step = this.tutorial.currentStep();
+    const markers = new Set<string>();
+    for (const m of STEP_CONFIG[step].markers) markers.add(axialKey(m));
+    if (step === 'attackEnemy') {
+      const enemy = this.sim.map.tiles.find((t) => t.unit?.id === TUTORIAL_ENEMY_WARRIOR_ID);
+      if (enemy) markers.add(axialKey(enemy));
+    }
+    return markers;
   }
 
   exploredKeysFor(playerIndex: number): Set<string> {
@@ -153,6 +190,7 @@ class GameController {
 
   saveGame(): void {
     if (!this.sim || useGameStore.getState().netMode !== 'single') return;
+    if (useGameStore.getState().tutorial) return;
     saveRepository.save(this.sim.snapshot());
   }
 
@@ -161,6 +199,11 @@ class GameController {
     if (!snap) return;
     this.sim = Simulator.fromSnapshot(snap);
     const store = useGameStore.getState();
+    this.tutorial = null;
+    store.setTutorial(false);
+    store.setTutorialStep(null);
+    store.setTutorialHighlightSkills([]);
+    store.setTutorialHighlightEndTurn(false);
     store.setPlayers(snap.players);
     store.setMode(snap.mode);
     store.setTurn(snap.turn);
@@ -203,11 +246,29 @@ class GameController {
       if (store.netMode === 'host') this.getNetwork().broadcastBatch(events);
       await this.presentEvents(events, preExplored);
       this.render();
+      if (useGameStore.getState().tutorial && this.tutorial) {
+        const changed = this.tutorial.afterCommand(events);
+        if (changed) {
+          this.syncTutorialStore();
+          const s = useGameStore.getState();
+          // Once a skill step completes, close the skill tree so the player can
+          // see the next banner/objective on the map.
+          if (s.overlay?.kind === 'skill' && !skillPulseStep(s.tutorialStep)) {
+            s.setOverlay(null);
+          }
+          this.render();
+        }
+      }
     });
   }
 
   async startGame(tribe: Tribe, enemyCount: number, mode: GameMode, difficulty: AiDifficulty = DEFAULT_AI_DIFFICULTY): Promise<void> {
     const store = useGameStore.getState();
+    this.tutorial = null;
+    store.setTutorial(false);
+    store.setTutorialStep(null);
+    store.setTutorialHighlightSkills([]);
+    store.setTutorialHighlightEndTurn(false);
     const players = buildPlayers(tribe, enemyCount, new SeededRandom(Math.floor(Math.random() * 100000)), difficulty);
     const map = generateMap(players.length, Math.floor(Math.random() * 100000));
     for (const p of players) initialExplorationFor(map, p.index);
@@ -238,6 +299,56 @@ class GameController {
     this.render();
     this.centerOnStartVillage();
     this.saveGame();
+  }
+
+  startTutorial(): Promise<void> {
+    const store = useGameStore.getState();
+    const players = buildTutorialPlayers();
+    const map = buildTutorialMap();
+    this.sim = new Simulator(map, players, 'turns30');
+    this.sim.startGame();
+    this.sim.drainEvents();
+    this.tutorial = new TutorialDirector({ sim: () => this.sim } satisfies TutorialHost);
+    this.tutorial.start();
+    store.setPlayers(players);
+    store.setMode('turns30');
+    store.setExpectedTurns(this.sim.expectedTurns);
+    store.setGameOver(false);
+    store.setWinnerIndex(null);
+    store.setBonusAwarded(false);
+    store.setLocalPlayerIndex(0);
+    store.setNetMode('single');
+    store.setTurn(1);
+    store.setCurrentPlayerIndex(0);
+    store.setAiActive(false);
+    store.setSelection(null);
+    store.setOverlay(null);
+    store.setTutorial(true);
+    this.syncTutorialStore();
+    this.syncKnownTribes(false);
+    store.setSelection({ kind: 'unit', q: TUTORIAL_CAPITAL.q, r: TUTORIAL_CAPITAL.r });
+    store.setScreen('game');
+    this.startVillageIntroPending = true;
+    return Promise.resolve();
+  }
+
+  tutorialWelcomeClosed(): void {
+    if (!this.tutorial) return;
+    if (this.tutorial.welcomeClosed()) {
+      this.syncTutorialStore();
+      this.render();
+    }
+  }
+
+  exitTutorial(): void {
+    this.tutorial = null;
+    useGameStore.getState().setOverlay(null);
+    useGameStore.getState().setTutorial(false);
+    useGameStore.getState().setTutorialStep(null);
+    useGameStore.getState().setTutorialHighlightSkills([]);
+    useGameStore.getState().setTutorialHighlightEndTurn(false);
+    useGameStore.getState().setSelection(null);
+    useGameStore.getState().setScreen('start');
   }
 
   private mapHeight(): number {

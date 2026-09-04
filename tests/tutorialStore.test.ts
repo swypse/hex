@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { useGameStore } from '../src/store/gameStore';
+import { gameController } from '../src/controller/gameController';
 
 describe('tutorial store fields', () => {
   it('defaults to inactive', () => {
@@ -25,5 +26,13 @@ describe('tutorial store fields', () => {
     s.setTutorialStep(null);
     s.setTutorialHighlightSkills([]);
     s.setTutorialHighlightEndTurn(false);
+  });
+});
+
+describe('gameController tutorial API', () => {
+  it('exposes tutorial entry/exit methods', () => {
+    expect(typeof gameController.startTutorial).toBe('function');
+    expect(typeof gameController.tutorialWelcomeClosed).toBe('function');
+    expect(typeof gameController.exitTutorial).toBe('function');
   });
 });
