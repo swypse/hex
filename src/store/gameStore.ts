@@ -5,6 +5,8 @@ import { Selection } from '../game/selection';
 import { GameStateSnapshot } from '../game/state';
 import { GameMode } from '../game/gameMode';
 import { Tribe } from '../game/tribes';
+import type { SkillId } from '../game/skills';
+import type { TutorialStepId } from '../game/tutorial/tutorialSteps';
 
 export type Screen = 'start' | 'setup' | 'lobby' | 'game';
 
@@ -56,6 +58,10 @@ interface GameStore {
   myPeerId: string;
   playersOnline: boolean[];
   texturesLoading: boolean;
+  tutorial: boolean;
+  tutorialStep: TutorialStepId | null;
+  tutorialHighlightSkills: SkillId[];
+  tutorialHighlightEndTurn: boolean;
 
   setScreen: (screen: Screen) => void;
   setPlayers: (players: Player[]) => void;
@@ -78,6 +84,10 @@ interface GameStore {
   setMyPeerId: (peerId: string) => void;
   setPlayersOnline: (online: boolean[]) => void;
   setTexturesLoading: (loading: boolean) => void;
+  setTutorial: (v: boolean) => void;
+  setTutorialStep: (v: TutorialStepId | null) => void;
+  setTutorialHighlightSkills: (v: SkillId[]) => void;
+  setTutorialHighlightEndTurn: (v: boolean) => void;
 }
 
 export const useGameStore = create<GameStore>((set, get) => ({
@@ -103,6 +113,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
   myPeerId: '',
   playersOnline: [],
   texturesLoading: false,
+  tutorial: false,
+  tutorialStep: null,
+  tutorialHighlightSkills: [],
+  tutorialHighlightEndTurn: false,
 
   setScreen: (screen) => {
     if (!suppressPush && get().screen !== screen) pushHistory(screen);
@@ -141,6 +155,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
   setMyPeerId: (myPeerId) => set({ myPeerId }),
   setPlayersOnline: (playersOnline) => set({ playersOnline }),
   setTexturesLoading: (texturesLoading) => set({ texturesLoading }),
+  setTutorial: (tutorial) => set({ tutorial }),
+  setTutorialStep: (tutorialStep) => set({ tutorialStep }),
+  setTutorialHighlightSkills: (tutorialHighlightSkills) => set({ tutorialHighlightSkills }),
+  setTutorialHighlightEndTurn: (tutorialHighlightEndTurn) => set({ tutorialHighlightEndTurn }),
 }));
 
 const SCREENS: Screen[] = ['start', 'setup', 'lobby', 'game'];
