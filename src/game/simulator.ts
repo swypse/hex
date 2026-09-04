@@ -229,10 +229,9 @@ export class Simulator {
     moveUnit(this.map, unit, target);
     exploreUnitPath(this.map, path, unit, unit.owner);
     this.touchBonus(target, unit);
-    if (canUsePort(target, player)) {
-      const becameShip = unit.shipLevel === undefined;
+    if (canUsePort(target, player) && unit.shipLevel === undefined) {
       gainShipAbility(unit);
-      if (becameShip) unit.hasAttacked = true;
+      unit.hasAttacked = true;
     }
     this.emit({ type: 'unitMoved', unitId, from, path, to: { q, r }, shipLevel });
     return true;

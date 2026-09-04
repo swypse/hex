@@ -295,6 +295,29 @@ describe('Simulator commands', () => {
     expect(sim.applyCommand({ type: 'move', unitId: 'u1', q: 0, r: 2 })).toBe(false);
   });
 
+  it('an upgraded ship that sails off its port and docks back keeps its level', () => {
+    const map = makeTestMap(3);
+    for (const t of map.tiles) t.terrain = TileType.Water;
+    const port = tileAt(map, 0, 0)!;
+    port.building = { kind: 'port', level: 1 };
+    port.ownedBy = 0;
+    const ship = makeUnit('ship', 0, 'warrior', 0, 0);
+    ship.shipLevel = 2;
+    port.unit = ship;
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    sim.startGame();
+    sim.drainEvents();
+    // Sail away from the port; the level must be preserved.
+    expect(sim.applyCommand({ type: 'move', unitId: 'ship', q: 1, r: 0 })).toBe(true);
+    expect(ship.shipLevel).toBe(2);
+    // New turn: sail back and dock on the very same port.
+    sim.applyCommand({ type: 'endTurn' });
+    sim.drainEvents();
+    expect(sim.applyCommand({ type: 'move', unitId: 'ship', q: 0, r: 0 })).toBe(true);
+    expect(ship.shipLevel).toBe(2);
+  });
+
   it('a shield ship may attack after moving, and a rider ship may not move after attacking', () => {
     const map = makeTestMap();
     for (const t of map.tiles) t.terrain = TileType.Water;
