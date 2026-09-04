@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { Simulator } from '../src/game/simulator';
 import { buildPlayers } from '../src/game/players';
+import { planAiActions } from '../src/game/ai';
 import { Tribe } from '../src/game/tribes';
 import { SeededRandom } from '../src/util/random';
 import { makeTestMap, tileAt, makeUnit } from './helpers/testMap';
@@ -69,5 +70,36 @@ describe('AI behavior scenarios', () => {
     }
     expect(sim.gameOver).toBe(true);
     expect(sim.winnerIndex).not.toBeNull();
+  });
+
+  it('does not crash when an easy AI exhausts every possible action', () => {
+    const map = makeTestMap(6);
+    const humanVillage = tileAt(map, 5, 0)!;
+    humanVillage.settlement = { owner: 0, level: 1, captureReady: false, capital: true };
+    humanVillage.ownedBy = 0;
+    const capital = tileAt(map, 0, 0)!;
+    capital.settlement = { owner: 1, level: 1, captureReady: false, capital: true };
+    capital.ownedBy = 1;
+    capital.unit = makeUnit('cap', 1, 'warrior', 0, 0);
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1), 'easy');
+    const sim = new Simulator(map, players, 'turns30', {
+      rng: () => 0.5,
+      aiRng: () => ({ next: () => 0 } as SeededRandom),
+    });
+    sim.startGame();
+    for (let i = 0; i < 35 && !sim.gameOver; i++) {
+      sim.applyCommand({ type: 'endTurn' });
+    }
+    expect(sim.gameOver).toBe(true);
+    expect(sim.winnerIndex).not.toBeNull();
+  });
+
+  it('plans nothing instead of throwing when the AI has no valid action and its mistake roll fires', () => {
+    const map = makeTestMap(2);
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1), 'easy');
+    const broke = players[1]!;
+    broke.resources = { wood: 0, stone: 0, money: 0, ore: 0 };
+    const alwaysRollMistake = { next: () => 0 } as SeededRandom;
+    expect(planAiActions(map, broke, alwaysRollMistake, 'capture')).toEqual([]);
   });
 });

@@ -184,7 +184,7 @@ function bestAvailableAction(
     }
   }
 
-  if (difficulty && difficulty.mistakeChance > 0 && rng.next() < difficulty.mistakeChance) {
+  if (difficulty && difficulty.mistakeChance > 0 && candidates.length > 0 && rng.next() < difficulty.mistakeChance) {
     const pick = candidates[Math.floor(rng.next() * candidates.length)]!;
     return Array.isArray(pick.action) ? pick.action : [pick.action];
   }
