@@ -128,4 +128,19 @@ describe('StartScreen background images', () => {
     expect(root.children.indexOf(sprites(root)[0]!)).toBeLessThan(root.children.length - 1);
     screen.destroy();
   });
+
+  it('shows a Tutorial button alongside Single player and Multiplayer', () => {
+    const screen = new StartScreen();
+    screen.mount(host);
+    const buttons = (screen as unknown as { buttons: unknown[] }).buttons;
+    const labels = buttons.map((b) => {
+      const btn = b as { children: { text?: string }[] };
+      const t = btn.children.find((c) => typeof c.text === 'string');
+      return (t?.text as string) ?? '';
+    });
+    expect(labels).toContain('Single player');
+    expect(labels).toContain('Multiplayer');
+    expect(labels).toContain('Tutorial');
+    screen.destroy();
+  });
 });

@@ -175,7 +175,14 @@ export class StartScreen implements ScreenController {
       width: 240,
       onClick: () => useGameStore.getState().setScreen('lobby'),
     });
-    const buttons: Button[] = [single, multi];
+    const tutorial = new Button({
+      label: 'Tutorial',
+      width: 240,
+      onClick: () => {
+        void gameController.startTutorial();
+      },
+    });
+    const buttons: Button[] = [single, multi, tutorial];
     if (saveRepository.hasSave()) {
       buttons.unshift(new Button({ label: 'Resume', width: 240, onClick: () => gameController.resumeGame() }));
     }
