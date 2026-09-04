@@ -11,6 +11,7 @@ import { UnitHelpDialog } from './UnitHelpDialog';
 import { GameOver } from './GameOver';
 import { GameStats } from './GameStats';
 import { WelcomeDialog } from './WelcomeDialog';
+import { TutorialOverlay } from './TutorialOverlay';
 
 interface Overlay {
   mount(host: UIHost, root: Container): void;
@@ -39,6 +40,7 @@ export class OverlayManager {
     buildinghelp: { make: () => new UnitHelpDialog(), mounted: null },
     buildinglimithelp: { make: () => new UnitHelpDialog(), mounted: null },
     welcome: { make: () => new WelcomeDialog(), mounted: null },
+    tutorial: { make: () => new TutorialOverlay(), mounted: null },
   };
   private unsub: (() => void) | null = null;
 
@@ -55,6 +57,7 @@ export class OverlayManager {
     const inGame = s.screen === 'game';
     const active = new Set<string>();
     if (s.centerMessage !== null) active.add('center');
+    if (inGame && s.tutorial) active.add('tutorial');
     if (inGame && s.gameOver && s.winnerIndex !== null) active.add('gameover');
     if (inGame) {
       switch (s.overlay?.kind) {
