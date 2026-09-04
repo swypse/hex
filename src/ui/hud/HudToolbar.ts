@@ -44,6 +44,8 @@ export class HudToolbar implements Widget {
   private unsub: (() => void) | null = null;
   private onResize: (() => void) | null = null;
   private tooltips: ActionTooltip[] = [];
+  private stopEndTurnPulse: (() => void) | null = null;
+  private endTurnPulse: Graphics | null = null;
 
   mount(host: UIHost, root: Container): void {
     this.host = host;
@@ -90,6 +92,11 @@ export class HudToolbar implements Widget {
 
   private update(): void {
     if (!this.el || !this.row || !this.endTurnRow || !this.statsRow || !this.host) return;
+    if (this.stopEndTurnPulse) {
+      this.stopEndTurnPulse();
+      this.stopEndTurnPulse = null;
+    }
+    this.endTurnPulse = null;
     for (const t of this.tooltips) t.destroy();
     this.tooltips = [];
     while (this.row.children.length > 0) {
@@ -156,12 +163,43 @@ export class HudToolbar implements Widget {
     this.endTurnRow.addChild(endTurn);
     this.tooltips.push(new ActionTooltip(this.el!, endTurn, 'End turn'));
 
+    if (store.tutorialHighlightEndTurn && !store.aiActive) {
+      const ring = new Graphics();
+      ring.circle(24, 24, 26).stroke({ width: 4, color: 0xffd700, alpha: 0.9 });
+      this.endTurnRow.addChild(ring);
+      this.endTurnPulse = ring;
+      this.startEndTurnPulse();
+    }
+
     this.layout();
+  }
+
+  private startEndTurnPulse(): void {
+    if (this.stopEndTurnPulse || !this.host) return;
+    const ticker = this.host.app.ticker;
+    const start = performance.now();
+    const fn = (): void => {
+      if (!this.endTurnPulse || this.endTurnPulse.destroyed) {
+        ticker.remove(fn);
+        this.stopEndTurnPulse = null;
+        return;
+      }
+      const phase = ((performance.now() - start) % 900) / 900;
+      const r = 24 + 2 * Math.abs(Math.sin(phase * Math.PI * 2));
+      this.endTurnPulse.clear().circle(24, 24, r).stroke({ width: 4, color: 0xffd700, alpha: 0.9 });
+    };
+    ticker.add(fn);
+    this.stopEndTurnPulse = () => ticker.remove(fn);
   }
 
   destroy(): void {
     for (const t of this.tooltips) t.destroy();
     this.tooltips = [];
+    if (this.stopEndTurnPulse) {
+      this.stopEndTurnPulse();
+      this.stopEndTurnPulse = null;
+    }
+    this.endTurnPulse = null;
     if (this.unsub) this.unsub();
     if (this.onResize) window.removeEventListener('resize', this.onResize);
     this.unsub = null;

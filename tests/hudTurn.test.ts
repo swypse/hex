@@ -97,3 +97,39 @@ describe('HudTurn waiting label', () => {
     expect(textOf()).toContain('Waiting for Unknown tribe turn...');
   });
 });
+
+describe('HudTurn tutorial label', () => {
+  let root: Container;
+  let turn: HudTurn | null = null;
+
+  beforeEach(() => {
+    Object.defineProperty(Text.prototype, 'width', { configurable: true, get: () => 60 });
+    Object.defineProperty(Text.prototype, 'height', { configurable: true, get: () => 14 });
+    (globalThis as { CanvasRenderingContext2D?: unknown }).CanvasRenderingContext2D = class {};
+    (globalThis as { document?: unknown }).document = {
+      createElement: () => ({ getContext: () => fakeCanvasContext(), width: 0, height: 0 }),
+    };
+    root = new Container();
+    useGameStore.setState({ screen: 'start', players: [], turn: 1, currentPlayerIndex: 0, localPlayerIndex: 0, gameOver: false, texturesLoading: false });
+  });
+
+  afterEach(() => {
+    turn?.destroy();
+    turn = null;
+  });
+
+  it('shows Tutorial instead of a mode name while store.tutorial is true', () => {
+    const players = [makePlayer(0, Tribe.Villagers, [Tribe.Villagers]), makePlayer(1, Tribe.Warriors, [Tribe.Warriors])];
+    useGameStore.setState({
+      screen: 'game', mode: 'turns30', tutorial: true, turn: 3, players,
+      localPlayerIndex: 0, currentPlayerIndex: 0, aiActive: false,
+    });
+    turn = new HudTurn();
+    turn.mount(makeHost(), root);
+    const text = (turn as unknown as { text: { text: string } }).text!.text;
+    expect(text).toContain('Tutorial. Turn 3');
+    expect(text).not.toContain('30 Turns');
+    turn.destroy();
+    turn = null;
+  });
+});

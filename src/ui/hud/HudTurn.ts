@@ -43,7 +43,7 @@ export class HudTurn implements Widget {
     if (!this.el || !this.text || !this.panel || !this.host) return;
     const s = useGameStore.getState();
     this.el.visible = s.screen === 'game';
-    let label = `${GAME_MODE_NAMES[s.mode]}. Turn ${s.turn}`;
+    let label = s.tutorial ? `Tutorial. Turn ${s.turn}` : `${GAME_MODE_NAMES[s.mode]}. Turn ${s.turn}`;
     const current = s.players[s.currentPlayerIndex];
     if (s.aiActive && current) {
       const tribe = TRIBES.find((t) => t.id === current.tribe);

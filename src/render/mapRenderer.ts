@@ -78,6 +78,8 @@ export class MapView {
   private fireEffects: FireEffect[] = [];
   private fireAnimRemove: (() => void) | null = null;
   private stopSelectedBorder: (() => void) | null = null;
+  private stopTutorialMarkers: (() => void) | null = null;
+  private tutorialMarkerParts: { g: Graphics; points: { x: number; y: number }[] }[] = [];
   private bounceRemove: (() => void) | null = null;
   private bounceSprite: Sprite | null = null;
   private bounceBaseY = 0;
@@ -123,6 +125,11 @@ export class MapView {
       this.stopSelectedBorder();
       this.stopSelectedBorder = null;
     }
+    if (this.stopTutorialMarkers) {
+      this.stopTutorialMarkers();
+      this.stopTutorialMarkers = null;
+    }
+    this.tutorialMarkerParts = [];
     this.stopBounce();
     this.stopHexBounce();
     this.container.destroy({ children: true });
@@ -143,6 +150,7 @@ export class MapView {
     localPlayerIndex: number,
     hiddenUnitIds: Set<string>,
     viewport: Viewport,
+    tutorialMarkerKeys: Set<string> = new Set<string>(),
   ): void {
     if (this.tileViews.size === 0) this.buildTiles(map);
     this.map = map;
@@ -256,7 +264,7 @@ export class MapView {
       this.overlay.addChild(ex.el);
       this.overlayItems.push({ el: ex.el, world: ex.world });
     }
-    this.drawHighlights(map, selection, reachableKeys, attackableKeys, reachableColor);
+    this.drawHighlights(map, selection, reachableKeys, attackableKeys, reachableColor, tutorialMarkerKeys);
     this.shipBobs = shipBobs;
     this.startShipBob();
     this.startExclamationAnimation();
@@ -509,7 +517,22 @@ export class MapView {
     reachableKeys: Set<string>,
     attackableKeys: Set<string>,
     reachableColor: number,
+    tutorialMarkerKeys: Set<string> = new Set<string>(),
   ): void {
+    this.tutorialMarkerParts = [];
+    for (const tile of map.tiles) {
+      if (!tutorialMarkerKeys.has(axialKey(tile))) continue;
+      const corners = hexCorners(tile, this.hexSize).map((c) => ({
+        x: c.x,
+        y: c.y - tileElevation(tile, this.hexSize),
+      }));
+      const ring = this.takeGraphics();
+      this.strokePolyline(ring, corners, 4, 0xffd700, 0.95);
+      this.container.addChild(ring);
+      this.highlights.push(ring);
+      this.tutorialMarkerParts.push({ g: ring, points: corners });
+    }
+    this.startTutorialPulse();
     const selectedKey = selection ? axialKey(selection) : '';
     const dotRadius = this.hexSize * 0.16;
     for (const tile of map.tiles) {
@@ -778,6 +801,32 @@ export class MapView {
     this.hexBounceSprite = null;
   }
 
+  private startTutorialPulse(): void {
+    if (this.stopTutorialMarkers) {
+      this.stopTutorialMarkers();
+      this.stopTutorialMarkers = null;
+    }
+    const parts = this.tutorialMarkerParts;
+    if (parts.length === 0) return;
+    const draw = (width: number): void => {
+      for (const p of parts) this.strokePolyline(p.g, p.points, width, 0xffd700, 0.95);
+    };
+    draw(4);
+    const ticker = this.app.ticker;
+    const start = performance.now();
+    const fn = (): void => {
+      if (parts.length === 0) {
+        ticker.remove(fn);
+        this.stopTutorialMarkers = null;
+        return;
+      }
+      const phase = ((performance.now() - start) % 900) / 900;
+      draw(3 + 3 * Math.abs(Math.sin(phase * Math.PI * 2)));
+    };
+    ticker.add(fn);
+    this.stopTutorialMarkers = () => ticker.remove(fn);
+  }
+
   private animateSelectedBorder(parts: { g: Graphics; points: { x: number; y: number }[] }[]): void {
     if (this.stopSelectedBorder) {
       this.stopSelectedBorder();
@@ -995,6 +1044,11 @@ export class MapView {
       this.stopSelectedBorder();
       this.stopSelectedBorder = null;
     }
+    if (this.stopTutorialMarkers) {
+      this.stopTutorialMarkers();
+      this.stopTutorialMarkers = null;
+    }
+    this.tutorialMarkerParts = [];
     for (const g of this.highlights) {
       g.parent?.removeChild(g);
       this.releaseGraphics(g);

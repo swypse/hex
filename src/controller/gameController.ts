@@ -764,6 +764,7 @@ class GameController {
         width: this.app.screen.width,
         height: this.mapHeight(),
       },
+      this.tutorialMarkerKeys(),
     );
     this.overlayItems = this.mapView.overlayItems;
     this.applyTransform();

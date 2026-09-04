@@ -169,6 +169,7 @@ export class SkillTree {
     }
     this.el.visible = true;
     const tribe = TRIBES.find((t) => t.id === human.tribe)!;
+    const highlight = new Set(useGameStore.getState().tutorialHighlightSkills);
 
     const title = makeLabel('Skill tree', { fontSize: 24, fill: 0xffffff, fontWeight: '700' });
     title.anchor.set(0.5, 0.5);
@@ -203,6 +204,12 @@ export class SkillTree {
     for (const id of Object.keys(SKILLS) as SkillId[]) {
       const pos = POS[id];
       const opened = hasSkill(human, id);
+      if (!opened && highlight.has(id)) {
+        const halo = new Graphics();
+        halo.circle(pos.x, pos.y, 33).stroke({ width: 5, color: 0xffd700, alpha: 0.95 });
+        halo.circle(pos.x, pos.y, 38).stroke({ width: 2, color: 0xffd700, alpha: 0.5 });
+        ring.addChild(halo);
+      }
       const node = new Container();
       node.eventMode = 'static';
       node.cursor = 'pointer';
