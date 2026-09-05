@@ -81,6 +81,8 @@ export class MapView {
   private stopSelectedBorder: (() => void) | null = null;
   private stopTutorialMarkers: (() => void) | null = null;
   private tutorialMarkerParts: { g: Graphics; points: { x: number; y: number }[] }[] = [];
+  private stopAttackPulse: (() => void) | null = null;
+  private attackPulseParts: { g: Graphics; x: number; y: number; base: number }[] = [];
   private bounceRemove: (() => void) | null = null;
   private bounceSprite: Sprite | null = null;
   private bounceBaseY = 0;
@@ -131,6 +133,11 @@ export class MapView {
       this.stopTutorialMarkers = null;
     }
     this.tutorialMarkerParts = [];
+    if (this.stopAttackPulse) {
+      this.stopAttackPulse();
+      this.stopAttackPulse = null;
+    }
+    this.attackPulseParts = [];
     this.stopBounce();
     this.stopHexBounce();
     this.container.destroy({ children: true });
@@ -521,6 +528,7 @@ export class MapView {
     tutorialMarkerKeys: Set<string> = new Set<string>(),
   ): void {
     this.tutorialMarkerParts = [];
+    this.attackPulseParts = [];
     for (const tile of map.tiles) {
       if (!tutorialMarkerKeys.has(axialKey(tile))) continue;
       const corners = hexCorners(tile, this.hexSize).map((c) => ({
@@ -562,13 +570,47 @@ export class MapView {
         this.animateSelectedBorder(parts);
         continue;
       }
-      // Attackable targets: a translucent red circle at the hex centre.
+      // Attackable targets: a pulsing translucent red circle at the hex centre.
       const p = hexToPixel(tile, this.hexSize);
       const attackDot = this.takeGraphics();
-      attackDot.circle(p.x, y, dotRadius).fill({ color: SELECTED_BORDER_COLOR, alpha: 0.7 });
+      this.attackPulseParts.push({ g: attackDot, x: p.x, y, base: dotRadius });
       this.container.addChild(attackDot);
       this.highlights.push(attackDot);
     }
+    this.startAttackPulse();
+  }
+
+  private startAttackPulse(): void {
+    if (this.stopAttackPulse) {
+      this.stopAttackPulse();
+      this.stopAttackPulse = null;
+    }
+    const parts = this.attackPulseParts;
+    if (parts.length === 0) return;
+    const draw = (r: number): void => {
+      for (const part of parts) {
+        part.g.clear();
+        part.g
+          .circle(part.x, part.y, r)
+          .fill({ color: SELECTED_BORDER_COLOR, alpha: 0.7 })
+          .stroke({ width: 4, color: 0xffffff, alpha: 0.9 });
+      }
+    };
+    const ticker = this.app.ticker;
+    const start = performance.now();
+    const fn = (): void => {
+      if (parts.length === 0) {
+        ticker.remove(fn);
+        this.stopAttackPulse = null;
+        return;
+      }
+      const t = ((performance.now() - start) % 1000) / 1000;
+      // Scale pulses from the base radius up to 2x and back.
+      const scale = 1 + Math.abs(t * 2 - 1);
+      draw(parts[0]!.base * scale);
+    };
+    ticker.add(fn);
+    this.stopAttackPulse = () => ticker.remove(fn);
   }
 
   /** Draw a pulsing hex border identical in structure to the red selected-tile
@@ -1059,6 +1101,11 @@ export class MapView {
       this.stopTutorialMarkers = null;
     }
     this.tutorialMarkerParts = [];
+    if (this.stopAttackPulse) {
+      this.stopAttackPulse();
+      this.stopAttackPulse = null;
+    }
+    this.attackPulseParts = [];
     for (const g of this.highlights) {
       g.parent?.removeChild(g);
       this.releaseGraphics(g);
