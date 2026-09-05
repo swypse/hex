@@ -23,6 +23,8 @@ export interface TutorialStepDef {
   highlightSkills: SkillId[];
   highlightEndTurn: boolean;
   pulseSkillsButton: boolean;
+  /** Toolbar action key (see ToolbarSpec.key) to pulse, if any. */
+  toolbarKey?: string;
   /** Rendered as a blocking dialog (welcome/end) rather than a banner. */
   dialog: boolean;
   /** Label for the dialog button; not used for banners. */
@@ -116,11 +118,12 @@ export const STEP_CONFIG: Record<TutorialStepId, TutorialStepDef> = {
   buildSawmill: {
     id: 'buildSawmill',
     heading: 'Build a sawmill',
-    text: 'Select the highlighted tile beside the forest and press Build sawmill (10 money). Sawmills produce +1 wood per adjacent forest each turn.',
+    text: 'Select the highlighted tile beside the forest and press the pulsing Build sawmill button (10 money). Sawmills produce +1 wood per adjacent forest each turn.',
     markers: [{ q: 0, r: 1 }],
     highlightSkills: [],
     highlightEndTurn: false,
     pulseSkillsButton: false,
+    toolbarKey: 'sawmill',
     dialog: false,
     buttonLabel: '',
   },
@@ -138,11 +141,12 @@ export const STEP_CONFIG: Record<TutorialStepId, TutorialStepDef> = {
   buildMine: {
     id: 'buildMine',
     heading: 'Build a mine',
-    text: 'Select the highlighted mountain and press Build mine (15 money). Mines produce 1 stone and 1 ore each turn.',
+    text: 'Select the highlighted mountain and press the pulsing Build mine button (15 money). Mines produce 1 stone and 1 ore each turn.',
     markers: [{ q: 2, r: -2 }],
     highlightSkills: [],
     highlightEndTurn: false,
     pulseSkillsButton: false,
+    toolbarKey: 'mine',
     dialog: false,
     buttonLabel: '',
   },

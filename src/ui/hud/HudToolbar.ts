@@ -8,6 +8,7 @@ import { IconButton } from '../kit/iconButton';
 import { ActionTooltip } from '../kit/actionTooltip';
 import { TOOLBAR_HEIGHT } from '../layout';
 import { toolbarSpecs } from './toolbarSpecs';
+import { STEP_CONFIG } from '../../game/tutorial/tutorialSteps';
 
 const ICON_ACTIONS: Record<string, string> = {
   upgrade: 'upgrade.png',
@@ -46,6 +47,8 @@ export class HudToolbar implements Widget {
   private tooltips: ActionTooltip[] = [];
   private stopEndTurnPulse: (() => void) | null = null;
   private endTurnPulse: Graphics | null = null;
+  private stopActionPulse: (() => void) | null = null;
+  private actionPulse: Graphics | null = null;
 
   mount(host: UIHost, root: Container): void {
     this.host = host;
@@ -97,6 +100,11 @@ export class HudToolbar implements Widget {
       this.stopEndTurnPulse = null;
     }
     this.endTurnPulse = null;
+    if (this.stopActionPulse) {
+      this.stopActionPulse();
+      this.stopActionPulse = null;
+    }
+    this.actionPulse = null;
     for (const t of this.tooltips) t.destroy();
     this.tooltips = [];
     while (this.row.children.length > 0) {
@@ -111,21 +119,35 @@ export class HudToolbar implements Widget {
     const store = useGameStore.getState();
     const actions = toolbarSpecs();
     const GAP = 12;
+    const storeStep = store.tutorial && store.tutorialStep !== null ? store.tutorialStep : null;
+    const tutorialKey = storeStep ? (STEP_CONFIG[storeStep].toolbarKey ?? null) : null;
     let x = 0;
 
-    const addText = (label: string, disabled: boolean, onClick: () => void, paddingX: number): void => {
+    const maybeHighlightAction = (btn: Container, key: string): void => {
+      if (!tutorialKey || key !== tutorialKey || this.actionPulse) return;
+      const ring = new Graphics();
+      ring.position.set(btn.position.x, 0);
+      ring.circle(24, 24, 26).stroke({ width: 4, color: 0xffd700, alpha: 0.9 });
+      this.row!.addChild(ring);
+      this.actionPulse = ring;
+      this.startActionPulse();
+    };
+
+    const addText = (label: string, disabled: boolean, onClick: () => void, paddingX: number, key: string): void => {
       const btn = new Button({ label, disabled, onClick, paddingX, paddingY: 10, fontSize: 20 });
       btn.position.set(x, 0);
       this.row!.addChild(btn);
       x += btn.width + GAP;
       this.tooltips.push(new ActionTooltip(this.el!, btn, label));
+      maybeHighlightAction(btn, key);
     };
-    const addIcon = (icon: string, disabled: boolean, onClick: () => void, tooltipText: string): void => {
+    const addIcon = (icon: string, disabled: boolean, onClick: () => void, tooltipText: string, key: string): void => {
       const btn = new IconButton({ icon, disabled, onClick, size: 48, ...ACTION_BTN });
       btn.position.set(x, 0);
       this.row!.addChild(btn);
       x += btn.width + GAP;
       this.tooltips.push(new ActionTooltip(this.el!, btn, tooltipText));
+      maybeHighlightAction(btn, key);
     };
 
     const isLastTurn = (): boolean => {
@@ -139,8 +161,8 @@ export class HudToolbar implements Widget {
     for (const spec of actions) {
       if (spec.disabled || store.aiActive || store.gameOver) continue;
       const iconFile = ICON_ACTIONS[spec.key];
-      if (iconFile) addIcon(iconFile, spec.disabled, spec.onClick, spec.label);
-      else addText(spec.label, spec.disabled, spec.onClick, 16);
+      if (iconFile) addIcon(iconFile, spec.disabled, spec.onClick, spec.label, spec.key);
+      else addText(spec.label, spec.disabled, spec.onClick, 16, spec.key);
     }
 
     const stats = new IconButton({
@@ -192,6 +214,24 @@ export class HudToolbar implements Widget {
     this.stopEndTurnPulse = () => ticker.remove(fn);
   }
 
+  private startActionPulse(): void {
+    if (this.stopActionPulse || !this.host) return;
+    const ticker = this.host.app.ticker;
+    const start = performance.now();
+    const fn = (): void => {
+      if (!this.actionPulse || this.actionPulse.destroyed) {
+        ticker.remove(fn);
+        this.stopActionPulse = null;
+        return;
+      }
+      const phase = ((performance.now() - start) % 900) / 900;
+      const r = 24 + 2 * Math.abs(Math.sin(phase * Math.PI * 2));
+      this.actionPulse.clear().circle(24, 24, r).stroke({ width: 4, color: 0xffd700, alpha: 0.9 });
+    };
+    ticker.add(fn);
+    this.stopActionPulse = () => ticker.remove(fn);
+  }
+
   destroy(): void {
     for (const t of this.tooltips) t.destroy();
     this.tooltips = [];
@@ -200,6 +240,11 @@ export class HudToolbar implements Widget {
       this.stopEndTurnPulse = null;
     }
     this.endTurnPulse = null;
+    if (this.stopActionPulse) {
+      this.stopActionPulse();
+      this.stopActionPulse = null;
+    }
+    this.actionPulse = null;
     if (this.unsub) this.unsub();
     if (this.onResize) window.removeEventListener('resize', this.onResize);
     this.unsub = null;
