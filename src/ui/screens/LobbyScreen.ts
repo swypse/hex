@@ -436,6 +436,13 @@ export class LobbyScreen implements ScreenController {
         this.root!.addChild(back);
         return;
       }
+      if (s.connection === 'connecting') {
+        const setup = makeLabel('Setting up the room...', { fontSize: 14, fill: 0xcccccc });
+        setup.anchor.set(0.5, 0.5);
+        setup.position.set(cx, y);
+        this.root!.addChild(setup);
+        return;
+      }
       const start = new Button({ label: 'Start game', width: 240, disabled: !canStart, onClick: () => { void gameController.startHostGame(); } });
       start.position.set(cx - 120, y);
       this.root!.addChild(start);

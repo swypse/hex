@@ -117,6 +117,7 @@ export function buildPeerConfig(iceServers: RTCIceServer[]): RTCConfiguration {
 }
 
 export interface HostSessionEvents {
+  onReady?: (peerId: string) => void;
   onOpen: (peerId: string, conn: DataConnection) => void;
   onData: (peerId: string, msg: ClientMessage) => void;
   onClose: (peerId: string) => void;
@@ -140,6 +141,7 @@ export class HostSession {
     this.started = true;
     this.peer = new Peer(peerId, { debug: 1, config: buildPeerConfig(iceServers) });
     this.peer.on('connection', (conn) => this.attach(conn));
+    this.peer.on('open', (id) => this.events.onReady?.(String(id)));
     this.peer.on('error', (err) => this.events.onError?.(err));
   }
 

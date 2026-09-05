@@ -62,6 +62,10 @@ export class NetworkController {
     this.hostTribe = opts.tribe;
     this.hostPlayers = [];
     this.hostSession = new HostSession({
+      onReady: () => {
+        if (this.canceled) return;
+        useGameStore.getState().setConnection('connected');
+      },
       onOpen: (peerId) => {
         this.hostPlayers.push({ peerId, name: '', tribeId: null, playerIndex: null, ready: false, online: true });
         this.broadcastLobby();
@@ -81,7 +85,7 @@ export class NetworkController {
     const store = useGameStore.getState();
     store.setNetMode('host');
     store.setLocalPlayerIndex(0);
-    store.setConnection('connected');
+    store.setConnection('connecting');
     store.setConnectionMessage('');
     store.setLobby({
       role: 'host',
