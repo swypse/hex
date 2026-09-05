@@ -169,6 +169,10 @@ class GameController {
       const bonusTile = this.sim.map.tiles.find((t) => t.bonus !== undefined && t.bonus !== null);
       if (bonusTile) markers.add(axialKey(bonusTile));
     }
+    if (step === 'approachFreeVillage' || step === 'captureFreeVillage') {
+      const freeVillage = this.sim.map.tiles.find((t) => t.settlement && t.settlement.owner === null);
+      if (freeVillage) markers.add(axialKey(freeVillage));
+    }
     return markers;
   }
 
@@ -328,7 +332,7 @@ class GameController {
     const store = useGameStore.getState();
     const players = buildTutorialPlayers();
     const map = buildTutorialMap();
-    this.sim = new Simulator(map, players, 'turns30');
+    this.sim = new Simulator(map, players, 'turns30', { disablePirates: true });
     this.sim.startGame();
     this.sim.drainEvents();
     this.tutorial = new TutorialDirector({ sim: () => this.sim } satisfies TutorialHost);

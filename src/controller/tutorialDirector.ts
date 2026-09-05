@@ -2,6 +2,7 @@ import type { Simulator } from '../game/simulator';
 import type { GameEvent } from '../game/events';
 import { hexDistance, hexNeighbors } from '../game/hex';
 import { tileAt } from '../game/selection';
+import type { MapTile } from '../game/mapGen';
 import { isLandType, isWaterType } from '../game/tileTypes';
 import { isExploredFor } from '../game/explore';
 import { hasSkill } from '../game/skills';
@@ -19,11 +20,15 @@ export interface TutorialHost {
 
 export class TutorialDirector {
   private stepIndex = 0;
+  private freeVillageQ = 0;
+  private freeVillageR = 0;
+  private freeVillageSet = false;
 
   constructor(private readonly host: TutorialHost) {}
 
   start(): void {
     this.stepIndex = 0;
+    this.freeVillageSet = false;
   }
 
   currentStep(): TutorialStepId {
@@ -72,6 +77,7 @@ export class TutorialDirector {
     else if (step === 'boardShip') this.repositionWarriorForBoarding();
     else if (step === 'attackEnemyShip') this.placeEnemyShip();
     else if (step === 'collectBonus') this.placeTutorialBonus();
+    else if (step === 'approachFreeVillage') this.placeFreeVillage();
     else if (step === 'end') this.removeDummyUnits();
   }
 
@@ -132,6 +138,16 @@ export class TutorialDirector {
         return !sim.map.tiles.some((t) => t.unit?.owner === TUTORIAL_ENEMY_PLAYER);
       case 'collectBonus':
         return !sim.map.tiles.some((t) => t.bonus !== undefined && t.bonus !== null);
+      case 'approachFreeVillage': {
+        if (!this.freeVillageSet) return false;
+        const v = tileAt(sim.map, this.freeVillageQ, this.freeVillageR);
+        return v !== undefined && v.settlement?.owner === null && v.unit?.owner === TUTORIAL_HUMAN;
+      }
+      case 'captureFreeVillage': {
+        if (!this.freeVillageSet) return false;
+        const v = tileAt(sim.map, this.freeVillageQ, this.freeVillageR);
+        return v?.settlement?.owner === TUTORIAL_HUMAN;
+      }
       default:
         return false;
     }
@@ -296,6 +312,42 @@ export class TutorialDirector {
         return;
       }
     }
+  }
+
+  private placeFreeVillage(): void {
+    const sim = this.host.sim();
+    if (!sim) return;
+    const anchor = sim.map.tiles.find(
+      (t) => t.unit && t.unit.owner === TUTORIAL_HUMAN && t.unit.shipLevel === undefined,
+    );
+    if (!anchor) return;
+    const freeSpot = (t: ReturnType<typeof tileAt>): boolean =>
+      t !== undefined &&
+      isLandType(t.terrain) &&
+      !t.unit &&
+      !t.settlement &&
+      !t.building &&
+      !t.bonus;
+    for (const n of hexNeighbors(anchor)) {
+      const t = tileAt(sim.map, n.q, n.r);
+      if (freeSpot(t)) {
+        this.placeSettlement(t!);
+        return;
+      }
+    }
+    for (const t of sim.map.tiles) {
+      if (hexDistance(t, anchor) <= 2 && freeSpot(t)) {
+        this.placeSettlement(t);
+        return;
+      }
+    }
+  }
+
+  private placeSettlement(tile: MapTile): void {
+    tile.settlement = { owner: null, level: 1, captureReady: false, name: 'Empty Village' };
+    this.freeVillageQ = tile.q;
+    this.freeVillageR = tile.r;
+    this.freeVillageSet = true;
   }
 
   private removeDummyUnits(): void {

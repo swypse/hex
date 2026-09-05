@@ -20,6 +20,8 @@ export type TutorialStepId =
   | 'upgradeShip'
   | 'attackEnemyShip'
   | 'collectBonus'
+  | 'approachFreeVillage'
+  | 'captureFreeVillage'
   | 'end';
 
 export interface TutorialStepDef {
@@ -57,6 +59,8 @@ export const STEP_ORDER: TutorialStepId[] = [
   'upgradeShip',
   'attackEnemyShip',
   'collectBonus',
+  'approachFreeVillage',
+  'captureFreeVillage',
   'end',
 ];
 
@@ -261,6 +265,28 @@ export const STEP_CONFIG: Record<TutorialStepId, TutorialStepDef> = {
     id: 'collectBonus',
     heading: 'Collect a bonus',
     text: 'Bonus markers are scattered across the map. Move one of your units onto the glowing bonus, then press End your turn. On the next turn a "Get the bonus" button appears — press it to collect rewards such as money or resources.',
+    markers: [],
+    highlightSkills: [],
+    highlightEndTurn: false,
+    pulseSkillsButton: false,
+    dialog: false,
+    buttonLabel: '',
+  },
+  approachFreeVillage: {
+    id: 'approachFreeVillage',
+    heading: 'Claim an empty village',
+    text: 'An unclaimed village appeared next to your unit. Move that unit onto the village — if it already acted this turn, press End your turn first so it can move.',
+    markers: [],
+    highlightSkills: [],
+    highlightEndTurn: false,
+    pulseSkillsButton: false,
+    dialog: false,
+    buttonLabel: '',
+  },
+  captureFreeVillage: {
+    id: 'captureFreeVillage',
+    heading: 'Capture the empty village',
+    text: 'Press End your turn so the village becomes capturable, then select it and press the Capture button. Villages expand your income and unit capacity.',
     markers: [],
     highlightSkills: [],
     highlightEndTurn: false,

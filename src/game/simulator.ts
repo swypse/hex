@@ -54,19 +54,21 @@ export class Simulator {
 
   private rng: () => number;
   private aiRng: () => SeededRandom;
+  private disablePirates: boolean;
   private events: GameEvent[] = [];
 
   constructor(
     map: GameMap,
     players: Player[],
     mode: GameMode,
-    opts: { rng?: () => number; aiRng?: () => SeededRandom } = {},
+    opts: { rng?: () => number; aiRng?: () => SeededRandom; disablePirates?: boolean } = {},
   ) {
     this.map = map;
     this.players = players;
     this.mode = mode;
     this.rng = opts.rng ?? Math.random;
     this.aiRng = opts.aiRng ?? (() => new SeededRandom(Math.floor(Math.random() * 100000)));
+    this.disablePirates = opts.disablePirates ?? false;
     this.turn = 1;
     this.currentPlayerIndex = 0;
     this.gameOver = false;
@@ -612,6 +614,7 @@ export class Simulator {
   }
 
   private runPirateTurn(): void {
+    if (this.disablePirates) return;
     this.trySpawnPirate();
     const pirates = this.map.tiles.filter((t) => t.unit && t.unit.type === 'pirate').map((t) => t.unit!);
     const acted = new Set<string>();

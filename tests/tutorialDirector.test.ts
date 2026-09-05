@@ -150,7 +150,28 @@ describe('TutorialDirector', () => {
     run(sim, dir, { type: 'endTurn' });
     expect(dir.currentStep()).toBe('collectBonus');
     run(sim, dir, { type: 'claimBonus' });
+    expect(dir.currentStep()).toBe('approachFreeVillage');
+
+    // A free (neutral) village spawns next to the archer.
+    const freeVillage = sim.map.tiles.find((t) => t.settlement && t.settlement.owner === null)!;
+    expect(isWaterType(freeVillage.terrain)).toBe(false);
+    expect(freeVillage.unit).toBeNull();
+    const archerAfterBonus = sim.map.tiles.find((t) => t.unit?.type === 'archer')!;
+    expect(hexDistance(freeVillage, archerAfterBonus)).toBeLessThanOrEqual(1);
+
+    // Claiming the bonus exhausted the archer; it can move onto the village
+    // only after ending the turn.
+    run(sim, dir, { type: 'endTurn' });
+    expect(dir.currentStep()).toBe('approachFreeVillage');
+    run(sim, dir, { type: 'move', unitId: archerAfterBonus.unit!.id, q: freeVillage.q, r: freeVillage.r });
+    expect(dir.currentStep()).toBe('captureFreeVillage');
+    // Capturing is only possible on the next turn once capture-ready is set.
+    run(sim, dir, { type: 'endTurn' });
+    expect(dir.currentStep()).toBe('captureFreeVillage');
+    const onVillage = sim.map.tiles.find((t) => t.settlement && t.unit?.owner === TUTORIAL_HUMAN)!;
+    run(sim, dir, { type: 'capture', q: freeVillage.q, r: freeVillage.r, unitId: onVillage.unit!.id });
     expect(dir.currentStep()).toBe('end');
+    expect(freeVillage.settlement?.owner).toBe(TUTORIAL_HUMAN);
     expect(sim.map.tiles.some((t) => t.unit?.owner === TUTORIAL_ENEMY_PLAYER)).toBe(false);
   });
 
