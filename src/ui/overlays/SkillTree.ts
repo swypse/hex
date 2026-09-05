@@ -241,19 +241,18 @@ export class SkillTree {
 
       const RADIUS = 28;
       const iconFile = SKILL_ICON_FILES[id];
-      // Skill nodes show their texture inside a colored circle: grey (535353)
-      // when unopened, blue (5198FF) once opened. Nodes without a mapped icon
-      // texture are just the colored circle.
+      // Colored circle: grey (535353) when unopened, blue (5198FF) when opened.
       const bg = new Graphics();
       bg.circle(pos.x, pos.y, RADIUS)
         .fill(opened ? 0x5198ff : 0x535353)
         .stroke({ width: opened ? 5 : 2, color: opened ? 0x5198ff : 0x333333 });
       node.addChild(bg);
 
+      // The skill image sits centered inside the circle, slightly smaller, so
+      // the colored circle stays visible as its background/ring.
       if (iconFile) {
-        const icon = makeIcon(iconFile, RADIUS * 2);
+        const icon = makeIcon(iconFile, 42);
         icon.position.set(pos.x, pos.y);
-        icon.mask = bg;
         node.addChild(icon);
       }
 
