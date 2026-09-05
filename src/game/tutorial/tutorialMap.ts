@@ -56,6 +56,22 @@ export function buildTutorialMap(): GameMap {
   // Mine tile: mountain at (2,-2) (claim radius 2 once upgraded).
   tileMap.get(axialKey({ q: 2, r: -2 }))!.terrain = TileType.GrasslandMountain;
 
+  // Cosmetic terrain variety on outer (distance 3) tiles, away from every tile
+  // the tutorial uses: movement, buildings, and the scripted enemy placement.
+  const variety: { q: number; r: number; terrain: TileType }[] = [
+    { q: 0, r: 3, terrain: TileType.DesertLand },
+    { q: 3, r: 0, terrain: TileType.TundraLand },
+    { q: 1, r: 2, terrain: TileType.TaigaLand },
+    { q: -3, r: 1, terrain: TileType.RainforestLand },
+    { q: -1, r: 3, terrain: TileType.RainforestForest },
+    { q: -3, r: 0, terrain: TileType.DesertMountain },
+    { q: 3, r: -1, terrain: TileType.TundraForest },
+  ];
+  for (const v of variety) {
+    const tile = tileMap.get(axialKey(v));
+    if (tile) tile.terrain = v.terrain;
+  }
+
   // Level-1 claim (radius 1) exactly like generateMap does.
   for (const t of tileMap.values()) {
     if (hexDistance(t, TUTORIAL_CAPITAL) <= 1) claimTileForVillage(t, capital);

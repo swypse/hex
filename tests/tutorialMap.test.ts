@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { axialKey, hexDistance } from '../src/game/hex';
-import { isForestType, isLandType, isMountainType, isWaterType } from '../src/game/tileTypes';
+import { isForestType, isLandType, isMountainType, isWaterType, TileType } from '../src/game/tileTypes';
 import { tileAt } from '../src/game/selection';
 import { upgradeVillage } from '../src/game/village';
 import {
@@ -55,6 +55,38 @@ describe('tutorial map', () => {
     // After upgrading to level 2 the claim pass must own it.
     upgradeVillage(map, tileAt(map, TUTORIAL_CAPITAL.q, TUTORIAL_CAPITAL.r)!);
     expect(tileAt(map, 2, -2)!.ownedBy).toBe(TUTORIAL_HUMAN);
+  });
+
+  it('shows a variety of non-grassland terrains on outer tiles', () => {
+    const map = buildTutorialMap();
+    const expectations: Record<string, TileType> = {
+      '0,3': TileType.DesertLand,
+      '3,0': TileType.TundraLand,
+      '1,2': TileType.TaigaLand,
+      '-3,1': TileType.RainforestLand,
+      '-1,3': TileType.RainforestForest,
+      '-3,0': TileType.DesertMountain,
+      '3,-1': TileType.TundraForest,
+    };
+    const nonGrassland = new Set<number>();
+    for (const [key, terrain] of Object.entries(expectations)) {
+      const [q, r] = key.split(',').map(Number);
+      const tile = tileAt(map, q!, r!)!;
+      expect(tile.terrain).toBe(terrain);
+      expect(hexDistance(tile, TUTORIAL_CAPITAL)).toBe(3);
+      nonGrassland.add(tile.terrain);
+    }
+    expect(nonGrassland.size).toBeGreaterThanOrEqual(4);
+  });
+
+  it('keeps the action tiles (movement, sawmill, mine, enemy) usable', () => {
+    const map = buildTutorialMap();
+    // Enemy preferred tile stays empty land.
+    expect(isLandType(tileAt(map, 2, 1)!.terrain)).toBe(true);
+    expect(tileAt(map, 2, 1)!.unit).toBeNull();
+    // Warrior parking and archer firing tiles stay land.
+    expect(isLandType(tileAt(map, 1, -1)!.terrain)).toBe(true);
+    expect(isLandType(tileAt(map, 1, 0)!.terrain)).toBe(true);
   });
 
   it('builds one human (rich, no skills) and one inactive dummy player', () => {
