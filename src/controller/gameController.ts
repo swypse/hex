@@ -58,7 +58,6 @@ class GameController {
   private camera: CameraController | null = null;
   private events: EventPresenter | null = null;
   private tutorial: TutorialDirector | null = null;
-  private lastTap = 0;
 
   init(app: Application, root: Container): void {
     if (this.mapRoot) return;
@@ -463,10 +462,6 @@ class GameController {
     }
   }
 
-  private resetView(): void {
-    this.getCamera().resetView();
-  }
-
   private async bringCellIntoView(q: number, r: number): Promise<void> {
     if (!this.app || !this.sim) return;
     const local = useGameStore.getState().localPlayerIndex;
@@ -736,15 +731,8 @@ class GameController {
       });
       this.mapView.container.on('pointertap', (e) => {
         if (!this.mapView || camera.isDragging) return;
-        const now = Date.now();
         const local = this.mapView.container.toLocal(e.global);
         const tile = pickTileAt(local.x, local.y, HEX_SIZE, this.sim!.map.tiles);
-        if (now - this.lastTap < 400 && !tile) {
-          this.lastTap = 0;
-          this.resetView();
-          return;
-        }
-        this.lastTap = now;
         if (tile) {
           this.handleMapClick(tile.q, tile.r);
         }

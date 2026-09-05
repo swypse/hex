@@ -3,7 +3,7 @@ import { gameController } from '../../controller/gameController';
 import { SKILLS, hasSkill, canOpenSkill, skillCost, type SkillId } from '../../game/skills';
 import { type Player } from '../../game/players';
 import { TRIBES } from '../../game/tribes';
-import { clampZoom, zoomAroundCursor } from '../../game/zoom';
+import { clampZoom, zoomAroundCursor, decayVelocity, INERTIA_START_SPEED, INERTIA_STOP_SPEED } from '../../game/zoom';
 import { useGameStore } from '../../store/gameStore';
 import { type UIHost } from '../host';
 import { Button } from '../kit/button';
@@ -93,10 +93,18 @@ export class SkillTree {
   private zoom = 1;
   private fitScale = 1;
   private pan = { x: 0, y: 0 };
-  private dragging = false;
-  private dragPointerId = -1;
+  private pointers = new Map<number, { x: number; y: number }>();
+  private listening = false;
+  private pinchActive = false;
+  private pinchStartZoom = 1;
+  private pinchStartDist = 0;
+  private pinchWorldAnchor = { x: 0, y: 0 };
   private dragStart = { x: 0, y: 0 };
   private panStart = { x: 0, y: 0 };
+  private dragLast = { x: 0, y: 0 };
+  private dragLastTime = 0;
+  private dragVelocity = { x: 0, y: 0 };
+  private inertiaRemove: (() => void) | null = null;
 
   mount(host: UIHost, root: Container): void {
     this.host = host;
@@ -124,6 +132,7 @@ export class SkillTree {
   }
 
   private onWheel = (e: FederatedWheelEvent): void => {
+    this.stopInertia();
     const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
     const scale = this.fitScale * this.zoom;
     const nextZoom = clampZoom(this.zoom * factor);
@@ -134,31 +143,142 @@ export class SkillTree {
   };
 
   private onPointerDown = (e: FederatedPointerEvent): void => {
-    this.dragging = true;
-    this.dragPointerId = e.pointerId;
-    this.dragStart = { x: e.global.x, y: e.global.y };
-    this.panStart = { ...this.pan };
-    window.addEventListener('pointermove', this.onWindowMove);
-    window.addEventListener('pointerup', this.onWindowUp);
-    window.addEventListener('pointercancel', this.onWindowUp);
+    const pos = { x: e.global.x, y: e.global.y };
+    this.pointers.set(e.pointerId, { ...pos });
+    this.stopInertia();
+    this.attachPointerListeners();
+    if (this.pointers.size >= 2) {
+      this.beginPinch();
+      return;
+    }
+    this.beginSingleDrag(pos);
   };
 
   private onWindowMove = (e: PointerEvent): void => {
-    if (!this.dragging) return;
+    if (!this.pointers.has(e.pointerId)) return;
+    const pos = { x: e.clientX, y: e.clientY };
+    this.pointers.set(e.pointerId, { ...pos });
+    if (this.pinchActive) {
+      this.applyPinch();
+      return;
+    }
+    if (this.pointers.size !== 1) return;
+    const now = performance.now();
+    const dt = Math.max(0.0001, (now - this.dragLastTime) / 1000);
+    const dx = pos.x - this.dragLast.x;
+    const dy = pos.y - this.dragLast.y;
+    this.dragVelocity.x = this.dragVelocity.x * 0.8 + (dx / dt) * 0.2;
+    this.dragVelocity.y = this.dragVelocity.y * 0.8 + (dy / dt) * 0.2;
     this.pan = {
-      x: this.panStart.x + (e.clientX - this.dragStart.x),
-      y: this.panStart.y + (e.clientY - this.dragStart.y),
+      x: this.panStart.x + (pos.x - this.dragStart.x),
+      y: this.panStart.y + (pos.y - this.dragStart.y),
     };
     this.applyTransform();
+    this.dragLast = { ...pos };
+    this.dragLastTime = now;
   };
 
   private onWindowUp = (e: PointerEvent): void => {
-    if (e.pointerId !== this.dragPointerId) return;
-    this.dragging = false;
+    if (!this.pointers.delete(e.pointerId)) return;
+    if (this.pinchActive && this.pointers.size < 2) {
+      this.pinchActive = false;
+      // Continue panning with the remaining finger.
+      const remaining = [...this.pointers.values()][0];
+      if (remaining) this.beginSingleDrag(remaining);
+    }
+    if (this.pointers.size === 0) {
+      if (!this.pinchActive && Math.hypot(this.dragVelocity.x, this.dragVelocity.y) >= INERTIA_START_SPEED) {
+        this.startInertia();
+      }
+      this.dragVelocity = { x: 0, y: 0 };
+      this.detachPointerListeners();
+    }
+  };
+
+  private attachPointerListeners(): void {
+    if (this.listening) return;
+    this.listening = true;
+    window.addEventListener('pointermove', this.onWindowMove);
+    window.addEventListener('pointerup', this.onWindowUp);
+    window.addEventListener('pointercancel', this.onWindowUp);
+  }
+
+  private detachPointerListeners(): void {
+    if (!this.listening) return;
+    this.listening = false;
     window.removeEventListener('pointermove', this.onWindowMove);
     window.removeEventListener('pointerup', this.onWindowUp);
     window.removeEventListener('pointercancel', this.onWindowUp);
-  };
+  }
+
+  private beginSingleDrag(pos: { x: number; y: number }): void {
+    this.dragStart = { ...pos };
+    this.panStart = { ...this.pan };
+    this.dragLast = { ...pos };
+    this.dragLastTime = performance.now();
+    this.dragVelocity = { x: 0, y: 0 };
+  }
+
+  private pointerDistance(): number {
+    const [a, b] = [...this.pointers.values()];
+    return Math.hypot(b!.x - a!.x, b!.y - a!.y);
+  }
+
+  private pointerMidpoint(): { x: number; y: number } {
+    const [a, b] = [...this.pointers.values()];
+    return { x: (a!.x + b!.x) / 2, y: (a!.y + b!.y) / 2 };
+  }
+
+  private beginPinch(): void {
+    if (this.pointers.size < 2) return;
+    this.pinchActive = true;
+    this.pinchStartZoom = this.zoom;
+    this.pinchStartDist = this.pointerDistance();
+    const mid = this.pointerMidpoint();
+    const startScale = this.fitScale * this.pinchStartZoom;
+    this.pinchWorldAnchor = {
+      x: (mid.x - this.pan.x) / startScale,
+      y: (mid.y - this.pan.y) / startScale,
+    };
+  }
+
+  private applyPinch(): void {
+    if (!this.pinchActive || this.pointers.size < 2) return;
+    const dist = this.pointerDistance();
+    const mid = this.pointerMidpoint();
+    const nextZoom = clampZoom(this.pinchStartZoom * (dist / this.pinchStartDist));
+    const nextScale = this.fitScale * nextZoom;
+    this.zoom = nextZoom;
+    this.pan = {
+      x: mid.x - this.pinchWorldAnchor.x * nextScale,
+      y: mid.y - this.pinchWorldAnchor.y * nextScale,
+    };
+    this.applyTransform();
+  }
+
+  private startInertia(): void {
+    if (this.inertiaRemove || !this.host || !this.host.app.ticker) return;
+    const ticker = this.host.app.ticker;
+    const fn = (t: { deltaMS: number }): void => {
+      const dt = Math.min(0.05, t.deltaMS / 1000);
+      this.pan = {
+        x: this.pan.x + this.dragVelocity.x * dt,
+        y: this.pan.y + this.dragVelocity.y * dt,
+      };
+      this.dragVelocity = decayVelocity(this.dragVelocity, dt);
+      this.applyTransform();
+      if (Math.hypot(this.dragVelocity.x, this.dragVelocity.y) < INERTIA_STOP_SPEED) this.stopInertia();
+    };
+    ticker.add(fn);
+    this.inertiaRemove = () => ticker.remove(fn);
+  }
+
+  private stopInertia(): void {
+    if (this.inertiaRemove) {
+      this.inertiaRemove();
+      this.inertiaRemove = null;
+    }
+  }
 
   private applyTransform(): void {
     if (!this.ring) return;
@@ -339,10 +459,11 @@ export class SkillTree {
     this.unsub = null;
     this.hudMoney?.destroy();
     this.hudMoney = null;
+    this.stopInertia();
+    this.detachPointerListeners();
+    this.pointers.clear();
+    this.pinchActive = false;
     window.removeEventListener('keydown', this.onKeyDown);
-    window.removeEventListener('pointermove', this.onWindowMove);
-    window.removeEventListener('pointerup', this.onWindowUp);
-    window.removeEventListener('pointercancel', this.onWindowUp);
     this.el?.destroy({ children: true });
     this.el = null;
     this.ring = null;
