@@ -33,6 +33,7 @@ export const FIRE_SIZE_MAX = 12;
 const FIRE_BASE_Y = 6;
 const SELECTED_BORDER_COLOR = 0xEB1F00;
 const SELECTED_BORDER_ALPHA = 1;
+const TUTORIAL_MARKER_COLOR = 0xffd700;
 
 interface FireParticle {
   g: Graphics;
@@ -526,11 +527,8 @@ export class MapView {
         x: c.x,
         y: c.y - tileElevation(tile, this.hexSize),
       }));
-      const ring = this.takeGraphics();
-      this.strokePolyline(ring, corners, 4, 0xffd700, 0.95);
-      this.container.addChild(ring);
-      this.highlights.push(ring);
-      this.tutorialMarkerParts.push({ g: ring, points: corners });
+      const parts = this.addPulseBorder(axialKey(tile), corners, TUTORIAL_MARKER_COLOR);
+      for (const p of parts) this.tutorialMarkerParts.push(p);
     }
     this.startTutorialPulse();
     const selectedKey = selection ? axialKey(selection) : '';
@@ -560,19 +558,8 @@ export class MapView {
       }));
       const isSelected = key === selectedKey;
       if (isSelected) {
-        this.reorderSelectedTile(key);
-        const split = splitHexBorder(corners);
-        const topPart = this.takeGraphics();
-        const bottomPart = this.takeGraphics();
-        topPart.zIndex = 2;
-        this.tileViews.get(key)!.el.addChild(topPart);
-        this.strokePolyline(bottomPart, split.bottom, 4, SELECTED_BORDER_COLOR, SELECTED_BORDER_ALPHA);
-        this.container.addChild(bottomPart);
-        this.highlights.push(topPart, bottomPart);
-        this.animateSelectedBorder([
-          { g: topPart, points: split.top },
-          { g: bottomPart, points: split.bottom },
-        ]);
+        const parts = this.addPulseBorder(key, corners, SELECTED_BORDER_COLOR);
+        this.animateSelectedBorder(parts);
         continue;
       }
       // Attackable targets: a translucent red circle at the hex centre.
@@ -582,6 +569,29 @@ export class MapView {
       this.container.addChild(attackDot);
       this.highlights.push(attackDot);
     }
+  }
+
+  /** Draw a pulsing hex border identical in structure to the red selected-tile
+   * border, using the given color. Returns the top/bottom parts so a caller can
+   * animate them. */
+  private addPulseBorder(
+    key: string,
+    corners: { x: number; y: number }[],
+    color: number,
+  ): { g: Graphics; points: { x: number; y: number }[] }[] {
+    this.reorderSelectedTile(key);
+    const split = splitHexBorder(corners);
+    const topPart = this.takeGraphics();
+    const bottomPart = this.takeGraphics();
+    topPart.zIndex = 2;
+    this.tileViews.get(key)!.el.addChild(topPart);
+    this.strokePolyline(bottomPart, split.bottom, 4, color, 1);
+    this.container.addChild(bottomPart);
+    this.highlights.push(topPart, bottomPart);
+    return [
+      { g: topPart, points: split.top },
+      { g: bottomPart, points: split.bottom },
+    ];
   }
 
   private strokePolyline(
@@ -809,7 +819,7 @@ export class MapView {
     const parts = this.tutorialMarkerParts;
     if (parts.length === 0) return;
     const draw = (width: number): void => {
-      for (const p of parts) this.strokePolyline(p.g, p.points, width, 0xffd700, 0.95);
+      for (const p of parts) this.strokePolyline(p.g, p.points, width, TUTORIAL_MARKER_COLOR, 1);
     };
     draw(4);
     const ticker = this.app.ticker;
@@ -820,8 +830,8 @@ export class MapView {
         this.stopTutorialMarkers = null;
         return;
       }
-      const phase = ((performance.now() - start) % 900) / 900;
-      draw(3 + 3 * Math.abs(Math.sin(phase * Math.PI * 2)));
+      const phase = ((performance.now() - start) % 1200) / 1200;
+      draw(2 + 4 * Math.abs(Math.sin(phase * Math.PI * 2)));
     };
     ticker.add(fn);
     this.stopTutorialMarkers = () => ticker.remove(fn);
