@@ -8,6 +8,7 @@ import { makeIcon } from '../kit/icon';
 import { makeLabel } from '../kit/label';
 import { makePanel } from '../kit/panel';
 import { Tooltip } from '../kit/tooltip';
+import { tooltipsEnabled } from '../kit/tooltipGate';
 import { RESOURCE_TOOLTIPS } from './resourceTooltips';
 
 export class HudMoney implements Widget {
@@ -78,7 +79,7 @@ export class HudMoney implements Widget {
       icon.eventMode = 'static';
       icon.position.set(x + iconSize / 2 + 6, cy);
       const info = RESOURCE_TOOLTIPS[row.key as keyof typeof RESOURCE_TOOLTIPS];
-      if (info && this.tooltip) {
+      if (info && this.tooltip && tooltipsEnabled()) {
         icon.on('pointerover', () => this.tooltip!.showForAfter(icon, info.name, `Required for ${info.requiredFor}`, 500));
         icon.on('pointerout', () => this.tooltip!.hideAfter(500));
         icon.on('pointerdown', () => this.tooltip!.showFor(icon, info.name, `Required for ${info.requiredFor}`));

@@ -7,6 +7,7 @@ import { type UIHost, type Widget } from '../host';
 import { makeIcon } from '../kit/icon';
 import { makeLabel } from '../kit/label';
 import { Tooltip } from '../kit/tooltip';
+import { tooltipsEnabled } from '../kit/tooltipGate';
 
 const SIZE = 64;
 const PAD = 8;
@@ -90,9 +91,11 @@ export class HudScore implements Widget {
       const icon = makeIcon(info.icon, ICON_SIZE);
       icon.position.set(x, 0);
       icon.eventMode = 'static';
-      icon.on('pointerover', () => this.tooltip!.showForAfter(icon, info.tooltip, '', 500));
-      icon.on('pointerout', () => this.tooltip!.hideAfter(500));
-      icon.on('pointerdown', () => this.tooltip!.showFor(icon, info.tooltip, ''));
+      if (tooltipsEnabled()) {
+        icon.on('pointerover', () => this.tooltip!.showForAfter(icon, info.tooltip, '', 500));
+        icon.on('pointerout', () => this.tooltip!.hideAfter(500));
+        icon.on('pointerdown', () => this.tooltip!.showFor(icon, info.tooltip, ''));
+      }
       this.buffRow.addChild(icon);
       x += ICON_SIZE + BUFF_GAP;
     }

@@ -241,4 +241,20 @@ describe('HudToolbar tutorial build highlights', () => {
     select(tile);
     expect(row.children.length).toBe(1);
   });
+
+  it('creates no action tooltips while the tutorial is active', () => {
+    const tile = ownedTile(TileType.GrasslandLand);
+    const neighbor = map.tiles.find((t) =>
+      hexNeighbors(tile).some((n) => n.q === t.q && n.r === t.r))!;
+    neighbor.terrain = TileType.GrasslandForest;
+    const store = useGameStore.getState();
+    store.setTutorial(true);
+    store.setTutorialStep('buildSawmill');
+    select(tile);
+    expect((toolbar as unknown as { tooltips: unknown[] }).tooltips.length).toBe(0);
+    store.setTutorial(false);
+    store.setTutorialStep(null);
+    select(tile);
+    expect((toolbar as unknown as { tooltips: unknown[] }).tooltips.length).toBeGreaterThan(0);
+  });
 });

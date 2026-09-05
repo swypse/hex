@@ -6,6 +6,7 @@ import { type UIHost, type Widget } from '../host';
 import { Button } from '../kit/button';
 import { IconButton } from '../kit/iconButton';
 import { ActionTooltip } from '../kit/actionTooltip';
+import { tooltipsEnabled } from '../kit/tooltipGate';
 import { TOOLBAR_HEIGHT } from '../layout';
 import { toolbarSpecs } from './toolbarSpecs';
 import { STEP_CONFIG } from '../../game/tutorial/tutorialSteps';
@@ -138,7 +139,7 @@ export class HudToolbar implements Widget {
       btn.position.set(x, 0);
       this.row!.addChild(btn);
       x += btn.width + GAP;
-      this.tooltips.push(new ActionTooltip(this.el!, btn, label));
+      if (tooltipsEnabled()) this.tooltips.push(new ActionTooltip(this.el!, btn, label));
       maybeHighlightAction(btn, key);
     };
     const addIcon = (icon: string, disabled: boolean, onClick: () => void, tooltipText: string, key: string): void => {
@@ -146,7 +147,7 @@ export class HudToolbar implements Widget {
       btn.position.set(x, 0);
       this.row!.addChild(btn);
       x += btn.width + GAP;
-      this.tooltips.push(new ActionTooltip(this.el!, btn, tooltipText));
+      if (tooltipsEnabled()) this.tooltips.push(new ActionTooltip(this.el!, btn, tooltipText));
       maybeHighlightAction(btn, key);
     };
 
@@ -172,7 +173,7 @@ export class HudToolbar implements Widget {
       ...ACTION_BTN,
     });
     this.statsRow.addChild(stats);
-    this.tooltips.push(new ActionTooltip(this.el!, stats, 'Game stats'));
+    if (tooltipsEnabled()) this.tooltips.push(new ActionTooltip(this.el!, stats, 'Game stats'));
 
     const endTurn = new IconButton({
       icon: 'end-turn.png',
@@ -183,7 +184,7 @@ export class HudToolbar implements Widget {
       color: isLastTurn() ? LAST_TURN_COLOR : ACTION_BTN.color,
     });
     this.endTurnRow.addChild(endTurn);
-    this.tooltips.push(new ActionTooltip(this.el!, endTurn, 'End turn'));
+    if (tooltipsEnabled()) this.tooltips.push(new ActionTooltip(this.el!, endTurn, 'End turn'));
 
     if (store.tutorialHighlightEndTurn && !store.aiActive) {
       const ring = new Graphics();
