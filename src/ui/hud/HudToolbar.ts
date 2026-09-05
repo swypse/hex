@@ -16,9 +16,9 @@ const ICON_ACTIONS: Record<string, string> = {
   heal: 'heal.png',
   capture: 'capture.png',
   spawn: 'spawn.png',
-  sawmill: 'build.png',
-  mine: 'build.png',
-  port: 'build.png',
+  sawmill: 'build-sawmill.png',
+  mine: 'build-mine.png',
+  port: 'build-port.png',
   temple: 'build.png',
   forestTemple: 'build.png',
 };
