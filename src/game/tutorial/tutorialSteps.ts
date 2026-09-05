@@ -184,3 +184,9 @@ export const STEP_CONFIG: Record<TutorialStepId, TutorialStepDef> = {
 export function skillPulseStep(step: TutorialStepId | null): boolean {
   return step === 'openForestry' || step === 'openClimbingSmithery';
 }
+
+/** "[N/M]" counter where N is the 1-based step index and M is the total
+ * number of tutorial messages. */
+export function stepCounter(step: TutorialStepId): string {
+  return `[${STEP_ORDER.indexOf(step) + 1}/${STEP_ORDER.length}]`;
+}

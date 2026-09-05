@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { SKILLS } from '../src/game/skills';
 import { buildTutorialMap } from '../src/game/tutorial/tutorialMap';
-import { STEP_ORDER, STEP_CONFIG, skillPulseStep, type TutorialStepDef } from '../src/game/tutorial/tutorialSteps';
+import { STEP_ORDER, STEP_CONFIG, skillPulseStep, stepCounter, type TutorialStepDef } from '../src/game/tutorial/tutorialSteps';
 
 const markerExists = (map: ReturnType<typeof buildTutorialMap>, m: { q: number; r: number }): boolean =>
   map.tiles.some((t) => t.q === m.q && t.r === m.r);
@@ -59,5 +59,13 @@ describe('tutorial steps', () => {
         expect(Math.max(Math.abs(m.q), Math.abs(m.r), Math.abs(m.q + m.r))).toBeLessThanOrEqual(4);
       }
     }
+  });
+
+  it('numbers every message heading with a [N/M] counter', () => {
+    expect(stepCounter('welcome')).toBe(`[1/${STEP_ORDER.length}]`);
+    expect(stepCounter('end')).toBe(`[${STEP_ORDER.length}/${STEP_ORDER.length}]`);
+    expect(stepCounter('buildSawmill')).toBe(`[7/${STEP_ORDER.length}]`);
+    const counted = STEP_ORDER.map((id) => stepCounter(id));
+    expect(new Set(counted).size).toBe(STEP_ORDER.length);
   });
 });

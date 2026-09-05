@@ -3,7 +3,7 @@ import { useGameStore } from '../../store/gameStore';
 import { type UIHost } from '../host';
 import { Button } from '../kit/button';
 import { makeLabel } from '../kit/label';
-import { STEP_CONFIG, type TutorialStepId } from '../../game/tutorial/tutorialSteps';
+import { STEP_CONFIG, stepCounter, type TutorialStepId } from '../../game/tutorial/tutorialSteps';
 import { gameController } from '../../controller/gameController';
 
 const BANNER_MAX_WIDTH = 720;
@@ -35,10 +35,11 @@ export class TutorialOverlay {
     const step = s.tutorialStep;
     if (step === null) return;
     const def = STEP_CONFIG[step];
+    const heading = `${stepCounter(step)} ${def.heading}`;
     if (def.dialog) {
-      this.buildDialog(def.heading, def.text, def.buttonLabel, step);
+      this.buildDialog(heading, def.text, def.buttonLabel, step);
     } else {
-      this.buildBanner(def.heading, def.text);
+      this.buildBanner(heading, def.text);
     }
   }
 
