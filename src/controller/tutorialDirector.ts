@@ -321,33 +321,56 @@ export class TutorialDirector {
       (t) => t.unit && t.unit.owner === TUTORIAL_HUMAN && t.unit.shipLevel === undefined,
     );
     if (!anchor) return;
-    const freeSpot = (t: ReturnType<typeof tileAt>): boolean =>
-      t !== undefined &&
+    // The empty village must not sit inside the player's own village territory:
+    // pick the closest land tile that is neither owned nor claimed by any
+    // settlement.
+    const freeNeutral = (t: MapTile): boolean =>
       isLandType(t.terrain) &&
+      t.ownedBy === null &&
+      t.claimedByVillage === null &&
       !t.unit &&
       !t.settlement &&
       !t.building &&
       !t.bonus;
-    for (const n of hexNeighbors(anchor)) {
-      const t = tileAt(sim.map, n.q, n.r);
-      if (freeSpot(t)) {
-        this.placeSettlement(t!);
-        return;
-      }
-    }
-    for (const t of sim.map.tiles) {
-      if (hexDistance(t, anchor) <= 2 && freeSpot(t)) {
-        this.placeSettlement(t);
-        return;
-      }
-    }
-  }
-
-  private placeSettlement(tile: MapTile): void {
-    tile.settlement = { owner: null, level: 1, captureReady: false, name: 'Empty Village' };
-    this.freeVillageQ = tile.q;
-    this.freeVillageR = tile.r;
+    const target = [...sim.map.tiles]
+      .filter(freeNeutral)
+      .sort((a, b) => hexDistance(a, anchor) - hexDistance(b, anchor))[0];
+    if (!target) return;
+    target.settlement = { owner: null, level: 1, captureReady: false, name: 'Empty Village' };
+    this.freeVillageQ = target.q;
+    this.freeVillageR = target.r;
     this.freeVillageSet = true;
+
+    // Stage the anchoring unit on a free land tile next to the village so it
+    // can step onto it in one move.
+    const unit = anchor.unit!;
+    if (isLandType(anchor.terrain) && hexDistance(anchor, target) === 1) return;
+    for (const n of hexNeighbors(target)) {
+      const t = tileAt(sim.map, n.q, n.r);
+      if (!t || !isLandType(t.terrain) || t.unit || t.settlement) continue;
+      anchor.unit = null;
+      t.unit = unit;
+      unit.q = t.q;
+      unit.r = t.r;
+      return;
+    }
+    // Fallback: stage on any free land tile within two hexes of the village.
+    const staging = sim.map.tiles
+      .filter(
+        (t) =>
+          hexDistance(t, target) <= 2 &&
+          t !== target &&
+          isLandType(t.terrain) &&
+          !t.unit &&
+          !t.settlement,
+      )
+      .sort((a, b) => hexDistance(a, anchor) - hexDistance(b, anchor))[0];
+    if (staging) {
+      anchor.unit = null;
+      staging.unit = unit;
+      unit.q = staging.q;
+      unit.r = staging.r;
+    }
   }
 
   private removeDummyUnits(): void {

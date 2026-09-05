@@ -152,10 +152,13 @@ describe('TutorialDirector', () => {
     run(sim, dir, { type: 'claimBonus' });
     expect(dir.currentStep()).toBe('approachFreeVillage');
 
-    // A free (neutral) village spawns next to the archer.
+    // A free (neutral) village spawns next to the archer, outside the player's
+    // own village territory.
     const freeVillage = sim.map.tiles.find((t) => t.settlement && t.settlement.owner === null)!;
     expect(isWaterType(freeVillage.terrain)).toBe(false);
     expect(freeVillage.unit).toBeNull();
+    expect(freeVillage.ownedBy).toBeNull();
+    expect(freeVillage.claimedByVillage).toBeNull();
     const archerAfterBonus = sim.map.tiles.find((t) => t.unit?.type === 'archer')!;
     expect(hexDistance(freeVillage, archerAfterBonus)).toBeLessThanOrEqual(1);
 
