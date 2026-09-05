@@ -42,7 +42,7 @@ describe('skills', () => {
     expect(skillCost('waterTemples', 0)).toBe(6);
     expect(skillCost('forestTemple', 0)).toBe(6);
     expect(skillCost('roads', 0)).toBe(6);
-    expect(skillCost('defence', 0)).toBe(6);
+    expect(skillCost('defense', 0)).toBe(6);
     expect(skillCost('knights', 0)).toBe(6);
     expect(skillCost('bridges', 0)).toBe(6);
     expect(SKILLS.smithery.parent).toBe('climbing');
@@ -53,7 +53,7 @@ describe('skills', () => {
     expect(SKILLS.waterTemples.parent).toBe('water');
     expect(SKILLS.forestTemple.parent).toBe('forestry');
     expect(SKILLS.roads.parent).toBe('forestry');
-    expect(SKILLS.defence.parent).toBe('shields');
+    expect(SKILLS.defense.parent).toBe('shields');
     expect(SKILLS.knights.parent).toBe('riding');
     expect(SKILLS.bridges.parent).toBe('riding');
     expect(SKILLS.climbing.parent).toBeNull();

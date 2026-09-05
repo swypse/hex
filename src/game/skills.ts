@@ -14,7 +14,7 @@ export type SkillId =
   | 'science'
   | 'roads'
   | 'shields'
-  | 'defence'
+  | 'defense'
   | 'catapult'
   | 'riding'
   | 'knights'
@@ -113,9 +113,9 @@ export const SKILLS: Record<SkillId, SkillInfo> = {
     parent: null,
     description: 'Allows spawning shield units (10 money).',
   },
-  defence: {
-    id: 'defence',
-    name: 'Defence',
+  defense: {
+    id: 'defense',
+    name: 'Defense',
     level: 2,
     parent: 'shields',
     description: 'Unlocks the Build village walls action (coming soon).',
