@@ -32,7 +32,9 @@ import {
   buildTutorialMap,
   buildTutorialPlayers,
   TUTORIAL_CAPITAL,
+  TUTORIAL_ENEMY_SHIP_ID,
   TUTORIAL_ENEMY_WARRIOR_ID,
+  TUTORIAL_START_WARRIOR_ID,
 } from '../game/tutorial/tutorialMap';
 
 const HEX_SIZE = 40;
@@ -144,6 +146,24 @@ class GameController {
     for (const m of STEP_CONFIG[step].markers) markers.add(axialKey(m));
     if (step === 'attackEnemy') {
       const enemy = this.sim.map.tiles.find((t) => t.unit?.id === TUTORIAL_ENEMY_WARRIOR_ID);
+      if (enemy) markers.add(axialKey(enemy));
+    }
+    if (step === 'boardShip') {
+      const warrior = this.sim.map.tiles.find((t) => t.unit?.id === TUTORIAL_START_WARRIOR_ID);
+      if (warrior) markers.add(axialKey(warrior));
+    }
+    if (step === 'upgradeShip') {
+      const ship = this.sim.map.tiles.find(
+        (t) => t.unit && t.unit.owner === 0 && t.unit.shipLevel !== undefined,
+      );
+      if (ship) markers.add(axialKey(ship));
+    }
+    if (step === 'attackEnemyShip') {
+      const ship = this.sim.map.tiles.find(
+        (t) => t.unit && t.unit.owner === 0 && t.unit.shipLevel !== undefined,
+      );
+      if (ship) markers.add(axialKey(ship));
+      const enemy = this.sim.map.tiles.find((t) => t.unit?.id === TUTORIAL_ENEMY_SHIP_ID);
       if (enemy) markers.add(axialKey(enemy));
     }
     return markers;
