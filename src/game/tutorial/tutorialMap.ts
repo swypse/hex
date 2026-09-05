@@ -8,13 +8,22 @@ import { EMPTY_STATS } from '../score';
 import { makeUnit } from '../units';
 import { Tribe } from '../tribes';
 
-export const TUTORIAL_RADIUS = 4;
+export const TUTORIAL_RADIUS = 5;
 export const TUTORIAL_CAPITAL = { q: 0, r: 0 };
+export const TUTORIAL_PORT_TILE = { q: 1, r: 0 };
 export const TUTORIAL_START_WARRIOR_ID = 'tutor-warrior';
 export const TUTORIAL_ENEMY_WARRIOR_ID = 'tutor-enemy-warrior';
-export const TUTORIAL_ENEMY_PREFERRED = { q: 2, r: 1 };
+export const TUTORIAL_ENEMY_SHIP_ID = 'tutor-enemy-ship';
+export const TUTORIAL_ARCHER_ENEMY_PREFERRED = { q: -3, r: 1 };
+export const TUTORIAL_SHIP_ENEMY_PREFERRED = { q: 4, r: 0 };
+// Temporary alias for the director during the migration; Task 3 switches the
+// director to TUTORIAL_ARCHER_ENEMY_PREFERRED and removes this line.
+export const TUTORIAL_ENEMY_PREFERRED = TUTORIAL_ARCHER_ENEMY_PREFERRED;
 export const TUTORIAL_HUMAN = 0;
 export const TUTORIAL_ENEMY_PLAYER = 1;
+export const TUTORIAL_WATER_TILES: { q: number; r: number }[] = [
+  { q: 1, r: 0 }, { q: 2, r: 0 }, { q: 3, r: 0 }, { q: 4, r: 0 }, { q: 4, r: -1 },
+];
 
 function grassTile(q: number, r: number): MapTile {
   return {
@@ -56,11 +65,19 @@ export function buildTutorialMap(): GameMap {
   // Mine tile: mountain at (2,-2) (claim radius 2 once upgraded).
   tileMap.get(axialKey({ q: 2, r: -2 }))!.terrain = TileType.GrasslandMountain;
 
-  // Cosmetic terrain variety on outer (distance 3) tiles, away from every tile
-  // the tutorial uses: movement, buildings, and the scripted enemy placement.
+  // East sea: water right next to the capital, open water stretching east.
+  for (const w of TUTORIAL_WATER_TILES) {
+    const tile = tileMap.get(axialKey(w));
+    if (tile) {
+      tile.terrain = TileType.Water;
+      tile.height = 0;
+    }
+  }
+
+  // Cosmetic terrain variety on outer tiles, away from every tile the
+  // tutorial uses: movement, buildings, the sea, and the scripted enemies.
   const variety: { q: number; r: number; terrain: TileType }[] = [
     { q: 0, r: 3, terrain: TileType.DesertLand },
-    { q: 3, r: 0, terrain: TileType.TundraLand },
     { q: 1, r: 2, terrain: TileType.TaigaLand },
     { q: -3, r: 1, terrain: TileType.RainforestLand },
     { q: -1, r: 3, terrain: TileType.RainforestForest },
@@ -90,7 +107,7 @@ export function buildTutorialPlayers(): Player[] {
     tribe: Tribe.Villagers,
     isHuman: true,
     name: 'You',
-    resources: { money: 70, wood: 20, stone: 20, ore: 5 },
+    resources: { money: 250, wood: 60, stone: 60, ore: 30 },
     score: 0,
     kills: 0,
     skills: [],
