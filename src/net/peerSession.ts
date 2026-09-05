@@ -57,6 +57,65 @@ export function hostPeerId(code: string): string {
   return HOST_PREFIX + code;
 }
 
+const STUN_SERVERS: RTCIceServer[] = [
+  { urls: 'stun:stun.l.google.com:19302' },
+  { urls: 'stun:stun1.l.google.com:19302' },
+];
+const METERED_CREDENTIALS_URL = 'https://swypse-hex.metered.live/api/v1/turn/credentials';
+const METERED_API_KEY = 'd468f3bc240e173eb3d8367ceadd11fd5e86';
+
+let iceServersPromise: Promise<RTCIceServer[]> | null = null;
+
+export function fallbackIceServers(): RTCIceServer[] {
+  return STUN_SERVERS.map((s) => ({ ...s }));
+}
+
+export function meteredTurnCredentialsUrl(): string {
+  return `${METERED_CREDENTIALS_URL}?apiKey=${encodeURIComponent(METERED_API_KEY)}`;
+}
+
+function asIceServers(data: unknown): RTCIceServer[] | null {
+  const list =
+    Array.isArray(data)
+      ? data
+      : data !== null && typeof data === 'object'
+        ? (data as { iceServers?: unknown }).iceServers
+        : undefined;
+  if (!Array.isArray(list)) return null;
+  const valid = list.filter(
+    (s): s is RTCIceServer =>
+      s !== null &&
+      typeof s === 'object' &&
+      (typeof (s as { urls?: unknown }).urls === 'string' || Array.isArray((s as { urls?: unknown }).urls)),
+  );
+  return valid.length > 0 ? valid : null;
+}
+
+function loadIceServers(): Promise<RTCIceServer[]> {
+  if (typeof RTCPeerConnection === 'undefined') return Promise.resolve(fallbackIceServers());
+  if (!iceServersPromise) {
+    iceServersPromise = (async () => {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 5000);
+      try {
+        const res = await fetch(meteredTurnCredentialsUrl(), { signal: controller.signal });
+        if (!res.ok) return fallbackIceServers();
+        return asIceServers(await res.json()) ?? fallbackIceServers();
+      } catch {
+        iceServersPromise = null;
+        return fallbackIceServers();
+      } finally {
+        clearTimeout(timer);
+      }
+    })();
+  }
+  return iceServersPromise;
+}
+
+export function buildPeerConfig(iceServers: RTCIceServer[]): RTCConfiguration {
+  return { iceServers };
+}
+
 export interface HostSessionEvents {
   onOpen: (peerId: string, conn: DataConnection) => void;
   onData: (peerId: string, msg: ClientMessage) => void;
@@ -66,11 +125,19 @@ export interface HostSessionEvents {
 export class HostSession {
   private peer: Peer | null = null;
   private conns = new Map<string, DataConnection>();
+  private started = false;
 
   constructor(private events: HostSessionEvents) {}
 
   open(code: string): void {
-    this.peer = new Peer(hostPeerId(code), { debug: 1 });
+    void this.start(hostPeerId(code));
+  }
+
+  private async start(peerId: string): Promise<void> {
+    const iceServers = await loadIceServers();
+    if (this.started) return;
+    this.started = true;
+    this.peer = new Peer(peerId, { debug: 1, config: buildPeerConfig(iceServers) });
     this.peer.on('connection', (conn) => this.attach(conn));
   }
 
@@ -121,6 +188,7 @@ export class ClientSession {
   private peer: Peer | null = null;
   private conn: DataConnection | null = null;
   private peerId: string | null = null;
+  private started = false;
 
   constructor(private events: ClientSessionEvents) {}
 
@@ -130,7 +198,14 @@ export class ClientSession {
 
   join(code: string, name: string): void {
     this.peerId = generateClientId();
-    this.peer = new Peer(this.peerId, { debug: 1 });
+    void this.start(code, name);
+  }
+
+  private async start(code: string, name: string): Promise<void> {
+    const iceServers = await loadIceServers();
+    if (!this.peerId || this.started) return;
+    this.started = true;
+    this.peer = new Peer(this.peerId, { debug: 1, config: buildPeerConfig(iceServers) });
     this.peer.on('open', () => {
       if (!this.peer) return;
       const conn = this.peer.connect(hostPeerId(code), { reliable: true });
