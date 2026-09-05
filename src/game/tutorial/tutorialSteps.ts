@@ -1,5 +1,5 @@
 import type { SkillId } from '../skills';
-import { TUTORIAL_CAPITAL } from './tutorialMap';
+import { TUTORIAL_CAPITAL, TUTORIAL_PORT_TILE } from './tutorialMap';
 
 export type TutorialStepId =
   | 'welcome'
@@ -13,6 +13,12 @@ export type TutorialStepId =
   | 'buildMine'
   | 'spawnArcher'
   | 'attackEnemy'
+  | 'upgradeVillage3'
+  | 'openWaterNavigation'
+  | 'buildPort'
+  | 'boardShip'
+  | 'upgradeShip'
+  | 'attackEnemyShip'
   | 'end';
 
 export interface TutorialStepDef {
@@ -43,10 +49,17 @@ export const STEP_ORDER: TutorialStepId[] = [
   'buildMine',
   'spawnArcher',
   'attackEnemy',
+  'upgradeVillage3',
+  'openWaterNavigation',
+  'buildPort',
+  'boardShip',
+  'upgradeShip',
+  'attackEnemyShip',
   'end',
 ];
 
 const CAPITAL = { ...TUTORIAL_CAPITAL };
+const PORT_TILE = { ...TUTORIAL_PORT_TILE };
 
 export const STEP_CONFIG: Record<TutorialStepId, TutorialStepDef> = {
   welcome: {
@@ -173,6 +186,75 @@ export const STEP_CONFIG: Record<TutorialStepId, TutorialStepDef> = {
     dialog: false,
     buttonLabel: '',
   },
+  upgradeVillage3: {
+    id: 'upgradeVillage3',
+    heading: 'Upgrade your village again',
+    text: 'Your village is at its building limit. Select it and press the pulsing Upgrade button (4 wood + 2 stone + 4 money) to reach level 3 and make room for a port.',
+    markers: [CAPITAL],
+    highlightSkills: [],
+    highlightEndTurn: false,
+    pulseSkillsButton: false,
+    toolbarKey: 'upgrade',
+    dialog: false,
+    buttonLabel: '',
+  },
+  openWaterNavigation: {
+    id: 'openWaterNavigation',
+    heading: 'Open the Water and Navigation skills',
+    text: 'You need Water, then Navigation, to build a port and sail. Open the skill tree and research both — the nodes are highlighted.',
+    markers: [],
+    highlightSkills: ['water', 'navigation'],
+    highlightEndTurn: false,
+    pulseSkillsButton: true,
+    dialog: false,
+    buttonLabel: '',
+  },
+  buildPort: {
+    id: 'buildPort',
+    heading: 'Build a port',
+    text: 'Select the highlighted water tile next to your village and press the pulsing Build port button (10 wood + 30 money + 2 ore).',
+    markers: [PORT_TILE],
+    highlightSkills: [],
+    highlightEndTurn: false,
+    pulseSkillsButton: false,
+    toolbarKey: 'port',
+    dialog: false,
+    buttonLabel: '',
+  },
+  boardShip: {
+    id: 'boardShip',
+    heading: 'Turn a unit into a ship',
+    text: 'Move your Warrior onto the port to turn it into a ship. Ships sail on water and can move then attack in the same turn.',
+    markers: [PORT_TILE],
+    highlightSkills: [],
+    highlightEndTurn: false,
+    pulseSkillsButton: false,
+    dialog: false,
+    buttonLabel: '',
+  },
+  upgradeShip: {
+    id: 'upgradeShip',
+    heading: 'Upgrade your ship',
+    text: 'Select your ship and press the pulsing Upgrade Ship button (8 money + 4 wood). Level-2 ships move farther.',
+    markers: [],
+    highlightSkills: [],
+    highlightEndTurn: false,
+    pulseSkillsButton: false,
+    toolbarKey: 'upgrade-ship',
+    dialog: false,
+    buttonLabel: '',
+  },
+  attackEnemyShip: {
+    id: 'attackEnemyShip',
+    heading: 'Sail and attack the enemy ship',
+    text: 'An enemy ship appeared on the sea. If your ship cannot act yet, end your turn. Then sail within range and click the enemy ship to attack — it will not move.',
+    markers: [],
+    highlightSkills: [],
+    highlightEndTurn: false,
+    pulseSkillsButton: false,
+    dialog: false,
+    buttonLabel: '',
+  },
   end: {
     id: 'end',
     heading: 'Basic tutorial complete',
@@ -187,7 +269,7 @@ export const STEP_CONFIG: Record<TutorialStepId, TutorialStepDef> = {
 };
 
 export function skillPulseStep(step: TutorialStepId | null): boolean {
-  return step === 'openForestry' || step === 'openClimbingSmithery';
+  return step === 'openForestry' || step === 'openClimbingSmithery' || step === 'openWaterNavigation';
 }
 
 /** "[N/M]" counter where N is the 1-based step index and M is the total

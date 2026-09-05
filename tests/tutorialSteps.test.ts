@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { SKILLS } from '../src/game/skills';
-import { buildTutorialMap } from '../src/game/tutorial/tutorialMap';
+import { buildTutorialMap, TUTORIAL_RADIUS } from '../src/game/tutorial/tutorialMap';
 import { STEP_ORDER, STEP_CONFIG, skillPulseStep, stepCounter, type TutorialStepDef } from '../src/game/tutorial/tutorialSteps';
 
 const markerExists = (map: ReturnType<typeof buildTutorialMap>, m: { q: number; r: number }): boolean =>
@@ -11,6 +11,25 @@ describe('tutorial steps', () => {
     expect(STEP_ORDER[0]).toBe('welcome');
     expect(STEP_ORDER[STEP_ORDER.length - 1]).toBe('end');
     expect(new Set(STEP_ORDER).size).toBe(STEP_ORDER.length);
+  });
+
+  it('orders all steps from welcome to end and includes the naval segment', () => {
+    expect(STEP_ORDER[0]).toBe('welcome');
+    expect(STEP_ORDER[STEP_ORDER.length - 1]).toBe('end');
+    expect(new Set(STEP_ORDER).size).toBe(STEP_ORDER.length);
+    const naval = ['upgradeVillage3', 'openWaterNavigation', 'buildPort', 'boardShip', 'upgradeShip', 'attackEnemyShip'];
+    for (const id of naval) expect(STEP_ORDER).toContain(id);
+    // Naval steps sit between the archer attack and the end.
+    expect(STEP_ORDER.indexOf('attackEnemy')).toBeLessThan(STEP_ORDER.indexOf('upgradeVillage3'));
+    expect(STEP_ORDER.indexOf('attackEnemyShip')).toBeLessThan(STEP_ORDER.indexOf('end'));
+  });
+
+  it('configures the naval steps with toolbar keys and skill highlights', () => {
+    expect(STEP_CONFIG.upgradeVillage3.toolbarKey).toBe('upgrade');
+    expect(STEP_CONFIG.buildPort.toolbarKey).toBe('port');
+    expect(STEP_CONFIG.upgradeShip.toolbarKey).toBe('upgrade-ship');
+    expect(STEP_CONFIG.openWaterNavigation.highlightSkills).toEqual(['water', 'navigation']);
+    expect(STEP_CONFIG.boardShip.markers).toEqual([{ q: 1, r: 0 }]);
   });
 
   it('gives every step a config with heading, body text and a button label', () => {
@@ -46,17 +65,18 @@ describe('tutorial steps', () => {
   it('drives the skills-button pulse from the skill steps only', () => {
     expect(skillPulseStep('openForestry')).toBe(true);
     expect(skillPulseStep('openClimbingSmithery')).toBe(true);
+    expect(skillPulseStep('openWaterNavigation')).toBe(true);
     for (const id of STEP_ORDER) {
-      if (id !== 'openForestry' && id !== 'openClimbingSmithery') {
+      if (id !== 'openForestry' && id !== 'openClimbingSmithery' && id !== 'openWaterNavigation') {
         expect(skillPulseStep(id)).toBe(false);
       }
     }
   });
 
-  it('keeps tutorial marker coords inside a radius-4 disc', () => {
+  it('keeps tutorial marker coords inside the map disc', () => {
     for (const id of STEP_ORDER) {
       for (const m of STEP_CONFIG[id].markers) {
-        expect(Math.max(Math.abs(m.q), Math.abs(m.r), Math.abs(m.q + m.r))).toBeLessThanOrEqual(4);
+        expect(Math.max(Math.abs(m.q), Math.abs(m.r), Math.abs(m.q + m.r))).toBeLessThanOrEqual(TUTORIAL_RADIUS);
       }
     }
   });
