@@ -70,6 +70,7 @@ const SKILL_ICON_FILES: Partial<Record<SkillId, string>> = {
   geology: 'ore-increase.png',
   water: 'build-port.png',
   waterTemples: 'water-temple.png',
+  navigation: 'ship.png',
   forestry: 'build-sawmill.png',
   forestTemple: 'forest-temple.png',
   science: 'miss-decrease.png',
@@ -240,22 +241,20 @@ export class SkillTree {
 
       const RADIUS = 28;
       const iconFile = SKILL_ICON_FILES[id];
-      const hasIcon = iconFile !== undefined;
-      // White medallion for skill icons; plain colored circle as a fallback
-      // when no icon texture is mapped (e.g. navigation).
+      // Skill nodes show their texture inside a colored circle: grey (535353)
+      // when unopened, blue (5198FF) once opened. Nodes without a mapped icon
+      // texture are just the colored circle.
       const bg = new Graphics();
       bg.circle(pos.x, pos.y, RADIUS)
-        .fill(hasIcon ? 0xffffff : opened ? 0xff8c00 : 0x555555)
-        .stroke({ width: opened ? 5 : 2, color: opened ? 0xff8c00 : 0x333333 });
+        .fill(opened ? 0x5198ff : 0x535353)
+        .stroke({ width: opened ? 5 : 2, color: opened ? 0x5198ff : 0x333333 });
       node.addChild(bg);
 
       if (iconFile) {
-        const clip = new Graphics();
-        clip.circle(pos.x, pos.y, RADIUS - 1).fill(0xffffff);
-        const icon = makeIcon(iconFile, (RADIUS - 1) * 2);
+        const icon = makeIcon(iconFile, RADIUS * 2);
         icon.position.set(pos.x, pos.y);
-        icon.mask = clip;
-        node.addChild(clip, icon);
+        icon.mask = bg;
+        node.addChild(icon);
       }
 
       // Price / check badge pinned to the top-right edge of the node circle.
