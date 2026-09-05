@@ -8,6 +8,7 @@ import { useGameStore } from '../../store/gameStore';
 import { type UIHost } from '../host';
 import { Button } from '../kit/button';
 import { makeLabel } from '../kit/label';
+import { makeIcon } from '../kit/icon';
 import { HudMoney } from '../hud/HudMoney';
 
 const RING_SPACING = 110;
@@ -61,6 +62,25 @@ export function skillLayout(): Record<SkillId, SkillNodeLayout> {
 }
 
 const POS = skillLayout();
+
+const SKILL_ICON_FILES: Partial<Record<SkillId, string>> = {
+  climbing: 'mountain.png',
+  smithery: 'build-mine.png',
+  swordsman: 'sword.png',
+  geology: 'ore-increase.png',
+  water: 'build-port.png',
+  waterTemples: 'water-temple.png',
+  forestry: 'build-sawmill.png',
+  forestTemple: 'forest-temple.png',
+  science: 'miss-decrease.png',
+  roads: 'build-road.png',
+  shields: 'shield.png',
+  defense: 'shield.png',
+  catapult: 'catapult.png',
+  riding: 'horse.png',
+  bridges: 'build-bridge.png',
+  knights: 'knight.png',
+};
 
 export class SkillTree {
   private el: Container | null = null;
@@ -217,13 +237,43 @@ export class SkillTree {
         this.selected = id;
         this.build();
       });
-      const circle = new Graphics();
-      circle.circle(pos.x, pos.y, 28).fill(opened ? 0xff8c00 : 0x555555).stroke({ width: opened ? 5 : 2, color: opened ? 0xff8c00 : 0x333333 });
-      node.addChild(circle);
-      const l = makeLabel(opened ? '\u2713' : String(skillCost(id, human.skills.length)), { fontSize: 12, fill: 0xffffff });
-      l.anchor.set(0.5, 0.5);
-      l.position.set(pos.x, pos.y);
-      node.addChild(l);
+
+      const RADIUS = 28;
+      const iconFile = SKILL_ICON_FILES[id];
+      const hasIcon = iconFile !== undefined;
+      // White medallion for skill icons; plain colored circle as a fallback
+      // when no icon texture is mapped (e.g. navigation).
+      const bg = new Graphics();
+      bg.circle(pos.x, pos.y, RADIUS)
+        .fill(hasIcon ? 0xffffff : opened ? 0xff8c00 : 0x555555)
+        .stroke({ width: opened ? 5 : 2, color: opened ? 0xff8c00 : 0x333333 });
+      node.addChild(bg);
+
+      if (iconFile) {
+        const clip = new Graphics();
+        clip.circle(pos.x, pos.y, RADIUS - 1).fill(0xffffff);
+        const icon = makeIcon(iconFile, (RADIUS - 1) * 2);
+        icon.position.set(pos.x, pos.y);
+        icon.mask = clip;
+        node.addChild(clip, icon);
+      }
+
+      // Price / check badge pinned to the top-right edge of the node circle.
+      const badgeCX = pos.x + RADIUS * 0.78;
+      const badgeCY = pos.y - RADIUS * 0.78;
+      const badgeR = 12;
+      const badge = new Graphics();
+      badge.circle(badgeCX, badgeCY, badgeR).fill(0xff8c00).stroke({ width: 2, color: 0xffffff });
+      node.addChild(badge);
+      const badgeText = makeLabel(opened ? '\u2713' : String(skillCost(id, human.skills.length)), {
+        fontSize: 11,
+        fill: 0xffffff,
+        fontWeight: '800',
+      });
+      badgeText.anchor.set(0.5, 0.5);
+      badgeText.position.set(badgeCX, badgeCY);
+      node.addChild(badgeText);
+
       const name = makeLabel(SKILLS[id].name, { fontSize: 13, fill: 0xeeeeee });
       name.anchor.set(0.5, 0.5);
       name.position.set(pos.x, pos.y + 50);
