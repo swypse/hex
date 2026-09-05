@@ -123,15 +123,18 @@ export class HudSelected implements Widget {
 
     const actions = this.suggestedSkillActions(tile, human);
 
+    const highlightBuildingsLine = s.tutorial && s.tutorialStep === 'upgradeVillage3';
+
     let maxW = 0;
     const lineH = 18;
     let y = 8;
     const lineWidths: number[] = [];
     for (let i = 0; i < lines.length; i++) {
+      const highlight = highlightBuildingsLine && i === buildingLimitLineIndex;
       const t = makeLabel(lines[i]!, {
         fontSize: 13,
-        fill: darkText ? 0x111111 : 0xeeeeee,
-        fontWeight: bolds[i]! ? '700' : undefined
+        fill: highlight ? 0xffd700 : darkText ? 0x111111 : 0xeeeeee,
+        fontWeight: highlight || bolds[i]! ? '700' : undefined
       });
       t.position.set(10, y);
       this.el.addChild(t);

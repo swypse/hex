@@ -80,6 +80,8 @@ describe('HudSelected village building constraints', () => {
       players,
       localPlayerIndex: 0,
       selection: { kind: 'village', q: 0, r: 0 },
+      tutorial: false,
+      tutorialStep: null,
     });
     hud = new HudSelected();
     hud.mount(makeHost(), new Container());
@@ -139,4 +141,36 @@ describe('HudSelected village building constraints', () => {
     mount(1, 1, null);
     expect(helpButtons()).toBe(1);
   });
+
+  it('highlights the Buildings line in gold during the upgradeVillage3 step', () => {
+    mount(2, 2, 0);
+    const st = useGameStore.getState();
+    st.setTutorial(true);
+    st.setTutorialStep('upgradeVillage3');
+    const gold = findText((hud as unknown as { el: Container }).el!, 'Buildings:');
+    expect(gold).toBeDefined();
+    expect(gold!.style.fill).toBe(0xffd700);
+  });
+
+  it('does not highlight the Buildings line during other tutorial steps', () => {
+    mount(2, 2, 0);
+    const st = useGameStore.getState();
+    st.setTutorial(true);
+    st.setTutorialStep('buildPort');
+    const text = findText((hud as unknown as { el: Container }).el!, 'Buildings:');
+    expect(text).toBeDefined();
+    expect(text!.style.fill).not.toBe(0xffd700);
+  });
 });
+
+function findText(root: Container, prefix: string): Text | undefined {
+  for (const ch of root.children) {
+    if (ch instanceof Text) {
+      if ((ch as Text).text.startsWith(prefix)) return ch as Text;
+    } else if (ch instanceof Container) {
+      const found = findText(ch as Container, prefix);
+      if (found) return found;
+    }
+  }
+  return undefined;
+}
