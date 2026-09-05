@@ -1,143 +1,213 @@
 import { describe, expect, it } from 'vitest';
 import { Simulator } from '../src/game/simulator';
-import { buildTutorialMap, buildTutorialPlayers, TUTORIAL_CAPITAL } from '../src/game/tutorial/tutorialMap';
+import {
+  buildTutorialMap, buildTutorialPlayers, TUTORIAL_PORT_TILE,
+  TUTORIAL_ENEMY_SHIP_ID, TUTORIAL_HUMAN, TUTORIAL_ENEMY_PLAYER,
+} from '../src/game/tutorial/tutorialMap';
 import { TutorialDirector, type TutorialHost } from '../src/controller/tutorialDirector';
 import { tileAt } from '../src/game/selection';
 import { hexDistance } from '../src/game/hex';
+import { isWaterType } from '../src/game/tileTypes';
+import { makeUnit } from '../src/game/units';
 
 function makeSim(): Simulator {
-  const sim = new Simulator(buildTutorialMap(), buildTutorialPlayers(), 'turns30', {
-    rng: () => 0.99,
-  });
+  const sim = new Simulator(buildTutorialMap(), buildTutorialPlayers(), 'turns30', { rng: () => 0.99 });
   sim.startGame();
   sim.drainEvents();
   return sim;
 }
 
-function makeDirector(sim: Simulator): { dir: TutorialDirector; host: TutorialHost } {
+function makeDirector(sim: Simulator): TutorialDirector {
   const host: TutorialHost = { sim: () => sim };
-  return { dir: new TutorialDirector(host), host };
+  return new TutorialDirector(host);
 }
 
-function run(sim: Simulator, dir: TutorialDirector, cmd: Parameters<Simulator['applyCommand']>[0]): boolean {
+function run(sim: Simulator, dir: TutorialDirector, cmd: Parameters<Simulator['applyCommand']>[0]): void {
   sim.applyCommand(cmd);
-  return dir.afterCommand(sim.drainEvents());
+  dir.afterCommand(sim.drainEvents());
+}
+
+function warriorUnit(sim: Simulator) {
+  return sim.map.tiles.find((t) => t.unit?.id === 'tutor-warrior')!.unit!;
+}
+
+function archerUnit(sim: Simulator) {
+  return sim.map.tiles.find((t) => t.unit?.type === 'archer')!.unit!;
+}
+
+function ownShipTile(sim: Simulator) {
+  return sim.map.tiles.find((t) => t.unit && t.unit.owner === TUTORIAL_HUMAN && t.unit.shipLevel !== undefined)!;
+}
+
+function dummyTile(sim: Simulator) {
+  return sim.map.tiles.find((t) => t.unit?.owner === TUTORIAL_ENEMY_PLAYER)!;
+}
+
+/** Drives the land + archer segment. Ends on the `upgradeVillage3` step. */
+function playToNavalStart(sim: Simulator, dir: TutorialDirector): void {
+  expect(dir.currentStep()).toBe('moveUnit');
+  run(sim, dir, { type: 'move', unitId: warriorUnit(sim).id, q: 1, r: -1 });
+  expect(dir.currentStep()).toBe('upgradeVillage');
+  run(sim, dir, { type: 'upgradeVillage', q: 0, r: 0 });
+  expect(dir.currentStep()).toBe('openForestry');
+  run(sim, dir, { type: 'openSkill', skill: 'forestry' });
+  expect(dir.currentStep()).toBe('endTurn1');
+  run(sim, dir, { type: 'endTurn' });
+  expect(dir.currentStep()).toBe('endTurn2');
+  run(sim, dir, { type: 'endTurn' });
+  expect(dir.currentStep()).toBe('buildSawmill');
+  run(sim, dir, { type: 'build', q: 0, r: 1, kind: 'sawmill' });
+  expect(dir.currentStep()).toBe('openClimbingSmithery');
+  run(sim, dir, { type: 'openSkill', skill: 'climbing' });
+  run(sim, dir, { type: 'openSkill', skill: 'smithery' });
+  expect(dir.currentStep()).toBe('buildMine');
+  run(sim, dir, { type: 'build', q: 2, r: -2, kind: 'mine' });
+  expect(dir.currentStep()).toBe('spawnArcher');
+  run(sim, dir, { type: 'spawn', q: 0, r: 0, unitType: 'archer' });
+  expect(dir.currentStep()).toBe('attackEnemy');
+
+  // The freshly-spawned archer cannot act until the next turn.
+  run(sim, dir, { type: 'endTurn' });
+  const archer = archerUnit(sim);
+  const enemy = dummyTile(sim);
+  expect(isWaterType(enemy.terrain)).toBe(false); // land warrior lesson
+  const firing = sim.map.tiles.find(
+    (t) => !t.unit && hexDistance(t, enemy) <= 2 && hexDistance(t, archer) <= 1 && !isWaterType(t.terrain),
+  )!;
+  run(sim, dir, { type: 'move', unitId: archer.id, q: firing.q, r: firing.r });
+  run(sim, dir, { type: 'attack', unitId: archerUnit(sim).id, q: enemy.q, r: enemy.r });
+  expect(dir.currentStep()).toBe('upgradeVillage3');
+  expect(sim.map.tiles.some((t) => t.unit?.owner === TUTORIAL_ENEMY_PLAYER)).toBe(false);
+}
+
+/** Opens Water + Navigation and upgrades the village to level 3. */
+function playNavalSkills(sim: Simulator, dir: TutorialDirector): void {
+  expect(dir.currentStep()).toBe('upgradeVillage3');
+  run(sim, dir, { type: 'upgradeVillage', q: 0, r: 0 });
+  expect(dir.currentStep()).toBe('openWaterNavigation');
+  run(sim, dir, { type: 'openSkill', skill: 'water' });
+  expect(dir.currentStep()).toBe('openWaterNavigation');
+  run(sim, dir, { type: 'openSkill', skill: 'navigation' });
+  expect(dir.currentStep()).toBe('buildPort');
 }
 
 describe('TutorialDirector', () => {
-  it('walks the full happy path to the end step', () => {
+  it('walks the full land + naval path to the end step', () => {
     const sim = makeSim();
-    const { dir } = makeDirector(sim);
+    const dir = makeDirector(sim);
     dir.start();
     expect(dir.currentStep()).toBe('welcome');
     dir.welcomeClosed();
-    expect(dir.currentStep()).toBe('moveUnit');
+    playToNavalStart(sim, dir);
+    playNavalSkills(sim, dir);
 
-    const warrior = sim.map.tiles.find((t) => t.unit?.id === 'tutor-warrior')!.unit!;
-    run(sim, dir, { type: 'move', unitId: warrior.id, q: 1, r: -1 });
-    expect(dir.currentStep()).toBe('upgradeVillage');
+    const port = tileAt(sim.map, TUTORIAL_PORT_TILE.q, TUTORIAL_PORT_TILE.r)!;
+    expect(port.unit).toBeNull();
+    run(sim, dir, { type: 'build', q: TUTORIAL_PORT_TILE.q, r: TUTORIAL_PORT_TILE.r, kind: 'port' });
+    expect(dir.currentStep()).toBe('boardShip');
 
-    run(sim, dir, { type: 'upgradeVillage', q: 0, r: 0 });
-    expect(dir.currentStep()).toBe('openForestry');
+    // Warrior is staged on a land tile adjacent to the port.
+    const warrior = sim.map.tiles.find((t) => t.unit?.id === 'tutor-warrior')!;
+    expect(isWaterType(warrior.terrain)).toBe(false);
+    expect(hexDistance(warrior, port)).toBe(1);
+    expect(port.unit).toBeNull();
 
-    run(sim, dir, { type: 'openSkill', skill: 'forestry' });
-    expect(dir.currentStep()).toBe('endTurn1');
+    run(sim, dir, { type: 'move', unitId: warrior.unit!.id, q: TUTORIAL_PORT_TILE.q, r: TUTORIAL_PORT_TILE.r });
+    expect(dir.currentStep()).toBe('upgradeShip');
 
+    const ship = ownShipTile(sim);
+    expect(ship.unit!.shipLevel).toBe(1);
+    // Upgrading is allowed the same turn the ship formed.
+    run(sim, dir, { type: 'upgradeShip', unitId: ship.unit!.id });
+    expect(dir.currentStep()).toBe('attackEnemyShip');
+
+    const enemyShip = sim.map.tiles.find((t) => t.unit?.id === TUTORIAL_ENEMY_SHIP_ID)!;
+    expect(isWaterType(enemyShip.terrain)).toBe(true);
+    expect(hexDistance(enemyShip, ship)).toBe(3);
+
+    // Freshly converted ship cannot act until next turn.
     run(sim, dir, { type: 'endTurn' });
-    expect(dir.currentStep()).toBe('endTurn2');
+    expect(dir.currentStep()).toBe('attackEnemyShip');
 
-    run(sim, dir, { type: 'endTurn' });
-    expect(dir.currentStep()).toBe('buildSawmill');
-
-    run(sim, dir, { type: 'build', q: 0, r: 1, kind: 'sawmill' });
-    expect(dir.currentStep()).toBe('openClimbingSmithery');
-
-    run(sim, dir, { type: 'openSkill', skill: 'climbing' });
-    expect(dir.currentStep()).toBe('openClimbingSmithery');
-    run(sim, dir, { type: 'openSkill', skill: 'smithery' });
-    expect(dir.currentStep()).toBe('buildMine');
-
-    run(sim, dir, { type: 'build', q: 2, r: -2, kind: 'mine' });
-    expect(dir.currentStep()).toBe('spawnArcher');
-
-    const cap = tileAt(sim.map, TUTORIAL_CAPITAL.q, TUTORIAL_CAPITAL.r)!;
-    expect(cap.unit).toBeNull();
-    run(sim, dir, { type: 'spawn', q: 0, r: 0, unitType: 'archer' });
-    expect(dir.currentStep()).toBe('attackEnemy');
-
-    // Enemy placed at distance 3 from the archer (on the capital).
-    const enemy = sim.map.tiles.find((t) => t.unit?.id === 'tutor-enemy-warrior')!;
-    expect(hexDistance(enemy, cap)).toBe(3);
-
-    // Archer cannot act until next turn.
-    run(sim, dir, { type: 'endTurn' });
-    expect(dir.currentStep()).toBe('attackEnemy');
-
-    const archer = sim.map.tiles.find((t) => t.unit?.type === 'archer')!.unit!;
-    run(sim, dir, { type: 'move', unitId: archer.id, q: 1, r: 0 });
-    run(sim, dir, { type: 'attack', unitId: archer.id, q: 2, r: 1 });
+    const s2 = ownShipTile(sim);
+    const firingWater = sim.map.tiles.find(
+      (t) => !t.unit && isWaterType(t.terrain) && hexDistance(t, s2) <= 3 && hexDistance(t, enemyShip) <= 2,
+    )!;
+    run(sim, dir, { type: 'move', unitId: s2.unit!.id, q: firingWater.q, r: firingWater.r });
+    run(sim, dir, { type: 'attack', unitId: ownShipTile(sim).unit!.id, q: enemyShip.q, r: enemyShip.r });
     expect(dir.currentStep()).toBe('end');
+    expect(sim.map.tiles.some((t) => t.unit?.owner === TUTORIAL_ENEMY_PLAYER)).toBe(false);
+  });
 
-    // Enemy removed by the director.
-    expect(sim.map.tiles.some((t) => t.unit?.id === 'tutor-enemy-warrior')).toBe(false);
+  it('repositions the Warrior next to the port before boarding', () => {
+    const sim = makeSim();
+    const dir = makeDirector(sim);
+    dir.start();
+    dir.welcomeClosed();
+    playToNavalStart(sim, dir);
+    playNavalSkills(sim, dir);
+
+    // Teleport the Warrior far away, then build the port; entering boardShip
+    // must move the Warrior onto a free land tile adjacent to the port.
+    const wTile = sim.map.tiles.find((t) => t.unit?.id === 'tutor-warrior')!;
+    const wUnit = wTile.unit!;
+    const far = tileAt(sim.map, -4, 0)!;
+    expect(far.unit).toBeNull();
+    wTile.unit = null;
+    far.unit = wUnit;
+    wUnit.q = far.q;
+    wUnit.r = far.r;
+
+    const portTile = tileAt(sim.map, TUTORIAL_PORT_TILE.q, TUTORIAL_PORT_TILE.r)!;
+    run(sim, dir, { type: 'build', q: TUTORIAL_PORT_TILE.q, r: TUTORIAL_PORT_TILE.r, kind: 'port' });
+    expect(dir.currentStep()).toBe('boardShip');
+
+    const after = sim.map.tiles.find((t) => t.unit?.id === 'tutor-warrior')!;
+    expect(isWaterType(after.terrain)).toBe(false);
+    expect(hexDistance(after, portTile)).toBe(1);
+  });
+
+  it('places the enemy ship elsewhere when the preferred water tile is occupied', () => {
+    const sim = makeSim();
+    const dir = makeDirector(sim);
+    dir.start();
+    dir.welcomeClosed();
+    playToNavalStart(sim, dir);
+    playNavalSkills(sim, dir);
+
+    const portTile = tileAt(sim.map, TUTORIAL_PORT_TILE.q, TUTORIAL_PORT_TILE.r)!;
+    run(sim, dir, { type: 'build', q: TUTORIAL_PORT_TILE.q, r: TUTORIAL_PORT_TILE.r, kind: 'port' });
+    const warrior = sim.map.tiles.find((t) => t.unit?.id === 'tutor-warrior')!;
+    run(sim, dir, { type: 'move', unitId: warrior.unit!.id, q: TUTORIAL_PORT_TILE.q, r: TUTORIAL_PORT_TILE.r });
+    const ship = ownShipTile(sim);
+    // Occupy the preferred enemy tile (4,0) so the director must fall back.
+    const blockerTile = tileAt(sim.map, 4, 0)!;
+    blockerTile.unit = makeUnit(TUTORIAL_ENEMY_PLAYER, 'warrior', 4, 0, { id: 'blocker', shipLevel: 1, spawnVillage: null });
+
+    run(sim, dir, { type: 'upgradeShip', unitId: ship.unit!.id });
+    expect(dir.currentStep()).toBe('attackEnemyShip');
+    const enemyShip = sim.map.tiles.find((t) => t.unit?.id === TUTORIAL_ENEMY_SHIP_ID)!;
+    expect(enemyShip.q === 4 && enemyShip.r === 0).toBe(false);
+    expect(isWaterType(enemyShip.terrain)).toBe(true);
+    expect(hexDistance(enemyShip, ship)).toBe(3);
   });
 
   it('skips steps whose objective is already satisfied', () => {
     const sim = makeSim();
-    const { dir } = makeDirector(sim);
+    const dir = makeDirector(sim);
     dir.start();
     dir.welcomeClosed();
-    const human = sim.players[0]!;
-    human.resources = { money: 70, wood: 20, stone: 20, ore: 5 };
-    human.skills.push('forestry', 'climbing', 'smithery');
-
-    const warrior = sim.map.tiles.find((t) => t.unit?.id === 'tutor-warrior')!.unit!;
-    run(sim, dir, { type: 'move', unitId: warrior.id, q: 1, r: -1 });
-    expect(dir.currentStep()).toBe('upgradeVillage');
-
-    // Upgrading completes upgradeVillage and, because Forestry is already open,
-    // the director must skip straight past openForestry to endTurn1.
+    const human = sim.players[TUTORIAL_HUMAN]!;
+    human.skills.push('forestry', 'climbing', 'smithery', 'water', 'navigation');
+    run(sim, dir, { type: 'move', unitId: warriorUnit(sim).id, q: 1, r: -1 });
     run(sim, dir, { type: 'upgradeVillage', q: 0, r: 0 });
     expect(dir.currentStep()).toBe('endTurn1');
-
     run(sim, dir, { type: 'endTurn' });
-    expect(dir.currentStep()).toBe('endTurn2');
     run(sim, dir, { type: 'endTurn' });
     expect(dir.currentStep()).toBe('buildSawmill');
-    // No sawmill yet -> an empty event batch changes nothing.
     expect(dir.afterCommand([])).toBe(false);
     expect(dir.currentStep()).toBe('buildSawmill');
-
-    // Building the sawmill skips openClimbingSmithery (already open) and stops
-    // at buildMine (mine not built yet).
     run(sim, dir, { type: 'build', q: 0, r: 1, kind: 'sawmill' });
-    expect(dir.currentStep()).toBe('buildMine');
-  });
-
-  it('falls back to another tile when the preferred enemy tile is occupied', () => {
-    const sim = makeSim();
-    const { dir } = makeDirector(sim);
-    dir.start();
-    dir.welcomeClosed();
-    const warrior = sim.map.tiles.find((t) => t.unit?.id === 'tutor-warrior')!.unit!;
-    run(sim, dir, { type: 'move', unitId: warrior.id, q: 1, r: -1 });
-    run(sim, dir, { type: 'upgradeVillage', q: 0, r: 0 });
-    run(sim, dir, { type: 'openSkill', skill: 'forestry' });
-    run(sim, dir, { type: 'endTurn' });
-    run(sim, dir, { type: 'endTurn' });
-    run(sim, dir, { type: 'build', q: 0, r: 1, kind: 'sawmill' });
-    run(sim, dir, { type: 'openSkill', skill: 'climbing' });
-    run(sim, dir, { type: 'openSkill', skill: 'smithery' });
-    run(sim, dir, { type: 'build', q: 2, r: -2, kind: 'mine' });
-    // Park a unit on the preferred enemy tile (2,1).
-    const cap = tileAt(sim.map, TUTORIAL_CAPITAL.q, TUTORIAL_CAPITAL.r)!;
-    const blocker = sim.map.tiles.find((t) => t.q === 2 && t.r === 1)!;
-    blocker.unit = { ...warrior, id: 'blocker', q: 2, r: 1 };
-    run(sim, dir, { type: 'spawn', q: 0, r: 0, unitType: 'archer' });
-    expect(dir.currentStep()).toBe('attackEnemy');
-    const enemy = sim.map.tiles.find((t) => t.unit?.id === 'tutor-enemy-warrior');
-    expect(enemy).toBeDefined();
-    expect(enemy!.q === 2 && enemy!.r === 1).toBe(false);
-    expect(hexDistance(enemy!, cap)).toBe(3);
+    expect(dir.currentStep()).toBe('buildMine'); // climbing/smithery already open
   });
 });

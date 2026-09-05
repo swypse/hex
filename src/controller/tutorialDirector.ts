@@ -2,14 +2,15 @@ import type { Simulator } from '../game/simulator';
 import type { GameEvent } from '../game/events';
 import { hexDistance } from '../game/hex';
 import { tileAt } from '../game/selection';
-import { isLandType } from '../game/tileTypes';
+import { isLandType, isWaterType } from '../game/tileTypes';
 import { isExploredFor } from '../game/explore';
 import { hasSkill } from '../game/skills';
 import { makeUnit } from '../game/units';
 import { STEP_ORDER, type TutorialStepId } from '../game/tutorial/tutorialSteps';
 import {
-  TUTORIAL_CAPITAL, TUTORIAL_ENEMY_PLAYER, TUTORIAL_ENEMY_PREFERRED,
-  TUTORIAL_ENEMY_WARRIOR_ID, TUTORIAL_HUMAN, TUTORIAL_START_WARRIOR_ID,
+  TUTORIAL_CAPITAL, TUTORIAL_ENEMY_PLAYER, TUTORIAL_ARCHER_ENEMY_PREFERRED,
+  TUTORIAL_SHIP_ENEMY_PREFERRED, TUTORIAL_ENEMY_SHIP_ID, TUTORIAL_ENEMY_WARRIOR_ID,
+  TUTORIAL_HUMAN, TUTORIAL_PORT_TILE, TUTORIAL_START_WARRIOR_ID,
 } from '../game/tutorial/tutorialMap';
 
 export interface TutorialHost {
@@ -67,7 +68,10 @@ export class TutorialDirector {
   private enterCurrent(): void {
     const step = this.currentStep();
     if (step === 'attackEnemy') this.placeEnemyWarrior();
-    else if (step === 'end') this.removeEnemyWarrior();
+    else if (step === 'upgradeVillage3') this.removeDummyUnits();
+    else if (step === 'boardShip') this.repositionWarriorForBoarding();
+    else if (step === 'attackEnemyShip') this.placeEnemyShip();
+    else if (step === 'end') this.removeDummyUnits();
   }
 
   private done(step: TutorialStepId): boolean {
@@ -105,6 +109,26 @@ export class TutorialDirector {
         );
       case 'attackEnemy':
         return !sim.map.tiles.some((t) => t.unit?.owner === TUTORIAL_ENEMY_PLAYER);
+      case 'upgradeVillage3': {
+        const cap = tileAt(sim.map, TUTORIAL_CAPITAL.q, TUTORIAL_CAPITAL.r);
+        return (cap?.settlement?.level ?? 0) >= 3;
+      }
+      case 'openWaterNavigation':
+        return hasSkill(human, 'water') && hasSkill(human, 'navigation');
+      case 'buildPort':
+        return sim.map.tiles.some(
+          (t) => t.building?.kind === 'port' && t.ownedBy === TUTORIAL_HUMAN,
+        );
+      case 'boardShip':
+        return sim.map.tiles.some(
+          (t) => t.unit && t.unit.owner === TUTORIAL_HUMAN && t.unit.shipLevel !== undefined,
+        );
+      case 'upgradeShip':
+        return sim.map.tiles.some(
+          (t) => t.unit && t.unit.owner === TUTORIAL_HUMAN && (t.unit.shipLevel ?? 0) >= 2,
+        );
+      case 'attackEnemyShip':
+        return !sim.map.tiles.some((t) => t.unit?.owner === TUTORIAL_ENEMY_PLAYER);
       default:
         return false;
     }
@@ -135,12 +159,18 @@ export class TutorialDirector {
         case 'endTurn2':
           if (e.type === 'turnStarted' && e.playerIndex === TUTORIAL_HUMAN) return true;
           break;
-        case 'attackEnemy':
-          if (e.type === 'attack' && e.attackerIndex === TUTORIAL_HUMAN && e.targetIndex === TUTORIAL_ENEMY_PLAYER) {
-            const attacker = sim.map.tiles.find((t) => t.unit?.id === e.attackerId)?.unit;
-            if (attacker?.type === 'archer') return true;
-          }
+        case 'attackEnemy': {
+          if (e.type !== 'attack' || e.attackerIndex !== TUTORIAL_HUMAN || e.targetIndex !== TUTORIAL_ENEMY_PLAYER) break;
+          const attacker = sim.map.tiles.find((t) => t.unit?.id === e.attackerId)?.unit;
+          if (attacker?.type === 'archer') return true;
           break;
+        }
+        case 'attackEnemyShip': {
+          if (e.type !== 'attack' || e.attackerIndex !== TUTORIAL_HUMAN || e.targetIndex !== TUTORIAL_ENEMY_PLAYER) break;
+          const attacker = sim.map.tiles.find((t) => t.unit?.id === e.attackerId)?.unit;
+          if (attacker?.shipLevel !== undefined) return true;
+          break;
+        }
         default:
           break;
       }
@@ -166,7 +196,7 @@ export class TutorialDirector {
       )
       .sort(
         (a, b) =>
-          hexDistance(a, TUTORIAL_ENEMY_PREFERRED) - hexDistance(b, TUTORIAL_ENEMY_PREFERRED),
+          hexDistance(a, TUTORIAL_ARCHER_ENEMY_PREFERRED) - hexDistance(b, TUTORIAL_ARCHER_ENEMY_PREFERRED),
       );
     const spot = candidates[0];
     if (!spot) return;
@@ -176,10 +206,66 @@ export class TutorialDirector {
     });
   }
 
-  private removeEnemyWarrior(): void {
+  private repositionWarriorForBoarding(): void {
     const sim = this.host.sim();
     if (!sim) return;
-    const tile = sim.map.tiles.find((t) => t.unit?.id === TUTORIAL_ENEMY_WARRIOR_ID);
-    if (tile) tile.unit = null;
+    const warrior = sim.map.tiles.find((t) => t.unit?.id === TUTORIAL_START_WARRIOR_ID)?.unit;
+    if (!warrior || warrior.shipLevel !== undefined) return;
+    const currentTile = tileAt(sim.map, warrior.q, warrior.r);
+    const stagingOk =
+      currentTile !== undefined &&
+      !isWaterType(currentTile.terrain) &&
+      hexDistance(warrior, TUTORIAL_PORT_TILE) === 1;
+    if (stagingOk) return;
+    const order = [
+      { q: 1, r: -1 }, { q: 0, r: 0 }, { q: 0, r: 1 }, { q: 1, r: 1 }, { q: 2, r: -1 },
+    ];
+    for (const n of order) {
+      const t = tileAt(sim.map, n.q, n.r);
+      if (!t || t.unit || !isLandType(t.terrain)) continue;
+      const fromTile = tileAt(sim.map, warrior.q, warrior.r);
+      if (fromTile) fromTile.unit = null;
+      t.unit = warrior;
+      warrior.q = t.q;
+      warrior.r = t.r;
+      return;
+    }
+  }
+
+  private placeEnemyShip(): void {
+    const sim = this.host.sim();
+    if (!sim) return;
+    const ship = sim.map.tiles.find(
+      (t) => t.unit && t.unit.owner === TUTORIAL_HUMAN && t.unit.shipLevel !== undefined,
+    );
+    const from = ship ?? tileAt(sim.map, TUTORIAL_PORT_TILE.q, TUTORIAL_PORT_TILE.r);
+    if (!from) return;
+    const candidates = sim.map.tiles
+      .filter(
+        (t) =>
+          isWaterType(t.terrain) &&
+          !t.unit &&
+          hexDistance(t, from) === 3 &&
+          isExploredFor(t, TUTORIAL_HUMAN),
+      )
+      .sort(
+        (a, b) =>
+          hexDistance(a, TUTORIAL_SHIP_ENEMY_PREFERRED) - hexDistance(b, TUTORIAL_SHIP_ENEMY_PREFERRED),
+      );
+    const spot = candidates[0];
+    if (!spot) return;
+    spot.unit = makeUnit(TUTORIAL_ENEMY_PLAYER, 'warrior', spot.q, spot.r, {
+      id: TUTORIAL_ENEMY_SHIP_ID,
+      shipLevel: 1,
+      spawnVillage: null,
+    });
+  }
+
+  private removeDummyUnits(): void {
+    const sim = this.host.sim();
+    if (!sim) return;
+    for (const t of sim.map.tiles) {
+      if (t.unit && t.unit.owner === TUTORIAL_ENEMY_PLAYER) t.unit = null;
+    }
   }
 }
