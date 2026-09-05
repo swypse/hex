@@ -10,16 +10,13 @@ import {
 } from '../src/game/tutorial/tutorialMap';
 
 describe('tutorial map', () => {
-  it('is a radius-5 disc with no water on the outermost ring', () => {
+  it('is a radius-5 disc of unique tiles', () => {
     const map = buildTutorialMap();
     expect(map.radius).toBe(TUTORIAL_RADIUS);
     const keys = new Set(map.tiles.map((t) => axialKey(t)));
     expect(keys.size).toBe(map.tiles.length);
     for (const t of map.tiles) {
       expect(hexDistance({ q: 0, r: 0 }, t)).toBeLessThanOrEqual(TUTORIAL_RADIUS);
-      if (hexDistance({ q: 0, r: 0 }, t) === TUTORIAL_RADIUS) {
-        expect(isWaterType(t.terrain)).toBe(false);
-      }
     }
   });
 
@@ -32,6 +29,20 @@ describe('tutorial map', () => {
     }
     expect(hexDistance(TUTORIAL_PORT_TILE, TUTORIAL_CAPITAL)).toBeLessThanOrEqual(2);
     expect(isWaterType(tileAt(map, TUTORIAL_PORT_TILE.q, TUTORIAL_PORT_TILE.r)!.terrain)).toBe(true);
+  });
+
+  it('stretches the sea to the map edge and several rows up and down', () => {
+    const map = buildTutorialMap();
+    const waters = map.tiles.filter((t) => isWaterType(t.terrain));
+    // Touches the outermost ring (reaches the map edge).
+    expect(waters.some((t) => hexDistance({ q: 0, r: 0 }, t) === TUTORIAL_RADIUS)).toBe(true);
+    // Spreads across rows above and below the village row.
+    const rows = new Set(waters.map((t) => t.r));
+    expect(rows.has(-1)).toBe(true);
+    expect(rows.has(1)).toBe(true);
+    expect(rows.has(-2)).toBe(true);
+    expect(rows.has(2)).toBe(true);
+    expect(waters.length).toBeGreaterThanOrEqual(15);
   });
 
   it('keeps the capital, warrior, sawmill and mine tiles usable', () => {

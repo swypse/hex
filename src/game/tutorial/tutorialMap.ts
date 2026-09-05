@@ -19,7 +19,16 @@ export const TUTORIAL_SHIP_ENEMY_PREFERRED = { q: 4, r: 0 };
 export const TUTORIAL_HUMAN = 0;
 export const TUTORIAL_ENEMY_PLAYER = 1;
 export const TUTORIAL_WATER_TILES: { q: number; r: number }[] = [
-  { q: 1, r: 0 }, { q: 2, r: 0 }, { q: 3, r: 0 }, { q: 4, r: 0 }, { q: 4, r: -1 },
+  // r = 0 row, from the port tile east to the map edge.
+  { q: 1, r: 0 }, { q: 2, r: 0 }, { q: 3, r: 0 }, { q: 4, r: 0 }, { q: 5, r: 0 },
+  // One row above.
+  { q: 2, r: -1 }, { q: 3, r: -1 }, { q: 4, r: -1 }, { q: 5, r: -1 },
+  // Two rows above.
+  { q: 3, r: -2 }, { q: 4, r: -2 }, { q: 5, r: -2 },
+  // One row below.
+  { q: 2, r: 1 }, { q: 3, r: 1 }, { q: 4, r: 1 },
+  // Two rows below.
+  { q: 2, r: 2 }, { q: 3, r: 2 },
 ];
 
 function grassTile(q: number, r: number): MapTile {
@@ -79,7 +88,6 @@ export function buildTutorialMap(): GameMap {
     { q: -3, r: 1, terrain: TileType.RainforestLand },
     { q: -1, r: 3, terrain: TileType.RainforestForest },
     { q: -3, r: 0, terrain: TileType.DesertMountain },
-    { q: 3, r: -1, terrain: TileType.TundraForest },
   ];
   for (const v of variety) {
     const tile = tileMap.get(axialKey(v));
