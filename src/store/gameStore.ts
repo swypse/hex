@@ -54,6 +54,7 @@ interface GameStore {
   netMode: 'single' | 'host' | 'client';
   lobby: LobbyState | null;
   connection: 'idle' | 'connecting' | 'connected' | 'error';
+  connectionMessage: string;
   pendingSnapshot: GameStateSnapshot | null;
   myPeerId: string;
   playersOnline: boolean[];
@@ -80,6 +81,7 @@ interface GameStore {
   setNetMode: (mode: 'single' | 'host' | 'client') => void;
   setLobby: (lobby: LobbyState | null) => void;
   setConnection: (connection: 'idle' | 'connecting' | 'connected' | 'error') => void;
+  setConnectionMessage: (message: string) => void;
   setPendingSnapshot: (snapshot: GameStateSnapshot | null) => void;
   setMyPeerId: (peerId: string) => void;
   setPlayersOnline: (online: boolean[]) => void;
@@ -109,6 +111,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   netMode: 'single',
   lobby: null,
   connection: 'idle',
+  connectionMessage: '',
   pendingSnapshot: null,
   myPeerId: '',
   playersOnline: [],
@@ -151,6 +154,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   setNetMode: (netMode) => set({ netMode }),
   setLobby: (lobby) => set({ lobby }),
   setConnection: (connection) => set({ connection }),
+  setConnectionMessage: (connectionMessage) => set({ connectionMessage }),
   setPendingSnapshot: (pendingSnapshot) => set({ pendingSnapshot }),
   setMyPeerId: (myPeerId) => set({ myPeerId }),
   setPlayersOnline: (playersOnline) => set({ playersOnline }),

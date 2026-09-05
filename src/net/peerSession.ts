@@ -120,6 +120,7 @@ export interface HostSessionEvents {
   onOpen: (peerId: string, conn: DataConnection) => void;
   onData: (peerId: string, msg: ClientMessage) => void;
   onClose: (peerId: string) => void;
+  onError?: (err: Error) => void;
 }
 
 export class HostSession {
@@ -139,6 +140,7 @@ export class HostSession {
     this.started = true;
     this.peer = new Peer(peerId, { debug: 1, config: buildPeerConfig(iceServers) });
     this.peer.on('connection', (conn) => this.attach(conn));
+    this.peer.on('error', (err) => this.events.onError?.(err));
   }
 
   private attach(conn: DataConnection): void {
@@ -184,11 +186,22 @@ export interface ClientSessionEvents {
   onError: (err: Error) => void;
 }
 
+const MAX_CONNECT_ATTEMPTS = 6;
+const CONNECT_RETRY_DELAY_MS = 1000;
+const CONNECT_ATTEMPT_TIMEOUT_MS = 6000;
+
 export class ClientSession {
   private peer: Peer | null = null;
   private conn: DataConnection | null = null;
   private peerId: string | null = null;
   private started = false;
+  private stopped = false;
+  private connected = false;
+  private joinCode = '';
+  private joinName = '';
+  private attempts = 0;
+  private retryTimer: ReturnType<typeof setTimeout> | null = null;
+  private attemptTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(private events: ClientSessionEvents) {}
 
@@ -198,30 +211,104 @@ export class ClientSession {
 
   join(code: string, name: string): void {
     this.peerId = generateClientId();
-    void this.start(code, name);
+    this.joinCode = code;
+    this.joinName = name;
+    void this.start();
   }
 
-  private async start(code: string, name: string): Promise<void> {
+  private async start(): Promise<void> {
     const iceServers = await loadIceServers();
-    if (!this.peerId || this.started) return;
+    if (this.stopped || !this.peerId || this.started) return;
     this.started = true;
     this.peer = new Peer(this.peerId, { debug: 1, config: buildPeerConfig(iceServers) });
-    this.peer.on('open', () => {
-      if (!this.peer) return;
-      const conn = this.peer.connect(hostPeerId(code), { reliable: true });
-      this.conn = conn;
-      conn.on('open', () => {
-        conn.send({ type: 'join', name } satisfies ClientMessage);
-        this.events.onOpen();
-      });
+    this.peer.on('open', () => this.tryConnect());
+    this.peer.on('error', (err) => this.handlePeerError(err));
+  }
+
+  private tryConnect(): void {
+    if (this.stopped || this.connected || !this.peer) return;
+    this.attempts++;
+    if (this.attemptTimer) {
+      clearTimeout(this.attemptTimer);
+      this.attemptTimer = null;
+    }
+    const conn = this.peer.connect(hostPeerId(this.joinCode), { reliable: true });
+    this.conn = conn;
+    let settled = false;
+    conn.on('open', () => {
+      if (this.conn !== conn) return;
+      settled = true;
+      this.clearAttemptTimer();
+      this.clearRetryTimer();
+      this.connected = true;
+      conn.send({ type: 'join', name: this.joinName } satisfies ClientMessage);
       conn.on('data', (data) => {
         if (typeof data === 'object' && data !== null && 'type' in data) {
           this.events.onData(data as HostMessage);
         }
       });
-      conn.on('close', () => this.events.onClose());
+      conn.on('close', () => {
+        if (this.conn !== conn) return;
+        this.conn = null;
+        this.events.onClose();
+      });
+      this.events.onOpen();
     });
-    this.peer.on('error', (err) => this.events.onError(err));
+    conn.on('close', () => {
+      if (settled) return;
+      settled = true;
+      this.clearAttemptTimer();
+      this.scheduleRetry();
+    });
+    this.attemptTimer = setTimeout(() => {
+      if (settled || this.conn !== conn) return;
+      settled = true;
+      this.attemptTimer = null;
+      this.scheduleRetry();
+    }, CONNECT_ATTEMPT_TIMEOUT_MS);
+  }
+
+  private handlePeerError(err: Error): void {
+    if (this.stopped || this.connected) return;
+    const type = (err as { type?: string }).type;
+    if (type === 'peer-unavailable') {
+      this.scheduleRetry();
+      return;
+    }
+    this.fail(new Error(`Connection error: ${err.message}`));
+  }
+
+  private scheduleRetry(): void {
+    if (this.stopped || this.connected || this.retryTimer) return;
+    if (this.attempts >= MAX_CONNECT_ATTEMPTS) {
+      this.fail(new Error(`Could not connect to room ${this.joinCode}. Check the code and that the host is still in the room.`));
+      return;
+    }
+    this.retryTimer = setTimeout(() => {
+      this.retryTimer = null;
+      this.tryConnect();
+    }, CONNECT_RETRY_DELAY_MS);
+  }
+
+  private fail(err: Error): void {
+    if (this.stopped || this.connected) return;
+    this.clearAttemptTimer();
+    this.clearRetryTimer();
+    this.events.onError(err);
+  }
+
+  private clearRetryTimer(): void {
+    if (this.retryTimer) {
+      clearTimeout(this.retryTimer);
+      this.retryTimer = null;
+    }
+  }
+
+  private clearAttemptTimer(): void {
+    if (this.attemptTimer) {
+      clearTimeout(this.attemptTimer);
+      this.attemptTimer = null;
+    }
   }
 
   send(msg: ClientMessage): void {
@@ -229,6 +316,9 @@ export class ClientSession {
   }
 
   close(): void {
+    this.stopped = true;
+    this.clearAttemptTimer();
+    this.clearRetryTimer();
     this.conn?.close();
     this.conn = null;
     this.peer?.destroy();

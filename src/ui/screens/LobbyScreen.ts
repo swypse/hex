@@ -426,6 +426,16 @@ export class LobbyScreen implements ScreenController {
     y += 70;
 
     if (isHost) {
+      if (s.connection === 'error') {
+        const errMsg = makeLabel(s.connectionMessage || 'Could not set up the room.', { fontSize: 14, fill: 0xc0392b });
+        errMsg.anchor.set(0.5, 0.5);
+        errMsg.position.set(cx, y);
+        this.root!.addChild(errMsg);
+        const back = new Button({ label: 'Back', width: 150, onClick: () => { gameController.cancelLobby(); this.view = 'menu'; this.render(); } });
+        back.position.set(cx - 75, y + 34);
+        this.root!.addChild(back);
+        return;
+      }
       const start = new Button({ label: 'Start game', width: 240, disabled: !canStart, onClick: () => { void gameController.startHostGame(); } });
       start.position.set(cx - 120, y);
       this.root!.addChild(start);
@@ -437,6 +447,21 @@ export class LobbyScreen implements ScreenController {
         this.root!.addChild(wait);
       }
     } else {
+      if (s.connection === 'error') {
+        const errMsg = makeLabel(s.connectionMessage || 'Connection failed.', { fontSize: 14, fill: 0xc0392b });
+        errMsg.anchor.set(0.5, 0.5);
+        errMsg.position.set(cx, y);
+        this.root!.addChild(errMsg);
+        y += 30;
+        const retryName = me?.name ?? this.name;
+        const retry = new Button({ label: 'Try again', width: 150, onClick: () => gameController.joinGame(lobby.code, retryName) });
+        retry.position.set(cx - 165, y);
+        this.root!.addChild(retry);
+        const back = new Button({ label: 'Back', width: 150, onClick: () => { gameController.cancelLobby(); this.view = 'join'; this.render(); } });
+        back.position.set(cx + 15, y);
+        this.root!.addChild(back);
+        return;
+      }
       const isReady = me?.ready ?? false;
       const ready = new Button({ label: isReady ? 'Ready!' : "I'm ready", width: 240, disabled: !me || me.tribeId === null || isReady, onClick: () => gameController.readyUp() });
       ready.position.set(cx - 120, y);
@@ -447,11 +472,23 @@ export class LobbyScreen implements ScreenController {
         wait.anchor.set(0.5, 0.5);
         wait.position.set(cx, y);
         this.root!.addChild(wait);
+        y += 24;
       } else if (me && me.tribeId === null) {
         const hint = makeLabel('Pick a tribe to become ready.', { fontSize: 14, fill: 0x888888 });
         hint.anchor.set(0.5, 0.5);
         hint.position.set(cx, y);
         this.root!.addChild(hint);
+        y += 24;
+      }
+      if (s.connection === 'connecting') {
+        const connecting = makeLabel('Connecting to the room...', { fontSize: 14, fill: 0xcccccc });
+        connecting.anchor.set(0.5, 0.5);
+        connecting.position.set(cx, y);
+        this.root!.addChild(connecting);
+        y += 30;
+        const cancel = new Button({ label: 'Cancel', width: 150, onClick: () => { gameController.cancelLobby(); this.view = 'join'; this.render(); } });
+        cancel.position.set(cx - 75, y);
+        this.root!.addChild(cancel);
       }
     }
   }

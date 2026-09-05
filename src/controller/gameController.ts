@@ -676,6 +676,10 @@ class GameController {
     return this.getNetwork().hostGame(opts);
   }
 
+  cancelLobby(): void {
+    this.getNetwork().cancelLobby();
+  }
+
   pickHostTribe(tribe: Tribe): void {
     this.getNetwork().pickHostTribe(tribe);
   }

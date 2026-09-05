@@ -48,12 +48,14 @@ export class NetworkController {
   hostConfig: { mode: GameMode; totalPlayers: number; aiCount: number } | null = null;
   clientSession: ClientSession | null = null;
   clientName = '';
+  private canceled = false;
   private pendingClientEvents: GameEvent[] = [];
   private pendingPreExplored: Set<string> | null = null;
 
   constructor(private readonly host: NetworkHost) {}
 
   hostGame(opts: { mode: GameMode; totalPlayers: number; aiCount: number; name: string; tribe: Tribe }): string {
+    this.canceled = false;
     const code = generateRoomCode();
     this.hostConfig = { mode: opts.mode, totalPlayers: opts.totalPlayers, aiCount: opts.aiCount };
     this.hostName = opts.name;
@@ -68,12 +70,19 @@ export class NetworkController {
       onClose: (peerId) => {
         this.handleClientClosed(peerId);
       },
+      onError: (err) => {
+        if (this.canceled) return;
+        const s = useGameStore.getState();
+        s.setConnection('error');
+        s.setConnectionMessage(err?.message ?? 'Could not set up the room.');
+      },
     });
     this.hostSession.open(code);
     const store = useGameStore.getState();
     store.setNetMode('host');
     store.setLocalPlayerIndex(0);
     store.setConnection('connected');
+    store.setConnectionMessage('');
     store.setLobby({
       role: 'host',
       code,
@@ -249,16 +258,31 @@ export class NetworkController {
   }
 
   joinGame(code: string, name: string): void {
+    this.canceled = false;
     this.clientName = name;
+    this.clientSession?.close();
+    this.clientSession = null;
     const store = useGameStore.getState();
     store.setNetMode('client');
     store.setConnection('connecting');
+    store.setConnectionMessage('');
     store.setLocalPlayerIndex(-1);
     this.clientSession = new ClientSession({
-      onOpen: () => store.setConnection('connected'),
+      onOpen: () => {
+        store.setConnection('connected');
+        store.setConnectionMessage('');
+      },
       onData: (msg) => this.onHostMessage(msg),
-      onClose: () => store.setConnection('error'),
-      onError: () => store.setConnection('error'),
+      onClose: () => {
+        if (this.canceled) return;
+        store.setConnection('error');
+        store.setConnectionMessage('Disconnected from the host.');
+      },
+      onError: (err) => {
+        if (this.canceled) return;
+        store.setConnection('error');
+        store.setConnectionMessage(err?.message ?? 'Connection failed.');
+      },
     });
     this.clientSession.join(code, name);
     const peerId = this.clientSession.getPeerId() ?? '';
@@ -272,6 +296,22 @@ export class NetworkController {
       players: [{ peerId, name, tribeId: null, isHost: false, ready: false }],
     });
     store.setScreen('lobby');
+  }
+
+  cancelLobby(): void {
+    this.canceled = true;
+    this.hostSession?.close();
+    this.hostSession = null;
+    this.hostPlayers = [];
+    this.hostConfig = null;
+    this.clientSession?.close();
+    this.clientSession = null;
+    const store = useGameStore.getState();
+    store.setLobby(null);
+    store.setConnection('idle');
+    store.setConnectionMessage('');
+    store.setNetMode('single');
+    store.setMyPeerId('');
   }
 
   pickClientTribe(tribe: Tribe): void {
