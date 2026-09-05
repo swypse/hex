@@ -22,6 +22,9 @@ const ICON_ACTIONS: Record<string, string> = {
   port: 'build-port.png',
   temple: 'build.png',
   forestTemple: 'build.png',
+  road: 'build-road.png',
+  bridge: 'build-bridge.png',
+  bonus: 'get-bonus.png',
 };
 
 const LAST_TURN_COLOR = 0x9cff55;

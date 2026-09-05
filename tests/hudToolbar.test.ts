@@ -109,20 +109,18 @@ describe('HudToolbar build actions', () => {
     expect(isIconButton(row.children[0] as Container)).toBe(true);
   });
 
-  it('shows a Get the bonus button when a claimable bonus cell is selected', () => {
+  it('shows a Get the bonus icon button when a claimable bonus cell is selected', () => {
     const t = map.tiles.find((x) => x.settlement === null && x.unit === null)!;
     t.bonus = { kind: 'money', claimer: 0, arrivalTurn: 1 };
     t.unit = {
       id: 'b1', owner: 0, type: 'warrior', q: t.q, r: t.r,
       hasMoved: false, hasAttacked: false, hasHealed: false,
-      hp: 5, attack: 2, attackDistance: 1, spawnVillage: null,
+      hp: 50, attack: 2, attackDistance: 1, spawnVillage: null,
     };
     useGameStore.getState().setTurn(2);
     select(t);
-    const labels = row.children.map((c) =>
-      (c as Container).children.map((ch) => (ch as Text).text ?? '').join(''),
-    );
-    expect(labels.some((l) => l.includes('Get the bonus'))).toBe(true);
+    expect(row.children.length).toBe(1);
+    expect(isIconButton(row.children[0] as Container)).toBe(true);
   });
 
   it('hides an action the player cannot afford', () => {

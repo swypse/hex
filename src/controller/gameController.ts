@@ -347,8 +347,8 @@ class GameController {
     this.syncTutorialStore();
     this.syncKnownTribes(false);
     store.setSelection({ kind: 'unit', q: TUTORIAL_CAPITAL.q, r: TUTORIAL_CAPITAL.r });
-    store.setScreen('game');
     this.startVillageIntroPending = true;
+    store.setScreen('game');
     return Promise.resolve();
   }
 
