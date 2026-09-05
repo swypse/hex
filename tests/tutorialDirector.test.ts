@@ -135,6 +135,21 @@ describe('TutorialDirector', () => {
     )!;
     run(sim, dir, { type: 'move', unitId: s2.unit!.id, q: firingWater.q, r: firingWater.r });
     run(sim, dir, { type: 'attack', unitId: ownShipTile(sim).unit!.id, q: enemyShip.q, r: enemyShip.r });
+    expect(dir.currentStep()).toBe('collectBonus');
+
+    // A bonus appears next to a land unit (the archer).
+    const bonusTile = sim.map.tiles.find((t) => t.bonus !== undefined && t.bonus !== null)!;
+    const archer = sim.map.tiles.find((t) => t.unit?.type === 'archer')!;
+    expect(isWaterType(bonusTile.terrain)).toBe(false);
+    expect(hexDistance(bonusTile, archer)).toBeLessThanOrEqual(1);
+    expect(bonusTile.unit).toBeNull();
+
+    run(sim, dir, { type: 'move', unitId: archer.unit!.id, q: bonusTile.q, r: bonusTile.r });
+    expect(dir.currentStep()).toBe('collectBonus');
+    // The bonus can only be claimed on the next turn.
+    run(sim, dir, { type: 'endTurn' });
+    expect(dir.currentStep()).toBe('collectBonus');
+    run(sim, dir, { type: 'claimBonus' });
     expect(dir.currentStep()).toBe('end');
     expect(sim.map.tiles.some((t) => t.unit?.owner === TUTORIAL_ENEMY_PLAYER)).toBe(false);
   });

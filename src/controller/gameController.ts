@@ -165,6 +165,10 @@ class GameController {
       const enemy = this.sim.map.tiles.find((t) => t.unit?.id === TUTORIAL_ENEMY_SHIP_ID);
       if (enemy) markers.add(axialKey(enemy));
     }
+    if (step === 'collectBonus') {
+      const bonusTile = this.sim.map.tiles.find((t) => t.bonus !== undefined && t.bonus !== null);
+      if (bonusTile) markers.add(axialKey(bonusTile));
+    }
     return markers;
   }
 

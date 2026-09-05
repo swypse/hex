@@ -1,6 +1,6 @@
 import type { Simulator } from '../game/simulator';
 import type { GameEvent } from '../game/events';
-import { hexDistance } from '../game/hex';
+import { hexDistance, hexNeighbors } from '../game/hex';
 import { tileAt } from '../game/selection';
 import { isLandType, isWaterType } from '../game/tileTypes';
 import { isExploredFor } from '../game/explore';
@@ -71,6 +71,7 @@ export class TutorialDirector {
     else if (step === 'upgradeVillage3') this.removeDummyUnits();
     else if (step === 'boardShip') this.repositionWarriorForBoarding();
     else if (step === 'attackEnemyShip') this.placeEnemyShip();
+    else if (step === 'collectBonus') this.placeTutorialBonus();
     else if (step === 'end') this.removeDummyUnits();
   }
 
@@ -129,6 +130,8 @@ export class TutorialDirector {
         );
       case 'attackEnemyShip':
         return !sim.map.tiles.some((t) => t.unit?.owner === TUTORIAL_ENEMY_PLAYER);
+      case 'collectBonus':
+        return !sim.map.tiles.some((t) => t.bonus !== undefined && t.bonus !== null);
       default:
         return false;
     }
@@ -171,6 +174,9 @@ export class TutorialDirector {
           if (attacker?.shipLevel !== undefined) return true;
           break;
         }
+        case 'collectBonus':
+          if (e.type === 'bonusClaimed' && e.playerIndex === TUTORIAL_HUMAN) return true;
+          break;
         default:
           break;
       }
@@ -259,6 +265,37 @@ export class TutorialDirector {
       shipLevel: 1,
       spawnVillage: null,
     });
+  }
+
+  private placeTutorialBonus(): void {
+    const sim = this.host.sim();
+    if (!sim) return;
+    // Anchor the bonus next to a player unit that still stands on land (the
+    // archer) so it is always reachable in one move.
+    const anchor = sim.map.tiles.find(
+      (t) => t.unit && t.unit.owner === TUTORIAL_HUMAN && t.unit.shipLevel === undefined,
+    );
+    if (!anchor) return;
+    const freeLand = (t: ReturnType<typeof tileAt>): boolean =>
+      t !== undefined &&
+      isLandType(t.terrain) &&
+      !t.unit &&
+      !t.settlement &&
+      !t.building &&
+      !t.bonus;
+    for (const n of hexNeighbors(anchor)) {
+      const t = tileAt(sim.map, n.q, n.r);
+      if (freeLand(t)) {
+        t!.bonus = { kind: 'money', claimer: null, arrivalTurn: 0 };
+        return;
+      }
+    }
+    for (const t of sim.map.tiles) {
+      if (hexDistance(t, anchor) <= 2 && freeLand(t)) {
+        t.bonus = { kind: 'money', claimer: null, arrivalTurn: 0 };
+        return;
+      }
+    }
   }
 
   private removeDummyUnits(): void {

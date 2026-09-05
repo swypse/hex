@@ -19,6 +19,7 @@ export type TutorialStepId =
   | 'boardShip'
   | 'upgradeShip'
   | 'attackEnemyShip'
+  | 'collectBonus'
   | 'end';
 
 export interface TutorialStepDef {
@@ -55,6 +56,7 @@ export const STEP_ORDER: TutorialStepId[] = [
   'boardShip',
   'upgradeShip',
   'attackEnemyShip',
+  'collectBonus',
   'end',
 ];
 
@@ -248,6 +250,17 @@ export const STEP_CONFIG: Record<TutorialStepId, TutorialStepDef> = {
     id: 'attackEnemyShip',
     heading: 'Sail and attack the enemy ship',
     text: 'An enemy ship appeared on the sea. If your ship cannot act yet, end your turn. Then sail within range and click the enemy ship to attack — it will not move.',
+    markers: [],
+    highlightSkills: [],
+    highlightEndTurn: false,
+    pulseSkillsButton: false,
+    dialog: false,
+    buttonLabel: '',
+  },
+  collectBonus: {
+    id: 'collectBonus',
+    heading: 'Collect a bonus',
+    text: 'Bonus markers are scattered across the map. Move one of your units onto the glowing bonus, then press End your turn. On the next turn a "Get the bonus" button appears — press it to collect rewards such as money or resources.',
     markers: [],
     highlightSkills: [],
     highlightEndTurn: false,
