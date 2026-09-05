@@ -74,11 +74,12 @@ export const STEP_CONFIG: Record<TutorialStepId, TutorialStepDef> = {
   upgradeVillage: {
     id: 'upgradeVillage',
     heading: 'Upgrade your village',
-    text: 'Click your village, then press Upgrade (2 wood + 1 stone + 2 money). Each level raises its income, territory and unit capacity.',
+    text: 'Click your village, then press the pulsing Upgrade button (2 wood + 1 stone + 2 money). Each level raises its income, territory and unit capacity.',
     markers: [CAPITAL],
     highlightSkills: [],
     highlightEndTurn: false,
     pulseSkillsButton: false,
+    toolbarKey: 'upgrade',
     dialog: false,
     buttonLabel: '',
   },

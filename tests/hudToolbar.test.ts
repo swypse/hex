@@ -220,6 +220,16 @@ describe('HudToolbar tutorial build highlights', () => {
     expect(row.children[1]).toBeInstanceOf(Graphics);
   });
 
+  it('pulses the upgrade village button during the upgradeVillage step', () => {
+    const capital = map.tiles.find((t) => t.settlement?.owner === 0)!;
+    const store = useGameStore.getState();
+    store.setTutorial(true);
+    store.setTutorialStep('upgradeVillage');
+    select(capital);
+    expect(row.children.length).toBe(2);
+    expect(row.children[1]).toBeInstanceOf(Graphics);
+  });
+
   it('does not add a ring when no build step is active', () => {
     const tile = ownedTile(TileType.GrasslandLand);
     const neighbor = map.tiles.find((t) =>
