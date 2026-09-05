@@ -8,8 +8,8 @@ import { useGameStore } from '../../store/gameStore';
 import { type UIHost } from '../host';
 import { Button } from '../kit/button';
 import { makeLabel } from '../kit/label';
-import { makeIcon } from '../kit/icon';
 import { HudMoney } from '../hud/HudMoney';
+import { makeSkillMedallion } from '../kit/skillMedallion';
 
 const RING_SPACING = 110;
 const CX = 400;
@@ -62,26 +62,6 @@ export function skillLayout(): Record<SkillId, SkillNodeLayout> {
 }
 
 const POS = skillLayout();
-
-const SKILL_ICON_FILES: Partial<Record<SkillId, string>> = {
-  climbing: 'mountain.png',
-  smithery: 'build-mine.png',
-  swordsman: 'sword.png',
-  geology: 'ore-increase.png',
-  water: 'build-port.png',
-  waterTemples: 'water-temple.png',
-  navigation: 'ship.png',
-  forestry: 'build-sawmill.png',
-  forestTemple: 'forest-temple.png',
-  science: 'miss-decrease.png',
-  roads: 'build-road.png',
-  shields: 'shield.png',
-  defense: 'shield.png',
-  catapult: 'catapult.png',
-  riding: 'horse.png',
-  bridges: 'build-bridge.png',
-  knights: 'knight.png',
-};
 
 export class SkillTree {
   private el: Container | null = null;
@@ -359,38 +339,14 @@ export class SkillTree {
         this.build();
       });
 
-      const RADIUS = 28;
-      const iconFile = SKILL_ICON_FILES[id];
-      // Colored circle: grey (535353) when unopened, blue (5198FF) when opened.
-      const bg = new Graphics();
-      bg.circle(pos.x, pos.y, RADIUS)
-        .fill(opened ? 0x5198ff : 0x535353)
-        .stroke({ width: opened ? 5 : 2, color: opened ? 0x5198ff : 0x333333 });
-      node.addChild(bg);
-
-      // The skill image sits centered inside the circle, slightly smaller, so
-      // the colored circle stays visible as its background/ring.
-      if (iconFile) {
-        const icon = makeIcon(iconFile, 42);
-        icon.position.set(pos.x, pos.y);
-        node.addChild(icon);
-      }
-
-      // Price / check badge pinned to the top-right edge of the node circle.
-      const badgeCX = pos.x + RADIUS * 0.78;
-      const badgeCY = pos.y - RADIUS * 0.78;
-      const badgeR = 12;
-      const badge = new Graphics();
-      badge.circle(badgeCX, badgeCY, badgeR).fill(0xff8c00).stroke({ width: 2, color: 0xffffff });
-      node.addChild(badge);
-      const badgeText = makeLabel(opened ? '\u2713' : String(skillCost(id, human.skills.length)), {
-        fontSize: 11,
-        fill: 0xffffff,
-        fontWeight: '800',
+      const medallion = makeSkillMedallion({
+        skill: id,
+        opened,
+        priceText: opened ? '\u2713' : String(skillCost(id, human.skills.length)),
+        size: 56,
       });
-      badgeText.anchor.set(0.5, 0.5);
-      badgeText.position.set(badgeCX, badgeCY);
-      node.addChild(badgeText);
+      medallion.position.set(pos.x, pos.y);
+      node.addChild(medallion);
 
       const name = makeLabel(SKILLS[id].name, { fontSize: 13, fill: 0xeeeeee });
       name.anchor.set(0.5, 0.5);

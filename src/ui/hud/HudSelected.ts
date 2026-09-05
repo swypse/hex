@@ -12,13 +12,13 @@ import { villageUpgradeCost } from '../../game/resources';
 import { buildingYield, BUILDING_NAMES } from '../../game/buildings';
 import { isExploredFor } from '../../game/explore';
 import { hexNeighbors } from '../../game/hex';
-import { canOpenSkill, hasSkill, type SkillId } from '../../game/skills';
+import { canOpenSkill, hasSkill, skillCost, type SkillId } from '../../game/skills';
 import type { Player } from '../../game/players';
 import type { MapTile } from '../../game/mapGen';
 import { useGameStore } from '../../store/gameStore';
 import { type UIHost, type Widget } from '../host';
 import { makeLabel } from '../kit/label';
-import { Button } from '../kit/button';
+import { makeSkillMedallion } from '../kit/skillMedallion';
 import { makePanel } from '../kit/panel';
 import { isLightColor } from '../kit/theme';
 import { TOOLBAR_HEIGHT, TURN_BAR_HEIGHT } from '../layout';
@@ -143,17 +143,29 @@ export class HudSelected implements Widget {
       y += lineH;
     }
     for (const a of actions) {
-      const btn = new Button({
-        label: a.label,
-        disabled: s.aiActive || !canOpenSkill(human, a.id),
-        onClick: () => gameController.openSkill(a.id),
-        paddingX: 10,
-        paddingY: 4,
+      const disabled = s.aiActive || !canOpenSkill(human, a.id);
+      const row = new Container();
+      row.eventMode = 'static';
+      row.cursor = 'pointer';
+      row.alpha = disabled ? 0.5 : 1;
+      row.on('pointertap', () => {
+        if (!disabled) gameController.openSkill(a.id);
       });
-      btn.position.set(10, y);
-      this.el.addChild(btn);
-      maxW = Math.max(maxW, btn.width);
-      y += btn.height + 6;
+      const size = 44;
+      const med = makeSkillMedallion({
+        skill: a.id,
+        opened: false,
+        priceText: String(skillCost(a.id, human.skills.length)),
+        size,
+      });
+      const cy = y + size / 2;
+      med.position.set(10 + size / 2, cy);
+      const label = makeLabel(a.label, { fontSize: 13, fill: 0xeeeeee });
+      label.position.set(10 + size + 8, cy - label.height / 2);
+      row.addChild(med, label);
+      this.el.addChild(row);
+      maxW = Math.max(maxW, 10 + size + 8 + label.width);
+      y += size + 6;
     }
     this.measured = actions.length > 0 ? y - 6 + 8 : y + 8;
 
