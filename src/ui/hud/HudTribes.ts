@@ -3,8 +3,8 @@ import { UNKNOWN_TRIBE_COLOR } from '../../game/discovery';
 import { TRIBES } from '../../game/tribes';
 import { useGameStore } from '../../store/gameStore';
 import { type UIHost, type Widget } from '../host';
-import { makeIcon } from '../kit/icon';
 import { makeLabel } from '../kit/label';
+import { makeIconChip } from '../kit/tribeChip';
 
 const CIRCLE_SIZE = 36;
 const RADIUS = CIRCLE_SIZE / 2;
@@ -58,24 +58,19 @@ export class HudTribes implements Widget {
   }
 
   private makeChip(tribeId: number, explored: boolean, active: boolean): Container {
-    const chip = new Container();
     if (explored) {
       const tribe = TRIBES.find((t) => t.id === tribeId);
-      if (!tribe) return chip;
-      const bg = new Graphics();
-      bg.circle(0, 0, RADIUS).fill(0xffffff);
-      const clip = new Graphics();
-      clip.circle(0, 0, RADIUS).fill(0xffffff);
-      const icon = makeIcon(`${tribe.code}-icon.png`, CIRCLE_SIZE);
-      icon.mask = clip;
-      chip.addChild(bg, clip, icon);
-    } else {
-      const bg = new Graphics();
-      bg.circle(0, 0, RADIUS).fill(UNKNOWN_TRIBE_COLOR);
-      const question = makeLabel('?', { fontSize: 22, fill: 0xffffff, fontWeight: '800' });
-      question.anchor.set(0.5, 0.5);
-      chip.addChild(bg, question);
+      if (!tribe) return new Container();
+      const chip = makeIconChip(`${tribe.code}-icon.png`, CIRCLE_SIZE);
+      chip.alpha = active ? 1 : ELIMINATED_ALPHA;
+      return chip;
     }
+    const chip = new Container();
+    const bg = new Graphics();
+    bg.circle(0, 0, RADIUS).fill(UNKNOWN_TRIBE_COLOR);
+    const question = makeLabel('?', { fontSize: 22, fill: 0xffffff, fontWeight: '800' });
+    question.anchor.set(0.5, 0.5);
+    chip.addChild(bg, question);
     chip.alpha = active ? 1 : ELIMINATED_ALPHA;
     return chip;
   }

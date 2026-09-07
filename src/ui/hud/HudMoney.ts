@@ -8,8 +8,8 @@ import { type UIHost, type Widget } from '../host';
 import { makeIcon } from '../kit/icon';
 import { makeLabel } from '../kit/label';
 import { makePanel } from '../kit/panel';
-import { Tooltip } from '../kit/tooltip';
-import { tooltipsEnabled } from '../kit/tooltipGate';
+import { Popup } from '../kit/popup';
+import { Button } from '../kit/button';
 import { RESOURCE_TOOLTIPS } from './resourceTooltips';
 
 export class HudMoney implements Widget {
@@ -19,15 +19,13 @@ export class HudMoney implements Widget {
   private onResize: (() => void) | null = null;
   private lastKey = '';
   private measured = 0;
-  private tooltip: Tooltip | null = null;
+  private popup: Popup | null = null;
 
   mount(host: UIHost, root: Container): void {
     this.host = host;
     const el = new Container();
     root.addChild(el);
     this.el = el;
-    this.tooltip = new Tooltip(host.app);
-    host.app.stage.addChild(this.tooltip.el);
     this.layout();
     this.update();
     this.unsub = useGameStore.subscribe(() => this.update());
@@ -60,7 +58,6 @@ export class HudMoney implements Widget {
     this.lastKey = key;
 
     this.el.removeChildren();
-    this.tooltip?.hide();
 
     const compact = this.host.app.screen.width <= 600;
     const iconSize = compact ? 17 : 21;
@@ -78,20 +75,23 @@ export class HudMoney implements Widget {
     for (const row of rows) {
       const icon = makeIcon(row.icon, iconSize);
       icon.eventMode = 'static';
+      icon.cursor = 'pointer';
       icon.position.set(x + iconSize / 2 + 6, cy);
-      const info = RESOURCE_TOOLTIPS[row.key as keyof typeof RESOURCE_TOOLTIPS];
-      if (info && this.tooltip && tooltipsEnabled()) {
-        icon.on('pointerover', () => this.tooltip!.showForAfter(icon, info.name, t('res.required', { text: info.requiredFor }), 500));
-        icon.on('pointerout', () => this.tooltip!.hideAfter(500));
-        icon.on('pointerdown', () => this.tooltip!.showFor(icon, info.name, t('res.required', { text: info.requiredFor })));
-      }
+      const open = (): void => this.openResourcePopup(row.key as 'money' | 'wood' | 'stone' | 'ore');
+      icon.on('pointertap', open);
       const value = makeLabel(row.value, { fontSize });
+      value.eventMode = 'static';
+      value.cursor = 'pointer';
       value.position.set(x + iconSize + 11, cy - value.height / 2);
+      value.on('pointertap', open);
       this.el.addChild(icon, value);
       let rowW = value.width;
       if (row.income !== '') {
         const income = makeLabel(row.income, { fontSize, fill: 0xaaaaaa });
+        income.eventMode = 'static';
+        income.cursor = 'pointer';
         income.position.set(x + iconSize + 11 + value.width, cy - income.height / 2);
+        income.on('pointertap', open);
         this.el.addChild(income);
         rowW += income.width;
       }
@@ -106,13 +106,55 @@ export class HudMoney implements Widget {
     this.layout();
   }
 
+  private openResourcePopup(resource: 'money' | 'wood' | 'stone' | 'ore'): void {
+    if (!this.host) return;
+    const r = this.resources();
+    const info = RESOURCE_TOOLTIPS[resource];
+    const income = resource === 'money' ? r.moneyIncome : r.building[resource];
+    const amount = r[resource];
+    if (this.popup) {
+      this.popup.destroy();
+      this.popup = null;
+    }
+    const close = new Button({ label: t('common.close'), onClick: () => this.closePopup() });
+    const popup = new Popup({
+      app: this.host.app,
+      title: income > 0 ? `${info.name}: ${amount} (+${income})` : `${info.name}: ${amount}`,
+      buttons: [close],
+      onClose: () => this.closePopup(),
+    });
+    const lines = [t('res.collect.' + resource)];
+    if (info.requiredFor.length > 0) lines.push(t('res.required', { text: info.requiredFor }));
+    let y = 0;
+    for (const line of lines) {
+      const label = makeLabel(line, {
+        fontSize: 14,
+        fill: 0xeeeeee,
+        wordWrap: true,
+        wordWrapWidth: popup.contentWidth,
+      });
+      label.position.set(0, y);
+      y += label.height + 6;
+      popup.content.addChild(label);
+    }
+    this.host.overlayLayer.addChild(popup.el);
+    this.popup = popup;
+    popup.finish();
+  }
+
+  private closePopup(): void {
+    if (this.popup) {
+      this.popup.destroy();
+      this.popup = null;
+    }
+  }
+
   destroy(): void {
     if (this.unsub) this.unsub();
     if (this.onResize) window.removeEventListener('resize', this.onResize);
     this.unsub = null;
     this.onResize = null;
-    this.tooltip?.destroy();
-    this.tooltip = null;
+    this.closePopup();
     this.el?.destroy({ children: true });
     this.el = null;
     this.host = null;

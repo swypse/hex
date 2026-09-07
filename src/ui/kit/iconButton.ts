@@ -64,7 +64,7 @@ export class IconButton extends Container {
 
   private redraw(fill: number, ring: boolean): void {
     this.bg.clear().circle(this.size / 2, this.size / 2, this.size / 2).fill(fill);
-    if (ring) this.bg.stroke({ width: this.borderWidth, color: this.borderColor, alignment: 0 });
+    if (ring && this.borderWidth > 0) this.bg.stroke({ width: this.borderWidth, color: this.borderColor, alignment: 0 });
   }
 
   private redrawDisabled(): void {

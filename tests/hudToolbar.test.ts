@@ -119,8 +119,8 @@ describe('HudToolbar build actions', () => {
     };
     useGameStore.getState().setTurn(2);
     select(t);
-    expect(row.children.length).toBe(1);
-    expect(isIconButton(row.children[0] as Container)).toBe(true);
+    expect(row.children.length).toBe(2);
+    expect(row.children.every((c) => isIconButton(c as Container))).toBe(true);
   });
 
   it('hides an action the player cannot afford', () => {
@@ -224,7 +224,7 @@ describe('HudToolbar tutorial build highlights', () => {
     store.setTutorial(true);
     store.setTutorialStep('upgradeVillage');
     select(capital);
-    expect(row.children.length).toBe(2);
+    expect(row.children.length).toBe(3);
     expect(row.children[1]).toBeInstanceOf(Graphics);
   });
 

@@ -520,6 +520,32 @@ describe('MapView hp bar anchoring', () => {
     v.destroy();
   });
 
+  it('does not draw a road above a bridge even when it is roadOwner-connected', () => {
+    const bridgeTile: MapTile = {
+      q: 0, r: 0, terrain: TileType.Water, height: 0.1, settlement: null,
+      building: null, roadOwner: 0, bridge: { owner: 0, dir: 'we' }, unit: null,
+      ownedBy: 0, claimedByVillage: null, exploredBy: [0],
+    };
+    const shoreTile: MapTile = {
+      q: 1, r: 0, terrain: TileType.GrasslandLand, height: 0.1, settlement: null,
+      building: null, roadOwner: 0, unit: null,
+      ownedBy: 0, claimedByVillage: null, exploredBy: [0],
+    };
+    const m: GameMap = { radius: 1, spawns: [], tiles: [bridgeTile, shoreTile] };
+    const app = {
+      screen: { width: 800, height: 600 },
+      ticker: { add: (): void => {}, remove: (): void => {} },
+    } as unknown as Application;
+    const v = new MapView(app, textures, HEX, SPRITE_SCALE, 2);
+    v.update(m, players, null, new Set(), new Set(), 0, new Set(), {
+      x: 400, y: 300, scale: 1, width: 800, height: 600,
+    });
+    const tv = (v as unknown as { tileViews: Map<string, { roadGraphics: Graphics | null; bridgeSprite: Sprite | null }> }).tileViews.get('0,0')!;
+    expect(tv.bridgeSprite).not.toBeNull();
+    expect(tv.roadGraphics).toBeNull();
+    v.destroy();
+  });
+
   it('renders the temple texture matching the temple level', () => {
     const t: MapTile = {
       q: 0, r: 0, terrain: TileType.Water, height: 0.1, settlement: null,

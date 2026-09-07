@@ -17,12 +17,14 @@ export type OverlayState =
   | { kind: 'spawn' }
   | { kind: 'skill' }
   | { kind: 'stats' }
+  | { kind: 'achievements' }
   | { kind: 'welcome' }
   | { kind: 'leave' }
   | { kind: 'unitHelp' }
   | { kind: 'settlementHelp' }
   | { kind: 'buildingHelp' }
   | { kind: 'buildingLimitHelp' }
+  | { kind: 'bridgeHelp' }
   | { kind: 'confirm'; target: { q: number; r: number } }
   | { kind: 'shipLanding'; target: { q: number; r: number } };
 
@@ -50,6 +52,8 @@ interface GameStore {
   bonusAwarded: boolean;
   centerMessage: string | null;
   centerMessageQueue: string[];
+  centerIconFile: string | null;
+  centerIconQueue: (string | null)[];
   localPlayerIndex: number;
   netMode: 'single' | 'host' | 'client';
   lobby: LobbyState | null;
@@ -76,7 +80,7 @@ interface GameStore {
   setWinnerIndex: (index: number | null) => void;
   setExpectedTurns: (turns: number) => void;
   setBonusAwarded: (awarded: boolean) => void;
-  setCenterMessage: (message: string | null) => void;
+  setCenterMessage: (message: string | null, iconFile?: string | null) => void;
   setLocalPlayerIndex: (index: number) => void;
   setNetMode: (mode: 'single' | 'host' | 'client') => void;
   setLobby: (lobby: LobbyState | null) => void;
@@ -107,6 +111,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
   bonusAwarded: false,
   centerMessage: null,
   centerMessageQueue: [],
+  centerIconFile: null,
+  centerIconQueue: [],
   localPlayerIndex: 0,
   netMode: 'single',
   lobby: null,
@@ -123,6 +129,14 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   setScreen: (screen) => {
     if (!suppressPush && get().screen !== screen) pushHistory(screen);
+    if (get().screen === 'game' && screen !== 'game') {
+      set({
+        centerMessage: null,
+        centerMessageQueue: [],
+        centerIconFile: null,
+        centerIconQueue: [],
+      });
+    }
     set({ screen });
   },
   setPlayers: (players) => set({ players }),
@@ -136,19 +150,25 @@ export const useGameStore = create<GameStore>((set, get) => ({
   setWinnerIndex: (index) => set({ winnerIndex: index }),
   setExpectedTurns: (turns) => set({ expectedTurns: turns }),
   setBonusAwarded: (awarded) => set({ bonusAwarded: awarded }),
-  setCenterMessage: (message) =>
+  setCenterMessage: (message, iconFile = null) =>
     set((s) => {
       if (message === null) {
         const next = s.centerMessageQueue[0] ?? null;
+        const nextIcon = next === null ? null : (s.centerIconQueue[0] ?? null);
         return {
           centerMessage: next,
           centerMessageQueue: next === null ? [] : s.centerMessageQueue.slice(1),
+          centerIconFile: nextIcon,
+          centerIconQueue: next === null ? [] : s.centerIconQueue.slice(1),
         };
       }
       if (s.centerMessage !== null) {
-        return { centerMessageQueue: [...s.centerMessageQueue, message] };
+        return {
+          centerMessageQueue: [...s.centerMessageQueue, message],
+          centerIconQueue: [...s.centerIconQueue, iconFile],
+        };
       }
-      return { centerMessage: message };
+      return { centerMessage: message, centerIconFile: iconFile ?? null };
     }),
   setLocalPlayerIndex: (index) => set({ localPlayerIndex: index }),
   setNetMode: (netMode) => set({ netMode }),

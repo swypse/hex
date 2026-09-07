@@ -4,6 +4,8 @@ import { villageIncome } from './capture';
 import { villageUpgradeCost } from './resources';
 import { buildingsInVillage, claimRadius, villageBuildingLimit, unitsInVillage, villageCapacity } from './village';
 import { SHIP_UPGRADE_COST } from './ship';
+import { BRIDGE_COST } from './bridges';
+import { BRIDGE_SCORE } from './score';
 import { t } from '../i18n';
 
 export function settlementHelpTitle(tile: MapTile): string {
@@ -37,6 +39,19 @@ export function buildingHelpTitle(tile: MapTile): string {
   const b = tile.building;
   if (!b) return '';
   return t('help.building.title', { name: BUILDING_NAMES[b.kind], level: b.level });
+}
+
+export function bridgeHelpTitle(): string {
+  return t('help.bridge.title');
+}
+
+export function bridgeHelpLines(): string[] {
+  return [
+    t('help.bridge.what'),
+    t('help.bridge.road'),
+    t('help.bridge.build', { wood: BRIDGE_COST.wood, stone: BRIDGE_COST.stone, money: BRIDGE_COST.money }),
+    t('help.bridge.score', { score: BRIDGE_SCORE }),
+  ];
 }
 
 export function buildingLimitHelpTitle(tile: MapTile): string {

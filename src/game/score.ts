@@ -59,9 +59,22 @@ export interface PlayerStats {
   pirateKills: number;
   villagesCaptured: number;
   villageUpgrades: number;
+  knightCombos: number;
+  enemyShipsKilled: number;
+  shipsCapturedByPirates: number;
+  bonusesCollected: number;
 }
 
-export const EMPTY_STATS: PlayerStats = { killedUnits: 0, pirateKills: 0, villagesCaptured: 0, villageUpgrades: 0 };
+export const EMPTY_STATS: PlayerStats = {
+  killedUnits: 0,
+  pirateKills: 0,
+  villagesCaptured: 0,
+  villageUpgrades: 0,
+  knightCombos: 0,
+  enemyShipsKilled: 0,
+  shipsCapturedByPirates: 0,
+  bonusesCollected: 0,
+};
 
 export interface ScoreBreakdownItem {
   label: string;

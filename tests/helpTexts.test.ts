@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { makeTestMap, tileAt } from './helpers/testMap';
 import {
+  bridgeHelpLines,
+  bridgeHelpTitle,
   buildingHelpLines,
   buildingHelpTitle,
   buildingLimitHelpLines,
@@ -51,5 +53,18 @@ describe('help texts', () => {
     expect(text).toMatch(/levels 1-4/);
     expect(text).toMatch(/level 1/);
     expect(text).toMatch(/upgrade/i);
+  });
+
+  it('describes a bridge with cost, movement and score info', () => {
+    expect(bridgeHelpTitle()).toBe('Bridge');
+    const lines = bridgeHelpLines();
+    expect(lines.length).toBeGreaterThan(0);
+    const text = lines.join(' ');
+    expect(text).toMatch(/water tile/);
+    expect(text).toMatch(/ships/);
+    expect(text).toMatch(/10 wood/);
+    expect(text).toMatch(/5 stone/);
+    expect(text).toMatch(/15 money/);
+    expect(text).toMatch(/5 game-end score/);
   });
 });

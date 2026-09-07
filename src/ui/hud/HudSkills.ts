@@ -19,6 +19,7 @@ export class HudSkills implements Widget {
     const btn = new IconButton({
       icon: 'skills.png',
       size: SKILLS_BUTTON_SIZE,
+      color: 0x373748,
       onClick: () => useGameStore.getState().setOverlay({ kind: 'skill' }),
     });
     btn.position.set(0, 0);

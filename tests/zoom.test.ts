@@ -87,6 +87,19 @@ describe('clampPan', () => {
     expect(clamped.x).toBeCloseTo(screenW - halfW);
     expect(clamped.y).toBeCloseTo(screenH - halfH);
   });
+
+  it('never freezes panning when the map exactly fills the screen', () => {
+    const radius = 6;
+    const hexSize = 40;
+    const screenW = 800;
+    const screenH = 600;
+    const scale = screenW / 2 / (Math.sqrt(3) * radius * hexSize);
+    const minX = clampPan({ x: -99999, y: 0 }, radius, hexSize, scale, screenW, screenH, 1).x;
+    const maxX = clampPan({ x: 99999, y: 0 }, radius, hexSize, scale, screenW, screenH, 1).x;
+    expect(maxX).toBeGreaterThan(minX);
+    expect(minX).toBe(0);
+    expect(maxX).toBe(screenW);
+  });
 });
 
 describe('qualityFactor', () => {

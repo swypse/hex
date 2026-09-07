@@ -21,7 +21,7 @@ import { MapView, type OverlayItem } from '../render/mapRenderer';
 import { pickTileAt } from '../render/tilePick';
 import { createTextures } from '../render/textureFactory';
 import { useGameStore } from '../store/gameStore';
-import { TOOLBAR_HEIGHT } from '../ui/layout';
+import { TOOLBAR_HEIGHT, isWideScreen } from '../ui/layout';
 import { saveRepository } from '../storage/saveGame';
 import { attackConfirmationEnabled } from '../storage/settings';
 import { SeededRandom } from '../util/random';
@@ -204,7 +204,7 @@ class GameController {
       newly.forEach((tribeId, i) => {
         const tribe = TRIBES.find((t) => t.id === tribeId);
         if (!tribe) return;
-        setTimeout(() => useGameStore.getState().setCenterMessage(`You meet ${tribe.name}!`), i * 1100);
+        setTimeout(() => useGameStore.getState().setCenterMessage(`You meet ${tribe.name}!`, `${tribe.code}-icon.png`), i * 1100);
       });
     }
     this.knownTribeIds = new Set<number>([...this.knownTribeIds, ...current]);
@@ -416,7 +416,8 @@ class GameController {
   }
 
   private mapHeight(): number {
-    return this.app ? this.app.screen.height - TOOLBAR_HEIGHT : 0;
+    if (!this.app) return 0;
+    return isWideScreen(this.app.screen.width) ? this.app.screen.height : this.app.screen.height - TOOLBAR_HEIGHT;
   }
 
   private getCamera(): CameraController {
@@ -647,6 +648,17 @@ class GameController {
     const unit = tileAt(this.sim.map, selection.q, selection.r)!.unit;
     if (!unit) return;
     this.sendCommand({ type: 'heal', unitId: unit.id });
+    store.setSelection(null);
+  }
+
+  disbandSelectedUnit(): void {
+    const store = useGameStore.getState();
+    if (store.aiActive) return;
+    const selection = store.selection;
+    if (!selection || selection.kind !== 'unit' || !this.sim) return;
+    const unit = tileAt(this.sim.map, selection.q, selection.r)!.unit;
+    if (!unit) return;
+    this.sendCommand({ type: 'disband', unitId: unit.id });
     store.setSelection(null);
   }
 
@@ -891,8 +903,9 @@ class GameController {
 
     this.reachableKeys = new Set<string>();
     this.attackableKeys = new Set<string>();
+    const isLocalTurn = store.currentPlayerIndex === store.localPlayerIndex && !store.aiActive;
     const selection = store.selection;
-    if (selection && selection.kind === 'unit') {
+    if (isLocalTurn && selection && selection.kind === 'unit') {
       const tile = tileAt(this.sim.map, selection.q, selection.r);
       const unit = tile?.unit;
       if (unit && unit.owner === store.localPlayerIndex && canMove(unit)) {

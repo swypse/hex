@@ -9,6 +9,9 @@ import { buildPlayers } from '../src/game/players';
 import { Tribe } from '../src/game/tribes';
 import { SeededRandom } from '../src/util/random';
 import { Simulator } from '../src/game/simulator';
+import { TileType } from '../src/game/tileTypes';
+import { hexNeighbors } from '../src/game/hex';
+import type { GameMap, MapTile } from '../src/game/mapGen';
 
 function fakeCanvasContext() {
   return {
@@ -168,6 +171,98 @@ describe('HudSelected village building constraints', () => {
     const text = findText((hud as unknown as { el: Container }).el!, 'Buildings:');
     expect(text).toBeDefined();
     expect(text!.style.fill).not.toBe(0xffd700);
+  });
+});
+
+describe('HudSelected building produce and bridge info lines', () => {
+  let hud: HudSelected;
+  const originalSim = (gameController as unknown as { sim: unknown }).sim;
+
+  const texts = (): string[] => {
+    const el = (hud as unknown as { el: Container }).el!;
+    const out: string[] = [];
+    const walk = (c: Container): void => {
+      for (const ch of c.children) {
+        if (ch instanceof Text) out.push((ch as Text).text);
+        if (ch instanceof Container) walk(ch as Container);
+      }
+    };
+    walk(el);
+    return out;
+  };
+
+  const helpButtons = (): number => texts().filter((t) => t === '?').length;
+
+  const boot = (setup: (map: GameMap) => MapTile): void => {
+    Object.defineProperty(Text.prototype, 'width', { configurable: true, get: () => 60 });
+    Object.defineProperty(Text.prototype, 'height', { configurable: true, get: () => 14 });
+    (globalThis as { CanvasRenderingContext2D?: unknown }).CanvasRenderingContext2D = class {};
+    (globalThis as { document?: unknown }).document = {
+      createElement: () => ({ getContext: () => fakeCanvasContext(), width: 0, height: 0 }),
+    };
+    const map = makeTestMap(2);
+    const tile = setup(map);
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    (gameController as unknown as { sim: Simulator | null }).sim = sim;
+    useGameStore.setState({
+      screen: 'game',
+      players,
+      localPlayerIndex: 0,
+      selection: { kind: 'village', q: tile.q, r: tile.r },
+      tutorial: false,
+      tutorialStep: null,
+    });
+    hud = new HudSelected();
+    hud.mount(makeHost(), new Container());
+  };
+
+  afterEach(() => {
+    hud?.destroy();
+    (gameController as unknown as { sim: unknown }).sim = originalSim;
+  });
+
+  it('lists only the mine yield (stone and ore) in the produces line', () => {
+    boot((map) => {
+      const t = map.tiles.find((x) => x.settlement === null && x.unit === null)!;
+      t.ownedBy = 0;
+      t.building = { kind: 'mine', level: 1 };
+      return t;
+    });
+    const all = texts().join('\n');
+    expect(all).toContain('Produces: stone 1, ore 1');
+    expect(all).not.toMatch(/wood 0/);
+  });
+
+  it('lists only the sawmill yield (wood) in the produces line', () => {
+    boot((map) => {
+      const t = map.tiles.find((x) => x.settlement === null && x.unit === null)!;
+      const neighbor = map.tiles.find((n) =>
+        hexNeighbors(t).some((h) => h.q === n.q && h.r === n.r),
+      )!;
+      neighbor.terrain = TileType.GrasslandForest;
+      t.ownedBy = 0;
+      t.building = { kind: 'sawmill', level: 1 };
+      return t;
+    });
+    const all = texts().join('\n');
+    expect(all).toContain('Produces: wood 1');
+    expect(all).not.toMatch(/stone 0/);
+    expect(all).not.toMatch(/ore 0/);
+  });
+
+  it('shows a Bridge row with a help button on a bridged tile', () => {
+    boot((map) => {
+      const t = tileAt(map, 0, 0)!;
+      t.terrain = TileType.Water;
+      t.bridge = { owner: 0, dir: 'we' };
+      t.roadOwner = 0;
+      return t;
+    });
+    const all = texts().join('\n');
+    expect(all).toContain('Water');
+    expect(all).toContain('Bridge');
+    expect(helpButtons()).toBeGreaterThanOrEqual(1);
   });
 });
 

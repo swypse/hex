@@ -57,15 +57,14 @@ export function clampPan(
   const halfH = 1.5 * mapRadius * hexSize * scale * tilt;
   // Allow the map edge to sit up to PAN_PADDING * screen inside the viewport.
   // Map spans [pan.x-halfW, pan.x+halfW]; pan.x in [screenW-halfW-padX, halfW+padX].
-  // When the map fits within the screen, keep it centered instead.
+  // When the map is close to (or smaller than) the screen, still keep enough
+  // slack on each side so panning never freezes at the exact-fit zoom.
   const padX = PAN_PADDING * screenW;
   const padY = PAN_PADDING * screenH;
-  // When the map fits within the screen, let it pan freely while staying fully
-  // visible; otherwise keep the edges within padding distance of the viewport.
-  const xMin = 2 * halfW <= screenW ? halfW : screenW - halfW - padX;
-  const xMax = 2 * halfW <= screenW ? screenW - halfW : halfW + padX;
-  const yMin = 2 * halfH <= screenH ? halfH : screenH - halfH - padY;
-  const yMax = 2 * halfH <= screenH ? screenH - halfH : halfH + padY;
+  const xMin = Math.min(halfW, screenW - halfW - padX);
+  const xMax = Math.max(screenW - halfW, halfW + padX);
+  const yMin = Math.min(halfH, screenH - halfH - padY);
+  const yMax = Math.max(screenH - halfH, halfH + padY);
   const clampAxis = (v: number, lo: number, hi: number): number =>
     lo < hi ? Math.min(hi, Math.max(lo, v)) : (lo + hi) / 2;
   return {

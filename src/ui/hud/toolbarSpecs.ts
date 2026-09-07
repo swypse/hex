@@ -4,7 +4,7 @@ import { useGameStore } from '../../store/gameStore';
 import { tileAt } from '../../game/selection';
 import { canAfford, villageUpgradeCost } from '../../game/resources';
 import { canBuildSawmill, canBuildForestTemple, canBuildMine, canBuildPort, canBuildTemple, BUILDING_COSTS } from '../../game/buildings';
-import { canHeal, UNIT_TYPES } from '../../game/units';
+import { canHeal, unitMaintenance, UNIT_TYPES, UNIT_TYPE_NAMES } from '../../game/units';
 import { SHIP_UPGRADE_COST, canUpgradeShip } from '../../game/ship';
 import { unitsInVillage, villageCapacity, canBuildWall, WALL_COST } from '../../game/village';
 import { canBuildRoad, ROAD_COST } from '../../game/roads';
@@ -104,6 +104,13 @@ export function toolbarSpecs(): ToolbarSpec[] {
       const ore = cost.ore > 0 ? ` + ${cost.ore} ${t('action.oreWord')}` : '';
       out.push({ key: 'upgrade-ship', label: t('action.upgradeShip', { money: cost.money, wood: cost.wood, ore }), disabled: !upgradable, onClick: () => gameController.upgradeSelectedShip() });
     }
+    const disbandCost = 3 * unitMaintenance(unit);
+    out.push({
+      key: 'disband',
+      label: t('action.disband', { name: UNIT_TYPE_NAMES[unit.type], cost: disbandCost }),
+      disabled: !canAfford(player.resources, { wood: 0, stone: 0, money: disbandCost, ore: 0 }),
+      onClick: () => gameController.disbandSelectedUnit(),
+    });
   }
 
   if (

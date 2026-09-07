@@ -3,6 +3,7 @@ import { generatePlayerNames } from './names';
 import { Resources, START_RESOURCES } from './resources';
 import type { SkillId } from './skills';
 import { EMPTY_STATS, type PlayerStats } from './score';
+import type { AchievementId } from './achievements';
 import { Tribe, TRIBES } from './tribes';
 import { AiDifficulty, DEFAULT_AI_DIFFICULTY } from './aiDifficulty';
 
@@ -19,6 +20,7 @@ export interface Player {
   knownTribes?: Tribe[];
   stats?: PlayerStats;
   difficulty?: AiDifficulty;
+  achievements?: AchievementId[];
 }
 
 function startingResourcesFor(tribe: Tribe): Resources {
@@ -44,6 +46,7 @@ function makePlayer(index: number, tribe: Tribe, isHuman: boolean, name: string,
     isActive: true,
     knownTribes: [tribe],
     stats: { ...EMPTY_STATS },
+    achievements: [],
     difficulty: isHuman ? undefined : difficulty,
   };
 }

@@ -7,7 +7,7 @@ import { UNIT_TYPE_NAMES, UNIT_TYPES, unitMaintenance, type Unit } from '../../g
 import { unitCanAct } from '../../game/unitActions';
 import { tileAt } from '../../game/selection';
 import { attackDamage } from '../../game/combat';
-import { activeBuffs } from '../../game/buffs';
+import { activeBuffs, VILLAGE_DEFENCE } from '../../game/buffs';
 import { isShip } from '../../game/ship';
 import { villageCapacity, villageBuildingLimit, buildingsInVillage, unitsInVillage } from '../../game/village';
 import { villageIncome } from '../../game/capture';
@@ -17,7 +17,7 @@ import { isExploredFor } from '../../game/explore';
 import { hexNeighbors } from '../../game/hex';
 import { canOpenSkill, hasSkill, skillCost, type SkillId } from '../../game/skills';
 import { canBuildRoadHere } from '../../game/roads';
-import { canBuildBridgeHere } from '../../game/bridges';
+import { canBuildBridgeHere, hasBridge } from '../../game/bridges';
 import type { Player } from '../../game/players';
 import type { GameMap, MapTile } from '../../game/mapGen';
 import { useGameStore } from '../../store/gameStore';
@@ -34,6 +34,7 @@ function unitDefenceBuffs(map: GameMap, unit: Unit, tile: MapTile): { key: strin
   const buffs = activeBuffs(map, unit.owner);
   if (buffs.includes('waterProtection') && isShip(unit)) out.push({ key: 'hud.buff.waterProtection', amount: 10 });
   if (buffs.includes('forestProtection') && isForestType(tile.terrain)) out.push({ key: 'hud.buff.forestProtection', amount: 10 });
+  if (tile.settlement && tile.settlement.owner === unit.owner) out.push({ key: 'hud.buff.village', amount: VILLAGE_DEFENCE });
   if (tile.settlement?.wall && tile.settlement.owner === unit.owner) out.push({ key: 'hud.buff.wall', amount: 3 });
   return out;
 }
@@ -90,6 +91,13 @@ export class HudSelected implements Widget {
     let settlementLineIndex = -1;
     let buildingLineIndex = -1;
     let buildingLimitLineIndex = -1;
+    let bridgeLineIndex = -1;
+
+    if (hasBridge(tile)) {
+      bridgeLineIndex = lines.length;
+      lines.push(t('hud.selected.bridge'));
+      bolds.push(true);
+    }
 
     if (tile.unit) {
       const unit = tile.unit;
@@ -134,8 +142,11 @@ export class HudSelected implements Widget {
       buildingLineIndex = lines.length;
       lines.push(t('hud.selected.building', { name: BUILDING_NAMES[b.kind], level: b.level }));
       bolds.push(true);
-      if (y.wood > 0 || y.stone > 0 || y.ore > 0) {
-        lines.push(t('hud.selected.produces', { wood: y.wood, stone: y.stone, ore: y.ore }));
+      if (y.wood > 0) {
+        lines.push(t('hud.selected.produces.wood', { wood: y.wood }));
+        bolds.push(false);
+      } else if (y.stone > 0 || y.ore > 0) {
+        lines.push(t('hud.selected.produces.stoneOre', { stone: y.stone, ore: y.ore }));
         bolds.push(false);
       }
     }
@@ -197,8 +208,9 @@ export class HudSelected implements Widget {
     this.measured = actions.length > 0 ? y - 6 + 8 : y + 8;
 
     const HELP_SIZE = 14;
-    type HelpKind = 'unitHelp' | 'settlementHelp' | 'buildingHelp' | 'buildingLimitHelp';
+    type HelpKind = 'unitHelp' | 'settlementHelp' | 'buildingHelp' | 'buildingLimitHelp' | 'bridgeHelp';
     const helpRows: { index: number; kind: HelpKind }[] = [];
+    if (bridgeLineIndex >= 0) helpRows.push({ index: bridgeLineIndex, kind: 'bridgeHelp' });
     if (tile.unit) helpRows.push({ index: unitLineIndex, kind: 'unitHelp' });
     if (tile.settlement) helpRows.push({ index: settlementLineIndex, kind: 'settlementHelp' });
     if (tile.building) helpRows.push({ index: buildingLineIndex, kind: 'buildingHelp' });

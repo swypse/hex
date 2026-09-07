@@ -5,6 +5,7 @@ import { TRIBES } from '../../game/tribes';
 import { Player } from '../../game/players';
 import { scoreBreakdown, totalScore } from '../../game/score';
 import { bonusScoreFor, rankPlayers } from '../../game/gameMode';
+import { achievementNameKey, achievementPoints, unlockedAchievements } from '../../game/achievements';
 import { useGameStore } from '../../store/gameStore';
 import { type UIHost } from '../host';
 import { Button } from '../kit/button';
@@ -175,6 +176,32 @@ export class GameOver {
       label.position.set(cw / 2, y);
       this.details.addChild(label);
       y += label.height + 8;
+    }
+    const openedAch = unlockedAchievements(player);
+    if (openedAch.length > 0) {
+      const heading = makeLabel(t('ach.title'), {
+        fontSize: 14,
+        fill: 0xffffff,
+        fontWeight: '700',
+        wordWrap: true,
+        wordWrapWidth: cw,
+      });
+      heading.anchor.set(0.5, 0);
+      heading.position.set(cw / 2, y + 4);
+      this.details.addChild(heading);
+      y += heading.height + 8;
+      for (const id of openedAch) {
+        const line = makeLabel(`${t(achievementNameKey(id))}: +${achievementPoints(id)}`, {
+          fontSize: 14,
+          fill: 0xeeeeee,
+          wordWrap: true,
+          wordWrapWidth: cw,
+        });
+        line.anchor.set(0.5, 0);
+        line.position.set(cw / 2, y);
+        this.details.addChild(line);
+        y += line.height + 8;
+      }
     }
     const total = makeLabel(`Total: ${totalScore(map, player)}`, {
       fontSize: 16,

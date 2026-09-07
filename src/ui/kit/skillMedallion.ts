@@ -44,7 +44,7 @@ export function makeSkillMedallion(opts: SkillMedallionOpts): Container {
 
   const bg = new Graphics();
   bg.circle(0, 0, R)
-    .fill(opts.opened ? 0xff8c00 : 0x535353)
+    .fill(opts.opened ? 0xff8c00 : 0x373748)
     .stroke({ width: Math.max(2, Math.round(size / 12)), color: opts.opened ? 0xff8c00 : 0x333333 });
   el.addChild(bg);
 

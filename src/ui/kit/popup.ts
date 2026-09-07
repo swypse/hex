@@ -356,10 +356,11 @@ export class Popup {
   private enableScrollListeners(): void {
     if (this.listening) return;
     this.listening = true;
-    // Drags begin only on the pad so scrolling never triggers the control the
-    // drag started on. Wheel events bubble from interactive children through
-    // the viewport.
-    this.scrollPad.on('pointerdown', this.onPadPointerDown);
+    // Drags begin anywhere in the scrollable area (including over content
+    // text/icons) so scrolling never depends on hitting the blank pad. Wheel
+    // events bubble from interactive children through the viewport.
+    this.scrollPad.on('pointerdown', this.onScrollPointerDown);
+    this.viewport.on('pointerdown', this.onScrollPointerDown);
     this.scrollPad.on('wheel', this.onWheel);
     this.viewport.on('wheel', this.onWheel);
   }
@@ -367,7 +368,8 @@ export class Popup {
   private disableScrollListeners(): void {
     if (!this.listening) return;
     this.listening = false;
-    this.scrollPad.off('pointerdown', this.onPadPointerDown);
+    this.scrollPad.off('pointerdown', this.onScrollPointerDown);
+    this.viewport.off('pointerdown', this.onScrollPointerDown);
     this.scrollPad.off('wheel', this.onWheel);
     this.viewport.off('wheel', this.onWheel);
     this.pointerId = null;
@@ -380,7 +382,7 @@ export class Popup {
     this.content.position.y = -this.scrollOffset;
   };
 
-  private onPadPointerDown = (e: FederatedPointerEvent): void => {
+  private onScrollPointerDown = (e: FederatedPointerEvent): void => {
     if (this.scrollMax <= 0 || this.pointerId !== null || e.button !== 0) return;
     this.pointerId = e.pointerId;
     this.lastClientY = e.clientY;

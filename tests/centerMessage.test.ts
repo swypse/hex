@@ -1,5 +1,5 @@
 import { describe, expect, it, afterEach, vi } from 'vitest';
-import { Container, Text } from 'pixi.js';
+import { Container, Sprite, Text } from 'pixi.js';
 import { CenterMessage } from '../src/ui/overlays/CenterMessage';
 import { useGameStore } from '../src/store/gameStore';
 import { t } from '../src/i18n';
@@ -34,9 +34,18 @@ function allTexts(c: Container): Text[] {
   return out;
 }
 
+function countSprites(c: Container): number {
+  let n = 0;
+  for (const ch of c.children) {
+    if (ch instanceof Sprite) n += 1;
+    if (ch instanceof Container) n += countSprites(ch);
+  }
+  return n;
+}
+
 describe('CenterMessage', () => {
   afterEach(() => {
-    useGameStore.setState({ centerMessage: null, centerMessageQueue: [] });
+    useGameStore.setState({ centerMessage: null, centerMessageQueue: [], centerIconFile: null, centerIconQueue: [] });
     vi.restoreAllMocks();
   });
 
@@ -70,6 +79,22 @@ describe('CenterMessage', () => {
 
     msg.destroy();
     expect(root.children.length).toBe(0);
+  });
+
+  it('shows the tribe icon above the text for a meet-tribe message', () => {
+    Object.defineProperty(Text.prototype, 'width', { configurable: true, get: () => 120 });
+    Object.defineProperty(Text.prototype, 'height', { configurable: true, get: () => 14 });
+    installCanvas();
+    useGameStore.setState({ centerMessage: 'You meet Cats!', centerIconFile: 'cats-icon.png' });
+    const host = makeHost();
+    const root = new Container();
+    const msg = new CenterMessage();
+    msg.mount(host, root);
+
+    const popupRoot = (root.children[0] as Container).children[0] as Container;
+    expect(allTexts(popupRoot).some((tx) => String(tx.text) === 'You meet Cats!')).toBe(true);
+    expect(countSprites(popupRoot)).toBeGreaterThan(0);
+    msg.destroy();
   });
 
   it('auto-clears the message after a timeout', async () => {

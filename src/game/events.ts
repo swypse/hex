@@ -2,6 +2,7 @@ import type { Axial } from './hex';
 import { SkillId } from './skills';
 import { UnitType } from './units';
 import type { BonusKind } from './bonus';
+import type { AchievementId } from './achievements';
 
 export type BuildingKind = 'sawmill' | 'mine' | 'port' | 'temple' | 'forestTemple';
 
@@ -31,12 +32,14 @@ export type GameEvent =
   | { type: 'healed'; unitId: string; playerIndex: number }
   | { type: 'shipUpgraded'; unitId: string; level: 1 | 2 | 3; playerIndex: number }
   | { type: 'shipReverted'; unitId: string }
+  | { type: 'unitDisbanded'; unitId: string; q: number; r: number; playerIndex: number }
   | { type: 'scoreFly'; playerIndex: number; amount: number; q: number; r: number }
   | { type: 'knightCombo'; unitId: string; q: number; r: number; playerIndex: number }
   | { type: 'bonusClaimed'; q: number; r: number; kind: BonusKind; playerIndex: number; skill?: SkillId }
   | { type: 'explorer'; q: number; r: number; path: Axial[]; playerIndex: number }
   | { type: 'pirateCapture'; q: number; r: number; playerIndex: number; success: boolean }
   | { type: 'pirateSpawned'; q: number; r: number }
+  | { type: 'achievementUnlocked'; playerIndex: number; achievement: AchievementId }
   | { type: 'turnStarted'; playerIndex: number; turn: number }
   | { type: 'aiTurn'; playerIndex: number }
   | { type: 'gameOver'; winnerIndex: number; bonus: number };

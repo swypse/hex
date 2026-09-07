@@ -10,6 +10,7 @@ import { SkillTree } from './SkillTree';
 import { UnitHelpDialog } from './UnitHelpDialog';
 import { GameOver } from './GameOver';
 import { GameStats } from './GameStats';
+import { AchievementsDialog } from './AchievementsDialog';
 import { WelcomeDialog } from './WelcomeDialog';
 import { TutorialOverlay } from './TutorialOverlay';
 
@@ -38,10 +39,12 @@ export class OverlayManager {
     skill: { make: () => new SkillTree(), mounted: null, hiding: false },
     gameover: { make: () => new GameOver(), mounted: null, hiding: false },
     stats: { make: () => new GameStats(), mounted: null, hiding: false },
+    achievements: { make: () => new AchievementsDialog(), mounted: null, hiding: false },
     unithelp: { make: () => new UnitHelpDialog(), mounted: null, hiding: false },
     settlementhelp: { make: () => new UnitHelpDialog(), mounted: null, hiding: false },
     buildinghelp: { make: () => new UnitHelpDialog(), mounted: null, hiding: false },
     buildinglimithelp: { make: () => new UnitHelpDialog(), mounted: null, hiding: false },
+    bridgehelp: { make: () => new UnitHelpDialog(), mounted: null, hiding: false },
     welcome: { make: () => new WelcomeDialog(), mounted: null, hiding: false },
     tutorial: { make: () => new TutorialOverlay(), mounted: null, hiding: false },
   };
@@ -60,7 +63,7 @@ export class OverlayManager {
     const s = useGameStore.getState();
     const inGame = s.screen === 'game';
     const active = new Set<string>();
-    if (s.centerMessage !== null) active.add('center');
+    if (inGame && s.centerMessage !== null) active.add('center');
     if (inGame && s.tutorial) active.add('tutorial');
     if (inGame && s.gameOver && s.winnerIndex !== null) active.add('gameover');
     if (inGame) {
@@ -83,6 +86,9 @@ export class OverlayManager {
         case 'stats':
           active.add('stats');
           break;
+        case 'achievements':
+          active.add('achievements');
+          break;
         case 'welcome':
           active.add('welcome');
           break;
@@ -97,6 +103,9 @@ export class OverlayManager {
           break;
         case 'buildingLimitHelp':
           active.add('buildinglimithelp');
+          break;
+        case 'bridgeHelp':
+          active.add('bridgehelp');
           break;
       }
     }

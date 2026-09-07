@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { Container } from 'pixi.js';
 import { HudSkills } from '../src/ui/hud/HudSkills';
-import { TOOLBAR_HEIGHT, TURN_BAR_HEIGHT } from '../src/ui/layout';
+import { TOOLBAR_HEIGHT, TURN_BAR_HEIGHT, ACTION_TOOLBAR_MAX_WIDTH } from '../src/ui/layout';
 import { type UIHost } from '../src/ui/host';
 
 const BUTTON_SIZE = 48;
@@ -25,13 +25,23 @@ describe('HudSkills placement', () => {
     root = new Container();
   });
 
-  it('sits bottom-right, centered under the end turn button and 6px above the turn bar', () => {
+  it('aligns to the right edge of the centered action panel on wide screens', () => {
     const skills = new HudSkills();
     skills.mount(host, root);
     const el = (skills as unknown as { el: Container }).el!;
     const { width, height } = host.app.screen;
-    expect(el.position.x).toBe(width - TOOLBAR_SIDE_PADDING - BUTTON_SIZE);
+    const barRight = (width + ACTION_TOOLBAR_MAX_WIDTH) / 2;
+    expect(el.position.x).toBe(barRight - TOOLBAR_SIDE_PADDING - BUTTON_SIZE);
     expect(el.position.y).toBe(height - TOOLBAR_HEIGHT - TURN_BAR_HEIGHT - TURN_BAR_GAP - BUTTON_SIZE);
+    skills.destroy();
+  });
+
+  it('aligns to the screen right edge on narrow screens', () => {
+    host = makeHost(400, 800);
+    const skills = new HudSkills();
+    skills.mount(host, new Container());
+    const el = (skills as unknown as { el: Container }).el!;
+    expect(el.position.x).toBe(400 - TOOLBAR_SIDE_PADDING - BUTTON_SIZE);
     skills.destroy();
   });
 });

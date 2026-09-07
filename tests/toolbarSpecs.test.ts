@@ -56,6 +56,21 @@ describe('toolbarSpecs', () => {
     expect(toolbarSpecs().some((a) => a.key === 'upgrade-ship')).toBe(true);
   });
 
+  it('offers the disband action for an own unit with its cost', () => {
+    const tile = map.tiles.find((t) => t.unit === null)!;
+    tile.ownedBy = 0;
+    tile.unit = {
+      id: 'w', owner: 0, type: 'warrior', q: tile.q, r: tile.r,
+      hasMoved: false, hasAttacked: false, hasHealed: false,
+      hp: UNIT_TYPES.warrior.maxHp, attack: 2, attackDistance: 1, spawnVillage: null,
+    };
+    select(tile);
+    const spec = toolbarSpecs().find((a) => a.key === 'disband');
+    expect(spec).toBeDefined();
+    expect(spec!.label).toContain('Disband Warrior');
+    expect(spec!.disabled).toBe(false);
+  });
+
   it('applies the ship upgrade when only the ship cell (not the unit) is selected', () => {
     const tile = map.tiles.find((t) => t.unit === null)!;
     tile.ownedBy = 0;

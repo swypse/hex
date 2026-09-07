@@ -8,7 +8,7 @@ import { Button } from '../kit/button';
 import { IconButton } from '../kit/iconButton';
 import { ActionTooltip } from '../kit/actionTooltip';
 import { tooltipsEnabled } from '../kit/tooltipGate';
-import { TOOLBAR_HEIGHT } from '../layout';
+import { TOOLBAR_HEIGHT, isWideScreen, ACTION_TOOLBAR_MAX_WIDTH } from '../layout';
 import { toolbarSpecs } from './toolbarSpecs';
 import { STEP_CONFIG } from '../../game/tutorial/tutorialSteps';
 
@@ -17,6 +17,7 @@ const ICON_ACTIONS: Record<string, string> = {
   wall: 'build-wall.png',
   'upgrade-ship': 'upgrade.png',
   heal: 'heal.png',
+  disband: 'disband.png',
   capture: 'capture.png',
   spawn: 'spawn.png',
   sawmill: 'build-sawmill.png',
@@ -31,19 +32,24 @@ const ICON_ACTIONS: Record<string, string> = {
 
 const LAST_TURN_COLOR = 0x9cff55;
 const SIDE_PADDING = 12;
+const PANEL_PADDING_X = 4;
+const PANEL_CORNER_RADIUS = 4;
+const OUTER_BG = 0x5297ff;
+const INNER_BG = 0x3977d8;
 const ACTION_BTN = {
-  color: 0x373749,
+  color: 0xd0e3ff,
   hoverColor: 0xffffff,
   pressedColor: 0xffffff,
-  borderColor: 0x41414e,
-  borderWidth: 4,
-  disabledAlpha: 0.8,
+  borderWidth: 0,
+  disabledAlpha: 0.6,
   transparentDisabled: true,
 } as const;
 
 export class HudToolbar implements Widget {
   private el: Container | null = null;
   private bg: Graphics | null = null;
+  private panel: Container | null = null;
+  private inner: Graphics | null = null;
   private row: Container | null = null;
   private endTurnRow: Container | null = null;
   private statsRow: Container | null = null;
@@ -60,13 +66,18 @@ export class HudToolbar implements Widget {
     this.host = host;
     const el = new Container();
     const bg = new Graphics();
+    const panel = new Container();
+    const inner = new Graphics();
     const row = new Container();
     const endTurnRow = new Container();
     const statsRow = new Container();
-    el.addChild(bg, row, endTurnRow, statsRow);
+    el.addChild(bg, panel);
+    panel.addChild(inner, statsRow, endTurnRow, row);
     root.addChild(el);
     this.el = el;
     this.bg = bg;
+    this.panel = panel;
+    this.inner = inner;
     this.row = row;
     this.endTurnRow = endTurnRow;
     this.statsRow = statsRow;
@@ -78,24 +89,47 @@ export class HudToolbar implements Widget {
   }
 
   private layout = (): void => {
-    if (!this.el || !this.bg || !this.host) return;
-    this.bg.clear().rect(0, 0, this.host.app.screen.width, TOOLBAR_HEIGHT).fill(0x202032);
+    if (!this.el || !this.bg || !this.panel || !this.inner || !this.host) return;
+    const screenW = this.host.app.screen.width;
+    const screenH = this.host.app.screen.height;
+    const barW = isWideScreen(screenW) ? ACTION_TOOLBAR_MAX_WIDTH : screenW;
+    const barX = isWideScreen(screenW) ? (screenW - barW) / 2 : 0;
+    const panelW = barW - PANEL_PADDING_X * 2;
+    this.bg.clear().rect(0, 0, barW, TOOLBAR_HEIGHT).fill(OUTER_BG);
     this.bg.eventMode = 'static';
-    this.el.position.set(0, this.host.app.screen.height - TOOLBAR_HEIGHT);
+    this.panel.position.set(PANEL_PADDING_X, 0);
+    const r = PANEL_CORNER_RADIUS;
+    this.inner
+      .clear()
+      .moveTo(0, TOOLBAR_HEIGHT)
+      .lineTo(0, r)
+      .arcTo(0, 0, r, 0, r)
+      .lineTo(panelW - r, 0)
+      .arcTo(panelW, 0, panelW, r, r)
+      .lineTo(panelW, TOOLBAR_HEIGHT)
+      .closePath()
+      .fill(INNER_BG);
+    this.el.position.set(barX, screenH - TOOLBAR_HEIGHT);
     const barY = (TOOLBAR_HEIGHT - 48) / 2;
-    if (this.row) {
-      const maxW = this.host.app.screen.width * 0.8;
-      const scale = this.row.width > maxW ? maxW / this.row.width : 1;
-      this.row.scale.set(scale, scale);
-      this.row.position.set((this.host.app.screen.width - this.row.width * scale) / 2, barY);
+    if (this.statsRow) {
+      this.statsRow.position.set(SIDE_PADDING, barY);
     }
     if (this.endTurnRow) {
       const btn = this.endTurnRow.children.length > 0 ? this.endTurnRow.getChildAt(0) : null;
       const width = btn ? btn.width : 48;
-      this.endTurnRow.position.set(this.host.app.screen.width - width - SIDE_PADDING, barY);
+      this.endTurnRow.position.set(panelW - width - SIDE_PADDING, barY);
     }
-    if (this.statsRow) {
-      this.statsRow.position.set(SIDE_PADDING, barY);
+    if (this.row) {
+      const statsW = this.statsRow ? this.statsRow.width : 0;
+      const endTurnW = this.endTurnRow ? this.endTurnRow.width : 0;
+      const freeLeft = SIDE_PADDING + statsW + 8;
+      const freeRight = panelW - SIDE_PADDING - endTurnW - 8;
+      const freeW = Math.max(0, freeRight - freeLeft);
+      const maxW = Math.min(freeW, ACTION_TOOLBAR_MAX_WIDTH * 0.9);
+      const scale = this.row.width > maxW ? maxW / this.row.width : 1;
+      this.row.scale.set(scale, scale);
+      const center = freeW > 0 ? (freeLeft + freeRight) / 2 : panelW / 2;
+      this.row.position.set(center - (this.row.width * scale) / 2, barY);
     }
   };
 
@@ -258,6 +292,8 @@ export class HudToolbar implements Widget {
     this.el?.destroy({ children: true });
     this.el = null;
     this.bg = null;
+    this.panel = null;
+    this.inner = null;
     this.row = null;
     this.endTurnRow = null;
     this.statsRow = null;

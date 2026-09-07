@@ -209,7 +209,7 @@ describe('scoreBreakdown', () => {
       resources: { wood: 0, stone: 0, money: 0, ore: 0 },
       score: 25 + 30 + 50 + 20 + 15 + 15 + 20 + 40,
       kills: 2, skills: ['swordsman'], isActive: true,
-      stats: { killedUnits: 3, pirateKills: 1, villagesCaptured: 1, villageUpgrades: 1 },
+      stats: { killedUnits: 3, pirateKills: 1, villagesCaptured: 1, villageUpgrades: 1, knightCombos: 0, enemyShipsKilled: 0, shipsCapturedByPirates: 0, bonusesCollected: 0 },
     };
     const items = scoreBreakdown(map, p, 40);
     const byLabel = new Map(items.map((i) => [i.label, i]));

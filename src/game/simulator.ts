@@ -14,8 +14,9 @@ import { PlayerStats } from './score';
 import { canAfford, pay, villageUpgradeCost } from './resources';
 import { awardScore, awardTempleScores, CAPTURE_SCORE, COMBO_SCORE, EMPTY_STATS, KILL_SCORE, PIRATE_KILL_SCORE, SKILL_SCORE, UPGRADE_SCORE } from './score';
 import { hasSkill, openSkill as applySkill, randomUnopenedSkill, SkillId } from './skills';
+import { evaluateAchievements, awardAchievementScores, currentlyMetIds, type AchievementId } from './achievements';
 import { gainShipAbility, revertShip, upgradeShip } from './ship';
-import { moveRange, canAttack, canHeal, canMove, healUnit, makeUnit, PIRATE_OWNER, Unit, UnitType, UNIT_MOVEMENT } from './units';
+import { moveRange, canAttack, canHeal, canMove, healUnit, makeUnit, unitMaintenance, PIRATE_OWNER, Unit, UnitType, UNIT_MOVEMENT } from './units';
 import { reachableTargets, moveUnit, pathBetween, tileAt } from './selection';
 import { spawnUnit } from './spawn';
 import { exploreUnitPath } from './explore';
@@ -38,6 +39,7 @@ export type Command =
   | { type: 'upgradeShip'; unitId: string }
   | { type: 'openSkill'; skill: SkillId }
   | { type: 'heal'; unitId: string }
+  | { type: 'disband'; unitId: string }
   | { type: 'shipLanding'; unitId: string; q: number; r: number }
   | { type: 'claimBonus' }
   | { type: 'endTurn' };
@@ -56,6 +58,7 @@ export const PREDICTABLE_COMMAND_TYPES: ReadonlySet<Command['type']> = new Set([
   'upgradeShip',
   'openSkill',
   'heal',
+  'disband',
   'shipLanding',
 ]);
 
@@ -74,6 +77,7 @@ export class Simulator {
   private aiRng: () => SeededRandom;
   private disablePirates: boolean;
   private events: GameEvent[] = [];
+  private achievementBaseline = new Map<number, Set<AchievementId>>();
 
   constructor(
     map: GameMap,
@@ -93,6 +97,7 @@ export class Simulator {
     this.winnerIndex = null;
     this.expectedTurns = expectedTurnsFor(players.length);
     this.bonusAwarded = false;
+    this.ensureAchievementBaseline();
   }
 
   static fromSnapshot(snap: GameStateSnapshot): Simulator {
@@ -174,6 +179,9 @@ export class Simulator {
       case 'heal':
         ok = this.doHeal(cmd.unitId);
         break;
+      case 'disband':
+        ok = this.doDisband(cmd.unitId);
+        break;
       case 'shipLanding':
         ok = this.doShipLanding(cmd.unitId, cmd.q, cmd.r);
         break;
@@ -186,7 +194,26 @@ export class Simulator {
         break;
     }
     this.syncDiscoveries();
+    if (ok && !this.gameOver) this.evaluateAchievementsForAll();
     return ok;
+  }
+
+  private evaluateAchievementsForAll(): void {
+    this.ensureAchievementBaseline();
+    for (const p of this.players) {
+      const skip = this.achievementBaseline.get(p.index) ?? new Set<AchievementId>();
+      for (const id of evaluateAchievements(this.map, p, skip)) {
+        this.emit({ type: 'achievementUnlocked', playerIndex: p.index, achievement: id });
+      }
+    }
+  }
+
+  private ensureAchievementBaseline(): void {
+    for (const p of this.players) {
+      if (!this.achievementBaseline.has(p.index)) {
+        this.achievementBaseline.set(p.index, new Set(currentlyMetIds(this.map, p)));
+      }
+    }
   }
 
   static isPredictable(cmd: Command): boolean {
@@ -304,6 +331,7 @@ export class Simulator {
       } else if (targetPlayer) {
         this.statsOf(targetPlayer).killedUnits += 1;
       }
+      if (targetPre.shipLevel !== undefined) this.statsOf(attackerPlayer).enemyShipsKilled += 1;
     }
     if (result.attackerDied && targetPlayer) {
       targetPlayer.kills += 1;
@@ -341,6 +369,7 @@ export class Simulator {
         if (attacker.killsThisTurn === 3) {
           awardScore(attackerPlayer, COMBO_SCORE);
           this.emitScoreFly(attackerPlayer.index, COMBO_SCORE, target);
+          this.statsOf(attackerPlayer).knightCombos += 1;
           this.emit({ type: 'knightCombo', unitId, q: target.q, r: target.r, playerIndex: attacker.owner });
         }
       }
@@ -485,6 +514,22 @@ export class Simulator {
     return true;
   }
 
+  private doDisband(unitId: string): boolean {
+    const tile = this.map.tiles.find((t) => t.unit?.id === unitId);
+    if (!tile?.unit) return false;
+    const unit = tile.unit;
+    if (unit.owner !== this.currentPlayerIndex) return false;
+    const player = this.players[unit.owner]!;
+    const cost = 3 * unitMaintenance(unit);
+    if (!canAfford(player.resources, { wood: 0, stone: 0, money: cost, ore: 0 })) return false;
+    player.resources = pay(player.resources, { wood: 0, stone: 0, money: cost, ore: 0 });
+    const q = tile.q;
+    const r = tile.r;
+    tile.unit = null;
+    this.emit({ type: 'unitDisbanded', unitId, q, r, playerIndex: unit.owner });
+    return true;
+  }
+
   private doShipLanding(unitId: string, q: number, r: number): boolean {
     const unit = this.findUnit(unitId);
     if (!unit || unit.shipLevel === undefined || unit.owner !== this.currentPlayerIndex) return false;
@@ -528,6 +573,7 @@ export class Simulator {
         t.unit.hasHealed = true;
       }
       const result = this.applyBonus(t, kind, player);
+      this.statsOf(player).bonusesCollected += 1;
       this.emit({
         type: 'bonusClaimed',
         q: t.q,
@@ -608,6 +654,7 @@ export class Simulator {
         this.turn += 1;
         this.growTemples();
         this.resetUnitFlags();
+        this.evaluateAchievementsForAll();
         if (this.checkEndConditions()) return;
       }
       this.currentPlayerIndex = next;
@@ -660,6 +707,7 @@ export class Simulator {
           break;
       }
     }
+    this.evaluateAchievementsForAll();
   }
 
   private runPirateTurn(): void {
@@ -721,6 +769,8 @@ export class Simulator {
       ship.hasMoved = false;
       ship.hasAttacked = false;
       ship.hasHealed = false;
+      const victim = this.players[targetOwner];
+      if (victim) this.statsOf(victim).shipsCapturedByPirates += 1;
     } else {
       pirate.hp = Math.max(0, pirate.hp - 20);
       ship.hp = Math.max(0, ship.hp - 10);
@@ -875,6 +925,7 @@ export class Simulator {
   private checkEndConditions(): boolean {
     if (this.mode === 'turns30' && this.turn >= 30) {
       awardTempleScores(this.map, this.players);
+      awardAchievementScores(this.players);
       this.endGame(computeWinner(this.players, this.map));
       return true;
     }
@@ -882,6 +933,7 @@ export class Simulator {
       const w = captureWinnerIndex(this.map);
       if (w !== null) {
         awardTempleScores(this.map, this.players);
+        awardAchievementScores(this.players);
         this.endGame(w);
         return true;
       }

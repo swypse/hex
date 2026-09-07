@@ -17,6 +17,7 @@ import { makeLabel } from '../ui/kit/label';
 import { saveRepository } from '../storage/saveGame';
 import { BonusKind } from '../game/bonus';
 import { SKILLS } from '../game/skills';
+import { achievementIcon, achievementNameKey } from '../game/achievements';
 import { CameraController } from './cameraController';
 import { initialAttackHpOverrides, hpOverrideAfterAttack } from './attackHp';
 import { t } from '../i18n';
@@ -234,6 +235,15 @@ export class EventPresenter {
             if (e.playerIndex === useGameStore.getState().localPlayerIndex) {
               useGameStore.getState().setCenterMessage(
                 e.success ? t('msg.shipCaptured') : t('msg.shipCaptureFailed'),
+              );
+            }
+            break;
+          }
+          case 'achievementUnlocked': {
+            if (e.playerIndex === useGameStore.getState().localPlayerIndex) {
+              useGameStore.getState().setCenterMessage(
+                t('ach.unlocked', { name: t(achievementNameKey(e.achievement)) }),
+                achievementIcon(e.achievement),
               );
             }
             break;
@@ -570,7 +580,7 @@ export class EventPresenter {
     }
     if (e.playerIndex !== local) return;
     if (e.kind === 'skill') {
-      if (e.skill) store.setCenterMessage(`Skill ${SKILLS[e.skill].name} opened!`);
+      if (e.skill) store.setCenterMessage(t('msg.skillOpened', { skill: SKILLS[e.skill].name }));
       return;
     }
     const messages: Record<Exclude<BonusKind, 'skill'>, string> = {

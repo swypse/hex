@@ -5,9 +5,7 @@ import { useGameStore } from '../../store/gameStore';
 import { type UIHost, type Widget } from '../host';
 import { makeLabel } from '../kit/label';
 import { t } from '../../i18n';
-import { TOOLBAR_HEIGHT, TURN_BAR_HEIGHT } from '../layout';
-
-const BLOCK_COLOR = 0x5198ff;
+import { TOOLBAR_HEIGHT, TURN_BAR_HEIGHT, TURN_BAR_COLOR, isWideScreen, ACTION_TOOLBAR_MAX_WIDTH } from '../layout';
 
 export class HudTurn implements Widget {
   private el: Container | null = null;
@@ -37,7 +35,10 @@ export class HudTurn implements Widget {
 
   private layout = (): void => {
     if (!this.el || !this.host) return;
-    this.el.position.set(0, this.host.app.screen.height - TOOLBAR_HEIGHT - TURN_BAR_HEIGHT);
+    const screenW = this.host.app.screen.width;
+    const wide = isWideScreen(screenW);
+    const barW = wide ? ACTION_TOOLBAR_MAX_WIDTH : screenW;
+    this.el.position.set(wide ? (screenW - barW) / 2 : 0, this.host.app.screen.height - TOOLBAR_HEIGHT - TURN_BAR_HEIGHT);
   };
 
   private update(): void {
@@ -61,8 +62,24 @@ export class HudTurn implements Widget {
       }
     }
     this.text.text = label;
-    this.panel.clear().rect(0, 0, this.host.app.screen.width, TURN_BAR_HEIGHT).fill({ color: BLOCK_COLOR });
-    this.text.position.set(this.host.app.screen.width / 2, TURN_BAR_HEIGHT / 2);
+    const wide = isWideScreen(this.host.app.screen.width);
+    const barW = wide ? ACTION_TOOLBAR_MAX_WIDTH : this.host.app.screen.width;
+    this.panel.clear();
+    if (wide) {
+      const r = 6;
+      this.panel
+        .moveTo(0, TURN_BAR_HEIGHT)
+        .lineTo(0, r)
+        .arcTo(0, 0, r, 0, r)
+        .lineTo(barW - r, 0)
+        .arcTo(barW, 0, barW, r, r)
+        .lineTo(barW, TURN_BAR_HEIGHT)
+        .closePath()
+        .fill({ color: TURN_BAR_COLOR });
+    } else {
+      this.panel.rect(0, 0, barW, TURN_BAR_HEIGHT).fill({ color: TURN_BAR_COLOR });
+    }
+    this.text.position.set(barW / 2, TURN_BAR_HEIGHT / 2);
   }
 
   destroy(): void {

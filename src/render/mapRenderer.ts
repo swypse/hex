@@ -436,7 +436,8 @@ export class MapView {
 
   private drawRoad(tv: TileView, tile: MapTile): void {
     const owner = tile.roadOwner;
-    if (owner === undefined || owner === null) {
+    const isBridge = tile.bridge !== undefined && tile.bridge !== null;
+    if (owner === undefined || owner === null || isBridge) {
       if (tv.roadGraphics) {
         tv.el.removeChild(tv.roadGraphics);
         tv.roadGraphics.destroy();

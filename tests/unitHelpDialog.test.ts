@@ -10,6 +10,7 @@ import { Tribe } from '../src/game/tribes';
 import { SeededRandom } from '../src/util/random';
 import { makeTestMap, tileAt, makeUnit } from './helpers/testMap';
 import type { GameMap } from '../src/game/mapGen';
+import { TileType } from '../src/game/tileTypes';
 
 type KeyboardEventLike = { key: string; preventDefault: () => void };
 
@@ -130,6 +131,20 @@ describe('UnitHelpDialog', () => {
       selection: { kind: 'village', q: 0, r: 0 },
       overlay: { kind: 'buildingLimitHelp' },
     });
+    const dialog = new UnitHelpDialog();
+    dialog.mount(host, root);
+    const card = (root.children[0] as Container).children[2] as Container;
+    expect(card.children.length).toBeGreaterThanOrEqual(4);
+    dialog.destroy();
+  });
+
+  it('mounts a bridge help popup when the selected tile has a bridge', () => {
+    tileAt(map, 0, 0)!.unit = null;
+    tileAt(map, 0, 0)!.settlement = null;
+    tileAt(map, 0, 0)!.terrain = TileType.Water;
+    tileAt(map, 0, 0)!.bridge = { owner: 0, dir: 'we' };
+    tileAt(map, 0, 0)!.roadOwner = 0;
+    useGameStore.setState({ overlay: { kind: 'bridgeHelp' } });
     const dialog = new UnitHelpDialog();
     dialog.mount(host, root);
     const card = (root.children[0] as Container).children[2] as Container;

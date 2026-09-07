@@ -11,10 +11,11 @@ import { HudTurn } from '../hud/HudTurn';
 import { HudMoney } from '../hud/HudMoney';
 import { HudSelected } from '../hud/HudSelected';
 import { HudSkills } from '../hud/HudSkills';
+import { HudAchievements } from '../hud/HudAchievements';
 import { HudToolbar } from '../hud/HudToolbar';
 import { HudTips } from '../hud/HudTips';
 import { HudTribes } from '../hud/HudTribes';
-import { TOOLBAR_HEIGHT } from '../layout';
+import { TOOLBAR_HEIGHT, isWideScreen } from '../layout';
 
 export class GameScreen implements ScreenController {
   private root: Container | null = null;
@@ -72,6 +73,7 @@ export class GameScreen implements ScreenController {
       new HudTribes(),
       new HudSelected(),
       new HudSkills(),
+      new HudAchievements(),
       new HudToolbar(),
       new HudTips(),
     ];
@@ -103,7 +105,10 @@ export class GameScreen implements ScreenController {
 
   private layoutMask(): void {
     if (!this.mapMask || !this.host) return;
-    this.mapMask.clear().rect(0, 0, this.host.app.screen.width, this.host.app.screen.height - TOOLBAR_HEIGHT).fill(0xffffff);
+    const height = isWideScreen(this.host.app.screen.width)
+      ? this.host.app.screen.height
+      : this.host.app.screen.height - TOOLBAR_HEIGHT;
+    this.mapMask.clear().rect(0, 0, this.host.app.screen.width, height).fill(0xffffff);
   }
 
   destroy(): void {

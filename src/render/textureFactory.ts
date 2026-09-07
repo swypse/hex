@@ -37,6 +37,26 @@ const VILLAGE_CONNECTED_IMAGE_FILE = 'village-connected.png';
 const SAWMILL_IMAGE_FILE = 'sawmill.png';
 const MINE_IMAGE_FILE = 'mine.png';
 
+/** Baked left/right vertical wall colours for each terrain group. */
+const TERRAIN_SIDE_COLORS: Partial<Record<TileType, { left: number; right: number }>> = {
+  [TileType.GrasslandLand]: { left: 0x7a952f, right: 0x4e640e },
+  [TileType.GrasslandForest]: { left: 0x7a952f, right: 0x4e640e },
+  [TileType.GrasslandMountain]: { left: 0x7a952f, right: 0x4e640e },
+  [TileType.DesertLand]: { left: 0xb2a027, right: 0x978612 },
+  [TileType.DesertForest]: { left: 0xb2a027, right: 0x978612 },
+  [TileType.DesertMountain]: { left: 0xb2a027, right: 0x978612 },
+  [TileType.TundraLand]: { left: 0x93508a, right: 0x671d76 },
+  [TileType.TundraForest]: { left: 0x93508a, right: 0x671d76 },
+  [TileType.TundraMountain]: { left: 0x93508a, right: 0x671d76 },
+  [TileType.TaigaLand]: { left: 0x1d7777, right: 0x374e4e },
+  [TileType.TaigaForest]: { left: 0x1d7777, right: 0x374e4e },
+  [TileType.TaigaMountain]: { left: 0x1d7777, right: 0x374e4e },
+  [TileType.RainforestLand]: { left: 0x859f1f, right: 0x1f3c08 },
+  [TileType.RainforestForest]: { left: 0x859f1f, right: 0x1f3c08 },
+  [TileType.RainforestMountain]: { left: 0x859f1f, right: 0x1f3c08 },
+  [TileType.Water]: { left: 0x1f63a1, right: 0x174167 },
+};
+
 const BRIDGE_IMAGE_FILES: Record<BridgeDir, string> = {
   nw: 'bridge-nw.png',
   ne: 'bridge-ne.png',
@@ -348,7 +368,7 @@ export async function createTextures(app: Application, map: GameMap, hexSize = 4
     const img = images.get(String(tile.terrain)) ?? null;
     tileTextures.set(
       key,
-      getTileTexture('tile', tile.terrain, heightPx, img, bottom, 'base'),
+      getTileTexture('tile', tile.terrain, heightPx, img, bottom, 'base', TERRAIN_SIDE_COLORS[tile.terrain]),
     );
     fogTextures.set(
       key,

@@ -4,6 +4,8 @@ import { gameController } from '../../controller/gameController';
 import { tileAt } from '../../game/selection';
 import { unitHelpLines, unitHelpTitle } from '../../game/unitDescriptions';
 import {
+  bridgeHelpLines,
+  bridgeHelpTitle,
   buildingHelpLines,
   buildingHelpTitle,
   buildingLimitHelpLines,
@@ -11,6 +13,7 @@ import {
   settlementHelpLines,
   settlementHelpTitle,
 } from '../../game/helpTexts';
+import { hasBridge } from '../../game/bridges';
 import { useGameStore } from '../../store/gameStore';
 import { type UIHost } from '../host';
 import { Button } from '../kit/button';
@@ -65,6 +68,14 @@ export class UnitHelpDialog {
         }
         title = buildingLimitHelpTitle(tile);
         lines = buildingLimitHelpLines(map, tile);
+        break;
+      case 'bridgeHelp':
+        if (!hasBridge(tile)) {
+          this.close();
+          return;
+        }
+        title = bridgeHelpTitle();
+        lines = bridgeHelpLines();
         break;
       default:
         if (!tile.unit) {

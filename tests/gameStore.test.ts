@@ -95,4 +95,30 @@ describe('gameStore', () => {
     expect(store().centerMessage).toBeNull();
     expect(store().centerMessageQueue).toEqual([]);
   });
+
+  it('keeps the center icon file in sync with the queued center messages', () => {
+    const store = () => useGameStore.getState();
+    store().setCenterMessage('You meet Cats!', 'cats-icon.png');
+    expect(store().centerMessage).toBe('You meet Cats!');
+    expect(store().centerIconFile).toBe('cats-icon.png');
+    store().setCenterMessage('second');
+    expect(store().centerIconFile).toBe('cats-icon.png');
+    expect(store().centerMessageQueue).toEqual(['second']);
+    store().setCenterMessage(null);
+    expect(store().centerMessage).toBe('second');
+    expect(store().centerIconFile).toBeNull();
+    store().setCenterMessage(null);
+    expect(store().centerMessage).toBeNull();
+  });
+
+  it('clears pending center messages when leaving the game screen', () => {
+    useGameStore.setState({ screen: 'game' });
+    const store = () => useGameStore.getState();
+    store().setCenterMessage('a');
+    store().setCenterMessage('b');
+    expect(store().centerMessageQueue).toEqual(['b']);
+    store().setScreen('start');
+    expect(store().centerMessage).toBeNull();
+    expect(store().centerMessageQueue).toEqual([]);
+  });
 });

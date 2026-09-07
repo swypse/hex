@@ -119,7 +119,10 @@ describe('buildPlayers', () => {
   it('seeds every player with zeroed stats', () => {
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(42));
     for (const p of players) {
-      expect(p.stats).toEqual({ killedUnits: 0, pirateKills: 0, villagesCaptured: 0, villageUpgrades: 0 });
+      expect(p.stats).toEqual({
+        killedUnits: 0, pirateKills: 0, villagesCaptured: 0, villageUpgrades: 0,
+        knightCombos: 0, enemyShipsKilled: 0, shipsCapturedByPirates: 0, bonusesCollected: 0,
+      });
     }
   });
 
