@@ -559,7 +559,8 @@ class GameController {
   async handleMapClick(q: number, r: number): Promise<void> {
     if (!this.sim || !this.app) return;
     const store = useGameStore.getState();
-    if (store.aiActive || store.gameOver) return;
+    if (store.gameOver) return;
+    const canAct = !store.aiActive;
     const tile = tileAt(this.sim.map, q, r);
     if (!tile) return;
     if (!isExploredFor(tile, store.localPlayerIndex)) {
@@ -571,7 +572,7 @@ class GameController {
     }
 
     const selection = store.selection;
-    if (selection && selection.kind === 'unit') {
+    if (selection && selection.kind === 'unit' && canAct) {
       const unit = tileAt(this.sim.map, selection.q, selection.r)?.unit;
       if (unit && unit.owner === store.localPlayerIndex && this.attackableKeys.has(axialKey(tile))) {
         if (attackConfirmationEnabled()) {
@@ -593,6 +594,8 @@ class GameController {
         return;
       }
     }
+
+    if (!canAct && selection && selection.kind === 'unit' && selection.q === q && selection.r === r) return;
 
     const next = cycleSelection(selection, tile);
     store.setSelection(next);
