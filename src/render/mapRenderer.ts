@@ -90,8 +90,7 @@ export class MapView {
   private bounceSprite: Sprite | null = null;
   private bounceBaseY = 0;
   private hexBounceRemove: (() => void) | null = null;
-  private hexBounceSprite: Sprite | null = null;
-  private hexBounceBaseY = 0;
+  private hexBounceSprites: { sprite: Sprite; baseY: number }[] = [];
   private lastBouncedKey = '';
   private highlights: Graphics[] = [];
   private graphicsPool: Graphics[] = [];
@@ -869,21 +868,26 @@ export class MapView {
     this.stopHexBounce();
     if (!key) return;
     const tv = this.tileViews.get(key);
-    const sprite = tv?.terrainSprite ?? null;
-    if (!sprite || sprite.destroyed) return;
-    this.hexBounceSprite = sprite;
-    this.hexBounceBaseY = sprite.position.y;
+    if (!tv) return;
+    const sprites: Sprite[] = [];
+    const terrain = tv.terrainSprite;
+    if (terrain && !terrain.destroyed) sprites.push(terrain);
+    const village = tv.villageSprite;
+    if (village && !village.destroyed) sprites.push(village);
+    if (sprites.length === 0) return;
+    this.hexBounceSprites = sprites.map((sprite) => ({ sprite, baseY: sprite.position.y }));
     const amp = this.hexSize * 0.2;
     const DURATION = 150;
     const start = performance.now();
     const fn = (): void => {
-      if (!this.hexBounceSprite || this.hexBounceSprite.destroyed) {
+      const entries = this.hexBounceSprites.filter((e) => !e.sprite.destroyed);
+      if (entries.length === 0) {
         this.stopHexBounce();
         return;
       }
       const t = Math.min(1, (performance.now() - start) / DURATION);
       const p = t < 0.5 ? t * 2 : 2 - t * 2;
-      this.hexBounceSprite.position.y = this.hexBounceBaseY - p * amp;
+      for (const e of entries) e.sprite.position.y = e.baseY - p * amp;
       if (t >= 1) this.stopHexBounce();
     };
     this.app.ticker.add(fn);
@@ -895,10 +899,10 @@ export class MapView {
       this.hexBounceRemove();
       this.hexBounceRemove = null;
     }
-    if (this.hexBounceSprite && !this.hexBounceSprite.destroyed) {
-      this.hexBounceSprite.position.y = this.hexBounceBaseY;
+    for (const e of this.hexBounceSprites) {
+      if (!e.sprite.destroyed) e.sprite.position.y = e.baseY;
     }
-    this.hexBounceSprite = null;
+    this.hexBounceSprites = [];
   }
 
   private startTutorialPulse(): void {
