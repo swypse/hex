@@ -728,6 +728,25 @@ class GameController {
     return true;
   }
 
+  /** Cheat (single-player only): reveals the whole map and all tribes for the
+   *  local player. Returns true when applied. */
+  cheatRemoveFog(): boolean {
+    if (!this.sim) return false;
+    const store = useGameStore.getState();
+    if (store.screen !== 'game' || store.netMode !== 'single') return false;
+    const local = this.sim.players[store.localPlayerIndex];
+    if (!local) return false;
+    for (const tile of this.sim.map.tiles) {
+      if (!(tile.exploredBy ?? []).includes(store.localPlayerIndex)) (tile.exploredBy ??= []).push(store.localPlayerIndex);
+    }
+    const tribes = this.sim.players.filter((p) => p.index !== local.index).map((p) => p.tribe);
+    local.knownTribes = Array.from(new Set([...(local.knownTribes ?? []), ...tribes]));
+    this.syncStore();
+    this.saveGame();
+    this.render();
+    return true;
+  }
+
   confirmShipLanding(): void {
     const store = useGameStore.getState();
     const pending = store.overlay?.kind === 'shipLanding' ? store.overlay.target : null;

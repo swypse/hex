@@ -440,6 +440,9 @@ describe('move animation', () => {
     const deathFn = callbacks[callbacks.length - 1]!;
     now = 2000;
     deathFn();
+    expect(mapRoot.children.length).toBe(1);
+    now = 4000;
+    deathFn();
     expect(mapRoot.children.length).toBe(0);
   });
 

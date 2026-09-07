@@ -87,6 +87,7 @@ export default {
   'msg.yourTurn': 'Your turn',
   'msg.cheatResources': '+100 of each resource (cheat)',
   'msg.cheatSkills': 'All skills unlocked (cheat)',
+  'msg.cheatFog': 'Map revealed (cheat)',
 
   // Common
   'common.close': 'Close',

@@ -26,7 +26,8 @@ const HEX_SIZE = 40;
 
 const DEATH_PARTICLE_COUNT = 10;
 const DEATH_RISE = 200;
-const DEATH_MS = 1000;
+const DEATH_MS = 3000;
+const DEATH_STAGGER_MS = 700;
 
 const COMBAT_DEATH_GAP_MS = 350;
 const COMBAT_ADVANCE_MS = 180;
@@ -736,12 +737,13 @@ export class EventPresenter {
     const world = hexToPixel(tile, HEX_SIZE);
     const el = new Container();
     el.zIndex = 10;
-    const particles: { g: Graphics; x0: number; swing: number; phase: number; opacity: number }[] = [];
+    const particles: { g: Graphics; x0: number; swing: number; phase: number; opacity: number; delay: number }[] = [];
     for (let i = 0; i < DEATH_PARTICLE_COUNT; i++) {
       const g = new Graphics();
       const size = 4 + Math.random() * 12;
       const opacity = 0.3 + Math.random() * 0.5;
       g.rect(-size / 2, -size / 2, size, size).fill({ color: 0xffffff, alpha: opacity });
+      g.alpha = 0;
       el.addChild(g);
       particles.push({
         g,
@@ -749,6 +751,7 @@ export class EventPresenter {
         swing: 6 + Math.random() * 14,
         phase: Math.random() * Math.PI * 2,
         opacity,
+        delay: Math.random() * DEATH_STAGGER_MS,
       });
     }
     el.position.set(
@@ -760,12 +763,15 @@ export class EventPresenter {
     const tickStart = performance.now();
     const ticker = app.ticker;
     const fn = (): void => {
-      const t = Math.min(1, (performance.now() - tickStart) / DEATH_MS);
+      const age = performance.now() - tickStart;
       for (const p of particles) {
+        const localAge = age - p.delay;
+        if (localAge <= 0) continue;
+        const t = Math.min(1, localAge / DEATH_MS);
         p.g.position.set(p.x0 + Math.sin(t * Math.PI * 2 + p.phase) * p.swing, -DEATH_RISE * t);
         p.g.alpha = p.opacity * (1 - t);
       }
-      if (t >= 1) {
+      if (age >= DEATH_MS + DEATH_STAGGER_MS) {
         ticker.remove(fn);
         mapRoot.removeChild(el);
         el.destroy();

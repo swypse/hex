@@ -5,6 +5,7 @@ import {
   triggeredCheat,
   RESOURCE_CHEAT_WORD,
   SKILLS_CHEAT_WORD,
+  FOG_CHEAT_WORD,
 } from '../src/game/cheats';
 
 function type(word: string, buffer = ''): string {
@@ -23,6 +24,12 @@ describe('cheat code buffer', () => {
     const buffer = type('skillS');
     expect(buffer).toBe(SKILLS_CHEAT_WORD);
     expect(triggeredCheat(buffer)).toBe(SKILLS_CHEAT_WORD);
+  });
+
+  it('triggers the fog cheat', () => {
+    const buffer = type('fog');
+    expect(buffer).toBe(FOG_CHEAT_WORD);
+    expect(triggeredCheat(type('abcxfog'))).toBe(FOG_CHEAT_WORD);
   });
 
   it('does not trigger on a partial word', () => {

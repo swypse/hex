@@ -1,7 +1,8 @@
 export const RESOURCE_CHEAT_WORD = 'resources';
 export const RESOURCE_CHEAT_AMOUNT = 100;
 export const SKILLS_CHEAT_WORD = 'skills';
-const CHEAT_WORDS = [RESOURCE_CHEAT_WORD, SKILLS_CHEAT_WORD];
+export const FOG_CHEAT_WORD = 'fog';
+const CHEAT_WORDS = [RESOURCE_CHEAT_WORD, SKILLS_CHEAT_WORD, FOG_CHEAT_WORD];
 const MAX_BUFFER = 64;
 
 /** Append a typed key (lowercased) to the rolling cheat buffer, keeping the
