@@ -59,7 +59,7 @@ describe('CenterMessage', () => {
     const text = allTexts(popupRoot).find((t) => String(t.text) === message);
     expect(text).toBeDefined();
     const style = text!.style;
-    expect(style.fontSize).toBe(10.5);
+    expect(style.fontSize).toBe(14);
     expect(style.wordWrap).toBe(true);
     expect(style.wordWrapWidth).toBeLessThanOrEqual(400 * 0.9);
 

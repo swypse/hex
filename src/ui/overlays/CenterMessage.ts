@@ -8,7 +8,7 @@ import { Popup, POPUP_BODY_SIZE } from '../kit/popup';
 const MESSAGE_MS = 1400;
 const YOUR_TURN_MS = 800;
 const FORCE_CLOSE_MS = 5000;
-const FONT_SIZE = (POPUP_BODY_SIZE * 1.5) / 2;
+const FONT_SIZE = POPUP_BODY_SIZE;
 
 function messageDuration(message: string): number {
   return message === t('msg.yourTurn') ? YOUR_TURN_MS : MESSAGE_MS;
