@@ -279,7 +279,7 @@ export class MapView {
       this.overlay.addChild(ex.el);
       this.overlayItems.push({ el: ex.el, world: ex.world });
     }
-    this.drawHighlights(map, selection, reachableKeys, attackableKeys, reachableColor, tutorialMarkerKeys);
+    this.drawHighlights(map, selection, reachableKeys, attackableKeys, reachableColor, localPlayerIndex, tutorialMarkerKeys);
     this.shipBobs = shipBobs;
     this.startShipBob();
     this.startExclamationAnimation();
@@ -536,6 +536,7 @@ export class MapView {
     reachableKeys: Set<string>,
     attackableKeys: Set<string>,
     reachableColor: number,
+    localPlayerIndex: number,
     tutorialMarkerKeys: Set<string> = new Set<string>(),
   ): void {
     this.tutorialMarkerParts = [];
@@ -579,8 +580,10 @@ export class MapView {
       }));
       const isSelected = key === selectedKey;
       if (isSelected) {
-        const parts = this.addPulseBorder(key, corners, SELECTED_BORDER_COLOR);
-        this.animateSelectedBorder(parts);
+        if (isExploredFor(tile, localPlayerIndex)) {
+          const parts = this.addPulseBorder(key, corners, SELECTED_BORDER_COLOR);
+          this.animateSelectedBorder(parts);
+        }
         continue;
       }
       // Attackable targets: a pulsing translucent red circle at the hex centre.
