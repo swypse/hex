@@ -32,7 +32,8 @@ export type OverlayState =
   | { kind: 'buildingLimitHelp' }
   | { kind: 'bridgeHelp' }
   | { kind: 'confirm'; target: { q: number; r: number } }
-  | { kind: 'shipLanding'; target: { q: number; r: number } };
+  | { kind: 'shipLanding'; target: { q: number; r: number } }
+  | { kind: 'disband'; unitId: string };
 
 export interface LobbyState {
   role: 'host' | 'client';

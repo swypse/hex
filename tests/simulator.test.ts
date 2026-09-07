@@ -237,6 +237,22 @@ describe('Simulator commands', () => {
     ]);
   });
 
+  it('counts a tribe eliminated when its last village is captured', () => {
+    const map = makeTestMap();
+    tileAt(map, 0, 0)!.settlement = { owner: 0, level: 1, captureReady: false };
+    tileAt(map, 0, 1)!.settlement = { owner: 1, level: 1, captureReady: true };
+    tileAt(map, 0, 1)!.ownedBy = 1;
+    const cap = makeUnit('cap', 0, 'warrior', 0, 1);
+    tileAt(map, 0, 1)!.unit = cap;
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    sim.startGame();
+    sim.drainEvents();
+    expect(sim.applyCommand({ type: 'capture', q: 0, r: 1, unitId: 'cap' })).toBe(true);
+    expect(players[0]!.stats!.tribesEliminated).toBe(1);
+    expect(players[1]!.isActive).toBe(false);
+  });
+
   it('a unit can dock only on its own port', () => {
     const map = makeTestMap();
     tileAt(map, 1, 0)!.terrain = TileType.Water;

@@ -63,7 +63,7 @@ export class GameScreen implements ScreenController {
     this.content = content;
     this.root.addChild(this.mapLayer, this.hud);
     host.screenLayer.addChild(this.root);
-    gameController.init(host.app, this.mapLayer!);
+    gameController.init(host.app, this.mapLayer!, host.overlayLayer);
 
     const gameWidgets: Widget[] = [
       new HudScore(),

@@ -122,6 +122,7 @@ describe('buildPlayers', () => {
       expect(p.stats).toEqual({
         killedUnits: 0, pirateKills: 0, villagesCaptured: 0, villageUpgrades: 0,
         knightCombos: 0, enemyShipsKilled: 0, shipsCapturedByPirates: 0, bonusesCollected: 0,
+        tribesEliminated: 0,
       });
     }
   });

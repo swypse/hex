@@ -11,7 +11,7 @@ import { buildPlayers } from '../game/players';
 import { AiDifficulty, DEFAULT_AI_DIFFICULTY } from '../game/aiDifficulty';
 import { hasSkill, SKILLS, SkillId } from '../game/skills';
 import { attackableTargets } from '../game/combat';
-import { moveRange, canMove, canAttack, type UnitType } from '../game/units';
+import { moveRange, canMove, canAttack, canDisband, type UnitType } from '../game/units';
 import { cycleSelection, reachableTargets, tileAt } from '../game/selection';
 import { type GameMode } from '../game/gameMode';
 import { isExploredFor, initialExplorationFor } from '../game/explore';
@@ -26,6 +26,7 @@ import { saveRepository } from '../storage/saveGame';
 import { attackConfirmationEnabled } from '../storage/settings';
 import { SeededRandom } from '../util/random';
 import { CameraController } from './cameraController';
+import { type Viewport } from '../render/tileSignature';
 import { EventPresenter } from './eventPresenter';
 import { NetworkController } from './networkController';
 import { TutorialDirector, type TutorialHost } from './tutorialDirector';
@@ -45,6 +46,7 @@ const VILLAGE_START_OFFSET = 200;
 class GameController {
   private app: Application | null = null;
   private mapRoot: Container | null = null;
+  private edgeLayerTarget: Container | null = null;
   private sim: Simulator | null = null;
   private textures: Awaited<ReturnType<typeof createTextures>> | null = null;
   private mapView: MapView | null = null;
@@ -62,10 +64,11 @@ class GameController {
   private events: EventPresenter | null = null;
   private tutorial: TutorialDirector | null = null;
 
-  init(app: Application, root: Container): void {
+  init(app: Application, root: Container, edgeLayerTarget: Container | null = null): void {
     if (this.mapRoot) return;
     this.app = app;
     this.mapRoot = root;
+    this.edgeLayerTarget = edgeLayerTarget;
     const token = ++this.initToken;
     const pending = useGameStore.getState().pendingSnapshot;
     const startIntro = pending !== null || this.startVillageIntroPending;
@@ -505,13 +508,15 @@ class GameController {
       item.el.position.set(camera.pan.x + item.world.x * scale, camera.pan.y + item.world.y * scale);
     }
     if (this.app) {
-      this.mapView.setViewport({
+      const viewport: Viewport = {
         x: camera.pan.x,
         y: camera.pan.y,
         scale,
         width: this.app.screen.width,
         height: this.mapHeight(),
-      });
+      };
+      this.mapView.setViewport(viewport);
+      this.mapView.repositionEdgeMarkers(viewport);
     }
   }
 
@@ -656,10 +661,26 @@ class GameController {
     if (store.aiActive) return;
     const selection = store.selection;
     if (!selection || selection.kind !== 'unit' || !this.sim) return;
-    const unit = tileAt(this.sim.map, selection.q, selection.r)!.unit;
-    if (!unit) return;
-    this.sendCommand({ type: 'disband', unitId: unit.id });
+    const tile = tileAt(this.sim.map, selection.q, selection.r);
+    const unit = tile?.unit;
+    if (!unit || unit.owner !== store.localPlayerIndex) return;
+    if (!canDisband(unit)) return;
+    store.setOverlay({ kind: 'disband', unitId: unit.id });
+  }
+
+  confirmDisband(): void {
+    const store = useGameStore.getState();
+    const pending = store.overlay?.kind === 'disband' ? store.overlay.unitId : null;
+    store.setOverlay(null);
+    if (!pending || !this.sim) return;
+    const unit = this.sim.map.tiles.find((t) => t.unit?.id === pending)?.unit;
+    if (!unit || !canDisband(unit)) return;
+    this.sendCommand({ type: 'disband', unitId: pending });
     store.setSelection(null);
+  }
+
+  cancelDisband(): void {
+    useGameStore.getState().setOverlay(null);
   }
 
   buildSelectedBuilding(kind: BuildingKind): void {
@@ -899,6 +920,7 @@ class GameController {
       });
       this.mapRoot!.addChild(this.mapView.container);
       this.mapRoot!.addChild(this.mapView.overlay);
+      if (this.edgeLayerTarget) this.mapView.attachEdgeLayerTo(this.edgeLayerTarget);
     }
 
     this.reachableKeys = new Set<string>();

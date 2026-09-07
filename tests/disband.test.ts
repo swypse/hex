@@ -35,4 +35,18 @@ describe('disband command', () => {
     expect(sim.applyCommand({ type: 'disband', unitId: 'u1' })).toBe(false);
     expect(tileAt(sim.map, 0, 0)!.unit).not.toBeNull();
   });
+
+  it('rejects disbanding a unit that has already moved this turn', () => {
+    const sim = setup(50);
+    tileAt(sim.map, 0, 0)!.unit!.hasMoved = true;
+    expect(sim.applyCommand({ type: 'disband', unitId: 'u1' })).toBe(false);
+    expect(tileAt(sim.map, 0, 0)!.unit).not.toBeNull();
+  });
+
+  it('rejects disbanding a unit that has already attacked this turn', () => {
+    const sim = setup(50);
+    tileAt(sim.map, 0, 0)!.unit!.hasAttacked = true;
+    expect(sim.applyCommand({ type: 'disband', unitId: 'u1' })).toBe(false);
+    expect(tileAt(sim.map, 0, 0)!.unit).not.toBeNull();
+  });
 });

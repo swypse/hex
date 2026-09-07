@@ -3,6 +3,7 @@ import { useGameStore } from '../../store/gameStore';
 import { type UIHost } from '../host';
 import { CenterMessage } from './CenterMessage';
 import { ConfirmDialog } from './ConfirmDialog';
+import { DisbandDialog } from './DisbandDialog';
 import { LeaveGameDialog } from './LeaveGameDialog';
 import { ShipLandingDialog } from './ShipLandingDialog';
 import { SpawnDialog } from './SpawnDialog';
@@ -33,6 +34,7 @@ export class OverlayManager {
   private readonly entries: Record<string, Entry> = {
     center: { make: () => new CenterMessage(), mounted: null, hiding: false },
     confirm: { make: () => new ConfirmDialog(), mounted: null, hiding: false },
+    disband: { make: () => new DisbandDialog(), mounted: null, hiding: false },
     leave: { make: () => new LeaveGameDialog(), mounted: null, hiding: false },
     ship: { make: () => new ShipLandingDialog(), mounted: null, hiding: false },
     spawn: { make: () => new SpawnDialog(), mounted: null, hiding: false },
@@ -70,6 +72,9 @@ export class OverlayManager {
       switch (s.overlay?.kind) {
         case 'confirm':
           active.add('confirm');
+          break;
+        case 'disband':
+          active.add('disband');
           break;
         case 'leave':
           active.add('leave');

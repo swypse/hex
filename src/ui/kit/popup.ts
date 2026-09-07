@@ -213,11 +213,15 @@ export class Popup {
   }
 
   private measureContentHeight(): number {
+    const savedMask = this.content.mask;
+    this.content.mask = null;
     let b: { maxY: number };
     try {
       b = this.content.getLocalBounds();
     } catch {
       b = { maxY: 0 };
+    } finally {
+      this.content.mask = savedMask;
     }
     if (Number.isFinite(b.maxY) && b.maxY > 0) return b.maxY;
     // Fallback: text/row metrics even when container bounds are not ready yet.
@@ -230,11 +234,15 @@ export class Popup {
   }
 
   private measureContentWidth(): number {
+    const savedMask = this.content.mask;
+    this.content.mask = null;
     let b: { minX: number; maxX: number };
     try {
       b = this.content.getLocalBounds();
     } catch {
       b = { minX: 0, maxX: 0 };
+    } finally {
+      this.content.mask = savedMask;
     }
     if (Number.isFinite(b.maxX) && Number.isFinite(b.minX) && b.maxX > b.minX) return b.maxX - b.minX;
     let max = 0;
@@ -377,7 +385,6 @@ export class Popup {
 
   private onWheel = (e: FederatedWheelEvent): void => {
     if (this.scrollMax <= 0 || e.deltaY === 0) return;
-    e.preventDefault();
     this.scrollOffset = Math.max(0, Math.min(this.scrollOffset + e.deltaY, this.scrollMax));
     this.content.position.y = -this.scrollOffset;
   };

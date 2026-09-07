@@ -9,7 +9,7 @@ import { makeLabel } from '../kit/label';
 import { Tooltip } from '../kit/tooltip';
 import { tooltipsEnabled } from '../kit/tooltipGate';
 
-const SIZE = 64;
+const SIZE = 56;
 const PAD = 8;
 const ICON_SIZE = 16;
 const BUFF_GAP = 4;
@@ -32,7 +32,12 @@ export class HudScore implements Widget {
     const pad = PAD;
     const bg = new Graphics();
     bg.circle(0, 0, size / 2).fill(0xffc465).stroke({ width: 4, color: 0xffe8b5 });
-    const text = makeLabel('0', { fontSize: 24, fill: 0x1a1a2e, fontWeight: '800' });
+    const text = makeLabel('0', {
+      fontSize: 20,
+      fill: 0xffffff,
+      fontWeight: '800',
+      dropShadow: { alpha: 0.1, blur: 0, color: 0x000000, distance: 1 },
+    });
     text.anchor.set(0.5, 0.5);
     const buffRow = new Container();
     el.addChild(bg, text, buffRow);

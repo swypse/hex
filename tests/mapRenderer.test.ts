@@ -374,6 +374,40 @@ describe('MapView hp bar anchoring', () => {
     v.destroy();
   });
 
+  it('shows an edge capture marker while the capturable village is off-screen and hides it once visible', () => {
+    const farVillage: MapTile = {
+      q: 10, r: 0, terrain: TileType.GrasslandLand, height: 0.1,
+      settlement: { owner: 1, level: 1, captureReady: true },
+      building: null, roadOwner: null,
+      unit: {
+        id: 'cap', owner: 0, type: 'warrior', q: 10, r: 0,
+        hasMoved: true, hasAttacked: false, hasHealed: false,
+        hp: 50, attack: 2, attackDistance: 1, spawnVillage: null,
+      },
+      ownedBy: 1, claimedByVillage: null, exploredBy: [0, 1],
+    };
+    const m: GameMap = { radius: 11, spawns: [], tiles: [farVillage] };
+    const markerTextures = buildTextures(m);
+    const app = {
+      screen: { width: 800, height: 600 },
+      ticker: { add: (): void => {}, remove: (): void => {} },
+    } as unknown as Application;
+    const enemy: Player = {
+      index: 1, tribe: Tribe.Warriors, isHuman: false, name: 'E',
+      resources: { ...START_RESOURCES }, score: 0, kills: 0, skills: [], isActive: true,
+    };
+    const v = new MapView(app, markerTextures, HEX, SPRITE_SCALE, 2);
+    v.update(m, [players[0]!, enemy], null, new Set(), new Set(), 0, new Set(), {
+      x: 0, y: 0, scale: 1, width: 120, height: 120,
+    });
+    const edge = (v as unknown as { edgeMarkers: Container }).edgeMarkers;
+    v.repositionEdgeMarkers({ x: 0, y: 0, scale: 1, width: 120, height: 120 });
+    expect(edge.children.length).toBe(1);
+    v.repositionEdgeMarkers({ x: -400, y: 200, scale: 1, width: 800, height: 600 });
+    expect(edge.children.length).toBe(0);
+    v.destroy();
+  });
+
   it('lays the hp label text above its black background', () => {
     const el = hpBarItem().el;
     expect(el.sortableChildren).toBe(true);

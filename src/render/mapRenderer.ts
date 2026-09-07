@@ -35,9 +35,15 @@ const FIRE_BASE_Y = 6;
 const SELECTED_BORDER_COLOR = 0xEB1F00;
 const SELECTED_BORDER_ALPHA = 1;
 const TUTORIAL_MARKER_COLOR = 0xffd700;
+const CAPTURE_EDGE_MARKER_COLOR = 0xEB1F00;
+const CAPTURE_EDGE_MARKER_ALPHA = 0.7;
+const CAPTURE_EDGE_MARKER_LEN = 40;
+const CAPTURE_EDGE_MARKER_MIN_W = 4;
+const CAPTURE_EDGE_MARKER_MAX_W = 8;
+const CAPTURE_EDGE_PULSE_MS = 600;
 /** Vertical squash applied to move/attack marker circles so they sit flat on
  *  the ground plane like the hexes. */
-const MARKER_Y_SCALE = 0.66;
+const MARKER_Y_SCALE = 0.75;
 
 interface FireParticle {
   g: Graphics;
@@ -105,6 +111,12 @@ export class MapView {
   private shipBobRemove: (() => void) | null = null;
   private shipBusy = new Set<string>();
   private unitFacings = new Map<string, 'left' | 'right'>();
+  private lastLocalIndex = 0;
+  /** Screen-space layer for edge capture markers. Kept out of `overlay` so a
+   *  host can place it above every HUD element. */
+  readonly edgeMarkers = new Container();
+  private edgeMarkerParts: { g: Graphics; side: 'l' | 'r' | 't' | 'b'; along: number; W: number; H: number }[] = [];
+  private stopEdgePulseFn: (() => void) | null = null;
 
   constructor(
     private readonly app: Application,
@@ -118,9 +130,17 @@ export class MapView {
     this.overlay = new Container();
   }
 
+  /** Adds the edge-marker layer on top of everything (as the first child of
+   *  `target`, so real overlays still render above it). */
+  attachEdgeLayerTo(target: Container): void {
+    this.edgeMarkers.removeFromParent();
+    target.addChildAt(this.edgeMarkers, 0);
+  }
+
   destroy(): void {
     this.clearFireEffects();
     this.stopShipBob();
+    this.stopEdgePulse();
     this.unitFacings.clear();
     if (this.exclamationAnimRemove) {
       this.exclamationAnimRemove();
@@ -153,6 +173,8 @@ export class MapView {
     this.stopHexBounce();
     this.container.destroy({ children: true });
     this.overlay.destroy({ children: true });
+    if (this.edgeMarkers.parent) this.edgeMarkers.parent.removeChild(this.edgeMarkers);
+    this.edgeMarkers.destroy({ children: true });
     this.graphicsPool = [];
     this.textPool = [];
     this.tileViews.clear();
@@ -174,6 +196,7 @@ export class MapView {
   ): void {
     if (this.tileViews.size === 0) this.buildTiles(map);
     this.map = map;
+    this.lastLocalIndex = localPlayerIndex;
     if (this.unitOverrides.size > 0) {
       const tiles = map.tiles.map((t) => {
         if (!this.unitOverrides.has(axialKey(t))) return t;
@@ -1256,6 +1279,108 @@ export class MapView {
 
     this.overlay.addChild(el);
     this.overlayItems.push({ el, world: position });
+  }
+
+  /** Recompute the screen-edge indicators for capturable villages that are
+   *  currently off-screen. Called after every camera move so the markers always
+   *  point at the villages' edges and vanish as soon as a village scrolls into
+   *  view. */
+  repositionEdgeMarkers(viewport: Viewport): void {
+    this.syncEdgeMarkers(viewport);
+  }
+
+  private syncEdgeMarkers(viewport: Viewport): void {
+    this.stopEdgePulse();
+    this.edgeMarkers.removeChildren().forEach((c) => c.destroy());
+    this.edgeMarkerParts = [];
+    if (!this.map || viewport.width <= 0 || viewport.height <= 0) return;
+    const W = viewport.width;
+    const H = viewport.height;
+    const parts: { g: Graphics; side: 'l' | 'r' | 't' | 'b'; along: number; W: number; H: number }[] = [];
+    for (const tile of this.map.tiles) {
+      const st = tile.settlement;
+      if (!st || !st.captureReady) continue;
+      const u = tile.unit;
+      if (!u || u.owner === st.owner) continue;
+      if (!isExploredFor(tile, this.lastLocalIndex)) continue;
+      const w = hexToPixel(tile, this.hexSize);
+      const sx = viewport.x + w.x * viewport.scale;
+      const sy = viewport.y + w.y * viewport.scale;
+      if (sx >= 0 && sx <= W && sy >= 0 && sy <= H) continue;
+      const dx = sx < 0 ? -sx : sx > W ? sx - W : 0;
+      const dy = sy < 0 ? -sy : sy > H ? sy - H : 0;
+      const side: 'l' | 'r' | 't' | 'b' = dx >= dy ? (sx < 0 ? 'l' : 'r') : sy < 0 ? 't' : 'b';
+      // The marker centre is where the line from the screen centre to the
+      // village crosses the chosen screen edge.
+      const cx = W / 2;
+      const cy = H / 2;
+      const vx = sx - cx;
+      const vy = sy - cy;
+      let along: number;
+      if (side === 'l') along = cy + (vy / vx) * -cx;
+      else if (side === 'r') along = cy + (vy / vx) * (W - cx);
+      else if (side === 't') along = cx + (vx / vy) * -cy;
+      else along = cx + (vx / vy) * (H - cy);
+      const halfLen = CAPTURE_EDGE_MARKER_LEN / 2;
+      along =
+        side === 'l' || side === 'r'
+          ? Math.max(halfLen, Math.min(H - halfLen, along))
+          : Math.max(halfLen, Math.min(W - halfLen, along));
+      const g = new Graphics();
+      g.alpha = CAPTURE_EDGE_MARKER_ALPHA;
+      this.edgeMarkers.addChild(g);
+      parts.push({ g, side, along, W, H });
+    }
+    this.edgeMarkerParts = parts;
+    if (parts.length === 0) return;
+    this.drawEdgeMarkers(CAPTURE_EDGE_MARKER_MIN_W);
+    this.startEdgePulse();
+  }
+
+  private drawEdgeMarkers(thickness: number): void {
+    const len = CAPTURE_EDGE_MARKER_LEN;
+    for (const part of this.edgeMarkerParts) {
+      part.g.clear();
+      const half = thickness / 2;
+      if (part.side === 'l' || part.side === 'r') {
+        // Vertical screen edges: a thin vertical strip pointing into the map.
+        const x = part.side === 'l' ? 0 : part.W - thickness;
+        part.g.rect(x, part.along - len / 2, thickness, len).fill(CAPTURE_EDGE_MARKER_COLOR);
+      } else {
+        // Horizontal screen edges: rotated — a wide flat bar lying on the edge.
+        const y = part.side === 't' ? 0 : part.H - thickness;
+        part.g.rect(part.along - len / 2, y, len, thickness).fill(CAPTURE_EDGE_MARKER_COLOR);
+      }
+    }
+  }
+
+  private startEdgePulse(): void {
+    if (this.stopEdgePulseFn) {
+      this.stopEdgePulseFn();
+      this.stopEdgePulseFn = null;
+    }
+    if (this.edgeMarkerParts.length === 0) return;
+    const ticker = this.app.ticker;
+    const start = performance.now();
+    const fn = (): void => {
+      if (this.edgeMarkerParts.length === 0) {
+        ticker.remove(fn);
+        this.stopEdgePulseFn = null;
+        return;
+      }
+      const t = ((performance.now() - start) % CAPTURE_EDGE_PULSE_MS) / CAPTURE_EDGE_PULSE_MS;
+      const width = CAPTURE_EDGE_MARKER_MIN_W + (CAPTURE_EDGE_MARKER_MAX_W - CAPTURE_EDGE_MARKER_MIN_W) * (0.5 - 0.5 * Math.cos(t * Math.PI * 2));
+      this.drawEdgeMarkers(width);
+    };
+    ticker.add(fn);
+    this.stopEdgePulseFn = () => ticker.remove(fn);
+  }
+
+  private stopEdgePulse(): void {
+    if (this.stopEdgePulseFn) {
+      this.stopEdgePulseFn();
+      this.stopEdgePulseFn = null;
+    }
   }
 
   private addVillageLabel(

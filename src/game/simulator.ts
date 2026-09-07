@@ -16,7 +16,7 @@ import { awardScore, awardTempleScores, CAPTURE_SCORE, COMBO_SCORE, EMPTY_STATS,
 import { hasSkill, openSkill as applySkill, randomUnopenedSkill, SkillId } from './skills';
 import { evaluateAchievements, awardAchievementScores, currentlyMetIds, type AchievementId } from './achievements';
 import { gainShipAbility, revertShip, upgradeShip } from './ship';
-import { moveRange, canAttack, canHeal, canMove, healUnit, makeUnit, unitMaintenance, PIRATE_OWNER, Unit, UnitType, UNIT_MOVEMENT } from './units';
+import { moveRange, canAttack, canDisband, canHeal, canMove, disbandCost, healUnit, makeUnit, unitMaintenance, PIRATE_OWNER, Unit, UnitType, UNIT_MOVEMENT } from './units';
 import { reachableTargets, moveUnit, pathBetween, tileAt } from './selection';
 import { spawnUnit } from './spawn';
 import { exploreUnitPath } from './explore';
@@ -391,6 +391,7 @@ export class Simulator {
     this.statsOf(capturer).villagesCaptured += 1;
     this.emitScoreFly(capturer.index, CAPTURE_SCORE, village);
     if (result.ownerDied) {
+      this.statsOf(capturer).tribesEliminated += 1;
       for (const p of this.players) {
         const owned = this.map.tiles.filter((t) => t.settlement && t.settlement.owner === p.index);
         if (owned.length === 0) p.isActive = false;
@@ -519,8 +520,9 @@ export class Simulator {
     if (!tile?.unit) return false;
     const unit = tile.unit;
     if (unit.owner !== this.currentPlayerIndex) return false;
+    if (!canDisband(unit)) return false;
     const player = this.players[unit.owner]!;
-    const cost = 3 * unitMaintenance(unit);
+    const cost = disbandCost(unit);
     if (!canAfford(player.resources, { wood: 0, stone: 0, money: cost, ore: 0 })) return false;
     player.resources = pay(player.resources, { wood: 0, stone: 0, money: cost, ore: 0 });
     const q = tile.q;

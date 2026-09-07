@@ -126,6 +126,17 @@ export function unitMaintenance(unit: Unit): number {
   return UNIT_MAINTENANCE[unit.type];
 }
 
+/** Money cost of disbanding a unit: three rounds of its upkeep. */
+export function disbandCost(unit: Unit): number {
+  return 3 * unitMaintenance(unit);
+}
+
+/** A unit may be disbanded only while it still has its move/attack for the
+ *  turn — never after it has already moved or attacked. */
+export function canDisband(unit: Unit): boolean {
+  return !unit.hasMoved && !unit.hasAttacked;
+}
+
 export const UNIT_TYPE_NAMES: Record<UnitType, string> = {
   warrior: t('unitType.warrior'),
   rider: t('unitType.rider'),

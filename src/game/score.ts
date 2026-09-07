@@ -63,6 +63,8 @@ export interface PlayerStats {
   enemyShipsKilled: number;
   shipsCapturedByPirates: number;
   bonusesCollected: number;
+  /** Tribes whose last village was captured by this player. */
+  tribesEliminated: number;
 }
 
 export const EMPTY_STATS: PlayerStats = {
@@ -74,6 +76,7 @@ export const EMPTY_STATS: PlayerStats = {
   enemyShipsKilled: 0,
   shipsCapturedByPirates: 0,
   bonusesCollected: 0,
+  tribesEliminated: 0,
 };
 
 export interface ScoreBreakdownItem {

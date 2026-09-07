@@ -63,6 +63,7 @@ describe('achievements', () => {
     const stats = {
       killedUnits: 0, pirateKills: 3, villagesCaptured: 0, villageUpgrades: 0,
       knightCombos: 3, enemyShipsKilled: 3, shipsCapturedByPirates: 3, bonusesCollected: 3,
+      tribesEliminated: 0,
     };
     const p = player({ kills: 10, stats });
     const opened = new Set(evaluateAchievements(mapOf([tile(0, 0)]), p));
