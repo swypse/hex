@@ -4,10 +4,11 @@ import { villageIncome } from './capture';
 import { villageUpgradeCost } from './resources';
 import { buildingsInVillage, claimRadius, villageBuildingLimit, unitsInVillage, villageCapacity } from './village';
 import { SHIP_UPGRADE_COST } from './ship';
+import { t } from '../i18n';
 
 export function settlementHelpTitle(tile: MapTile): string {
   const name = tile.settlement?.name;
-  return name && name.length > 0 ? name : 'Settlement';
+  return name && name.length > 0 ? name : t('hud.selected.settlementDefault');
 }
 
 export function settlementHelpLines(map: GameMap, tile: MapTile): string[] {
@@ -17,16 +18,17 @@ export function settlementHelpLines(map: GameMap, tile: MapTile): string[] {
   const radius = claimRadius(s.level);
   const income = villageIncome(map, tile);
   const cost = villageUpgradeCost(s.level);
+  const limits = [1, 2, 3, 4].map((l) => villageBuildingLimit(l));
   const lines = [
-    `Village level ${s.level}; holds ${stationed}/${villageCapacity(s.level)} units.`,
-    `Claims territory up to ${radius} hexes away and produces ${income} money income per round (base 3 + level × 2, minus upkeep for the units raised here).`,
-    `Upgrade to level ${s.level + 1} costs ${cost.wood} wood, ${cost.stone} stone and ${cost.money} money, and expands its claim, capacity and income.`,
-    `Supports ${villageBuildingLimit(1)}/${villageBuildingLimit(2)}/${villageBuildingLimit(3)}/${villageBuildingLimit(4)} buildings at levels 1-4 (upgrade to allow more).`,
+    t('help.settlement.level', { level: s.level, held: stationed, capacity: villageCapacity(s.level) }),
+    t('help.settlement.claim', { radius, income }),
+    t('help.settlement.upgrade', { level: s.level + 1, wood: cost.wood, stone: cost.stone, money: cost.money }),
+    t('help.settlement.slots', { l1: limits[0]!, l2: limits[1]!, l3: limits[2]!, l4: limits[3]! }),
   ];
   if (s.owner === null) {
-    lines.push('Neutral village: standing on it with a unit makes it capturable (red marker), then capture to claim it for 50 points.');
+    lines.push(t('help.settlement.neutral'));
   } else {
-    lines.push('Spawns units here while it is yours (a new unit can act from the next turn).');
+    lines.push(t('help.settlement.spawns'));
   }
   return lines;
 }
@@ -34,12 +36,14 @@ export function settlementHelpLines(map: GameMap, tile: MapTile): string[] {
 export function buildingHelpTitle(tile: MapTile): string {
   const b = tile.building;
   if (!b) return '';
-  return `${BUILDING_NAMES[b.kind]} (level ${b.level})`;
+  return t('help.building.title', { name: BUILDING_NAMES[b.kind], level: b.level });
 }
 
 export function buildingLimitHelpTitle(tile: MapTile): string {
   const s = tile.settlement;
-  return s && s.name && s.name.length > 0 ? `${s.name}: building limits` : 'Building limits';
+  return s && s.name && s.name.length > 0
+    ? t('help.blimit.title', { name: s.name })
+    : t('help.blimit.titlePlain');
 }
 
 export function buildingLimitHelpLines(map: GameMap, tile: MapTile): string[] {
@@ -50,10 +54,10 @@ export function buildingLimitHelpLines(map: GameMap, tile: MapTile): string[] {
   const limit = villageBuildingLimit(s.level);
   const plural = limit === 1 ? '' : 's';
   return [
-    `Villages support ${limits} buildings at levels 1-4. This village is level ${s.level}, so it currently holds ${built}/${limit} building${plural}.`,
-    'Upgrade the village to raise its building limit.',
-    'Each building stands on one of the tiles the village claims around it — never on the village hex itself, and never on another settlement or building.',
-    'Every building needs its own skill and costs resources (money, wood, stone or ore); none of them produce money.',
+    t('help.blimit.line0', { limits, level: s.level, built, limit, plural }),
+    t('help.blimit.line1'),
+    t('help.blimit.line2'),
+    t('help.blimit.line3'),
   ];
 }
 
@@ -64,42 +68,47 @@ export function buildingHelpLines(map: GameMap, tile: MapTile): string[] {
     case 'sawmill': {
       const y = buildingYield(map, tile, null);
       return [
-        `Produces +${b.level} wood per round for each adjacent forest (currently ${y.wood} wood).`,
-        `Requires the Forestry skill; costs ${BUILDING_COSTS.sawmill.money} money.`,
-        'Built on owned land next to a forest.',
+        t('help.building.sawmill.produce', { level: b.level, wood: y.wood }),
+        t('help.building.sawmill.skill', { money: BUILDING_COSTS.sawmill.money }),
+        t('help.building.sawmill.place'),
       ];
     }
     case 'mine': {
       const y = buildingYield(map, tile, null);
-      const note = y.ore > b.level ? ' (+1 ore from Geology)' : '';
+      const note = y.ore > b.level ? t('help.building.mine.note') : '';
       return [
-        `Produces ${y.stone} stone and ${y.ore} ore per round at level ${b.level}${note}.`,
-        `Requires the Smithery skill; costs ${BUILDING_COSTS.mine.money} money.`,
-        'Built on an owned mountain.',
+        t('help.building.mine.produce', { stone: y.stone, ore: y.ore, level: b.level, note }),
+        t('help.building.mine.skill', { money: BUILDING_COSTS.mine.money }),
+        t('help.building.mine.place'),
       ];
     }
     case 'port': {
       return [
-        'Boarding: move a unit onto the port and it becomes a ship (level 1); boarding ends the turn.',
-        `Ship upgrade on an owned cell: to level 2 = ${SHIP_UPGRADE_COST[2].money} money + ${SHIP_UPGRADE_COST[2].wood} wood; to level 3 = ${SHIP_UPGRADE_COST[3].money} money + ${SHIP_UPGRADE_COST[3].wood} wood + ${SHIP_UPGRADE_COST[3].ore} ore.`,
-        `Requires the Water skill; costs ${BUILDING_COSTS.port.wood} wood + ${BUILDING_COSTS.port.money} money + ${BUILDING_COSTS.port.ore} ore.`,
-        'Built on an owned water tile.',
+        t('help.building.port.board'),
+        t('help.building.port.upgrade', {
+          m2: SHIP_UPGRADE_COST[2].money, w2: SHIP_UPGRADE_COST[2].wood,
+          m3: SHIP_UPGRADE_COST[3].money, w3: SHIP_UPGRADE_COST[3].wood, o3: SHIP_UPGRADE_COST[3].ore,
+        }),
+        t('help.building.port.skill', {
+          wood: BUILDING_COSTS.port.wood, money: BUILDING_COSTS.port.money, ore: BUILDING_COSTS.port.ore,
+        }),
+        t('help.building.port.place'),
       ];
     }
     case 'temple': {
       return [
-        'Grows one level every two turns, up to level 4.',
-        'Awards 10/15/20/25 end-game score by level.',
-        `Requires the Water temples skill; costs ${BUILDING_COSTS.temple.stone} stone + ${BUILDING_COSTS.temple.money} money.`,
-        'Built on an owned water tile.',
+        t('help.building.temple.grow'),
+        t('help.building.temple.score'),
+        t('help.building.temple.skill', { stone: BUILDING_COSTS.temple.stone, money: BUILDING_COSTS.temple.money }),
+        t('help.building.temple.place'),
       ];
     }
     case 'forestTemple': {
       return [
-        'Grows one level every two turns, up to level 4.',
-        'Awards 10/15/20/25 end-game score by level.',
-        `Requires the Forest temple skill; costs ${BUILDING_COSTS.forestTemple.stone} stone + ${BUILDING_COSTS.forestTemple.money} money.`,
-        'Built on an owned forest tile.',
+        t('help.building.temple.grow'),
+        t('help.building.temple.score'),
+        t('help.building.forestTemple.skill', { stone: BUILDING_COSTS.forestTemple.stone, money: BUILDING_COSTS.forestTemple.money }),
+        t('help.building.forestTemple.place'),
       ];
     }
   }
