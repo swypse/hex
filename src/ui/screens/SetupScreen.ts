@@ -10,9 +10,10 @@ import { isTouchDevice } from '../touch';
 import { type ScreenController, type UIHost } from '../host';
 import { ScreenScroll } from '../verticalScroll';
 import { Button } from '../kit/button';
+import { ButtonGroup } from '../kit/buttonGroup';
 import { makeIcon } from '../kit/icon';
 import { makeLabel } from '../kit/label';
-import { TRIBE_ROW_STEP, tribeSlots } from '../kit/tribeLayout';
+import { TRIBE_GAP, TRIBE_ROW_STEP, tribeSlots } from '../kit/tribeLayout';
 
 const ENEMY_OPTIONS = [1, 2, 3, 4, 5];
 const MODE_OPTIONS: GameMode[] = ['capture', 'turns30'];
@@ -22,11 +23,11 @@ const SELECTOR_COUNT = 5;
 const TITLE_TO_CONTENT = 44;
 // Vertical gap between the bottom of one block and the title above the next.
 const BLOCK_GAP = 16;
-// Horizontal gap between option buttons (enemies / mode / difficulty).
-const BUTTON_GAP = 8;
 // Horizontal margin kept clear on each side when laying out the tribe grid.
 const SIDE_MARGIN = 24;
 const RADIUS = 28;
+// Vertical gap between the tribe name labels and the description below them.
+const DESC_GAP = 24;
 
 export class SetupScreen implements ScreenController {
   private root: Container | null = null;
@@ -43,9 +44,11 @@ export class SetupScreen implements ScreenController {
   private tribeItems: Container[] = [];
   private tribeCircles: Graphics[] = [];
   private tribeItemLabels: Text[] = [];
-  private enemyButtons: Button[] = [];
-  private modeButtons: Button[] = [];
-  private difficultyButtons: Button[] = [];
+  private tribeDesc: Text | null = null;
+  private tribeDescH = 0;
+  private enemyGroup: ButtonGroup | null = null;
+  private modeGroup: ButtonGroup | null = null;
+  private difficultyGroup: ButtonGroup | null = null;
   private startBtn: Button | null = null;
   private backBtn: Button | null = null;
   private hint: Text | null = null;
@@ -90,49 +93,47 @@ export class SetupScreen implements ScreenController {
       this.scroll!.content.addChild(item);
     }
 
-    for (const n of ENEMY_OPTIONS) {
-      const b = new Button({
+    this.enemyGroup = new ButtonGroup({
+      fontSize: 12,
+      items: ENEMY_OPTIONS.map((n) => ({
         label: String(n),
-        width: 64,
         onClick: () => {
           this.enemies = n;
           this.refresh();
         },
-      });
-      this.enemyButtons.push(b);
-      this.scroll!.content.addChild(b);
-    }
+      })),
+    });
+    this.scroll!.content.addChild(this.enemyGroup);
 
-    for (const m of MODE_OPTIONS) {
-      const b = new Button({
+    this.modeGroup = new ButtonGroup({
+      fontSize: 12,
+      items: MODE_OPTIONS.map((m) => ({
         label: m === 'capture' ? t('mode.capture') : t('mode.turns30'),
         onClick: () => {
           useGameStore.getState().setMode(m);
           this.refresh();
         },
-      });
-      this.modeButtons.push(b);
-      this.scroll!.content.addChild(b);
-    }
+      })),
+    });
+    this.scroll!.content.addChild(this.modeGroup);
 
-    for (const d of DIFFICULTY_OPTIONS) {
-      const b = new Button({
+    this.difficultyGroup = new ButtonGroup({
+      fontSize: 12,
+      items: DIFFICULTY_OPTIONS.map((d) => ({
         label: t(d === 'easy' ? 'difficulty.easy' : d === 'normal' ? 'difficulty.normal' : 'difficulty.hard'),
-        width: 110,
         onClick: () => {
           this.difficulty = d;
           this.refresh();
         },
-      });
-      this.difficultyButtons.push(b);
-      this.scroll!.content.addChild(b);
-    }
+      })),
+    });
+    this.scroll!.content.addChild(this.difficultyGroup);
 
     this.startBtn = new Button({
       label: t('setup.start'),
-      fontSize: 32,
-      paddingX: 32,
-      paddingY: 16,
+      fontSize: 24,
+      paddingX: 48,
+      paddingY: 14,
       onClick: () => gameController.startGame(this.tribe, this.enemies, useGameStore.getState().mode, this.difficulty),
     });
     this.hint = makeLabel(t('setup.hint'), { fontSize: 12, fill: 0xeeeeee });
@@ -140,7 +141,12 @@ export class SetupScreen implements ScreenController {
     this.hint.alpha = 0.7;
     this.hint.anchor.set(0.5, 0.5);
 
-    this.backBtn = new Button({ label: t('setup.back'), width: 96, fontSize: 14, onClick: () => useGameStore.getState().setScreen('start') });
+    this.backBtn = new Button({
+      label: t('setup.back'),
+      width: 96,
+      fontSize: 14,
+      onClick: () => useGameStore.getState().setScreen('start')
+    });
 
     this.scroll!.content.addChild(
       this.tribeTitle,
@@ -207,6 +213,37 @@ export class SetupScreen implements ScreenController {
     this.refresh();
   }
 
+  /** Rebuilds the selected-tribe description below the tribe icons, wrapping it
+   *  to the available screen width. The block keeps the height of the longest
+   *  tribe description so switching tribes never shifts the blocks below. */
+  private refreshTribeDesc(w: number): void {
+    if (this.tribeDesc) {
+      this.scroll!.content.removeChild(this.tribeDesc);
+      this.tribeDesc.destroy();
+      this.tribeDesc = null;
+    }
+    const wrapW = Math.max(120, Math.min(720, w - SIDE_MARGIN * 2));
+    const opts = {
+      fontSize: 18,
+      fill: 0xcccccc,
+      wordWrap: true,
+      wordWrapWidth: wrapW,
+    };
+    let maxH = 0;
+    for (const tr of TRIBES) {
+      const probe = makeLabel(t(`tribe.desc.${tr.code}`), opts);
+      maxH = Math.max(maxH, probe.height);
+      probe.destroy();
+    }
+    this.tribeDescH = maxH;
+    const info = TRIBES.find((t) => t.id === this.tribe);
+    if (!info) return;
+    const desc = makeLabel(t(`tribe.desc.${info.code}`), opts);
+    desc.anchor.set(0.5, 0);
+    this.tribeDesc = desc;
+    this.scroll!.content.addChild(desc);
+  }
+
   private refresh(): void {
     if (!this.root) return;
     const tribeIndex = TRIBES.findIndex((t) => t.id === this.tribe);
@@ -217,13 +254,13 @@ export class SetupScreen implements ScreenController {
       c.clear().circle(0, 0, 28).fill(0xffffff);
       if (i === tribeIndex) c.stroke({ width: 4, color: 0x5099ff });
     });
-    this.enemyButtons.forEach((b, i) => {
+    this.enemyGroup?.buttons.forEach((b, i) => {
       b.selected = i === enemiesIndex;
     });
-    this.modeButtons.forEach((b, i) => {
+    this.modeGroup?.buttons.forEach((b, i) => {
       b.selected = i === modeIndex;
     });
-    this.difficultyButtons.forEach((b, i) => {
+    this.difficultyGroup?.buttons.forEach((b, i) => {
       b.selected = i === difficultyIndex;
     });
     this.backBtn!.selected = this.selector === 4;
@@ -241,14 +278,16 @@ export class SetupScreen implements ScreenController {
     const cx = w / 2;
     const titleHalf = this.tribeTitle?.height ? this.tribeTitle.height / 2 : 15;
     const labelH = this.tribeItemLabels[0]?.height ?? 16;
-    const buttonH = this.enemyButtons[0]?.height ?? 36;
+    const buttonH = this.enemyGroup?.buttonHeight ?? 36;
     const startH = this.startBtn?.height ?? 0;
     const backH = this.backBtn?.height ?? 0;
     const hintH = this.hint?.height ?? 0;
 
     // Tribe grid may wrap onto a second row on narrow screens.
     const avail = Math.max(0, w - SIDE_MARGIN * 2);
-    const grid = tribeSlots(this.tribeItems.length, avail);
+    const grid = tribeSlots(this.tribeItems.length, avail, TRIBE_GAP * 2);
+
+    this.refreshTribeDesc(w);
 
     // Block height measured from the title's centre to the bottom of its content.
     const tribeDrop = TITLE_TO_CONTENT + RADIUS + (grid.rows - 1) * TRIBE_ROW_STEP + 34 + labelH;
@@ -256,8 +295,10 @@ export class SetupScreen implements ScreenController {
 
     // All y positions below are relative to the tribe title's centre (cy0 = 0).
     const cy0 = 0;
-    const bottomTribe = cy0 + tribeDrop;
-    const cy1 = bottomTribe + BLOCK_GAP + titleHalf;
+    const tribeContentBottom = cy0 + tribeDrop;
+    const descTop = tribeContentBottom + DESC_GAP;
+    const descH = this.tribeDescH;
+    const cy1 = descTop + descH + BLOCK_GAP + titleHalf;
     const bottomEnemies = cy1 + buttonDrop;
     const cy2 = bottomEnemies + BLOCK_GAP + titleHalf;
     const bottomMode = cy2 + buttonDrop;
@@ -278,33 +319,19 @@ export class SetupScreen implements ScreenController {
       const s = grid.slots[i]!;
       item.position.set(cx + s.x, y(tribeRow1Centre) + s.y);
     });
+    if (this.tribeDesc) this.tribeDesc.position.set(cx, y(descTop));
 
     this.enemiesTitle!.position.set(cx, y(cy1));
-    const enemyWidth = this.enemyButtons.reduce((sum, b) => sum + b.width, 0) + BUTTON_GAP * (this.enemyButtons.length - 1);
-    let ex = cx - enemyWidth / 2;
     const enemyTop = y(cy1) + TITLE_TO_CONTENT;
-    this.enemyButtons.forEach((b) => {
-      b.position.set(ex, enemyTop);
-      ex += b.width + BUTTON_GAP;
-    });
+    if (this.enemyGroup) this.enemyGroup.position.set(cx - this.enemyGroup.groupWidth / 2, enemyTop);
 
     this.modeTitle!.position.set(cx, y(cy2));
-    const modeWidth = this.modeButtons.reduce((sum, b) => sum + b.width, 0) + BUTTON_GAP * (this.modeButtons.length - 1);
-    let mx = cx - modeWidth / 2;
     const modeTop = y(cy2) + TITLE_TO_CONTENT;
-    this.modeButtons.forEach((b) => {
-      b.position.set(mx, modeTop);
-      mx += b.width + BUTTON_GAP;
-    });
+    if (this.modeGroup) this.modeGroup.position.set(cx - this.modeGroup.groupWidth / 2, modeTop);
 
     this.difficultyTitle!.position.set(cx, y(cy3));
-    const diffWidth = this.difficultyButtons.reduce((sum, b) => sum + b.width, 0) + BUTTON_GAP * (this.difficultyButtons.length - 1);
-    let dx = cx - diffWidth / 2;
     const diffTop = y(cy3) + TITLE_TO_CONTENT;
-    this.difficultyButtons.forEach((b) => {
-      b.position.set(dx, diffTop);
-      dx += b.width + BUTTON_GAP;
-    });
+    if (this.difficultyGroup) this.difficultyGroup.position.set(cx - this.difficultyGroup.groupWidth / 2, diffTop);
 
     this.startBtn!.position.set(cx - this.startBtn!.width / 2, y(startTop));
     this.backBtn!.position.set(cx - this.backBtn!.width / 2, y(backTop));
@@ -324,9 +351,11 @@ export class SetupScreen implements ScreenController {
     this.tribeItems = [];
     this.tribeCircles = [];
     this.tribeItemLabels = [];
-    this.enemyButtons = [];
-    this.modeButtons = [];
-    this.difficultyButtons = [];
+    this.tribeDesc?.destroy();
+    this.tribeDesc = null;
+    this.enemyGroup = null;
+    this.modeGroup = null;
+    this.difficultyGroup = null;
     this.tribeTitle = null;
     this.enemiesTitle = null;
     this.modeTitle = null;

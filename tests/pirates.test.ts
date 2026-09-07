@@ -29,7 +29,7 @@ function makePirate(id: string, q: number, r: number): Unit {
     hp: PIRATE_HP,
     attack: 30,
     attackDistance: 3,
-    defence: 10,
+    defense: 10,
     spawnVillage: null,
   };
 }

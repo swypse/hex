@@ -16,7 +16,7 @@ export const SKILL_ICON_FILES: Partial<Record<SkillId, string>> = {
   forestry: 'build-sawmill.png',
   forestTemple: 'forest-temple.png',
   science: 'miss-decrease.png',
-  roads: 'build-road.png',
+  roads: 'skill-roads.png',
   shields: 'shield.png',
   defense: 'build-wall.png',
   catapult: 'catapult.png',

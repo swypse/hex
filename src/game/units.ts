@@ -16,7 +16,7 @@ export interface UnitTypeInfo {
   attack: number;
   attackDistance: number;
   maxHp: number;
-  defence: number;
+  defense: number;
   price: number;
   priceWood: number;
   priceOre: number;
@@ -24,14 +24,14 @@ export interface UnitTypeInfo {
 }
 
 export const UNIT_TYPES: Record<UnitType, UnitTypeInfo> = {
-  warrior: { movement: 1, attack: 20, attackDistance: 1, maxHp: 50, defence: 0, price: 4, priceWood: 0, priceOre: 0, shape: 'circle' },
-  rider: { movement: 4, attack: 20, attackDistance: 1, maxHp: 40, defence: 5, price: 6, priceWood: 0, priceOre: 0, shape: 'square' },
-  archer: { movement: 1, attack: 20, attackDistance: 2, maxHp: 30, defence: 5, price: 6, priceWood: 0, priceOre: 0, shape: 'triangle' },
-  swordsman: { movement: 1, attack: 40, attackDistance: 1, maxHp: 80, defence: 10, price: 15, priceWood: 0, priceOre: 3, shape: 'swordsman' },
-  shield: { movement: 1, attack: 10, attackDistance: 1, maxHp: 100, defence: 20, price: 10, priceWood: 0, priceOre: 3, shape: 'square' },
-  catapult: { movement: 1, attack: 40, attackDistance: 4, maxHp: 30, defence: 0, price: 30, priceWood: 20, priceOre: 5, shape: 'square' },
-  knight: { movement: 3, attack: 50, attackDistance: 1, maxHp: 50, defence: 10, price: 20, priceWood: 0, priceOre: 10, shape: 'swordsman' },
-  pirate: { movement: 5, attack: 30, attackDistance: 3, maxHp: PIRATE_HP, defence: 10, price: 0, priceWood: 0, priceOre: 0, shape: 'square' },
+  warrior: { movement: 1, attack: 20, attackDistance: 1, maxHp: 50, defense: 0, price: 4, priceWood: 0, priceOre: 0, shape: 'circle' },
+  rider: { movement: 4, attack: 20, attackDistance: 1, maxHp: 40, defense: 5, price: 6, priceWood: 0, priceOre: 0, shape: 'square' },
+  archer: { movement: 1, attack: 20, attackDistance: 2, maxHp: 30, defense: 5, price: 6, priceWood: 0, priceOre: 0, shape: 'triangle' },
+  swordsman: { movement: 1, attack: 40, attackDistance: 1, maxHp: 80, defense: 10, price: 15, priceWood: 0, priceOre: 3, shape: 'swordsman' },
+  shield: { movement: 1, attack: 10, attackDistance: 1, maxHp: 100, defense: 20, price: 10, priceWood: 0, priceOre: 3, shape: 'square' },
+  catapult: { movement: 1, attack: 40, attackDistance: 4, maxHp: 30, defense: 0, price: 30, priceWood: 20, priceOre: 5, shape: 'square' },
+  knight: { movement: 3, attack: 50, attackDistance: 1, maxHp: 50, defense: 10, price: 20, priceWood: 0, priceOre: 10, shape: 'swordsman' },
+  pirate: { movement: 5, attack: 30, attackDistance: 3, maxHp: PIRATE_HP, defense: 10, price: 0, priceWood: 0, priceOre: 0, shape: 'square' },
 };
 
 export const UNIT_IMAGE_FILES: Record<Tribe, Record<PlayableUnitType, string>> = {
@@ -56,7 +56,7 @@ export interface Unit {
   hp: number;
   attack: number;
   attackDistance: number;
-  defence?: number;
+  defense?: number;
   spawnVillage: { q: number; r: number } | null;
   shipLevel?: 1 | 2 | 3;
   /** A knight that killed this turn may attack again (until a non-kill attack). */
@@ -137,7 +137,7 @@ export const UNIT_TYPE_NAMES: Record<UnitType, string> = {
   pirate: t('unitType.pirate'),
 };
 
-export const HEAL_AMOUNT = 20;
+export const HEAL_AMOUNT = 15;
 
 export interface UnitOptions {
   id?: string;
@@ -170,7 +170,7 @@ export function makeUnit(
     hp: opts.hp ?? UNIT_TYPES[type].maxHp,
     attack: UNIT_TYPES[type].attack,
     attackDistance: UNIT_TYPES[type].attackDistance,
-    defence: UNIT_TYPES[type].defence,
+    defense: UNIT_TYPES[type].defense,
     spawnVillage: opts.spawnVillage ?? null,
     shipLevel: opts.shipLevel,
   };

@@ -343,6 +343,37 @@ describe('MapView hp bar anchoring', () => {
     expect(label.zIndex).toBeGreaterThan(labelBg.zIndex);
   });
 
+  it('shows the village-connected icon when two own villages are joined by a road', () => {
+    const ownVillage = (q: number, r: number): MapTile => ({
+      q, r, terrain: TileType.GrasslandLand, height: 0.1, settlement: { owner: 0, level: 1, captureReady: false, name: `Own${q}` },
+      building: null, roadOwner: null, unit: null, ownedBy: 0, claimedByVillage: null, exploredBy: [0],
+    });
+    const roadTile: MapTile = {
+      q: 1, r: 0, terrain: TileType.GrasslandLand, height: 0.1, settlement: null,
+      building: null, roadOwner: 0, unit: null, ownedBy: 0, claimedByVillage: null, exploredBy: [0],
+    };
+    const m: GameMap = { radius: 2, spawns: [], tiles: [ownVillage(0, 0), roadTile, ownVillage(2, 0)] };
+    const connectedTextures = buildTextures(m);
+    connectedTextures.villageConnectedTexture = tex(16, 16);
+    const app = {
+      screen: { width: 800, height: 600 },
+      ticker: { add: (): void => {}, remove: (): void => {} },
+    } as unknown as Application;
+    const v = new MapView(app, connectedTextures, HEX, SPRITE_SCALE, 2);
+    v.update(m, players, null, new Set(), new Set(), 0, new Set(), {
+      x: 400, y: 300, scale: 1, width: 800, height: 600,
+    });
+    const items = (v as unknown as { overlayItems: { el: Container }[] }).overlayItems;
+    const labels = items.filter((o) =>
+      o.el.children.some((c) => c instanceof Text && String((c as Text).text).startsWith('Own')),
+    );
+    expect(labels.length).toBe(2);
+    for (const l of labels) {
+      expect(l.el.children.some((c) => c instanceof Sprite)).toBe(true);
+    }
+    v.destroy();
+  });
+
   it('lays the hp label text above its black background', () => {
     const el = hpBarItem().el;
     expect(el.sortableChildren).toBe(true);
@@ -543,6 +574,38 @@ describe('MapView hp bar anchoring', () => {
     const tv = (v as unknown as { tileViews: Map<string, { roadGraphics: Graphics | null; bridgeSprite: Sprite | null }> }).tileViews.get('0,0')!;
     expect(tv.bridgeSprite).not.toBeNull();
     expect(tv.roadGraphics).toBeNull();
+    v.destroy();
+  });
+
+  it('raises the bridge to the lower of its two coast elevations', () => {
+    const bridgeTile: MapTile = {
+      q: 0, r: 0, terrain: TileType.Water, height: 0.1, settlement: null,
+      building: null, roadOwner: 0, bridge: { owner: 0, dir: 'we' }, unit: null,
+      ownedBy: 0, claimedByVillage: null, exploredBy: [0],
+    };
+    const lowCoast: MapTile = {
+      q: -1, r: 0, terrain: TileType.GrasslandLand, height: 0.4, settlement: null,
+      building: null, roadOwner: 0, unit: null,
+      ownedBy: 0, claimedByVillage: null, exploredBy: [0],
+    };
+    const highCoast: MapTile = {
+      q: 1, r: 0, terrain: TileType.GrasslandLand, height: 0.9, settlement: null,
+      building: null, roadOwner: 0, unit: null,
+      ownedBy: 0, claimedByVillage: null, exploredBy: [0],
+    };
+    const m: GameMap = { radius: 1, spawns: [], tiles: [bridgeTile, lowCoast, highCoast] };
+    const app = {
+      screen: { width: 800, height: 600 },
+      ticker: { add: (): void => {}, remove: (): void => {} },
+    } as unknown as Application;
+    const v = new MapView(app, textures, HEX, SPRITE_SCALE, 2);
+    v.update(m, players, null, new Set(), new Set(), 0, new Set(), {
+      x: 400, y: 300, scale: 1, width: 800, height: 600,
+    });
+    const tv = (v as unknown as { tileViews: Map<string, { bridgeSprite: Sprite | null }> }).tileViews.get('0,0')!;
+    const p = hexToPixel({ q: 0, r: 0 }, HEX);
+    expect(tv.bridgeSprite?.y).toBeCloseTo(p.y - tileElevation(lowCoast, HEX));
+    expect(tileElevation(highCoast, HEX)).toBeGreaterThan(tileElevation(lowCoast, HEX));
     v.destroy();
   });
 

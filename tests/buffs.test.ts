@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { activeBuffs, damageReduction, BUFF_INFO, VILLAGE_DEFENCE } from '../src/game/buffs';
+import { activeBuffs, damageReduction, BUFF_INFO, VILLAGE_DEFENSE } from '../src/game/buffs';
 import { GameMap, MapTile } from '../src/game/mapGen';
 import { TileType } from '../src/game/tileTypes';
 import { Unit } from '../src/game/units';
@@ -80,15 +80,15 @@ describe('damageReduction', () => {
     expect(damageReduction(map, unit, tile(3, 0, TileType.Water, 1))).toBe(0);
   });
 
-  it('gives a unit +10 defence while standing in its own village', () => {
+  it('gives a unit +10 defense while standing in its own village', () => {
     const map = makeForestMap();
     const settlementTile = tile(0, 0, TileType.GrasslandLand, 0);
     settlementTile.settlement = { owner: 0, level: 1, captureReady: false };
     const unit = makeUnit('u', 0, 0, 0, false);
-    expect(damageReduction(map, unit, settlementTile)).toBe(VILLAGE_DEFENCE);
+    expect(damageReduction(map, unit, settlementTile)).toBe(VILLAGE_DEFENSE);
   });
 
-  it('does not grant village defence to a unit in an enemy village', () => {
+  it('does not grant village defense to a unit in an enemy village', () => {
     const map = makeForestMap();
     const settlementTile = tile(0, 0, TileType.GrasslandLand, 1);
     settlementTile.settlement = { owner: 1, level: 1, captureReady: false };

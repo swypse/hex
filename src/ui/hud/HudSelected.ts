@@ -7,7 +7,7 @@ import { UNIT_TYPE_NAMES, UNIT_TYPES, unitMaintenance, type Unit } from '../../g
 import { unitCanAct } from '../../game/unitActions';
 import { tileAt } from '../../game/selection';
 import { attackDamage } from '../../game/combat';
-import { activeBuffs, VILLAGE_DEFENCE } from '../../game/buffs';
+import { activeBuffs, VILLAGE_DEFENSE } from '../../game/buffs';
 import { isShip } from '../../game/ship';
 import { villageCapacity, villageBuildingLimit, buildingsInVillage, unitsInVillage } from '../../game/village';
 import { villageIncome } from '../../game/capture';
@@ -28,13 +28,13 @@ import { makePanel } from '../kit/panel';
 import { isLightColor } from '../kit/theme';
 import { TOOLBAR_HEIGHT, TURN_BAR_HEIGHT } from '../layout';
 
-function unitDefenceBuffs(map: GameMap, unit: Unit, tile: MapTile): { key: string; amount: number }[] {
+function unitDefenseBuffs(map: GameMap, unit: Unit, tile: MapTile): { key: string; amount: number }[] {
   const out: { key: string; amount: number }[] = [];
   if (unit.owner < 0) return out;
   const buffs = activeBuffs(map, unit.owner);
   if (buffs.includes('waterProtection') && isShip(unit)) out.push({ key: 'hud.buff.waterProtection', amount: 10 });
   if (buffs.includes('forestProtection') && isForestType(tile.terrain)) out.push({ key: 'hud.buff.forestProtection', amount: 10 });
-  if (tile.settlement && tile.settlement.owner === unit.owner) out.push({ key: 'hud.buff.village', amount: VILLAGE_DEFENCE });
+  if (tile.settlement && tile.settlement.owner === unit.owner) out.push({ key: 'hud.buff.village', amount: VILLAGE_DEFENSE });
   if (tile.settlement?.wall && tile.settlement.owner === unit.owner) out.push({ key: 'hud.buff.wall', amount: 3 });
   return out;
 }
@@ -105,9 +105,9 @@ export class HudSelected implements Widget {
       const maxHp = UNIT_TYPES[unit.type].maxHp;
       const canAct = unit.type === 'pirate' ? false : unitCanAct(map, tile, unit, player!);
       unitLineIndex = lines.length;
-      lines.push(t('hud.selected.unit', { name: UNIT_TYPE_NAMES[unit.type], hp: unit.hp, max: maxHp, active: canAct ? ' •' : '', atk: attackDamage(unit), def: unit.defence ?? 0, upkeep: unitMaintenance(unit) }));
+      lines.push(t('hud.selected.unit', { name: UNIT_TYPE_NAMES[unit.type], hp: unit.hp, max: maxHp, active: canAct ? ' •' : '', atk: attackDamage(unit), def: unit.defense ?? 0, upkeep: unitMaintenance(unit) }));
       bolds.push(true);
-      for (const buff of unitDefenceBuffs(map, unit, tile)) {
+      for (const buff of unitDefenseBuffs(map, unit, tile)) {
         lines.push(t(buff.key, { n: buff.amount }));
         bolds.push(false);
       }

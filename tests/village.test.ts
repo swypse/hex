@@ -25,7 +25,7 @@ describe('claimRadius', () => {
   it('maps level to radius', () => {
     expect(claimRadius(1)).toBe(1);
     expect(claimRadius(2)).toBe(2);
-    expect(claimRadius(5)).toBe(2);
+    expect(claimRadius(5)).toBe(3);
   });
 });
 

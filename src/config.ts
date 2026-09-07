@@ -8,3 +8,4 @@ export const TRIBE_COLORS = {
   Forest: 0x47b220,
   Aqua: 0x4da2da,
 } as const;
+

@@ -33,6 +33,9 @@ const DEATH_STAGGER_MS = 700;
 const COMBAT_DEATH_GAP_MS = 350;
 const COMBAT_ADVANCE_MS = 180;
 
+const ACH_CHIP_BG = 0x373748;
+const ACH_CHIP_SIZE = 64;
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -244,6 +247,7 @@ export class EventPresenter {
               useGameStore.getState().setCenterMessage(
                 t('ach.unlocked', { name: t(achievementNameKey(e.achievement)) }),
                 achievementIcon(e.achievement),
+                { size: ACH_CHIP_SIZE, bgColor: ACH_CHIP_BG },
               );
             }
             break;

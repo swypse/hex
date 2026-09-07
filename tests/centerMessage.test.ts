@@ -45,7 +45,7 @@ function countSprites(c: Container): number {
 
 describe('CenterMessage', () => {
   afterEach(() => {
-    useGameStore.setState({ centerMessage: null, centerMessageQueue: [], centerIconFile: null, centerIconQueue: [] });
+    useGameStore.setState({ centerMessage: null, centerMessageQueue: [], centerIconFile: null, centerIconQueue: [], centerChipStyle: null, centerChipQueue: [] });
     vi.restoreAllMocks();
   });
 
@@ -94,6 +94,34 @@ describe('CenterMessage', () => {
     const popupRoot = (root.children[0] as Container).children[0] as Container;
     expect(allTexts(popupRoot).some((tx) => String(tx.text) === 'You meet Cats!')).toBe(true);
     expect(countSprites(popupRoot)).toBeGreaterThan(0);
+    msg.destroy();
+  });
+
+  it('renders the achievement icon chip at 64px when a chip style is set', () => {
+    Object.defineProperty(Text.prototype, 'width', { configurable: true, get: () => 120 });
+    Object.defineProperty(Text.prototype, 'height', { configurable: true, get: () => 14 });
+    installCanvas();
+    useGameStore.setState({
+      centerMessage: 'Achievement unlocked!',
+      centerIconFile: 'achivements/x.png',
+      centerChipStyle: { size: 64, bgColor: 0x373748 },
+    });
+    const host = makeHost();
+    const root = new Container();
+    const msg = new CenterMessage();
+    msg.mount(host, root);
+
+    const popupRoot = (root.children[0] as Container).children[0] as Container;
+    const sprites: Sprite[] = [];
+    const walk = (n: Container): void => {
+      for (const ch of n.children) {
+        if (ch instanceof Sprite) sprites.push(ch);
+        if (ch instanceof Container) walk(ch);
+      }
+    };
+    walk(popupRoot);
+    expect(sprites.length).toBeGreaterThan(0);
+    for (const s of sprites) expect(s.width).toBe(64);
     msg.destroy();
   });
 

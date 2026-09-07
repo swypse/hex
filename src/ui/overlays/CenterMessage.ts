@@ -95,8 +95,9 @@ export class CenterMessage {
   private makeIconPopup(message: string): Popup {
     const host = this.host!;
     const probe = makeLabel(message, { fontSize: FONT_SIZE, fill: 0xffffff });
+    const chipSize = this.chipSize();
     const screenW = host.app.screen.width;
-    const desired = Math.max(probe.width, ICON_CHIP_SIZE) + 8 + 40;
+    const desired = Math.max(probe.width, chipSize) + 8 + 40;
     return new Popup({
       app: host.app,
       modal: false,
@@ -107,8 +108,14 @@ export class CenterMessage {
     });
   }
 
+  private chipSize(): number {
+    return useGameStore.getState().centerChipStyle?.size ?? ICON_CHIP_SIZE;
+  }
+
   private addIconContent(popup: Popup, message: string, iconFile: string): void {
     const contentW = popup.contentWidth;
+    const style = useGameStore.getState().centerChipStyle;
+    const chipSize = style?.size ?? ICON_CHIP_SIZE;
     const label = makeLabel(message, {
       fontSize: FONT_SIZE,
       fill: 0xffffff,
@@ -116,10 +123,10 @@ export class CenterMessage {
       wordWrapWidth: contentW,
     });
     label.anchor.set(0.5, 0);
-    label.position.set(contentW / 2, ICON_CHIP_SIZE + ICON_ICON_GAP);
+    label.position.set(contentW / 2, chipSize + ICON_ICON_GAP);
     popup.content.addChild(label);
-    const chip = makeIconChip(iconFile, ICON_CHIP_SIZE);
-    chip.position.set(contentW / 2, ICON_CHIP_SIZE / 2);
+    const chip = makeIconChip(iconFile, chipSize, style ? { bgColor: style.bgColor } : undefined);
+    chip.position.set(contentW / 2, chipSize / 2);
     popup.content.addChild(chip);
   }
 

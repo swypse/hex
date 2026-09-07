@@ -55,7 +55,7 @@ export function makeUnit(id: string, owner: number, type: UnitType, q: number, r
     hp: UNIT_TYPES[type].maxHp,
     attack: UNIT_ATTACK[type],
     attackDistance: UNIT_ATTACK_DISTANCE[type],
-    defence: UNIT_TYPES[type].defence,
+    defense: UNIT_TYPES[type].defense,
     spawnVillage: null,
   };
 }

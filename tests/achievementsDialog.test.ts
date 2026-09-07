@@ -91,7 +91,7 @@ describe('AchievementsDialog', () => {
 
     const card = (root.children[0] as Container).children[2] as Container;
     const content = (card.children[2] as Container).children[2] as Container;
-    const firstRow = content.children[0] as Container;
+    const firstRow = (content.children[0] as Container).children[0] as Container;
     (firstRow as unknown as { emit: (e: string) => void }).emit('pointertap');
 
     expect(root.children.length).toBe(2);

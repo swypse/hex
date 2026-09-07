@@ -64,7 +64,7 @@ export function isVillageRoadConnected(map: GameMap, villageTile: MapTile): bool
     for (const n of hexNeighbors(cur)) {
       const t = tileAt(map, n.q, n.r);
       if (!t) continue;
-      if (t.settlement && t.settlement.owner !== null && t.settlement.owner !== owner) {
+      if (t.settlement && t.settlement.owner !== null && !(t.q === villageTile.q && t.r === villageTile.r)) {
         return true;
       }
       seed(t);

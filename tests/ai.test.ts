@@ -20,11 +20,11 @@ function makeTile(
 }
 
 function makeWarrior(id: string, owner: number, q: number, r: number): Unit {
-  return { id, owner, type: 'warrior', q, r, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 50, attack: 20, attackDistance: 1, defence: 0, spawnVillage: null };
+  return { id, owner, type: 'warrior', q, r, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 50, attack: 20, attackDistance: 1, defense: 0, spawnVillage: null };
 }
 
 function makeRider(id: string, owner: number, q: number, r: number): Unit {
-  return { id, owner, type: 'rider', q, r, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 40, attack: 20, attackDistance: 1, defence: 5, spawnVillage: null };
+  return { id, owner, type: 'rider', q, r, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 40, attack: 20, attackDistance: 1, defense: 5, spawnVillage: null };
 }
 
 function aiPlayer(): import('../src/game/players').Player {

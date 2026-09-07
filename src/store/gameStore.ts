@@ -12,6 +12,12 @@ export type Screen = 'start' | 'setup' | 'lobby' | 'game';
 
 export type { LobbyPlayer };
 
+/** Optional styling for the icon chip shown above a center message. */
+export interface IconChipStyle {
+  size: number;
+  bgColor: number;
+}
+
 export type OverlayState =
   | null
   | { kind: 'spawn' }
@@ -54,6 +60,8 @@ interface GameStore {
   centerMessageQueue: string[];
   centerIconFile: string | null;
   centerIconQueue: (string | null)[];
+  centerChipStyle: IconChipStyle | null;
+  centerChipQueue: (IconChipStyle | null)[];
   localPlayerIndex: number;
   netMode: 'single' | 'host' | 'client';
   lobby: LobbyState | null;
@@ -80,7 +88,7 @@ interface GameStore {
   setWinnerIndex: (index: number | null) => void;
   setExpectedTurns: (turns: number) => void;
   setBonusAwarded: (awarded: boolean) => void;
-  setCenterMessage: (message: string | null, iconFile?: string | null) => void;
+  setCenterMessage: (message: string | null, iconFile?: string | null, chipStyle?: IconChipStyle | null) => void;
   setLocalPlayerIndex: (index: number) => void;
   setNetMode: (mode: 'single' | 'host' | 'client') => void;
   setLobby: (lobby: LobbyState | null) => void;
@@ -113,6 +121,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
   centerMessageQueue: [],
   centerIconFile: null,
   centerIconQueue: [],
+  centerChipStyle: null,
+  centerChipQueue: [],
   localPlayerIndex: 0,
   netMode: 'single',
   lobby: null,
@@ -135,6 +145,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
         centerMessageQueue: [],
         centerIconFile: null,
         centerIconQueue: [],
+        centerChipStyle: null,
+        centerChipQueue: [],
       });
     }
     set({ screen });
@@ -150,25 +162,29 @@ export const useGameStore = create<GameStore>((set, get) => ({
   setWinnerIndex: (index) => set({ winnerIndex: index }),
   setExpectedTurns: (turns) => set({ expectedTurns: turns }),
   setBonusAwarded: (awarded) => set({ bonusAwarded: awarded }),
-  setCenterMessage: (message, iconFile = null) =>
+  setCenterMessage: (message, iconFile = null, chipStyle = null) =>
     set((s) => {
       if (message === null) {
         const next = s.centerMessageQueue[0] ?? null;
         const nextIcon = next === null ? null : (s.centerIconQueue[0] ?? null);
+        const nextStyle = next === null ? null : (s.centerChipQueue[0] ?? null);
         return {
           centerMessage: next,
           centerMessageQueue: next === null ? [] : s.centerMessageQueue.slice(1),
           centerIconFile: nextIcon,
           centerIconQueue: next === null ? [] : s.centerIconQueue.slice(1),
+          centerChipStyle: nextStyle,
+          centerChipQueue: next === null ? [] : s.centerChipQueue.slice(1),
         };
       }
       if (s.centerMessage !== null) {
         return {
           centerMessageQueue: [...s.centerMessageQueue, message],
           centerIconQueue: [...s.centerIconQueue, iconFile],
+          centerChipQueue: [...s.centerChipQueue, chipStyle],
         };
       }
-      return { centerMessage: message, centerIconFile: iconFile ?? null };
+      return { centerMessage: message, centerIconFile: iconFile ?? null, centerChipStyle: chipStyle };
     }),
   setLocalPlayerIndex: (index) => set({ localPlayerIndex: index }),
   setNetMode: (netMode) => set({ netMode }),

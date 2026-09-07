@@ -132,7 +132,7 @@ describe('HudSelected village building constraints', () => {
     expect(all).not.toContain('Owner:');
   });
 
-  it('shows the unit defence and walled-village buff on the selected unit', () => {
+  it('shows the unit defense and walled-village buff on the selected unit', () => {
     mount(1, 1, 0, { unitOnVillage: true, wall: true });
     const all = texts().join('\n');
     expect(all).toContain('DEF 0');

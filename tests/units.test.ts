@@ -22,18 +22,18 @@ import {
 
 describe('UNIT_TYPES', () => {
   it('defines warrior, rider, archer, swordsman', () => {
-    expect(UNIT_TYPES.warrior).toEqual({ movement: 1, attack: 20, attackDistance: 1, maxHp: 50, defence: 0, price: 4, priceWood: 0, priceOre: 0, shape: 'circle' });
-    expect(UNIT_TYPES.rider).toEqual({ movement: 4, attack: 20, attackDistance: 1, maxHp: 40, defence: 5, price: 6, priceWood: 0, priceOre: 0, shape: 'square' });
-    expect(UNIT_TYPES.archer).toEqual({ movement: 1, attack: 20, attackDistance: 2, maxHp: 30, defence: 5, price: 6, priceWood: 0, priceOre: 0, shape: 'triangle' });
-    expect(UNIT_TYPES.swordsman).toEqual({ movement: 1, attack: 40, attackDistance: 1, maxHp: 80, defence: 10, price: 15, priceWood: 0, priceOre: 3, shape: 'swordsman' });
+    expect(UNIT_TYPES.warrior).toEqual({ movement: 1, attack: 20, attackDistance: 1, maxHp: 50, defense: 0, price: 4, priceWood: 0, priceOre: 0, shape: 'circle' });
+    expect(UNIT_TYPES.rider).toEqual({ movement: 4, attack: 20, attackDistance: 1, maxHp: 40, defense: 5, price: 6, priceWood: 0, priceOre: 0, shape: 'square' });
+    expect(UNIT_TYPES.archer).toEqual({ movement: 1, attack: 20, attackDistance: 2, maxHp: 30, defense: 5, price: 6, priceWood: 0, priceOre: 0, shape: 'triangle' });
+    expect(UNIT_TYPES.swordsman).toEqual({ movement: 1, attack: 40, attackDistance: 1, maxHp: 80, defense: 10, price: 15, priceWood: 0, priceOre: 3, shape: 'swordsman' });
   });
 
   it('defines the shield unit with 100 hp, 1 movement and a 10 money + 3 ore price', () => {
-    expect(UNIT_TYPES.shield).toEqual({ movement: 1, attack: 10, attackDistance: 1, maxHp: 100, defence: 20, price: 10, priceWood: 0, priceOre: 3, shape: 'square' });
+    expect(UNIT_TYPES.shield).toEqual({ movement: 1, attack: 10, attackDistance: 1, maxHp: 100, defense: 20, price: 10, priceWood: 0, priceOre: 3, shape: 'square' });
   });
 
   it('defines the catapult unit with siege stats and a wood cost', () => {
-    expect(UNIT_TYPES.catapult).toEqual({ movement: 1, attack: 40, attackDistance: 4, maxHp: 30, defence: 0, price: 30, priceWood: 20, priceOre: 5, shape: 'square' });
+    expect(UNIT_TYPES.catapult).toEqual({ movement: 1, attack: 40, attackDistance: 4, maxHp: 30, defense: 0, price: 30, priceWood: 20, priceOre: 5, shape: 'square' });
     expect(UNIT_MOVEMENT.catapult).toBe(1);
     expect(UNIT_ATTACK.catapult).toBe(40);
     expect(UNIT_ATTACK_DISTANCE.catapult).toBe(4);
@@ -41,7 +41,7 @@ describe('UNIT_TYPES', () => {
   });
 
   it('defines the knight unit with 3 movement, 5 attack and an ore cost', () => {
-    expect(UNIT_TYPES.knight).toEqual({ movement: 3, attack: 50, attackDistance: 1, maxHp: 50, defence: 10, price: 20, priceWood: 0, priceOre: 10, shape: 'swordsman' });
+    expect(UNIT_TYPES.knight).toEqual({ movement: 3, attack: 50, attackDistance: 1, maxHp: 50, defense: 10, price: 20, priceWood: 0, priceOre: 10, shape: 'swordsman' });
     expect(UNIT_MOVEMENT.knight).toBe(3);
     expect(UNIT_ATTACK.knight).toBe(50);
     expect(UNIT_ATTACK_DISTANCE.knight).toBe(1);
@@ -75,7 +75,7 @@ function mkUnit(overrides: Partial<import('../src/game/units').Unit> = {}): impo
     hp: 50,
     attack: 20,
     attackDistance: 1,
-    defence: 0,
+    defense: 0,
     spawnVillage: null,
     ...overrides,
   };
@@ -94,7 +94,7 @@ function makeShield(overrides: Partial<import('../src/game/units').Unit> = {}): 
     hp: 100,
     attack: 10,
     attackDistance: 1,
-    defence: 20,
+    defense: 20,
     spawnVillage: null,
     ...overrides,
   };
@@ -113,7 +113,7 @@ function makeCatapult(overrides: Partial<import('../src/game/units').Unit> = {})
     hp: 30,
     attack: 40,
     attackDistance: 4,
-    defence: 0,
+    defense: 0,
     spawnVillage: null,
     ...overrides,
   };
@@ -179,7 +179,7 @@ describe('action availability', () => {
     healUnit(unit);
     expect(unit.hp).toBe(50);
     expect(unit.hasHealed).toBe(true);
-    expect(HEAL_AMOUNT).toBe(20);
+    expect(HEAL_AMOUNT).toBe(15);
     const full = mkUnit();
     healUnit(full);
     expect(full.hp).toBe(50);

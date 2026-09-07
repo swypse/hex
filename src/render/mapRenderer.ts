@@ -3,6 +3,7 @@ import {
 } from 'pixi.js';
 import { axialKey, compareTileY, hexCorners, hexEdge, hexEdgeNeighbor, hexToPixel, splitHexBorder } from '../game/hex';
 import { GameMap, MapTile } from '../game/mapGen';
+import { bridgeCoastOffsets } from '../game/bridges';
 import { portDirection } from '../game/buildings';
 import { Player } from '../game/players';
 import { Selection } from '../game/selection';
@@ -34,6 +35,9 @@ const FIRE_BASE_Y = 6;
 const SELECTED_BORDER_COLOR = 0xEB1F00;
 const SELECTED_BORDER_ALPHA = 1;
 const TUTORIAL_MARKER_COLOR = 0xffd700;
+/** Vertical squash applied to move/attack marker circles so they sit flat on
+ *  the ground plane like the hexes. */
+const MARKER_Y_SCALE = 0.66;
 
 interface FireParticle {
   g: Graphics;
@@ -166,6 +170,7 @@ export class MapView {
     hiddenUnitIds: Set<string>,
     viewport: Viewport,
     tutorialMarkerKeys: Set<string> = new Set<string>(),
+    localTurn = true,
   ): void {
     if (this.tileViews.size === 0) this.buildTiles(map);
     this.map = map;
@@ -279,7 +284,7 @@ export class MapView {
       this.overlay.addChild(ex.el);
       this.overlayItems.push({ el: ex.el, world: ex.world });
     }
-    this.drawHighlights(map, selection, reachableKeys, attackableKeys, reachableColor, localPlayerIndex, tutorialMarkerKeys);
+    this.drawHighlights(map, selection, reachableKeys, attackableKeys, reachableColor, localPlayerIndex, tutorialMarkerKeys, localTurn);
     this.shipBobs = shipBobs;
     this.startShipBob();
     this.startExclamationAnimation();
@@ -379,7 +384,7 @@ export class MapView {
     if (tv.buildingSprite) tv.buildingSprite.visible = explored;
 
     const bridgeTex = tile.bridge ? this.textures.bridgeTextures[tile.bridge.dir] : null;
-    this.syncSprite(tv, 'bridgeSprite', bridgeTex ? bridgeTex.texture : null, p.x, y, bridgeTex?.anchorY ?? 0.5);
+    this.syncSprite(tv, 'bridgeSprite', bridgeTex ? bridgeTex.texture : null, p.x, this.bridgeSpriteY(tile, y), bridgeTex?.anchorY ?? 0.5);
     if (tv.bridgeSprite) tv.bridgeSprite.visible = explored;
 
     this.drawTileTerritory(tv.territory, tile, players, explored);
@@ -410,6 +415,21 @@ export class MapView {
         this.faceUnitSprite(tv.unitSprite, this.unitFacings.get(tile.unit.id) ?? 'right');
       }
     }
+  }
+
+  /** Y for a bridge sprite: the deck rides at the height of the lower of the
+   *  two coasts it spans, so it visually meets (not floats above) its shores. */
+  private bridgeSpriteY(tile: MapTile, fallbackY: number): number {
+    const dir = tile.bridge?.dir;
+    if (!dir) return fallbackY;
+    let min: number | null = null;
+    for (const off of bridgeCoastOffsets(dir)) {
+      const n = this.tileIndex.get(axialKey({ q: tile.q + off.q, r: tile.r + off.r }));
+      if (!n) continue;
+      const e = tileElevation(n, this.hexSize);
+      if (min === null || e < min) min = e;
+    }
+    return min === null ? fallbackY : fallbackY - min;
   }
 
   /** Sets a unit's horizontal facing so its sprite looks toward its last
@@ -539,6 +559,7 @@ export class MapView {
     reachableColor: number,
     localPlayerIndex: number,
     tutorialMarkerKeys: Set<string> = new Set<string>(),
+    localTurn = true,
   ): void {
     this.tutorialMarkerParts = [];
     this.attackPulseParts = [];
@@ -561,7 +582,7 @@ export class MapView {
       if (reachableKeys.has(key) && key !== selectedKey) {
         const p = hexToPixel(tile, this.hexSize);
         const dot = this.takeGraphics();
-        dot.circle(p.x, y, dotRadius).fill({ color: reachableColor, alpha: 0.5 }).stroke({
+        dot.ellipse(p.x, y, dotRadius, dotRadius * MARKER_Y_SCALE).fill({ color: reachableColor, alpha: 0.5 }).stroke({
           width: 2,
           color: 0xffffff,
           alpha: 0.9
@@ -581,7 +602,7 @@ export class MapView {
       }));
       const isSelected = key === selectedKey;
       if (isSelected) {
-        if (isExploredFor(tile, localPlayerIndex)) {
+        if (localTurn && isExploredFor(tile, localPlayerIndex)) {
           const parts = this.addPulseBorder(key, corners, SELECTED_BORDER_COLOR);
           this.animateSelectedBorder(parts);
         }
@@ -609,7 +630,7 @@ export class MapView {
       for (const part of parts) {
         part.g.clear();
         part.g
-          .circle(part.x, part.y, r)
+          .ellipse(part.x, part.y, r, r * MARKER_Y_SCALE)
           .fill({ color: part.color, alpha: 0.5 })
           .stroke({ width: 2, color: 0xffffff, alpha: 0.5 });
       }
@@ -642,7 +663,7 @@ export class MapView {
       for (const part of parts) {
         part.g.clear();
         part.g
-          .circle(part.x, part.y, r)
+          .ellipse(part.x, part.y, r, r * MARKER_Y_SCALE)
           .fill({ color: SELECTED_BORDER_COLOR, alpha: 0.7 })
           .stroke({ width: 4, color: 0xffffff, alpha: 0.5 });
       }
@@ -1264,6 +1285,7 @@ export class MapView {
       icon.height = iconSize;
     }
     const contentW = label.width + (icon ? iconSize + gap : 0);
+    const padX = 4;
     const x0 = -contentW / 2;
     if (icon) icon.position.set(x0, 0);
     label.position.set(x0 + (icon ? iconSize + gap : 0), 0);
@@ -1271,12 +1293,12 @@ export class MapView {
     const labelBg = this.takeGraphics();
     labelBg.zIndex = 0;
     labelBg
-      .rect(x0 - 2, -label.height / 2 - 1, contentW + 4, label.height + 2)
+      .roundRect(x0 - padX, -label.height / 2 - 1, contentW + padX * 2, label.height + 2, 2)
       .fill(territoryColor(tribe, this.knownOwners.has(owner)));
 
     label.zIndex = 1;
     if (icon) {
-      icon.zIndex = 0;
+      icon.zIndex = 1;
       el.addChild(icon);
     }
     el.sortableChildren = true;

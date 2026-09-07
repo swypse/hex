@@ -203,13 +203,14 @@ describe('roads', () => {
     expect(isVillageRoadConnected(map, map.tiles[3]!)).toBe(true);
   });
 
-  it('does not connect villages of the same tribe', () => {
+  it('connects a village whose road path reaches another of the same tribe\'s villages', () => {
     const map = mapWith([
       villageTile(0, 0, 0),
       tile(1, 0, TileType.GrasslandLand, { roadOwner: 0 }),
       villageTile(2, 0, 0),
     ]);
-    expect(isVillageRoadConnected(map, map.tiles[0]!)).toBe(false);
+    expect(isVillageRoadConnected(map, map.tiles[0]!)).toBe(true);
+    expect(isVillageRoadConnected(map, map.tiles[2]!)).toBe(true);
   });
 });
 

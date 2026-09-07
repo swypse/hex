@@ -28,6 +28,11 @@ export function bridgeDirFor(map: GameMap, tile: MapTile): BridgeDir | null {
   return null;
 }
 
+/** The two opposite-coast neighbour offsets for a bridge direction. */
+export function bridgeCoastOffsets(dir: BridgeDir): { q: number; r: number }[] {
+  return AXES.find((a) => a.dir === dir)?.offsets ?? [];
+}
+
 export function hasBridge(tile: MapTile): boolean {
   return tile.bridge !== undefined && tile.bridge !== null;
 }

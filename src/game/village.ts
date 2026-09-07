@@ -7,7 +7,6 @@ import type { Player } from './players';
 import { GameMap, MapTile } from './mapGen';
 
 export const WALL_COST = { money: 20, wood: 0, stone: 15, ore: 5 };
-export const WALL_DEFENCE = 3;
 
 export function canBuildWall(tile: MapTile, player: Player): boolean {
   const s = tile.settlement;
@@ -25,6 +24,7 @@ export function buildWall(tile: MapTile, player: Player): boolean {
 }
 
 export function claimRadius(level: number): number {
+  if (level >= 5) return 3;
   return level === 1 ? 1 : 2;
 }
 

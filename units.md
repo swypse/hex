@@ -1,16 +1,16 @@
 # Units
 
 Balance reference for all unit types. This document is a **proposal**: it scales every damage-related value (HP, attack,
-damage rolls, defence) **×10** for finer balance, adds a new **defence** characteristic (not implemented yet), and
+damage rolls, defense) **×10** for finer balance, adds a new **defense** characteristic (not implemented yet), and
 adjusts a few costs/abilities. Movement, attack range and costs are **not** scaled.
 
-## Defence rule (to implement)
+## Defense rule (to implement)
 
-- Every unit has `defence` (`Def`), an armour value. Defence is no longer limited to whole 0–2 points: with a ×10 damage
+- Every unit has `defense` (`Def`), an armour value. Defense is no longer limited to whole 0–2 points: with a ×10 damage
   scale it can use steps of **5** (5 ≈ 0.5 in the old scale), so fragile units can carry light armour.
-- Incoming damage is reduced by the defender's defence and never drops below **10**:
+- Incoming damage is reduced by the defender's defense and never drops below **10**:
   `final = max(10, rolled − defender.Def)`.
-- A unit standing in **its own village** gains **+10 defence**.
+- A unit standing in **its own village** gains **+10 defense**.
 - The reduction applies to normal attacks, the catapult's 40–60 roll, and counter-attacks.
 - Attack damage still scales with the attacker's current HP (`round(baseAtk × hp / maxHp)`).
 
@@ -51,14 +51,14 @@ determines movement, attack and range.
 | 2          | crew's | 20  | 0   | 3    | 2         | 16 + 8🪵 + 2⛏ (→ lvl 3)   |
 | 3          | crew's | 30  | 0   | 4    | 3         | —                          |
 
-Ships have no armour of their own (`Def 0`); only the crew's defence would apply, mirroring how HP already works. A
+Ships have no armour of their own (`Def 0`); only the crew's defense would apply, mirroring how HP already works. A
 level-1 ship is created by moving a unit onto its own **port** (10🪵 + 30 + 2⛏), which ends the turn.
 
 ---
 
 ## How each type is countered
 
-Numbers below assume **full-HP damage and the flat-defence rule (min 10)**, and describe clean conditions on open
+Numbers below assume **full-HP damage and the flat-defense rule (min 10)**, and describe clean conditions on open
 ground. Real fights depend on terrain, villages, HP and numbers — treat the bullet as "this type is the reliable
 answer", not "always wins 1v1".
 

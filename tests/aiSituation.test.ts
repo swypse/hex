@@ -12,7 +12,7 @@ function tile(q: number, r: number, opts: Partial<MapTile> = {}): MapTile {
 }
 
 function unit(id: string, owner: number, type: keyof typeof UNIT_TYPES, q: number, r: number): Unit {
-  return { id, owner, type, q, r, hasMoved: false, hasAttacked: false, hasHealed: false, hp: UNIT_TYPES[type].maxHp, attack: UNIT_TYPES[type].attack, attackDistance: UNIT_TYPES[type].attackDistance, defence: UNIT_TYPES[type].defence, spawnVillage: null };
+  return { id, owner, type, q, r, hasMoved: false, hasAttacked: false, hasHealed: false, hp: UNIT_TYPES[type].maxHp, attack: UNIT_TYPES[type].attack, attackDistance: UNIT_TYPES[type].attackDistance, defense: UNIT_TYPES[type].defense, spawnVillage: null };
 }
 
 function player(index: number): Player {

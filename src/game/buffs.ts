@@ -7,8 +7,8 @@ export type BuffId = 'waterProtection' | 'forestProtection';
 
 export const TEMPLE_BUFF_THRESHOLD = 3;
 
-/** Defence a unit gets while standing in its own village. */
-export const VILLAGE_DEFENCE = 10;
+/** Defense a unit gets while standing in its own village. */
+export const VILLAGE_DEFENSE = 5;
 
 export const BUFF_INFO: Record<BuffId, { name: string; icon: string; tooltip: string }> = {
   waterProtection: { name: 'Water Protection', icon: 'water-protection.png', tooltip: 'Water Protection: -10 dmg for ships' },
@@ -36,6 +36,6 @@ export function damageReduction(map: GameMap, unit: Unit, tile: MapTile): number
   if (buffs.includes('waterProtection') && isShip(unit)) reduction += 10;
   if (buffs.includes('forestProtection') && isForestType(tile.terrain)) reduction += 10;
   if (tile.settlement?.wall && tile.settlement.owner === unit.owner) reduction += 3;
-  if (tile.settlement && tile.settlement.owner === unit.owner) reduction += VILLAGE_DEFENCE;
+  if (tile.settlement && tile.settlement.owner === unit.owner) reduction += VILLAGE_DEFENSE;
   return reduction;
 }

@@ -8,7 +8,7 @@ import { makeLabel } from '../kit/label';
 import { makeIconChip } from '../kit/tribeChip';
 import { Popup } from '../kit/popup';
 
-const ROW_ICON = 86;
+const ROW_ICON = 64;
 const ICON_LABEL_GAP = 18;
 const ROW_GAP = 18;
 const DETAIL_ICON = 64;
@@ -47,8 +47,10 @@ export class AchievementsDialog {
       onClose: () => this.close(),
     });
     const cw = popup.contentWidth;
-    const labelW = Math.max(120, cw - ROW_ICON - ICON_LABEL_GAP - 70);
+    const listW = cw - OPENED_BORDER_WIDTH * 2;
+    const labelW = Math.max(120, listW - ROW_ICON - ICON_LABEL_GAP - 70);
 
+    const list = new Container();
     let y = 0;
     const ordered = [
       ...ACHIEVEMENTS.filter((a) => opened.has(a.id)),
@@ -75,15 +77,17 @@ export class AchievementsDialog {
         fontWeight: '700',
       });
       score.anchor.set(1, 0.5);
-      score.position.set(cw, rowH / 2);
+      score.position.set(listW, rowH / 2);
       row.addChild(chip, name, score);
       row.eventMode = 'static';
       row.cursor = 'pointer';
       row.on('pointertap', () => this.openDetail(a));
       row.position.set(0, y);
-      popup.content.addChild(row);
+      list.addChild(row);
       y += rowH + ROW_GAP;
     }
+    list.position.set(OPENED_BORDER_WIDTH, OPENED_BORDER_WIDTH);
+    popup.content.addChild(list);
 
     root.addChild(popup.el);
     this.el = popup.el;

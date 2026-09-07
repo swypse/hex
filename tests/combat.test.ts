@@ -15,15 +15,15 @@ function makeTile(
 }
 
 function makeWarrior(id: string, owner: number, q: number, r: number, hp: number): Unit {
-  return { id, owner, type: 'warrior', q, r, hasMoved: false, hasAttacked: false, hasHealed: false, hp, attack: 20, attackDistance: 1, defence: 0, spawnVillage: null };
+  return { id, owner, type: 'warrior', q, r, hasMoved: false, hasAttacked: false, hasHealed: false, hp, attack: 20, attackDistance: 1, defense: 0, spawnVillage: null };
 }
 
 function makeShield(id: string, owner: number, q: number, r: number, hp: number): Unit {
-  return { id, owner, type: 'shield', q, r, hasMoved: false, hasAttacked: false, hasHealed: false, hp, attack: 10, attackDistance: 1, defence: 20, spawnVillage: null };
+  return { id, owner, type: 'shield', q, r, hasMoved: false, hasAttacked: false, hasHealed: false, hp, attack: 10, attackDistance: 1, defense: 20, spawnVillage: null };
 }
 
 function makeCatapult(id: string, owner: number, q: number, r: number, hp: number): Unit {
-  return { id, owner, type: 'catapult', q, r, hasMoved: false, hasAttacked: false, hasHealed: false, hp, attack: 40, attackDistance: 4, defence: 0, spawnVillage: null };
+  return { id, owner, type: 'catapult', q, r, hasMoved: false, hasAttacked: false, hasHealed: false, hp, attack: 40, attackDistance: 4, defense: 0, spawnVillage: null };
 }
 
 function makeMap(): GameMap {
@@ -105,7 +105,7 @@ describe('chooseBestAttack', () => {
 
   it('prefers a target that cannot retaliate', () => {
     const map: GameMap = { radius: 4, tiles: [], spawns: [] };
-    const archer: Unit = { id: 'a', owner: 0, type: 'archer', q: 0, r: 0, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 30, attack: 20, attackDistance: 2, defence: 5, spawnVillage: null };
+    const archer: Unit = { id: 'a', owner: 0, type: 'archer', q: 0, r: 0, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 30, attack: 20, attackDistance: 2, defense: 5, spawnVillage: null };
     const melee = makeTile(1, 0, TileType.GrasslandLand, makeWarrior('m', 1, 1, 0, 1));
     const farMelee = makeTile(2, 0, TileType.GrasslandLand, makeWarrior('f', 1, 2, 0, 1));
     map.tiles.push(makeTile(0, 0, TileType.GrasslandLand, archer), melee, farMelee);
@@ -155,7 +155,7 @@ describe('performAttack', () => {
 
   it('does not move an archer onto the killed tile', () => {
     const map = makeMap();
-    const archer: Unit = { id: 'arc', owner: 0, type: 'archer', q: 0, r: 0, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 30, attack: 20, attackDistance: 3, defence: 5, spawnVillage: null };
+    const archer: Unit = { id: 'arc', owner: 0, type: 'archer', q: 0, r: 0, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 30, attack: 20, attackDistance: 3, defense: 5, spawnVillage: null };
     map.tiles[0]!.unit = archer;
     const dying = makeTile(1, 0, TileType.GrasslandLand, makeWarrior('b', 1, 1, 0, 1));
     map.tiles[1]! = dying;
@@ -179,7 +179,7 @@ describe('performAttack', () => {
     expect(catapult.r).toBe(0);
   });
 
-  it('a shield takes 20 less damage from a catapult attack via its defence', () => {
+  it('a shield takes 20 less damage from a catapult attack via its defense', () => {
     const map: GameMap = { radius: 4, tiles: [], spawns: [] };
     const catapult = makeCatapult('c', 0, 0, 0, 30);
     const shield = makeTile(1, 0, TileType.GrasslandLand, makeShield('s', 1, 1, 0, 100));
@@ -201,7 +201,7 @@ describe('performAttack', () => {
 
   it('does not move a ship onto the killed tile', () => {
     const map = makeMap();
-    const ship: Unit = { id: 'ship', owner: 0, type: 'warrior', q: 0, r: 0, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 50, attack: 20, attackDistance: 1, defence: 0, spawnVillage: null, shipLevel: 1 };
+    const ship: Unit = { id: 'ship', owner: 0, type: 'warrior', q: 0, r: 0, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 50, attack: 20, attackDistance: 1, defense: 0, spawnVillage: null, shipLevel: 1 };
     map.tiles[0]!.unit = ship;
     const dying = makeTile(1, 0, TileType.GrasslandLand, makeWarrior('b', 1, 1, 0, 1));
     map.tiles[1]! = dying;
@@ -213,7 +213,7 @@ describe('performAttack', () => {
   it('does not move a land attacker onto a killed ship tile', () => {
     const map = makeMap();
     const attacker = map.tiles[0]!.unit!;
-    const dyingShip: Unit = { id: 'ship', owner: 1, type: 'warrior', q: 0, r: -1, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 1, attack: 20, attackDistance: 1, defence: 0, spawnVillage: null, shipLevel: 1 };
+    const dyingShip: Unit = { id: 'ship', owner: 1, type: 'warrior', q: 0, r: -1, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 1, attack: 20, attackDistance: 1, defense: 0, spawnVillage: null, shipLevel: 1 };
     const shipTile = makeTile(0, -1, TileType.Water, dyingShip);
     map.tiles[2]! = shipTile;
     performAttack(map, attacker, shipTile, noMiss);
@@ -225,9 +225,9 @@ describe('performAttack', () => {
 
   it('does not move a ship attacker onto a killed ship tile', () => {
     const map = makeMap();
-    const ship: Unit = { id: 'shipA', owner: 0, type: 'warrior', q: 0, r: 0, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 50, attack: 20, attackDistance: 1, defence: 0, spawnVillage: null, shipLevel: 1 };
+    const ship: Unit = { id: 'shipA', owner: 0, type: 'warrior', q: 0, r: 0, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 50, attack: 20, attackDistance: 1, defense: 0, spawnVillage: null, shipLevel: 1 };
     map.tiles[0]!.unit = ship;
-    const dyingShip: Unit = { id: 'shipB', owner: 1, type: 'warrior', q: 0, r: -1, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 1, attack: 20, attackDistance: 1, defence: 0, spawnVillage: null, shipLevel: 1 };
+    const dyingShip: Unit = { id: 'shipB', owner: 1, type: 'warrior', q: 0, r: -1, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 1, attack: 20, attackDistance: 1, defense: 0, spawnVillage: null, shipLevel: 1 };
     const shipTile = makeTile(0, -1, TileType.Water, dyingShip);
     map.tiles[2]! = shipTile;
     performAttack(map, ship, shipTile, noMiss);
@@ -238,7 +238,7 @@ describe('performAttack', () => {
   it('does not move a land attacker onto a killed pirate tile', () => {
     const map = makeMap();
     const attacker = map.tiles[0]!.unit!;
-    const pirate: Unit = { id: 'pir', owner: -1, type: 'pirate', q: 0, r: -1, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 1, attack: 30, attackDistance: 3, defence: 10, spawnVillage: null };
+    const pirate: Unit = { id: 'pir', owner: -1, type: 'pirate', q: 0, r: -1, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 1, attack: 30, attackDistance: 3, defense: 10, spawnVillage: null };
     const pirateTile = makeTile(0, -1, TileType.Water, pirate);
     map.tiles[2]! = pirateTile;
     performAttack(map, attacker, pirateTile, noMiss);
@@ -264,7 +264,7 @@ describe('performAttack', () => {
 
   it('does not apply counter-damage when the attacker is beyond the target reach', () => {
     const map: GameMap = { radius: 4, tiles: [], spawns: [] };
-    const archer: Unit = { id: 'arc', owner: 0, type: 'archer', q: 0, r: 0, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 30, attack: 20, attackDistance: 2, defence: 5, spawnVillage: null };
+    const archer: Unit = { id: 'arc', owner: 0, type: 'archer', q: 0, r: 0, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 30, attack: 20, attackDistance: 2, defense: 5, spawnVillage: null };
     const far = makeTile(2, 0, TileType.GrasslandLand, makeWarrior('w', 1, 2, 0, 30));
     map.tiles.push(makeTile(0, 0, TileType.GrasslandLand, archer), far);
     const result = performAttack(map, archer, far, noMiss);
@@ -278,7 +278,7 @@ describe('ship attacks', () => {  it('a level-3 ship attacks at distance 3 with 
     const ship: Unit = {
       id: 's', owner: 0, type: 'archer', q: 0, r: 0,
       hasMoved: false, hasAttacked: false, hasHealed: false,
-      hp: 30, attack: 20, attackDistance: 2, defence: 5, spawnVillage: null,
+      hp: 30, attack: 20, attackDistance: 2, defense: 5, spawnVillage: null,
       shipLevel: 3,
     };
     const map: GameMap = { radius: 4, tiles: [], spawns: [] };
@@ -392,7 +392,7 @@ describe('temple protection', () => {
 
 describe('tradeIsFavorable', () => {
   function unitOf(id: string, type: keyof typeof UNIT_TYPES, owner: number, q: number, r: number): Unit {
-    return { id, owner, type, q, r, hasMoved: false, hasAttacked: false, hasHealed: false, hp: UNIT_TYPES[type].maxHp, attack: UNIT_TYPES[type].attack, attackDistance: UNIT_TYPES[type].attackDistance, defence: UNIT_TYPES[type].defence, spawnVillage: null };
+    return { id, owner, type, q, r, hasMoved: false, hasAttacked: false, hasHealed: false, hp: UNIT_TYPES[type].maxHp, attack: UNIT_TYPES[type].attack, attackDistance: UNIT_TYPES[type].attackDistance, defense: UNIT_TYPES[type].defense, spawnVillage: null };
   }
   function tileWith(q: number, r: number, u: Unit): MapTile {
     return { q, r, terrain: TileType.GrasslandLand, settlement: null, building: null, unit: u, ownedBy: null, claimedByVillage: null, exploredBy: [0, 1] };

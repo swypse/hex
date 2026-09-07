@@ -22,15 +22,15 @@ function tile(
 }
 
 function warrior(id: string, owner: number, q: number, r: number, hp = 50): Unit {
-  return { id, owner, type: 'warrior', q, r, hasMoved: false, hasAttacked: false, hasHealed: false, hp, attack: 20, attackDistance: 1, defence: 0, spawnVillage: null };
+  return { id, owner, type: 'warrior', q, r, hasMoved: false, hasAttacked: false, hasHealed: false, hp, attack: 20, attackDistance: 1, defense: 0, spawnVillage: null };
 }
 
 function archer(id: string, owner: number, q: number, r: number): Unit {
-  return { id, owner, type: 'archer', q, r, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 30, attack: 20, attackDistance: 2, defence: 5, spawnVillage: null };
+  return { id, owner, type: 'archer', q, r, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 30, attack: 20, attackDistance: 2, defense: 5, spawnVillage: null };
 }
 
 function rider(id: string, owner: number, q: number, r: number): Unit {
-  return { id, owner, type: 'rider', q, r, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 40, attack: 20, attackDistance: 1, defence: 5, spawnVillage: null };
+  return { id, owner, type: 'rider', q, r, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 40, attack: 20, attackDistance: 1, defense: 5, spawnVillage: null };
 }
 
 function player(money: number, skills: Player['skills'] = []): Player {

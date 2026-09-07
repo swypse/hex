@@ -934,6 +934,7 @@ class GameController {
         height: this.mapHeight(),
       },
       this.tutorialMarkerKeys(),
+      isLocalTurn,
     );
     this.overlayItems = this.mapView.overlayItems;
     this.applyTransform();

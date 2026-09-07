@@ -16,7 +16,7 @@ export interface Settlement {
   captureReady: boolean;
   name?: string;
   capital?: boolean;
-  /** Built wall: units inside gain bonus defence. */
+  /** Built wall: units inside gain bonus defense. */
   wall?: boolean;
 }
 

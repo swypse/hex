@@ -104,7 +104,7 @@ export function performAttack(
 
   const attackerDamage = Math.max(
     MIN_DAMAGE,
-    rollAttackDamage(attacker, rng) - (targetUnit.defence ?? 0) - damageReduction(map, targetUnit, target),
+    rollAttackDamage(attacker, rng) - (targetUnit.defense ?? 0) - damageReduction(map, targetUnit, target),
   );
   const targetDied = targetUnit.hp - attackerDamage <= 0;
   targetUnit.hp = Math.max(0, targetUnit.hp - attackerDamage);
@@ -119,7 +119,7 @@ export function performAttack(
   );
   if (!targetDied && distance <= targetUnit.attackDistance) {
     const counterReduction = attackerTile ? damageReduction(map, attacker, attackerTile) : 0;
-    targetDamage = Math.max(MIN_DAMAGE, counterAttackDamage(targetUnit) - (attacker.defence ?? 0) - counterReduction);
+    targetDamage = Math.max(MIN_DAMAGE, counterAttackDamage(targetUnit) - (attacker.defense ?? 0) - counterReduction);
     attackerDied = attacker.hp - targetDamage <= 0;
     attacker.hp = Math.max(0, attacker.hp - targetDamage);
   }

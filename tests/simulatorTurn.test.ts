@@ -145,7 +145,7 @@ describe('Simulator turn engine', () => {
     sim.startGame();
     sim.drainEvents();
     sim.applyCommand({ type: 'endTurn' });
-    expect(aiUnit.hp).toBe(22);
+    expect(aiUnit.hp).toBe(17);
     const events = sim.drainEvents();
     expect(events.some((e) => e.type === 'healed' && e.unitId === 'ai')).toBe(true);
   });

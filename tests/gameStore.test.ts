@@ -111,6 +111,21 @@ describe('gameStore', () => {
     expect(store().centerMessage).toBeNull();
   });
 
+  it('keeps the center chip style in sync with the queued center messages', () => {
+    const style = { size: 64, bgColor: 0x373748 };
+    const store = () => useGameStore.getState();
+    store().setCenterMessage('Achievement unlocked!', 'achivements/x.png', style);
+    expect(store().centerChipStyle).toEqual(style);
+    store().setCenterMessage('second', null, null);
+    expect(store().centerMessageQueue).toEqual(['second']);
+    store().setCenterMessage(null);
+    expect(store().centerMessage).toBe('second');
+    expect(store().centerChipStyle).toBeNull();
+    store().setCenterMessage(null);
+    expect(store().centerChipStyle).toBeNull();
+    expect(store().centerChipQueue).toEqual([]);
+  });
+
   it('clears pending center messages when leaving the game screen', () => {
     useGameStore.setState({ screen: 'game' });
     const store = () => useGameStore.getState();
