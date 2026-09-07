@@ -422,7 +422,7 @@ describe('MapView hp bar anchoring', () => {
     const terrainSprite = tv.el.children.find((c) => (c as { zIndex: number }).zIndex === 0);
     const unitSprite = tv.el.children.find((c) => (c as { zIndex: number }).zIndex === 7);
     const tileGraphics = tv.el.children.filter((c) => c instanceof Graphics);
-    expect(tileGraphics.length).toBe(3);
+    expect(tileGraphics.length).toBe(2);
     const topPart = tileGraphics.find(
       (c) => (c as { zIndex: number }).zIndex > (terrainSprite as { zIndex: number }).zIndex && (c as { zIndex: number }).zIndex < (unitSprite as { zIndex: number }).zIndex,
     );

@@ -11,7 +11,6 @@ import { UNIT_TYPES, PIRATE_COLOR, Unit } from '../game/units';
 import { unitCanAct } from '../game/unitActions';
 import { isExploredFor } from '../game/explore';
 import { territoryColor } from '../game/discovery';
-import { isMountainType } from '../game/tileTypes';
 import { villageCapacity, unitsInVillage } from '../game/village';
 import { isVillageRoadConnected } from '../game/roads';
 import { SELECTION_COLOR } from '../config';
@@ -62,7 +61,6 @@ interface TileView {
   bonusSprite: Sprite | null;
   unitSprite: Sprite | null;
   territory: Graphics;
-  shadowGraphics: Graphics;
   roadGraphics: Graphics | null;
   signature: string;
 }
@@ -325,10 +323,6 @@ export class MapView {
       territory.zIndex = 2;
       el.addChild(territory);
 
-      const shadowGraphics = new Graphics();
-      shadowGraphics.zIndex = 2;
-      el.addChild(shadowGraphics);
-
       el.sortableChildren = true;
 
       this.tileViews.set(axialKey(tile), {
@@ -342,7 +336,6 @@ export class MapView {
         bonusSprite: null,
         unitSprite: null,
         territory,
-        shadowGraphics,
         roadGraphics: null,
         signature: '',
       });
@@ -392,8 +385,6 @@ export class MapView {
     this.drawTileTerritory(tv.territory, tile, players, explored);
     tv.territory.visible = explored;
 
-    this.drawMountainShadow(tv, tile, explored);
-
     this.drawRoad(tv, tile);
 
     const bonusTex = tile.bonus ? this.textures.bonusTexture : null;
@@ -421,37 +412,8 @@ export class MapView {
     }
   }
 
-  private drawMountainShadow(tv: TileView, tile: MapTile, explored: boolean): void {
-    const g = tv.shadowGraphics;
-    g.clear();
-    if (!explored) return;
-    const edges: number[] = [];
-    for (const e of [3, 4]) {
-      const neighbor = this.tileIndex.get(axialKey(hexEdgeNeighbor(tile, e)));
-      if (neighbor && isMountainType(neighbor.terrain)) edges.push(e);
-    }
-    if (edges.length === 0) return;
-    const p = hexToPixel(tile, this.hexSize);
-    const elev = tileElevation(tile, this.hexSize);
-    const cx = p.x;
-    const cy = p.y - elev;
-    const inset = Math.max(6, this.hexSize * 0.14);
-    for (const e of edges) {
-      const seg = hexEdge(tile, e, this.hexSize);
-      const ax = seg.ax;
-      const ay = seg.ay - elev;
-      const bx = seg.bx;
-      const by = seg.by - elev;
-      const axIn = ax - ((ax - cx) / (Math.hypot(ax - cx, ay - cy) || 1)) * inset;
-      const ayIn = ay - ((ay - cy) / (Math.hypot(ax - cx, ay - cy) || 1)) * inset;
-      const bxIn = bx - ((bx - cx) / (Math.hypot(bx - cx, by - cy) || 1)) * inset;
-      const byIn = by - ((by - cy) / (Math.hypot(bx - cx, by - cy) || 1)) * inset;
-      g.poly([ax, ay, bx, by, bxIn, byIn, axIn, ayIn]).fill({ color: 0x000000, alpha: 0.2 });
-    }
-  }
-
   /** Sets a unit's horizontal facing so its sprite looks toward its last
-   *  attacked enemy: flipped (left) or default (right). */
+   * attacked enemy: flipped (left) or default (right). */
   private faceUnitSprite(sprite: Sprite, facing: 'left' | 'right'): void {
     sprite.scale.set(this.spriteScale * (facing === 'left' ? -1 : 1), this.spriteScale);
   }
