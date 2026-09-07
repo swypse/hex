@@ -739,9 +739,9 @@ export class EventPresenter {
     const particles: { g: Graphics; x0: number; swing: number; phase: number; opacity: number }[] = [];
     for (let i = 0; i < DEATH_PARTICLE_COUNT; i++) {
       const g = new Graphics();
-      const radius = 3 + Math.random() * 15;
-      const opacity = 0.1 + Math.random() * 0.3;
-      g.circle(0, 0, radius).fill({ color: 0xffffff, alpha: opacity });
+      const size = 4 + Math.random() * 12;
+      const opacity = 0.3 + Math.random() * 0.5;
+      g.rect(-size / 2, -size / 2, size, size).fill({ color: 0xffffff, alpha: opacity });
       el.addChild(g);
       particles.push({
         g,
