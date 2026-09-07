@@ -3,7 +3,7 @@ import { Circle, Container, Graphics, Text } from 'pixi.js';
 import { gameController } from '../../controller/gameController';
 import { TRIBES } from '../../game/tribes';
 import { isForestType, isMountainType, isWaterType, TILE_TYPE_COLORS, TILE_TYPE_NAMES } from '../../game/tileTypes';
-import { UNIT_TYPE_NAMES, UNIT_TYPES, type Unit } from '../../game/units';
+import { UNIT_TYPE_NAMES, UNIT_TYPES, unitMaintenance, type Unit } from '../../game/units';
 import { unitCanAct } from '../../game/unitActions';
 import { tileAt } from '../../game/selection';
 import { attackDamage } from '../../game/combat';
@@ -97,7 +97,7 @@ export class HudSelected implements Widget {
       const maxHp = UNIT_TYPES[unit.type].maxHp;
       const canAct = unit.type === 'pirate' ? false : unitCanAct(map, tile, unit, player!);
       unitLineIndex = lines.length;
-      lines.push(t('hud.selected.unit', { name: UNIT_TYPE_NAMES[unit.type], hp: unit.hp, max: maxHp, active: canAct ? ' •' : '', atk: attackDamage(unit), def: unit.defence ?? 0 }));
+      lines.push(t('hud.selected.unit', { name: UNIT_TYPE_NAMES[unit.type], hp: unit.hp, max: maxHp, active: canAct ? ' •' : '', atk: attackDamage(unit), def: unit.defence ?? 0, upkeep: unitMaintenance(unit) }));
       bolds.push(true);
       for (const buff of unitDefenceBuffs(map, unit, tile)) {
         lines.push(t(buff.key, { n: buff.amount }));

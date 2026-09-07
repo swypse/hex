@@ -133,6 +133,7 @@ describe('HudSelected village building constraints', () => {
     mount(1, 1, 0, { unitOnVillage: true, wall: true });
     const all = texts().join('\n');
     expect(all).toContain('DEF 0');
+    expect(all).toContain('UPKEEP 1');
     expect(all).toContain('+3 DEF — village wall');
   });
 

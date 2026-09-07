@@ -262,7 +262,7 @@ export default {
   'leave.title': 'Leave game?',
   'leave.hint': 'The current game will be abandoned.',
   'hud.selected.settlementDefault': 'Settlement',
-  'hud.selected.unit': '{name} HP {hp}/{max}{active} ATK {atk} DEF {def}',
+  'hud.selected.unit': '{name} HP {hp}/{max}{active} ATK {atk} DEF {def} UPKEEP {upkeep}',
   'hud.buff.wall': '+{n} DEF — village wall',
   'hud.buff.forestProtection': '+{n} DEF — forest protection',
   'hud.buff.waterProtection': '+{n} DEF — water protection',
