@@ -2,7 +2,7 @@ import { Container, Graphics } from 'pixi.js';
 import { gameController } from '../../controller/gameController';
 import { useGameStore } from '../../store/gameStore';
 import { t } from '../../i18n';
-import { advanceCheatBuffer, cheatCodeTriggered } from '../../game/cheats';
+import { advanceCheatBuffer, triggeredCheat, SKILLS_CHEAT_WORD, RESOURCE_CHEAT_WORD } from '../../game/cheats';
 import { type ScreenController, type UIHost, type Widget } from '../host';
 import { HudScore } from '../hud/HudScore';
 import { HudPlayers } from '../hud/HudPlayers';
@@ -33,10 +33,13 @@ export class GameScreen implements ScreenController {
     if (e.key.length !== 1) return;
     if (!/[a-z]/i.test(e.key)) return;
     this.cheatBuffer = advanceCheatBuffer(this.cheatBuffer, e.key);
-    if (!cheatCodeTriggered(this.cheatBuffer)) return;
+    const cheat = triggeredCheat(this.cheatBuffer);
+    if (!cheat) return;
     this.cheatBuffer = '';
-    if (gameController.cheatResources()) {
+    if (cheat === RESOURCE_CHEAT_WORD && gameController.cheatResources()) {
       useGameStore.getState().setCenterMessage(t('msg.cheatResources'));
+    } else if (cheat === SKILLS_CHEAT_WORD && gameController.cheatOpenAllSkills()) {
+      useGameStore.getState().setCenterMessage(t('msg.cheatSkills'));
     }
   };
 

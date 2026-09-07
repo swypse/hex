@@ -2,7 +2,9 @@ import { describe, it, expect } from 'vitest';
 import {
   advanceCheatBuffer,
   cheatCodeTriggered,
+  triggeredCheat,
   RESOURCE_CHEAT_WORD,
+  SKILLS_CHEAT_WORD,
 } from '../src/game/cheats';
 
 function type(word: string, buffer = ''): string {
@@ -17,12 +19,20 @@ describe('cheat code buffer', () => {
     expect(cheatCodeTriggered(buffer)).toBe(true);
   });
 
+  it('triggers the skills cheat', () => {
+    const buffer = type('skillS');
+    expect(buffer).toBe(SKILLS_CHEAT_WORD);
+    expect(triggeredCheat(buffer)).toBe(SKILLS_CHEAT_WORD);
+  });
+
   it('does not trigger on a partial word', () => {
     expect(cheatCodeTriggered(type('resour'))).toBe(false);
+    expect(triggeredCheat(type('skil'))).toBeNull();
   });
 
   it('triggers when the word appears at the end of typed text', () => {
     expect(cheatCodeTriggered(type('abcresources'))).toBe(true);
+    expect(triggeredCheat(type('xxskills'))).toBe(SKILLS_CHEAT_WORD);
   });
 
   it('does not trigger when the word is interrupted by other letters', () => {

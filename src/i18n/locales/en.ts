@@ -86,6 +86,7 @@ export default {
   'msg.pirates': 'Pirates!',
   'msg.yourTurn': 'Your turn',
   'msg.cheatResources': '+100 of each resource (cheat)',
+  'msg.cheatSkills': 'All skills unlocked (cheat)',
 
   // Common
   'common.close': 'Close',

@@ -86,6 +86,7 @@ export default {
   'msg.pirates': 'Пираты!',
   'msg.yourTurn': 'Ваш ход',
   'msg.cheatResources': '+100 к каждому ресурсу (чит)',
+  'msg.cheatSkills': 'Открыты все навыки (чит)',
 
   // Common
   'common.close': 'Закрыть',

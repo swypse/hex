@@ -9,7 +9,7 @@ import { TileType } from '../game/tileTypes';
 import { generateMap, type GameMap } from '../game/mapGen';
 import { buildPlayers } from '../game/players';
 import { AiDifficulty, DEFAULT_AI_DIFFICULTY } from '../game/aiDifficulty';
-import { hasSkill, SkillId } from '../game/skills';
+import { hasSkill, SKILLS, SkillId } from '../game/skills';
 import { attackableTargets } from '../game/combat';
 import { moveRange, canMove, canAttack, type UnitType } from '../game/units';
 import { cycleSelection, reachableTargets, tileAt } from '../game/selection';
@@ -709,6 +709,20 @@ class GameController {
       money: local.resources.money + RESOURCE_CHEAT_AMOUNT,
       ore: local.resources.ore + RESOURCE_CHEAT_AMOUNT,
     };
+    this.syncStore();
+    this.saveGame();
+    return true;
+  }
+
+  /** Cheat (single-player only): opens every skill for the local player.
+   *  Returns true when granted. */
+  cheatOpenAllSkills(): boolean {
+    if (!this.sim) return false;
+    const store = useGameStore.getState();
+    if (store.screen !== 'game' || store.netMode !== 'single') return false;
+    const local = this.sim.players[store.localPlayerIndex];
+    if (!local) return false;
+    local.skills = Object.keys(SKILLS) as SkillId[];
     this.syncStore();
     this.saveGame();
     return true;
