@@ -24,6 +24,7 @@ import { useGameStore } from '../store/gameStore';
 import { TOOLBAR_HEIGHT, isWideScreen } from '../ui/layout';
 import { saveRepository } from '../storage/saveGame';
 import { attackConfirmationEnabled } from '../storage/settings';
+import { sfx } from '../sound/sfx';
 import { SeededRandom } from '../util/random';
 import { CameraController } from './cameraController';
 import { type Viewport } from '../render/tileSignature';
@@ -120,7 +121,16 @@ class GameController {
   private syncStore(): void {
     const store = useGameStore.getState();
     if (!this.sim) return;
-    store.setPlayers([...this.sim.players]);
+    store.setPlayers(
+      this.sim.players.map((p) => ({
+        ...p,
+        resources: { ...p.resources },
+        skills: [...p.skills],
+        knownTribes: p.knownTribes ? [...p.knownTribes] : undefined,
+        stats: p.stats ? { ...p.stats } : undefined,
+        achievements: p.achievements ? [...p.achievements] : undefined,
+      })),
+    );
     store.setTurn(this.sim.turn);
     store.setCurrentPlayerIndex(this.sim.currentPlayerIndex);
     store.setGameOver(this.sim.gameOver);
@@ -307,11 +317,11 @@ class GameController {
       if (store.aiActive && cmd.type !== 'endTurn') return;
       const preExplored = this.exploredKeysFor(store.localPlayerIndex);
       const ok = this.sim.applyCommand(cmd);
-      this.syncStore();
       if (ok) this.saveGame();
       const events = this.sim.drainEvents();
       if (store.netMode === 'host') this.getNetwork().broadcastBatch(events);
       await this.presentEvents(events, preExplored);
+      this.syncStore();
       this.render();
       if (useGameStore.getState().tutorial && this.tutorial) {
         const changed = this.tutorial.afterCommand(events);
@@ -597,6 +607,7 @@ class GameController {
         }
         this.sendCommand({ type: 'move', unitId: unit.id, q, r });
         store.setSelection({ kind: 'unit', q: tile.q, r: tile.r });
+        sfx.play('click');
         return;
       }
     }
@@ -605,6 +616,7 @@ class GameController {
 
     const next = cycleSelection(selection, tile);
     store.setSelection(next);
+    sfx.play('click');
     if (next.kind === 'unit') {
       const u = tileAt(this.sim.map, next.q, next.r)?.unit;
       if (u && u.owner === store.localPlayerIndex) this.mapView?.bounceUnit(next.q, next.r);

@@ -10,6 +10,7 @@ export interface GameSettings {
   aiDifficulty: AiDifficulty;
   disableTips: boolean;
   lang: Language;
+  soundOn: boolean;
 }
 
 const DEFAULTS: GameSettings = {
@@ -17,6 +18,7 @@ const DEFAULTS: GameSettings = {
   aiDifficulty: DEFAULT_AI_DIFFICULTY,
   disableTips: false,
   lang: 'en',
+  soundOn: true,
 };
 
 export function loadSettings(): GameSettings {
@@ -66,4 +68,12 @@ export function currentLanguage(): Language {
 
 export function setLanguage(lang: Language): void {
   saveSettings({ ...loadSettings(), lang });
+}
+
+export function soundEnabled(): boolean {
+  return loadSettings().soundOn;
+}
+
+export function setSoundEnabled(enabled: boolean): void {
+  saveSettings({ ...loadSettings(), soundOn: enabled });
 }

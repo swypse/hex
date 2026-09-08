@@ -1,6 +1,7 @@
 import { Circle, Container, Graphics, Sprite } from 'pixi.js';
 import { makeIcon } from './icon';
 import { THEME } from './theme';
+import { sfx } from '../../sound/sfx';
 
 export interface IconButtonOpts {
   icon: string;
@@ -94,7 +95,9 @@ export class IconButton extends Container {
     }
   };
   private onTap = (): void => {
-    if (!this._disabled) this.onClick();
+    if (this._disabled) return;
+    sfx.play('click');
+    this.onClick();
   };
 
   get disabled(): boolean {

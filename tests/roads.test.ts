@@ -183,24 +183,24 @@ describe('roads', () => {
     expect(isVillageRoadConnected(map, map.tiles[0]!)).toBe(false);
   });
 
-  it("connects a village whose road path reaches another tribe's village", () => {
+  it("does not count reaching another tribe's village as connected", () => {
     const map = mapWith([
       villageTile(0, 0, 0),
       tile(1, 0, TileType.GrasslandLand, { roadOwner: 0 }),
       villageTile(2, 0, 1),
     ]);
-    expect(isVillageRoadConnected(map, map.tiles[0]!)).toBe(true);
+    expect(isVillageRoadConnected(map, map.tiles[0]!)).toBe(false);
   });
 
-  it('connects both villages at the ends of the completed road path', () => {
+  it("does not connect either village when the road path ends at another tribe's village", () => {
     const map = mapWith([
       villageTile(0, 0, 0),
       tile(1, 0, TileType.GrasslandLand, { roadOwner: 0 }),
       tile(2, 0, TileType.GrasslandLand, { roadOwner: 0 }),
       villageTile(3, 0, 1),
     ]);
-    expect(isVillageRoadConnected(map, map.tiles[0]!)).toBe(true);
-    expect(isVillageRoadConnected(map, map.tiles[3]!)).toBe(true);
+    expect(isVillageRoadConnected(map, map.tiles[0]!)).toBe(false);
+    expect(isVillageRoadConnected(map, map.tiles[3]!)).toBe(false);
   });
 
   it('connects a village whose road path reaches another of the same tribe\'s villages', () => {
@@ -215,13 +215,13 @@ describe('roads', () => {
 });
 
 describe('bridges as roads', () => {
-  function bridgeMap(): MapTile[] {
+  function bridgeMap(secondOwner: number): MapTile[] {
     const bridge = tile(1, 0, TileType.Water, { roadOwner: 0 });
     bridge.bridge = { owner: 0, dir: 'we' };
     return [
       villageTile(0, 0, 0),
       bridge,
-      villageTile(2, 0, 1),
+      villageTile(2, 0, secondOwner),
     ];
   }
 
@@ -239,9 +239,15 @@ describe('bridges as roads', () => {
     expect(canBuildRoad(map, map.tiles[2]!, player(100, 10, 10, 0, ['forestry', 'roads']))).toBe(true);
   });
 
-  it('isVillageRoadConnected crosses a bridge to another village', () => {
-    const map = mapWith(bridgeMap());
+  it('isVillageRoadConnected connects own villages across a bridge', () => {
+    const map = mapWith(bridgeMap(0));
     expect(isVillageRoadConnected(map, map.tiles[0]!)).toBe(true);
     expect(isVillageRoadConnected(map, map.tiles[2]!)).toBe(true);
+  });
+
+  it("does not count another tribe's village across a bridge as connected", () => {
+    const map = mapWith(bridgeMap(1));
+    expect(isVillageRoadConnected(map, map.tiles[0]!)).toBe(false);
+    expect(isVillageRoadConnected(map, map.tiles[2]!)).toBe(false);
   });
 });

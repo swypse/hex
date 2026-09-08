@@ -21,6 +21,7 @@ import { achievementIcon, achievementNameKey } from '../game/achievements';
 import { CameraController } from './cameraController';
 import { initialAttackHpOverrides, hpOverrideAfterAttack } from './attackHp';
 import { t } from '../i18n';
+import { sfx } from '../sound/sfx';
 
 const HEX_SIZE = 40;
 
@@ -188,12 +189,14 @@ export class EventPresenter {
             this.presentCaptured(e);
             break;
           case 'villageUpgraded':
+            if (e.playerIndex === local) sfx.play('upgrade');
             break;
           case 'built':
             break;
           case 'templeGrown':
             break;
           case 'skillOpened':
+            if (e.playerIndex === local) sfx.play('claim');
             break;
           case 'healed': {
             const unit = this.findUnitById(e.unitId);
@@ -221,6 +224,7 @@ export class EventPresenter {
           }
           case 'bonusClaimed':
             this.presentBonusClaimed(e);
+            if (e.playerIndex === local) sfx.play('claim');
             break;
           case 'explorer':
             await this.presentExplorer(e);
@@ -289,6 +293,8 @@ export class EventPresenter {
     const attackerVisible = attackerTile !== undefined && isExploredFor(attackerTile, local);
     const targetVisible = targetTile !== undefined && isExploredFor(targetTile, local);
     const mapView = this.host.mapView();
+
+    if (!e.missed && (attackerVisible || targetVisible)) sfx.play('hit');
 
     // In the final sim state a melee attacker that killed its target already
     // stands on the target tile; detect that so we can animate the advance.

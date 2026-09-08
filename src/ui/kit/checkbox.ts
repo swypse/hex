@@ -1,9 +1,11 @@
 import { Container, Graphics } from 'pixi.js';
 import { makeLabel } from './label';
+import { sfx } from '../../sound/sfx';
 
 export interface Checkbox {
   el: Container;
   setChecked(checked: boolean): void;
+  tap(): void;
 }
 
 export function makeCheckbox(checked: boolean, onToggle: (checked: boolean) => void): Checkbox {
@@ -27,12 +29,17 @@ export function makeCheckbox(checked: boolean, onToggle: (checked: boolean) => v
   el.addChild(bg, mark);
   el.eventMode = 'static';
   el.cursor = 'pointer';
-  el.on('pointertap', () => onToggle(!on));
+
+  const tap = (): void => {
+    sfx.play('click');
+    onToggle(!on);
+  };
+  el.on('pointertap', tap);
 
   const setChecked = (value: boolean): void => {
     on = value;
     paint();
   };
 
-  return { el, setChecked };
+  return { el, setChecked, tap };
 }

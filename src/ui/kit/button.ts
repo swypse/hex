@@ -1,6 +1,7 @@
 import { Container, Graphics, Text } from 'pixi.js';
 import { makeLabel } from './label';
 import { TEXT_BUTTON, THEME } from './theme';
+import { sfx } from '../../sound/sfx';
 
 const SHADOW_OFFSET_X = 4;
 const SHADOW_OFFSET_Y = 4;
@@ -150,11 +151,15 @@ export class Button extends Container {
     }
   };
   private onTap = (): void => {
-    if (!this._disabled) this.onClick();
+    if (this._disabled) return;
+    sfx.play('click');
+    this.onClick();
   };
 
   trigger(): void {
-    if (!this._disabled) this.onClick();
+    if (this._disabled) return;
+    sfx.play('click');
+    this.onClick();
   }
 
   setLabel(text: string): void {

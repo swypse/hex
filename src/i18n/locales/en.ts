@@ -76,6 +76,7 @@ export default {
   'settings.difficulty': 'AI difficulty',
   'settings.disableTips': 'Disable tips',
   'settings.language': 'Language',
+  'settings.sound': 'Sound',
   'settings.close': 'Close',
 
   // Center / event messages
@@ -120,6 +121,8 @@ export default {
   'common.ok': 'OK',
   'common.confirm': 'Confirm',
   'common.back': 'Back',
+  'common.on': 'On',
+  'common.off': 'Off',
   'gameover.modeTurns': 'Mode: {mode} · Turns: {turns}',
   'hud.turn.tutorial': 'Tutorial. Turn {turn}',
   'hud.turn.mode': '{mode}. Turn {turn}',

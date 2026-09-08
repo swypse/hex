@@ -1,6 +1,7 @@
 import { axialKey, hexDistance } from './hex';
 import { GameMap, MapTile } from './mapGen';
 import { shipAttackDistance } from './ship';
+import { isMountainType } from './tileTypes';
 import { Unit } from './units';
 
 export function isExploredFor(tile: MapTile, playerIndex: number): boolean {
@@ -33,7 +34,7 @@ export function exploreUnitPath(
   unit: Unit,
   playerIndex: number,
 ): MapTile[] {
-  const radius = unit.shipLevel !== undefined
+  const baseRadius = unit.shipLevel !== undefined
     ? shipAttackDistance(unit)
     : unit.type === 'catapult'
       ? 1
@@ -43,6 +44,7 @@ export function exploreUnitPath(
   for (const step of path) {
     const center = map.tiles.find((t) => t.q === step.q && t.r === step.r);
     if (!center) continue;
+    const radius = isMountainType(center.terrain) ? Math.max(baseRadius, 2) : baseRadius;
     for (const t of exploreAround(map, center, radius, playerIndex)) {
       if (!seen.has(t)) {
         seen.add(t);

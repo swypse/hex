@@ -49,11 +49,9 @@ export function villageCapacity(level: number): number {
   return 1 + level;
 }
 
-/** How many buildings a village of this level may support (1 at level 1). */
+/** How many buildings a village of this level may support. */
 export function villageBuildingLimit(level: number): number {
-  if (level >= 4) return 4;
-  if (level === 3) return 3;
-  return level === 2 ? 2 : 1;
+  return level;
 }
 
 /** Number of buildings on tiles claimed by the given village. */

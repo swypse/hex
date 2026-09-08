@@ -2,13 +2,14 @@ import { Application, Container, FillGradient, Graphics, Sprite, Text, Texture }
 import { gameController } from '../../controller/gameController';
 import { useGameStore } from '../../store/gameStore';
 import { saveRepository } from '../../storage/saveGame';
-import { loadSettings, setAiDifficulty, setAttackConfirmation, setTipsDisabled } from '../../storage/settings';
+import { loadSettings, setAiDifficulty, setAttackConfirmation, setSoundEnabled, setTipsDisabled } from '../../storage/settings';
 import { AiDifficulty } from '../../game/aiDifficulty';
 import { isTouchDevice } from '../touch';
 import { type ScreenController, type UIHost } from '../host';
 import { ScreenScroll } from '../verticalScroll';
 import { t } from '../../i18n';
 import { Button } from '../kit/button';
+import { ButtonGroup } from '../kit/buttonGroup';
 import { makeCheckbox } from '../kit/checkbox';
 import { makeLabel } from '../kit/label';
 import { Modal } from '../kit/modal';
@@ -60,93 +61,128 @@ class SettingsPanel {
     const content = popup.content;
     const cw = popup.contentWidth;
     const rowH = 30;
+    const blockGap = 10;
+    let y = 0;
 
-    let current = loadSettings().attackConfirmation;
-    const apply = (value: boolean): void => {
-      current = value;
-      setAttackConfirmation(value);
-      checkbox.setChecked(value);
-    };
-    const label = makeLabel(t('settings.attackConfirm'), { fontSize: 14, fill: 0xeeeeee });
-    const checkbox = makeCheckbox(current, apply);
-    label.position.set(0, (rowH - label.height) / 2);
-    checkbox.el.position.set(cw - 22, (rowH - 22) / 2);
-    label.eventMode = 'static';
-    label.cursor = 'pointer';
-    label.on('pointertap', () => apply(!current));
-    const row1 = new Container();
-    row1.addChild(label, checkbox.el);
-    row1.position.set(0, 0);
-    content.addChild(row1);
+    const attackLabel = makeLabel(t('settings.attackConfirm'), { fontSize: 14, fill: 0xeeeeee });
+    const attackCheckbox = makeCheckbox(loadSettings().attackConfirmation, (v) => {
+      setAttackConfirmation(v);
+      attackCheckbox.setChecked(v);
+    });
+    attackLabel.eventMode = 'static';
+    attackLabel.cursor = 'pointer';
+    attackLabel.on('pointertap', () => attackCheckbox.tap());
+    attackLabel.position.set(0, y + (rowH - attackLabel.height) / 2);
+    attackCheckbox.el.position.set(cw - 22, y + (rowH - 22) / 2);
+    content.addChild(attackLabel, attackCheckbox.el);
+    y += rowH + blockGap;
 
     const difficultyLabel = makeLabel(t('settings.difficulty'), { fontSize: 14, fill: 0xeeeeee });
-    difficultyLabel.position.set(0, rowH + 6);
+    difficultyLabel.position.set(0, y);
     content.addChild(difficultyLabel);
-    const difficultyCurrent = loadSettings().aiDifficulty;
+    y += difficultyLabel.height + 8;
+
+    const difficultyOptions: AiDifficulty[] = ['easy', 'normal', 'hard'];
     const difficultyKeys: Record<AiDifficulty, string> = {
       easy: 'difficulty.easy',
       normal: 'difficulty.normal',
       hard: 'difficulty.hard',
     };
-    const difficultyButtons: Button[] = (['easy', 'normal', 'hard'] as AiDifficulty[]).map((d, i) => {
-      const b = new Button({
+    const difficultyGroup = new ButtonGroup({
+      fontSize: 12,
+      items: difficultyOptions.map((d) => ({
         label: t(difficultyKeys[d]),
-        width: 76,
-        selected: d === difficultyCurrent,
         onClick: () => {
           setAiDifficulty(d);
-          difficultyButtons.forEach((bb) => {
-            bb.selected = bb === b;
+          difficultyGroup.buttons.forEach((b, i) => {
+            b.selected = difficultyOptions[i] === d;
           });
         },
-      });
-      b.position.set(i * 82, rowH + 6 + difficultyLabel.height + 8);
-      return b;
+      })),
     });
-    difficultyButtons.forEach((b) => content.addChild(b));
+    const currentDifficulty = loadSettings().aiDifficulty;
+    difficultyGroup.buttons.forEach((b, i) => {
+      b.selected = difficultyOptions[i] === currentDifficulty;
+    });
+    difficultyGroup.position.set(0, y);
+    content.addChild(difficultyGroup);
+    y += difficultyGroup.buttonHeight + blockGap;
 
-    let tipsOn = loadSettings().disableTips;
-    const applyTips = (value: boolean): void => {
-      tipsOn = value;
-      setTipsDisabled(value);
-      tipsCheckbox.setChecked(value);
-    };
-    const tipsCheckbox = makeCheckbox(tipsOn, applyTips);
     const tipsLabel = makeLabel(t('settings.disableTips'), { fontSize: 14, fill: 0xeeeeee });
-    const tipsY = rowH + 6 + difficultyLabel.height + 8 + 34 + 10;
-    tipsLabel.position.set(0, tipsY + (rowH - tipsLabel.height) / 2);
-    tipsCheckbox.el.position.set(cw - 22, tipsY + (rowH - 22) / 2);
+    const tipsCheckbox = makeCheckbox(loadSettings().disableTips, (v) => {
+      setTipsDisabled(v);
+      tipsCheckbox.setChecked(v);
+    });
     tipsLabel.eventMode = 'static';
     tipsLabel.cursor = 'pointer';
-    tipsLabel.on('pointertap', () => applyTips(!tipsOn));
+    tipsLabel.on('pointertap', () => tipsCheckbox.tap());
+    tipsLabel.position.set(0, y + (rowH - tipsLabel.height) / 2);
+    tipsCheckbox.el.position.set(cw - 22, y + (rowH - 22) / 2);
     content.addChild(tipsLabel, tipsCheckbox.el);
+    y += rowH + blockGap;
 
-    // Language row
+    const soundLabel = makeLabel(t('settings.sound'), { fontSize: 14, fill: 0xeeeeee });
+    soundLabel.position.set(0, y);
+    content.addChild(soundLabel);
+    y += soundLabel.height + 8;
+
+    const soundGroup = new ButtonGroup({
+      fontSize: 12,
+      items: [
+        {
+          label: t('common.on'),
+          onClick: () => {
+            setSoundEnabled(true);
+            soundGroup.buttons.forEach((b, i) => {
+              b.selected = i === 0;
+            });
+          },
+        },
+        {
+          label: t('common.off'),
+          onClick: () => {
+            setSoundEnabled(false);
+            soundGroup.buttons.forEach((b, i) => {
+              b.selected = i === 1;
+            });
+          },
+        },
+      ],
+    });
+    const soundOn = loadSettings().soundOn;
+    soundGroup.buttons.forEach((b, i) => {
+      b.selected = i === 0 ? soundOn : !soundOn;
+    });
+    soundGroup.position.set(0, y);
+    content.addChild(soundGroup);
+    y += soundGroup.buttonHeight + blockGap;
+
     const langLabel = makeLabel(t('settings.language'), { fontSize: 14, fill: 0xeeeeee });
-    const langY = tipsY + rowH + 8;
-    langLabel.position.set(0, langY);
+    langLabel.position.set(0, y);
     content.addChild(langLabel);
-    const currentLang = loadSettings().lang;
-    const pickLang = (code: Language): void => {
-      if (code === currentLang) return;
-      setLanguage(code);
-      window.location.reload();
-    };
-    const langs: { code: Language; key: string }[] = [
+    y += langLabel.height + 8;
+
+    const langOptions: { code: Language; key: string }[] = [
       { code: 'en', key: 'lang.en' },
       { code: 'ru', key: 'lang.ru' },
     ];
-    const langButtons: Button[] = langs.map((l, i) => {
-      const b = new Button({
+    const currentLang = loadSettings().lang;
+    const langGroup = new ButtonGroup({
+      fontSize: 12,
+      items: langOptions.map((l) => ({
         label: t(l.key),
-        width: 110,
-        selected: l.code === currentLang,
-        onClick: () => pickLang(l.code),
-      });
-      b.position.set(i * 118, langY + langLabel.height + 8);
-      return b;
+        onClick: () => {
+          if (l.code === currentLang) return;
+          setLanguage(l.code);
+          window.location.reload();
+        },
+      })),
     });
-    langButtons.forEach((b) => content.addChild(b));
+    langGroup.buttons.forEach((b, i) => {
+      b.selected = langOptions[i]!.code === currentLang;
+    });
+    langGroup.position.set(0, y);
+    content.addChild(langGroup);
   }
 
   mount(container: Container): void {

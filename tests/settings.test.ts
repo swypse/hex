@@ -6,7 +6,9 @@ import {
   saveSettings,
   setAiDifficulty,
   setAttackConfirmation,
+  setSoundEnabled,
   setTipsDisabled,
+  soundEnabled,
   tipsDisabled,
 } from '../src/storage/settings';
 
@@ -32,7 +34,7 @@ describe('settings storage', () => {
 
   it('persists an attack confirmation value', () => {
     fakeStorage();
-    saveSettings({ attackConfirmation: false, aiDifficulty: 'normal', disableTips: false, lang: 'en' });
+    saveSettings({ attackConfirmation: false, aiDifficulty: 'normal', disableTips: false, lang: 'en', soundOn: true });
     expect(loadSettings().attackConfirmation).toBe(false);
     expect(attackConfirmationEnabled()).toBe(false);
     setAttackConfirmation(true);
@@ -64,5 +66,23 @@ describe('Disable tips setting', () => {
     expect(tipsDisabled()).toBe(true);
     setTipsDisabled(false);
     expect(tipsDisabled()).toBe(false);
+  });
+});
+
+describe('Sound setting', () => {
+  it('defaults to enabled', () => {
+    fakeStorage();
+    expect(loadSettings().soundOn).toBe(true);
+    expect(soundEnabled()).toBe(true);
+  });
+
+  it('round-trips a disabled sound value', () => {
+    fakeStorage();
+    setSoundEnabled(false);
+    expect(soundEnabled()).toBe(false);
+    expect(loadSettings().soundOn).toBe(false);
+    setSoundEnabled(true);
+    expect(soundEnabled()).toBe(true);
+    expect(loadSettings().soundOn).toBe(true);
   });
 });

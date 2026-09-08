@@ -10,6 +10,7 @@ import { TileType } from '../src/game/tileTypes';
 import { UNIT_TYPES } from '../src/game/units';
 import { storageService } from '../src/storage/storageService';
 import { setAttackConfirmation } from '../src/storage/settings';
+import { sfx } from '../src/sound/sfx';
 
 describe('toolbarSpecs', () => {
   let map: ReturnType<typeof generateMap>;
@@ -199,5 +200,16 @@ describe('toolbarSpecs', () => {
     tile.ownedBy = null;
     useGameStore.getState().setSelection({ kind: 'terrain', q: 1, r: 0 });
     expect(toolbarSpecs().some((a) => a.key === 'bridge')).toBe(false);
+  });
+
+  it('plays the click sound when a hex tap selects a tile', async () => {
+    const tile = map.tiles.find((t) => t.unit === null)!;
+    tile.exploredBy = [0];
+    (gameController as unknown as { app: unknown }).app = { screen: {} };
+    const spy = vi.spyOn(sfx, 'play');
+    await gameController.handleMapClick(tile.q, tile.r);
+    expect(useGameStore.getState().selection).not.toBeNull();
+    expect(spy).toHaveBeenCalledWith('click');
+    spy.mockRestore();
   });
 });

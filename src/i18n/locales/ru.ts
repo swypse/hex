@@ -76,6 +76,7 @@ export default {
   'settings.difficulty': 'Сложность ИИ',
   'settings.disableTips': 'Отключить подсказки',
   'settings.language': 'Язык',
+  'settings.sound': 'Звук',
   'settings.close': 'Закрыть',
 
   // Center / event messages
@@ -120,6 +121,8 @@ export default {
   'common.ok': 'ОК',
   'common.confirm': 'Подтвердить',
   'common.back': 'Назад',
+  'common.on': 'Вкл',
+  'common.off': 'Выкл',
   'gameover.modeTurns': 'Режим: {mode} · Ходов: {turns}',
   'hud.turn.tutorial': 'Обучение. Ход {turn}',
   'hud.turn.mode': '{mode}. Ход {turn}',

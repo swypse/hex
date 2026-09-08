@@ -46,28 +46,25 @@ export function buildRoad(map: GameMap, tile: MapTile, player: Player): boolean 
 export function isVillageRoadConnected(map: GameMap, villageTile: MapTile): boolean {
   const owner = villageTile.settlement?.owner;
   if (owner === null || owner === undefined) return false;
-  const visited = new Set<string>();
-  const queue: MapTile[] = [];
-  const seed = (t: MapTile | undefined): void => {
-    if (!t) return;
-    const isRoad = t.roadOwner !== null && t.roadOwner !== undefined;
-    const isPort = t.building?.kind === 'port' && t.ownedBy !== null && t.ownedBy !== undefined;
-    if (!isRoad && !isPort) return;
-    const k = axialKey(t);
-    if (visited.has(k)) return;
-    visited.add(k);
-    queue.push(t);
+  const byKey = new Map(map.tiles.map((t) => [axialKey(t), t] as const));
+  const isNode = (t: MapTile): boolean => {
+    if (axialKey(t) === axialKey(villageTile)) return true;
+    if (t.settlement !== null && t.settlement.owner === owner) return true;
+    if (t.roadOwner === owner) return true;
+    return t.building?.kind === 'port' && t.ownedBy === owner;
   };
-  for (const n of hexNeighbors(villageTile)) seed(tileAt(map, n.q, n.r));
+  const visited = new Set<string>([axialKey(villageTile)]);
+  const queue: MapTile[] = [villageTile];
   while (queue.length > 0) {
     const cur = queue.shift()!;
     for (const n of hexNeighbors(cur)) {
-      const t = tileAt(map, n.q, n.r);
-      if (!t) continue;
-      if (t.settlement && t.settlement.owner !== null && !(t.q === villageTile.q && t.r === villageTile.r)) {
+      const t = byKey.get(axialKey(n));
+      if (!t || visited.has(axialKey(t)) || !isNode(t)) continue;
+      if (t.settlement !== null && t.settlement.owner === owner && !(t.q === villageTile.q && t.r === villageTile.r)) {
         return true;
       }
-      seed(t);
+      visited.add(axialKey(t));
+      queue.push(t);
     }
   }
   return false;

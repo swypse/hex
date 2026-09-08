@@ -98,6 +98,24 @@ describe('exploreUnitPath', () => {
     expect(newly.length).toBe(new Set(newly).size);
   });
 
+  it('does not widen the radius on a non-mountain tile', () => {
+    const map = makeMap();
+    const warrior = unit(1);
+    exploreUnitPath(map, [{ q: 0, r: 0 }], warrior, 0);
+    expect(isExploredFor(map.tiles.find((t) => t.q === 1 && t.r === 0)!, 0)).toBe(true);
+    expect(isExploredFor(map.tiles.find((t) => t.q === 2 && t.r === 0)!, 0)).toBe(false);
+  });
+
+  it('a step onto a mountain explores at least radius 2', () => {
+    const map = makeMap();
+    map.tiles.find((t) => t.q === 0 && t.r === 0)!.terrain = TileType.GrasslandMountain;
+    const warrior = unit(1);
+    exploreUnitPath(map, [{ q: 0, r: 0 }], warrior, 0);
+    expect(isExploredFor(map.tiles.find((t) => t.q === 2 && t.r === 0)!, 0)).toBe(true);
+    expect(isExploredFor(map.tiles.find((t) => t.q === 1 && t.r === 1)!, 0)).toBe(true);
+    expect(isExploredFor(map.tiles.find((t) => t.q === 2 && t.r === 1)!, 0)).toBe(false);
+  });
+
   it('uses the ship attack distance for ships', () => {
     const map = makeMap();
     const ship: Unit = { ...unit(1), shipLevel: 2 };
