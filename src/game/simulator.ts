@@ -701,6 +701,9 @@ export class Simulator {
         case 'build':
           this.doBuild(a.q, a.r, a.kind);
           break;
+        case 'buildRoad':
+          this.doBuildRoad(a.q, a.r);
+          break;
         case 'buildBridge':
           this.doBuildBridge(a.q, a.r);
           break;
@@ -875,30 +878,63 @@ export class Simulator {
   }
 
   private pirateMoveToward(unit: Unit, target: MapTile): void {
-    const steps: { q: number; r: number }[] = [];
-    let pos = { q: unit.q, r: unit.r };
-    for (let i = 0; i < UNIT_MOVEMENT.pirate; i++) {
-      const candidates = hexNeighbors(pos)
-        .map((n) => tileAt(this.map, n.q, n.r))
-        .filter((t): t is MapTile => t !== undefined && isWaterType(t.terrain) && !t.unit);
-      let best: MapTile | null = null;
-      let bestDist = hexDistance(pos, target);
-      for (const c of candidates) {
-        const d = hexDistance(c, target);
-        if (d < bestDist) {
-          bestDist = d;
-          best = c;
-        }
-      }
-      if (!best) break;
-      steps.push({ q: best.q, r: best.r });
-      pos = { q: best.q, r: best.r };
+    // Path over water toward the closest water cell from which the pirate can
+    // hit the target (its own hex when the target is a ship). Greedy straight
+    // line chases stall against land barriers, so navigate instead.
+    const path = this.pirateWaterPath(unit, target);
+    if (path.length === 0) {
+      // No reachable firing position: patrol instead of idling at the coast.
+      this.pirateMoveRandom(unit);
+      return;
     }
-    if (steps.length === 0) return;
+    const steps = path.slice(0, UNIT_MOVEMENT.pirate);
     const from = { q: unit.q, r: unit.r };
     const to = steps[steps.length - 1]!;
     moveUnit(this.map, unit, tileAt(this.map, to.q, to.r)!);
     this.emit({ type: 'unitMoved', unitId: unit.id, from, path: steps, to });
+  }
+
+  /** BFS over unoccupied water tiles from the pirate toward any water cell
+   *  within its attack range of `target`. Returns the step cells to reach the
+   *  nearest such cell (empty when already in range or unreachable). */
+  private pirateWaterPath(unit: Unit, target: MapTile): { q: number; r: number }[] {
+    const key = (q: number, r: number): string => `${q},${r}`;
+    const from = { q: unit.q, r: unit.r };
+    const fromKey = key(from.q, from.r);
+    const goal = new Set<string>();
+    for (const t of this.map.tiles) {
+      if (!isWaterType(t.terrain)) continue;
+      if (hexDistance(t, target) > unit.attackDistance) continue;
+      goal.add(key(t.q, t.r));
+    }
+    if (goal.has(fromKey)) return [];
+    const prev = new Map<string, string>();
+    const seen = new Set<string>([fromKey]);
+    const queue: { q: number; r: number }[] = [from];
+    while (queue.length > 0) {
+      const cur = queue.shift()!;
+      for (const n of hexNeighbors(cur)) {
+        const k = key(n.q, n.r);
+        if (seen.has(k)) continue;
+        const tile = tileAt(this.map, n.q, n.r);
+        if (!tile || !isWaterType(tile.terrain) || tile.unit) continue;
+        seen.add(k);
+        prev.set(k, key(cur.q, cur.r));
+        if (goal.has(k)) {
+          const path: { q: number; r: number }[] = [];
+          let c = { q: n.q, r: n.r };
+          while (key(c.q, c.r) !== fromKey) {
+            path.unshift({ q: c.q, r: c.r });
+            const p = prev.get(key(c.q, c.r))!;
+            const [pq, pr] = p.split(',').map(Number);
+            c = { q: pq!, r: pr! };
+          }
+          return path;
+        }
+        queue.push(n);
+      }
+    }
+    return [];
   }
 
   private applyIncome(): void {

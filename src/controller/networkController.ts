@@ -5,7 +5,7 @@ import { GameEvent } from '../game/events';
 import { generateRoomCode, ClientMessage, HostMessage, LobbyPlayer } from '../net/peerSession';
 import { RelayHostSession, RelayClientSession } from '../net/relaySession';
 import { buildMultiplayerPlayers } from '../game/players';
-import { generateMap } from '../game/mapGen';
+import { generateMap, type MapSize } from '../game/mapGen';
 import { initialExplorationFor } from '../game/explore';
 import { Tribe } from '../game/tribes';
 import { useGameStore } from '../store/gameStore';
@@ -46,7 +46,7 @@ export class NetworkController {
   hostSession: RelayHostSession | null = null;
   hostName = '';
   hostTribe: Tribe | null = null;
-  hostConfig: { mode: GameMode; totalPlayers: number; aiCount: number } | null = null;
+  hostConfig: { mode: GameMode; totalPlayers: number; aiCount: number; mapSize: MapSize } | null = null;
   clientSession: RelayClientSession | null = null;
   clientName = '';
   private hostStarted = false;
@@ -58,11 +58,11 @@ export class NetworkController {
 
   constructor(private readonly host: NetworkHost) {}
 
-  hostGame(opts: { mode: GameMode; totalPlayers: number; aiCount: number; name: string; tribe: Tribe }): string {
+  hostGame(opts: { mode: GameMode; totalPlayers: number; aiCount: number; mapSize?: MapSize; name: string; tribe: Tribe }): string {
     this.canceled = false;
     this.hostStarted = false;
     const code = generateRoomCode();
-    this.hostConfig = { mode: opts.mode, totalPlayers: opts.totalPlayers, aiCount: opts.aiCount };
+    this.hostConfig = { mode: opts.mode, totalPlayers: opts.totalPlayers, aiCount: opts.aiCount, mapSize: opts.mapSize ?? 'normal' };
     this.hostName = opts.name;
     this.hostTribe = opts.tribe;
     this.hostPlayers = [];
@@ -258,7 +258,7 @@ export class NetworkController {
       ...clients.map((p) => ({ name: p.name, tribe: p.tribeId! })),
     ];
     const players = buildMultiplayerPlayers(humans, this.hostConfig.aiCount, new SeededRandom(Math.floor(Math.random() * 100000)), loadSettings().aiDifficulty);
-    const map = generateMap(players.length, Math.floor(Math.random() * 100000));
+    const map = generateMap(players.length, Math.floor(Math.random() * 100000), this.hostConfig.mapSize);
     for (const p of players) initialExplorationFor(map, p.index);
     const sim = new Simulator(map, players, this.hostConfig.mode);
     this.host.setSim(sim);

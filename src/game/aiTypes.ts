@@ -10,6 +10,7 @@ export type AiAction =
   | { type: 'capture'; q: number; r: number; unitId: string }
   | { type: 'heal'; unitId: string; q: number; r: number }
   | { type: 'build'; q: number; r: number; kind: BuildingKind }
+  | { type: 'buildRoad'; q: number; r: number }
   | { type: 'buildBridge'; q: number; r: number }
   | { type: 'openSkill'; skill: SkillId };
 

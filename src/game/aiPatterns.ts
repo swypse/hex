@@ -351,6 +351,10 @@ export const AI_PATTERNS: AiPattern[] = [
           if (!unit || unit.owner !== player.index) continue;
           if (state.acted.has(unit.id) || state.moved.has(unit.id)) continue;
           if (t.settlement && t.settlement.owner === player.index) continue;
+          // A unit that can strike an enemy this turn is pressing that fight —
+          // do not strip it for garrison duty (that causes pointless retreat
+          // loops when the unit is the only one left).
+          if (attackableTargets(map, unit, player.index).length > 0) continue;
           if (hexDistance(t, v) > d.enemyTurns * UNIT_MOVEMENT[unit.type]) continue;
           const reach = reachableTargets(map, unit, undefined, canClimb, canDock, player.index).filter(
             (c) =>
@@ -654,7 +658,9 @@ export const AI_PATTERNS: AiPattern[] = [
     priority: 78,
     evaluate({ map, player, state, situation, difficulty }): AiAction[] | null {
       if (!situation || situation.enemies.length === 0) return null;
-      if (situation.endangered && situation.stance === 'defend') return null;
+      // When endangered, reinforcement (higher priority) recalls the closest
+      // free unit to the village; units already engaging a threat keep pressing
+      // it instead of being frozen out of combat entirely.
       const canClimb = hasSkill(player, 'climbing');
       const canDock = hasSkill(player, 'navigation');
       let best: { action: AiAction[]; score: number } | null = null;
@@ -694,6 +700,9 @@ export const AI_PATTERNS: AiPattern[] = [
           for (const c of reachableTargets(map, unit, undefined, canClimb, canDock, player.index)) {
             if (state.occupied.has(key(c.q, c.r))) continue;
             if (c.settlement && c.settlement.owner === player.index) continue;
+            // Don't use a foreign village as an attack staging tile: stepping on
+            // it should claim it for capture, never to strike-and-leave.
+            if (c.settlement && c.settlement.owner !== player.index) continue;
             const nd = hexDistance(c, enemyTile);
             if (nd >= startDist) continue;
             const moveDist = hexDistance(t, c);

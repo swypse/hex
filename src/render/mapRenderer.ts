@@ -100,7 +100,7 @@ export class MapView {
   private bounceSprite: Sprite | null = null;
   private bounceBaseY = 0;
   private hexBounceRemove: (() => void) | null = null;
-  private hexBounceSprites: { sprite: Sprite; baseY: number }[] = [];
+  private hexBounceSprites: { sprite: Sprite; baseY: number; delay: number }[] = [];
   private lastBouncedKey = '';
   private highlights: Graphics[] = [];
   private graphicsPool: Graphics[] = [];
@@ -299,7 +299,7 @@ export class MapView {
     for (const l of labels) this.addVillageLabel(l.tile, l.owner, l.el, l.world, players);
     // HP bars come after village labels so a unit's bar + text always render on
     // top of a village name label on the same tile.
-    for (const hp of hpBars) this.addHpBar(hp.unit, hp.position, hp.canAct, hp.color, localPlayerIndex, hp.hp);
+    for (const hp of hpBars) this.addHpBar(hp.unit, hp.position, hp.canAct, hp.color, localPlayerIndex, hp.hp, localTurn);
     // Capture markers come last so the icon renders above the unit's hp bar and
     // its hp text.
     for (const ex of exclamations) {
@@ -918,28 +918,67 @@ export class MapView {
     const tv = this.tileViews.get(key);
     if (!tv) return;
     const sprites: Sprite[] = [];
-    const terrain = tv.terrainSprite;
-    if (terrain && !terrain.destroyed) sprites.push(terrain);
-    const village = tv.villageSprite;
-    if (village && !village.destroyed) sprites.push(village);
+    const delayed = new Set<Sprite>();
+    // The whole selected hex moves together: terrain, village and any surface
+    // texture on it (building, bridge, port, temple).
+    for (const s of this.hexSurfaceSprites(tv)) sprites.push(s);
+    // When the selected cell is not a village itself but belongs to a village,
+    // pulse that village's whole hex as well (like a selection) so its territory
+    // is linked to it. It starts a moment later so the selected cell's own pulse
+    // is seen first.
+    const tile = this.tileIndex.get(key);
+    if (tile && !tile.settlement) {
+      const claim = tile.claimedByVillage;
+      if (claim) {
+        const claimView = this.tileViews.get(axialKey(claim));
+        if (claimView) {
+          for (const s of this.hexSurfaceSprites(claimView)) {
+            sprites.push(s);
+            delayed.add(s);
+          }
+        }
+      }
+    }
     if (sprites.length === 0) return;
-    this.hexBounceSprites = sprites.map((sprite) => ({ sprite, baseY: sprite.position.y }));
+    const CLAIM_DELAY_MS = 80;
+    this.hexBounceSprites = sprites.map((sprite) => ({
+      sprite,
+      baseY: sprite.position.y,
+      delay: delayed.has(sprite) ? CLAIM_DELAY_MS : 0,
+    }));
     const amp = this.hexSize * 0.2;
     const DURATION = 150;
     const start = performance.now();
+    const endAt = start + DURATION + (delayed.size > 0 ? CLAIM_DELAY_MS : 0);
     const fn = (): void => {
       const entries = this.hexBounceSprites.filter((e) => !e.sprite.destroyed);
       if (entries.length === 0) {
         this.stopHexBounce();
         return;
       }
-      const t = Math.min(1, (performance.now() - start) / DURATION);
-      const p = t < 0.5 ? t * 2 : 2 - t * 2;
-      for (const e of entries) e.sprite.position.y = e.baseY - p * amp;
-      if (t >= 1) this.stopHexBounce();
+      const elapsed = performance.now() - start;
+      for (const e of entries) {
+        const local = elapsed - e.delay;
+        if (local < 0) continue;
+        const t = Math.min(1, local / DURATION);
+        const p = t < 0.5 ? t * 2 : 2 - t * 2;
+        e.sprite.position.y = e.baseY - p * amp;
+      }
+      if (performance.now() >= endAt) this.stopHexBounce();
     };
     this.app.ticker.add(fn);
     this.hexBounceRemove = () => this.app.ticker.remove(fn);
+  }
+
+  /** The sprites that sit on top of a hex and move with it when its tile is
+   *  bounced: terrain, village, and its surface textures (sawmill/mine/port/
+   *  temple building, bridge). */
+  private hexSurfaceSprites(tv: TileView): Sprite[] {
+    const out: Sprite[] = [];
+    for (const s of [tv.terrainSprite, tv.villageSprite, tv.buildingSprite, tv.bridgeSprite]) {
+      if (s && !s.destroyed) out.push(s);
+    }
+    return out;
   }
 
   private stopHexBounce(): void {
@@ -1236,7 +1275,7 @@ export class MapView {
   private addHpBar(unit: Unit, position: {
     x: number;
     y: number
-  }, canAct: boolean, tribeColor: number, localPlayerIndex: number, hp: number): void {
+  }, canAct: boolean, tribeColor: number, localPlayerIndex: number, hp: number, localTurn: boolean): void {
     const el = new Container();
     el.position.set(position.x, position.y);
     const barWidth = this.hexSize * 0.6;
@@ -1270,7 +1309,7 @@ export class MapView {
 
     const labelBg = this.takeGraphics();
     labelBg.zIndex = 0;
-    const dim = unit.owner === localPlayerIndex && !canAct;
+    const dim = unit.owner === localPlayerIndex && (!localTurn || !canAct);
     labelBg
       .rect(label.x - label.width / 2 - 2, label.y - label.height, label.width + 4, label.height)
       .fill({ color: 0x000000, alpha: dim ? 0.3 : 1 });

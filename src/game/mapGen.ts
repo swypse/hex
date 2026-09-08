@@ -62,13 +62,27 @@ export interface GameMap {
   spawns: Spawn[];
 }
 
-export function mapRadiusFor(playerCount: number): number {
+export type MapSize = 'normal' | 'big' | 'huge';
+
+/** Linear map-size multiplier per option: big is ~2x the normal radius, huge
+ *  ~3x. The map hex count therefore scales ~4x and ~9x. */
+export const MAP_RADIUS_FACTOR: Record<MapSize, number> = {
+  normal: 1,
+  big: 2,
+  huge: 3,
+};
+
+function baseMapRadius(playerCount: number): number {
   if (playerCount === 2) return Math.round(11 / 1.5);
   if (playerCount === 3) return Math.round(12 / 1.5);
   if (playerCount === 4) return Math.round(14 / 1.5);
   if (playerCount === 5) return Math.round(15 / 1.5);
   if (playerCount === 6) return Math.round(16 / 1.5);
   throw new Error(`Unsupported player count: ${playerCount}`);
+}
+
+export function mapRadiusFor(playerCount: number, size: MapSize = 'normal'): number {
+  return Math.round(baseMapRadius(playerCount) * MAP_RADIUS_FACTOR[size]);
 }
 
 export function bridgeIslandVillages(tiles: MapTile[]): void {
@@ -179,8 +193,8 @@ function angleDiff(a: number, b: number): number {
   return Math.min(d, 2 * Math.PI - d);
 }
 
-export function generateMap(playerCount: number, seed: number): GameMap {
-  const radius = mapRadiusFor(playerCount) + WATER_BORDER;
+export function generateMap(playerCount: number, seed: number, size: MapSize = 'normal'): GameMap {
+  const radius = mapRadiusFor(playerCount, size) + WATER_BORDER;
   const rng = new SeededRandom(seed);
   const villageNames = generateVillageNames(playerCount * 2, rng);
   const tiles = allTiles(radius);

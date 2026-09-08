@@ -216,7 +216,8 @@ describe('LobbyScreen host keyboard navigation', () => {
     key('ArrowDown');
     key('ArrowDown');
     key('ArrowDown');
-    expect(state().focus).toBe(4);
+    key('ArrowDown');
+    expect(state().focus).toBe(5);
     const create = uiNodes(screen).find((c) => hasDirectText(c, 'Create room')) as Button;
     expect(create.selected).toBe(true);
     key('Enter');
@@ -229,7 +230,8 @@ describe('LobbyScreen host keyboard navigation', () => {
     key('ArrowDown');
     key('ArrowDown');
     key('ArrowDown');
-    expect(state().focus).toBe(5);
+    key('ArrowDown');
+    expect(state().focus).toBe(6);
     key('Enter');
     expect(state().view).toBe('menu');
   });

@@ -50,8 +50,9 @@ describe('SetupScreen', () => {
     keyHandler!({ key: 'ArrowDown', preventDefault: () => {} }); // enemies
     keyHandler!({ key: 'ArrowDown', preventDefault: () => {} }); // mode
     keyHandler!({ key: 'ArrowDown', preventDefault: () => {} }); // difficulty
+    keyHandler!({ key: 'ArrowDown', preventDefault: () => {} }); // map size
     keyHandler!({ key: 'ArrowDown', preventDefault: () => {} }); // back
-    expect((screen as unknown as { selector: number }).selector).toBe(4);
+    expect((screen as unknown as { selector: number }).selector).toBe(5);
     keyHandler!({ key: 'Enter', preventDefault: () => {} });
     expect(useGameStore.getState().screen).toBe('start');
   });

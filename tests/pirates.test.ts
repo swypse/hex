@@ -189,7 +189,7 @@ describe('Pirates', () => {
     expect(tileAt(map, 0, 0)!.unit!.hp).toBe(140);
   });
 
-  it('move toward the nearest player unit over sea when it is out of range', () => {
+  it('moves toward the nearest player unit over sea when it is out of range', () => {
     const map = makeTestMap(4);
     tileAt(map, 0, 0)!.terrain = TileType.Water;
     tileAt(map, 0, 1)!.terrain = TileType.Water;
@@ -208,8 +208,9 @@ describe('Pirates', () => {
 
     sim.applyCommand({ type: 'endTurn' });
     const events = sim.drainEvents();
+    // The pirate closes to within its attack range (3) of the ship.
     expect(pirate.q).toBe(0);
-    expect(pirate.r).toBe(3);
+    expect(pirate.r).toBe(1);
     expect(events.some((e) => e.type === 'unitMoved' && (e as { unitId: string }).unitId === 'pirate-1')).toBe(true);
   });
 

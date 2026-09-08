@@ -177,7 +177,7 @@ support only as many buildings as its level allows: level 1 → 1, level 2 → 2
 |----------|----------------------------|--------------|--------------------------------|----------------------------------------------------------------------------------|
 | Sawmill  | 10 money                   | Forestry     | land tile adjacent to a forest | +1 wood per adjacent forest per level                                            |
 | Mine     | 15 money                   | Smithery     | mountain tile                  | +1 stone and +1 ore per level (+1 ore with Geology)                              |
-| Port     | 10 wood + 30 money + 2 ore | Water        | water tile                     | none; used to create and upgrade ships                                           |
+| Port     | 10 wood + 30 money + 2 ore | Water        | owned water tile adjacent to your own land | none; used to create and upgrade ships |
 | Temple   | 10 stone + 30 money        | Water temple | water tile                     | none; grows +1 level every 2 turns (max 4); awards 10/15/20/25 score at game end |
 
 ## Resources

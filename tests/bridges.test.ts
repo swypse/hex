@@ -135,6 +135,8 @@ describe('port and water temple exclusion', () => {
     const map = weGap();
     const water = tileAt(map, 1, 0)!;
     water.ownedBy = 0;
+    // The west shore is owned land, so the (non-bridged) water tile is a legal port.
+    tileAt(map, 0, 0)!.ownedBy = 0;
     if (bridged) water.bridge = { owner: 0, dir: 'we' };
     return map;
   }

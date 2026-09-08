@@ -4,6 +4,7 @@ import { useGameStore } from '../../store/gameStore';
 import { t } from '../../i18n';
 import { TRIBES, type Tribe } from '../../game/tribes';
 import { type GameMode } from '../../game/gameMode';
+import { type MapSize } from '../../game/mapGen';
 import { buildJoinLink, consumePendingJoin } from '../../net/joinLink';
 import { type ScreenController, type UIHost } from '../host';
 import { Button } from '../kit/button';
@@ -16,8 +17,9 @@ import { ScreenScroll } from '../verticalScroll';
 
 type View = 'menu' | 'host' | 'join';
 
-const HOST_NAV_ITEMS = 6;
+const HOST_NAV_ITEMS = 7;
 const CREATE_ROOM_FOCUS = HOST_NAV_ITEMS - 2;
+const MAP_SIZE_OPTIONS: MapSize[] = ['normal', 'big', 'huge'];
 
 export class LobbyScreen implements ScreenController {
   private root: Container | null = null;
@@ -25,6 +27,7 @@ export class LobbyScreen implements ScreenController {
   private scroller: ScreenScroll | null = null;
   private view: View = 'menu';
   private mode: GameMode = 'capture';
+  private mapSize: MapSize = 'normal';
   private humans = 2;
   private aiCount = 1;
   private tribe: Tribe = TRIBES[0]!.id;
@@ -133,7 +136,7 @@ export class LobbyScreen implements ScreenController {
 
   private createRoom(): void {
     if (this.name.trim().length > 0 && this.humans + this.aiCount >= 2) {
-      gameController.hostGame({ mode: this.mode, totalPlayers: this.humans + this.aiCount, aiCount: this.aiCount, name: this.name.trim(), tribe: this.tribe });
+      gameController.hostGame({ mode: this.mode, totalPlayers: this.humans + this.aiCount, aiCount: this.aiCount, mapSize: this.mapSize, name: this.name.trim(), tribe: this.tribe });
     }
   }
 
@@ -205,10 +208,13 @@ export class LobbyScreen implements ScreenController {
       const opts = Array.from({ length: maxAi }, (_, i) => i);
       const i = opts.indexOf(this.aiCount);
       this.aiCount = opts[(i + dir + opts.length) % opts.length]!;
-    } else {
+    } else if (this.focus === 3) {
       const opts: GameMode[] = ['capture', 'turns30'];
       const i = opts.indexOf(this.mode);
       this.mode = opts[(i + dir + opts.length) % opts.length]!;
+    } else {
+      const i = MAP_SIZE_OPTIONS.indexOf(this.mapSize);
+      this.mapSize = MAP_SIZE_OPTIONS[(i + dir + MAP_SIZE_OPTIONS.length) % MAP_SIZE_OPTIONS.length]!;
     }
     this.render();
   }
@@ -284,17 +290,26 @@ export class LobbyScreen implements ScreenController {
       this.viewContent.addChild(b);
     });
 
+    const mapLabel = this.groupLabel(t('lobby.mapSize'), 4);
+    mapLabel.position.set(cx, y + 436 + rowDelta);
+    this.viewContent.addChild(mapLabel);
+    MAP_SIZE_OPTIONS.forEach((s, i) => {
+      const b = new Button({ label: t(`mapSize.${s}`), width: 140, selected: s === this.mapSize, onClick: () => { this.mapSize = s; this.render(); } });
+      b.position.set(cx - 226 + i * 156, y + 486 + rowDelta);
+      this.viewContent.addChild(b);
+    });
+
     this.createBtn = new Button({ label: t('lobby.createRoom'), width: 240, selected: this.focus === CREATE_ROOM_FOCUS, onClick: () => this.createRoom() });
     const back = new Button({ label: t('lobby.back'), width: 96, fontSize: 14, selected: this.focus === HOST_NAV_ITEMS - 1, onClick: () => { this.view = 'menu'; this.render(); } });
-    this.createBtn.position.set(cx - 120, y + 446 + rowDelta);
-    back.position.set(cx - 48, y + 506 + rowDelta);
+    this.createBtn.position.set(cx - 120, y + 556 + rowDelta);
+    back.position.set(cx - 48, y + 616 + rowDelta);
     this.viewContent.addChild(this.createBtn, back);
     this.updateCreate();
 
     const hint = makeLabel(t('lobby.hostHint'), { fontSize: 12, fill: 0x888888 });
     hint.visible = !isTouchDevice();
     hint.anchor.set(0.5, 0.5);
-    hint.position.set(cx, y + 566 + rowDelta);
+    hint.position.set(cx, y + 676 + rowDelta);
     this.viewContent.addChild(hint);
   }
 

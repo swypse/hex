@@ -1,4 +1,4 @@
-import { hexDistance, hexNeighbors, hexToPixel } from './hex';
+import { axialKey, hexNeighbors } from './hex';
 import { GameMap, MapTile } from './mapGen';
 import { Player } from './players';
 import { canAfford, pay, Resources } from './resources';
@@ -74,7 +74,13 @@ export function canBuildPort(map: GameMap, tile: MapTile, player: Player): boole
   if (tile.ownedBy !== player.index) return false;
   if (tile.settlement || tile.building) return false;
   if (!villageHasBuildingSlot(map, tile, player)) return false;
-  return isWaterType(tile.terrain);
+  if (!isWaterType(tile.terrain)) return false;
+  // A port must sit on the player's own coast so a land unit can reach and
+  // board it; a water tile in the middle of a lake or at the map edge cannot.
+  return hexNeighbors(tile).some((n) => {
+    const t = neighborTile(map, n);
+    return t !== undefined && t.ownedBy === player.index && !isWaterType(t.terrain);
+  });
 }
 
 export function canBuildTemple(map: GameMap, tile: MapTile, player: Player): boolean {
@@ -109,34 +115,27 @@ const PORT_DIRECTION_VECTORS: { d: PortDirection; o: { q: number; r: number } }[
 
 export function portDirection(map: GameMap, tile: MapTile): PortDirection | null {
   if (tile.building?.kind !== 'port' || tile.ownedBy === null) return null;
-  let best: MapTile | null = null;
-  let bestDist = Infinity;
-  for (const t of map.tiles) {
-    if (!t.settlement || t.settlement.owner !== tile.ownedBy) continue;
-    const d = hexDistance(tile, t);
-    if (d < bestDist) {
-      bestDist = d;
-      best = t;
+  const owner = tile.ownedBy;
+  const home = tile.claimedByVillage ? axialKey(tile.claimedByVillage) : null;
+  const ownedShore = (n: MapTile): boolean =>
+    n.ownedBy === owner && !isWaterType(n.terrain);
+  const ownShoreDir = (sameVillageOnly: boolean): PortDirection | null => {
+    for (const { d, o } of PORT_DIRECTION_VECTORS) {
+      const n = neighborTile(map, { q: tile.q + o.q, r: tile.r + o.r });
+      if (!n || !ownedShore(n)) continue;
+      if (sameVillageOnly && home !== null) {
+        const nHome = n.claimedByVillage ? axialKey(n.claimedByVillage) : null;
+        if (nHome !== home) continue;
+      }
+      return d;
     }
-  }
-  if (!best) return null;
-  const from = hexToPixel(tile, 1);
-  const to = hexToPixel(best, 1);
-  const dx = to.x - from.x;
-  const dy = to.y - from.y;
-  const len = Math.hypot(dx, dy) || 1;
-  let result: PortDirection = 'e';
-  let bestDot = -Infinity;
-  for (const { d, o } of PORT_DIRECTION_VECTORS) {
-    const v = hexToPixel(o, 1);
-    const vLen = Math.hypot(v.x, v.y) || 1;
-    const dot = ((dx / len) * v.x + (dy / len) * v.y) / vLen;
-    if (dot > bestDot) {
-      bestDot = dot;
-      result = d;
-    }
-  }
-  return result;
+    return null;
+  };
+  // The dock faces an adjacent shore a unit boards from. Prefer the port
+  // owner's adjacent land that belongs to the same village as the port tile;
+  // fall back to any of the owner's adjacent land. Foreign or unowned shores
+  // and distant villages are never dock targets.
+  return ownShoreDir(true) ?? ownShoreDir(false);
 }
 
 export function buildBuilding(

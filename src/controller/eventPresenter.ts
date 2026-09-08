@@ -41,6 +41,22 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/** Explorer path cells that should stay under fog until the scout arrives —
+ *  only cells the player had not explored before the bonus. Cells that were
+ *  already explored must remain visible; deferring (and re-revealing) them
+ *  would fog them a second time. */
+export function deferredExplorerKeys(
+  pathTiles: { q: number; r: number }[],
+  preExplored: Set<string>,
+): Set<string> {
+  const defer = new Set<string>();
+  for (const c of pathTiles) {
+    const k = axialKey(c);
+    if (!preExplored.has(k)) defer.add(k);
+  }
+  return defer;
+}
+
 export interface EventHost {
   app(): Application | null;
   mapRoot(): Container | null;
@@ -94,15 +110,15 @@ export class EventPresenter {
   /** Keep a player's own explorer path under fog until its scout reaches each
    * cell. Returns the path keys whose local exploration was deferred; callers
    * must restore them (see `restoreDeferredFog`). */
-  private deferExplorerFog(events: GameEvent[], local: number): Set<string> {
-    const keys = new Set<string>();
+  private deferExplorerFog(events: GameEvent[], local: number, preExplored: Set<string>): Set<string> {
+    const pathTiles: { q: number; r: number }[] = [];
     for (const e of events) {
       if (e.type !== 'explorer' || e.playerIndex !== local) continue;
-      keys.add(axialKey({ q: e.q, r: e.r }));
-      for (const s of e.path) keys.add(axialKey(s));
+      pathTiles.push({ q: e.q, r: e.r }, ...e.path);
     }
-    this.setLocalExplored(keys, false);
-    return keys;
+    const defer = deferredExplorerKeys(pathTiles, preExplored);
+    this.setLocalExplored(defer, false);
+    return defer;
   }
 
   private restoreDeferredFog(keys: Set<string>): void {
@@ -130,7 +146,7 @@ export class EventPresenter {
     const sim = this.host.sim();
     if (!this.host.app() || !sim) return;
     const local = useGameStore.getState().localPlayerIndex;
-    const deferredFog = this.deferExplorerFog(events, local);
+    const deferredFog = this.deferExplorerFog(events, local, preExplored);
     this.revealNewlyExplored(preExplored, deferredFog);
     // The sim state already reflects every move in this batch, so any render
     // draws each moved unit on its destination. Hide all units that will be

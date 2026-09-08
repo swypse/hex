@@ -17,6 +17,28 @@ describe('map generation', () => {
     expect(() => mapRadiusFor(7)).toThrow();
   });
 
+  it('scales the radius by map size (normal ~1x, big ~2x, huge ~3x)', () => {
+    expect(mapRadiusFor(2)).toBe(7);
+    expect(mapRadiusFor(2, 'normal')).toBe(7);
+    expect(mapRadiusFor(2, 'big')).toBe(14);
+    expect(mapRadiusFor(2, 'huge')).toBe(21);
+    expect(mapRadiusFor(6, 'big')).toBe(22);
+    expect(mapRadiusFor(6, 'huge')).toBe(33);
+  });
+
+  it('generates larger maps for big and huge sizes', () => {
+    const normal = generateMap(2, 42);
+    const big = generateMap(2, 42, 'big');
+    const huge = generateMap(2, 42, 'huge');
+    expect(normal.radius).toBe(8);
+    expect(big.radius).toBe(15);
+    expect(huge.radius).toBe(22);
+    expect(big.tiles.length).toBeGreaterThan(normal.tiles.length * 3);
+    expect(huge.tiles.length).toBeGreaterThan(big.tiles.length * 1.8);
+    expect(big.tiles).toHaveLength(allTiles(15).length);
+    expect(huge.tiles).toHaveLength(allTiles(22).length);
+  });
+
   it('generates the expected number of tiles', () => {
     const map = generateMap(2, 42);
     expect(map.tiles).toHaveLength(allTiles(8).length);

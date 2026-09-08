@@ -4,6 +4,7 @@ import { useGameStore } from '../../store/gameStore';
 import { TRIBES, type Tribe } from '../../game/tribes';
 import { type GameMode } from '../../game/gameMode';
 import { type AiDifficulty } from '../../game/aiDifficulty';
+import { type MapSize } from '../../game/mapGen';
 import { loadSettings } from '../../storage/settings';
 import { t } from '../../i18n';
 import { isTouchDevice } from '../touch';
@@ -18,7 +19,8 @@ import { TRIBE_GAP, TRIBE_ROW_STEP, tribeSlots } from '../kit/tribeLayout';
 const ENEMY_OPTIONS = [1, 2, 3, 4, 5];
 const MODE_OPTIONS: GameMode[] = ['capture', 'turns30'];
 const DIFFICULTY_OPTIONS: AiDifficulty[] = ['easy', 'normal', 'hard'];
-const SELECTOR_COUNT = 5;
+const MAP_SIZE_OPTIONS: MapSize[] = ['normal', 'big', 'huge'];
+const SELECTOR_COUNT = 6;
 // Title centre to the block content below it (circle tops and button tops).
 const TITLE_TO_CONTENT = 44;
 // Vertical gap between the bottom of one block and the title above the next.
@@ -37,10 +39,12 @@ export class SetupScreen implements ScreenController {
   private tribe: Tribe = TRIBES[0]!.id;
   private enemies = 3;
   private difficulty: AiDifficulty = loadSettings().aiDifficulty;
+  private mapSize: MapSize = 'normal';
   private tribeTitle: Text | null = null;
   private enemiesTitle: Text | null = null;
   private modeTitle: Text | null = null;
   private difficultyTitle: Text | null = null;
+  private mapSizeTitle: Text | null = null;
   private tribeItems: Container[] = [];
   private tribeCircles: Graphics[] = [];
   private tribeItemLabels: Text[] = [];
@@ -49,6 +53,7 @@ export class SetupScreen implements ScreenController {
   private enemyGroup: ButtonGroup | null = null;
   private modeGroup: ButtonGroup | null = null;
   private difficultyGroup: ButtonGroup | null = null;
+  private mapSizeGroup: ButtonGroup | null = null;
   private startBtn: Button | null = null;
   private backBtn: Button | null = null;
   private hint: Text | null = null;
@@ -67,6 +72,8 @@ export class SetupScreen implements ScreenController {
     this.modeTitle.anchor.set(0.5, 0.5);
     this.difficultyTitle = makeLabel(t('setup.difficulty'), { fontSize: 24, fill: 0xffffff });
     this.difficultyTitle.anchor.set(0.5, 0.5);
+    this.mapSizeTitle = makeLabel(t('setup.mapSize'), { fontSize: 24, fill: 0xffffff });
+    this.mapSizeTitle.anchor.set(0.5, 0.5);
 
     for (const t of TRIBES) {
       const circle = new Graphics();
@@ -129,12 +136,24 @@ export class SetupScreen implements ScreenController {
     });
     this.scroll!.content.addChild(this.difficultyGroup);
 
+    this.mapSizeGroup = new ButtonGroup({
+      fontSize: 12,
+      items: MAP_SIZE_OPTIONS.map((s) => ({
+        label: t(`mapSize.${s}`),
+        onClick: () => {
+          this.mapSize = s;
+          this.refresh();
+        },
+      })),
+    });
+    this.scroll!.content.addChild(this.mapSizeGroup);
+
     this.startBtn = new Button({
       label: t('setup.start'),
       fontSize: 24,
       paddingX: 48,
       paddingY: 14,
-      onClick: () => gameController.startGame(this.tribe, this.enemies, useGameStore.getState().mode, this.difficulty),
+      onClick: () => gameController.startGame(this.tribe, this.enemies, useGameStore.getState().mode, this.difficulty, this.mapSize),
     });
     this.hint = makeLabel(t('setup.hint'), { fontSize: 12, fill: 0xeeeeee });
     this.hint.visible = !isTouchDevice();
@@ -153,6 +172,7 @@ export class SetupScreen implements ScreenController {
       this.enemiesTitle,
       this.modeTitle,
       this.difficultyTitle,
+      this.mapSizeTitle,
       this.startBtn,
       this.backBtn,
       this.hint,
@@ -183,10 +203,10 @@ export class SetupScreen implements ScreenController {
       this.change(1);
     } else if (e.key === 'Enter') {
       e.preventDefault();
-      if (this.selector === 4) {
+      if (this.selector === SELECTOR_COUNT - 1) {
         useGameStore.getState().setScreen('start');
       } else {
-        gameController.startGame(this.tribe, this.enemies, store.mode, this.difficulty);
+        gameController.startGame(this.tribe, this.enemies, store.mode, this.difficulty, this.mapSize);
       }
     } else if (e.key === 'Backspace') {
       e.preventDefault();
@@ -195,7 +215,7 @@ export class SetupScreen implements ScreenController {
   };
 
   private change(dir: number): void {
-    if (this.selector === 4) return;
+    if (this.selector === SELECTOR_COUNT - 1) return;
     if (this.selector === 0) {
       const i = TRIBES.findIndex((t) => t.id === this.tribe);
       this.tribe = TRIBES[(i + dir + TRIBES.length) % TRIBES.length]!.id;
@@ -206,9 +226,12 @@ export class SetupScreen implements ScreenController {
       const store = useGameStore.getState();
       const i = MODE_OPTIONS.indexOf(store.mode);
       useGameStore.getState().setMode(MODE_OPTIONS[(i + dir + MODE_OPTIONS.length) % MODE_OPTIONS.length]!);
-    } else {
+    } else if (this.selector === 3) {
       const i = DIFFICULTY_OPTIONS.indexOf(this.difficulty);
       this.difficulty = DIFFICULTY_OPTIONS[(i + dir + DIFFICULTY_OPTIONS.length) % DIFFICULTY_OPTIONS.length]!;
+    } else {
+      const i = MAP_SIZE_OPTIONS.indexOf(this.mapSize);
+      this.mapSize = MAP_SIZE_OPTIONS[(i + dir + MAP_SIZE_OPTIONS.length) % MAP_SIZE_OPTIONS.length]!;
     }
     this.refresh();
   }
@@ -250,6 +273,7 @@ export class SetupScreen implements ScreenController {
     const enemiesIndex = ENEMY_OPTIONS.indexOf(this.enemies);
     const modeIndex = MODE_OPTIONS.indexOf(useGameStore.getState().mode);
     const difficultyIndex = DIFFICULTY_OPTIONS.indexOf(this.difficulty);
+    const mapSizeIndex = MAP_SIZE_OPTIONS.indexOf(this.mapSize);
     this.tribeCircles.forEach((c, i) => {
       c.clear().circle(0, 0, 28).fill(0xffffff);
       if (i === tribeIndex) c.stroke({ width: 4, color: 0x5099ff });
@@ -263,11 +287,15 @@ export class SetupScreen implements ScreenController {
     this.difficultyGroup?.buttons.forEach((b, i) => {
       b.selected = i === difficultyIndex;
     });
-    this.backBtn!.selected = this.selector === 4;
+    this.mapSizeGroup?.buttons.forEach((b, i) => {
+      b.selected = i === mapSizeIndex;
+    });
+    this.backBtn!.selected = this.selector === SELECTOR_COUNT - 1;
     this.tribeTitle!.style.fill = this.selector === 0 ? 0xffffff : 0x888888;
     this.enemiesTitle!.style.fill = this.selector === 1 ? 0xffffff : 0x888888;
     this.modeTitle!.style.fill = this.selector === 2 ? 0xffffff : 0x888888;
     this.difficultyTitle!.style.fill = this.selector === 3 ? 0xffffff : 0x888888;
+    this.mapSizeTitle!.style.fill = this.selector === 4 ? 0xffffff : 0x888888;
     this.layout();
   }
 
@@ -304,7 +332,9 @@ export class SetupScreen implements ScreenController {
     const bottomMode = cy2 + buttonDrop;
     const cy3 = bottomMode + BLOCK_GAP + titleHalf;
     const bottomDifficulty = cy3 + buttonDrop;
-    const startTop = bottomDifficulty + 30;
+    const cy4 = bottomDifficulty + BLOCK_GAP + titleHalf;
+    const bottomMap = cy4 + buttonDrop;
+    const startTop = bottomMap + 30;
     const backTop = startTop + startH + 16;
     const hintCentre = backTop + backH + 16;
     const glyphTop = cy0 - titleHalf;
@@ -333,6 +363,10 @@ export class SetupScreen implements ScreenController {
     const diffTop = y(cy3) + TITLE_TO_CONTENT;
     if (this.difficultyGroup) this.difficultyGroup.position.set(cx - this.difficultyGroup.groupWidth / 2, diffTop);
 
+    this.mapSizeTitle!.position.set(cx, y(cy4));
+    const mapTop = y(cy4) + TITLE_TO_CONTENT;
+    if (this.mapSizeGroup) this.mapSizeGroup.position.set(cx - this.mapSizeGroup.groupWidth / 2, mapTop);
+
     this.startBtn!.position.set(cx - this.startBtn!.width / 2, y(startTop));
     this.backBtn!.position.set(cx - this.backBtn!.width / 2, y(backTop));
     if (this.hint) this.hint.position.set(cx, y(hintCentre));
@@ -356,10 +390,12 @@ export class SetupScreen implements ScreenController {
     this.enemyGroup = null;
     this.modeGroup = null;
     this.difficultyGroup = null;
+    this.mapSizeGroup = null;
     this.tribeTitle = null;
     this.enemiesTitle = null;
     this.modeTitle = null;
     this.difficultyTitle = null;
+    this.mapSizeTitle = null;
     this.startBtn = null;
     this.backBtn = null;
     this.hint = null;

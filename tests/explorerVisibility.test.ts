@@ -1,9 +1,10 @@
 import { describe, it, expect, vi } from 'vitest';
 import { Container } from 'pixi.js';
-import { EventPresenter, type EventHost } from '../src/controller/eventPresenter';
+import { EventPresenter, deferredExplorerKeys, type EventHost } from '../src/controller/eventPresenter';
 import { useGameStore } from '../src/store/gameStore';
 import { TileType } from '../src/game/tileTypes';
 import type { MapTile } from '../src/game/mapGen';
+import { axialKey } from '../src/game/hex';
 
 describe('explorer visibility', () => {
   function tile(q: number, r: number): MapTile {
@@ -57,5 +58,19 @@ describe('explorer visibility', () => {
     );
     expect(tiles[0]!.exploredBy).toEqual([0]);
     expect(tiles[1]!.exploredBy).toEqual([0]);
+  });
+});
+
+describe('deferredExplorerKeys', () => {
+  it('defers every explorer cell the player had not explored before the bonus', () => {
+    const pre = new Set<string>();
+    expect(deferredExplorerKeys([{ q: 0, r: 0 }, { q: 1, r: 0 }, { q: 2, r: 0 }], pre))
+      .toEqual(new Set(['0,0', '1,0', '2,0']));
+  });
+
+  it('does not defer explorer cells the player already explored', () => {
+    const pre = new Set([axialKey({ q: 1, r: 0 }), axialKey({ q: 0, r: 0 })]);
+    expect(deferredExplorerKeys([{ q: 0, r: 0 }, { q: 1, r: 0 }, { q: 2, r: 0 }], pre))
+      .toEqual(new Set(['2,0']));
   });
 });

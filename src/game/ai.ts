@@ -1,6 +1,7 @@
 import { canBuildSawmill, canBuildForestTemple, canBuildMine, canBuildPort, canBuildTemple, BUILDING_COSTS } from './buildings';
 import { hexDistance, hexNeighbors } from './hex';
-import { BRIDGE_COST, canBuildBridge } from './bridges';
+import { canBuildBridge, BRIDGE_COST } from './bridges';
+import { canBuildRoad } from './roads';
 import { GameMap, MapTile } from './mapGen';
 import { Player } from './players';
 import { canAfford, pay, villageUpgradeCost } from './resources';
@@ -154,8 +155,12 @@ function bestAvailableAction(
     let bestAttackAfter: MapTile | null = null;
     for (const c of targets) {
       const ghost: Unit = { ...unit, q: c.q, r: c.r };
+      // Stepping onto a foreign village means claiming it for capture next turn
+      // — never chain an attack after that move (a melee kill would advance the
+      // unit off the village and forfeit the capture).
+      const foreignVillage = c.settlement !== null && c.settlement.owner !== unit.owner;
       const a = chooseBestAttack(map, ghost, unit.owner);
-      if (a && (!difficulty || !difficulty.checkTrades || tradeIsFavorable(ghost, a))) {
+      if (a && !foreignVillage && (!difficulty || !difficulty.checkTrades || tradeIsFavorable(ghost, a))) {
         const s = 3000 - hexDistance(t, c);
         if (s > bestMoveScore) {
           bestMoveScore = s;
@@ -187,7 +192,7 @@ function bestAvailableAction(
         bestAttackAfter = null;
       }
     }
-    if (bestMove && bestAttackAfter) {
+    if (bestMove && bestMoveScore > 0 && bestAttackAfter) {
       candidates.push({
         score: bestMoveScore + jitter(),
         action: [
@@ -195,7 +200,7 @@ function bestAvailableAction(
           { type: 'attack', unitId: unit.id, q: bestAttackAfter.q, r: bestAttackAfter.r },
         ],
       });
-    } else if (bestMove) {
+    } else if (bestMove && bestMoveScore > 0) {
       candidates.push({ score: bestMoveScore + jitter(), action: { type: 'move', unitId: unit.id, q: bestMove.q, r: bestMove.r } });
     }
   }
@@ -226,6 +231,22 @@ function bestAvailableAction(
         candidates.push({ score: 200 + jitter(), action: { type: 'build', q: tile.q, r: tile.r, kind: 'forestTemple' } });
       }
     }
+  }
+
+  for (const tile of map.tiles) {
+    if (state.built.has(key(tile.q, tile.r))) continue;
+    if (!canBuildRoad(map, tile, player)) continue;
+    if (tile.unit && tile.unit.owner !== player.index) continue;
+    // Only extend the road network where it pushes toward unexplored ground or
+    // a foreign village (roads grant +1 movement, speeding up expansion).
+    const pushesForward = hexNeighbors(tile).some((n) => {
+      const nt = tileAt(map, n.q, n.r);
+      if (!nt) return false;
+      if (!isExploredFor(nt, player.index)) return true;
+      return nt.settlement !== null && nt.settlement.owner !== player.index;
+    });
+    if (!pushesForward) continue;
+    candidates.push({ score: 150 + jitter(), action: { type: 'buildRoad', q: tile.q, r: tile.r } });
   }
 
   for (const tile of map.tiles) {
@@ -278,6 +299,10 @@ function markUsed(state: AiPlannerState, action: AiAction): void {
       state.upgraded.add(key(action.q, action.r));
       break;
     case 'build':
+      state.built.add(key(action.q, action.r));
+      state.occupied.add(key(action.q, action.r));
+      break;
+    case 'buildRoad':
       state.built.add(key(action.q, action.r));
       state.occupied.add(key(action.q, action.r));
       break;

@@ -104,6 +104,11 @@ describe('HudToolbar build actions', () => {
 
   it('renders the build port action as an icon button', () => {
     const tile = ownedTile(TileType.Water);
+    // A port is only buildable on an owned water tile with an owned land shore.
+    const shore = map.tiles.find((t) =>
+      hexNeighbors(tile).some((n) => n.q === t.q && n.r === t.r))!;
+    shore.terrain = TileType.GrasslandLand;
+    shore.ownedBy = 0;
     select(tile);
     expect(row.children.length).toBe(1);
     expect(isIconButton(row.children[0] as Container)).toBe(true);

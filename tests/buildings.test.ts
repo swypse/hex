@@ -96,18 +96,34 @@ describe('canBuildMine', () => {
 });
 
 describe('canBuildPort', () => {
-  it('requires water and an owned water tile', () => {
+  it('requires the water skill, an owned water tile, and an adjacent owned land tile', () => {
     const map: GameMap = { radius: 2, tiles: [], spawns: [] };
     const water = tile(0, 0, TileType.Water, 0);
     map.tiles.push(water);
-    expect(canBuildPort(map, water, player(100))).toBe(false);
-    expect(canBuildPort(map, water, player(100, ['water']))).toBe(true);
+    // Owned water alone (no land shore) is not enough.
+    expect(canBuildPort(map, water, player(100, ['water']))).toBe(false);
     const land = tile(1, 0, TileType.GrasslandLand, 0);
     map.tiles.push(land);
+    expect(canBuildPort(map, water, player(100))).toBe(false);
+    expect(canBuildPort(map, water, player(100, ['water']))).toBe(true);
+    const otherLand = tile(2, 0, TileType.GrasslandLand, 0);
+    map.tiles.push(otherLand);
     expect(canBuildPort(map, land, player(100, ['water']))).toBe(false);
     const unowned = tile(0, 1, TileType.Water, null);
     map.tiles.push(unowned);
     expect(canBuildPort(map, unowned, player(100, ['water']))).toBe(false);
+  });
+
+  it('rejects an owned water tile whose only shore is unowned or foreign land', () => {
+    let map: GameMap = { radius: 3, tiles: [], spawns: [] };
+    const unownedShore = tile(0, 0, TileType.Water, 0);
+    map.tiles.push(unownedShore, tile(1, 0, TileType.GrasslandLand, null));
+    expect(canBuildPort(map, unownedShore, player(100, ['water']))).toBe(false);
+
+    map = { radius: 3, tiles: [], spawns: [] };
+    const foreignShore = tile(0, 0, TileType.Water, 0);
+    map.tiles.push(foreignShore, tile(1, 0, TileType.GrasslandLand, 1));
+    expect(canBuildPort(map, foreignShore, player(100, ['water']))).toBe(false);
   });
 });
 
@@ -158,7 +174,7 @@ describe('buildBuilding', () => {
   it('builds a port, deducts 10 wood + 30 money + 2 ore, sets level 1', () => {
     const map: GameMap = { radius: 2, tiles: [], spawns: [] };
     const water = tile(0, 0, TileType.Water, 0);
-    map.tiles.push(water);
+    map.tiles.push(water, tile(1, 0, TileType.GrasslandLand, 0));
     const p = player(100, ['water']);
     p.resources.wood = 10;
     p.resources.ore = 2;
@@ -321,7 +337,7 @@ describe('portDirection', () => {
   const portAt = (q: number, r: number, owner = 0): MapTile =>
     tile(q, r, TileType.Water, owner, null, { kind: 'port', level: 1 });
 
-  it('snaps to the adjacent direction for a village one tile away', () => {
+  it('snaps to the adjacent owned land tile, one hex away in any direction', () => {
     const cases: [number, number, PortDirection][] = [
       [1, 0, 'e'],
       [1, -1, 'ne'],
@@ -336,13 +352,48 @@ describe('portDirection', () => {
     }
   });
 
-  it('uses the most closely aligned direction for a distant village', () => {
-    map.tiles = [portAt(0, 0), villageAt(2, -3)];
-    expect(portDirection(map, map.tiles[0]!)).toBe('ne');
+  it('picks the first adjacent owned land in canonical order when several exist', () => {
+    // Both (1,0) 'e' and (0,-1) 'nw' are owned land; the canonical order
+    // (e → ne → nw → w → sw → se) selects 'e'.
+    map.tiles = [portAt(0, 0), villageAt(1, 0), villageAt(0, -1)];
+    expect(portDirection(map, map.tiles[0]!)).toBe('e');
   });
 
-  it('uses the nearest owned village when several exist', () => {
-    map.tiles = [portAt(0, 0), villageAt(-2, 2), villageAt(1, 0)];
+  it('prefers the port owner land and ignores an adjacent foreign-owned shore', () => {
+    // Own land west ('w'), foreign land east ('e'); only the owner's land docks.
+    map.tiles = [portAt(0, 0), villageAt(-1, 0), tile(1, 0, TileType.GrasslandLand, 1, { owner: 1, level: 1, captureReady: false })];
+    expect(portDirection(map, map.tiles[0]!)).toBe('w');
+  });
+
+  it('prefers adjacent owner land claimed by the same village as the port tile', () => {
+    const port = portAt(0, 0);
+    port.claimedByVillage = { q: 0, r: 0 };
+    // 'e' is the owner's land but belongs to a different village; 'nw' belongs
+    // to the port tile's home village.
+    const otherOwn = villageAt(1, 0);
+    otherOwn.claimedByVillage = { q: 9, r: 9 };
+    const home = villageAt(0, -1);
+    home.claimedByVillage = { q: 0, r: 0 };
+    map.tiles = [port, otherOwn, home];
+    expect(portDirection(map, port)).toBe('nw');
+  });
+
+  it('falls back to any owner adjacent land when none is from the port village', () => {
+    const port = portAt(0, 0);
+    port.claimedByVillage = { q: 0, r: 0 };
+    const otherOwn = villageAt(1, 0);
+    otherOwn.claimedByVillage = { q: 9, r: 9 };
+    map.tiles = [port, otherOwn];
+    expect(portDirection(map, port)).toBe('e');
+  });
+
+  it('ignores a distant village and unowned land when no adjacent owned land exists', () => {
+    map.tiles = [portAt(0, 0), villageAt(2, -3), tile(0, 1, TileType.GrasslandLand, null, null)];
+    expect(portDirection(map, map.tiles[0]!)).toBeNull();
+  });
+
+  it('ignores an adjacent foreign or unowned water tile as a dock target', () => {
+    map.tiles = [portAt(0, 0), villageAt(1, 0), tile(0, 1, TileType.Water, 1, null, null)];
     expect(portDirection(map, map.tiles[0]!)).toBe('e');
   });
 
@@ -354,7 +405,7 @@ describe('portDirection', () => {
     expect(portDirection(map, mine)).toBeNull();
   });
 
-  it('returns null when the owner has no village', () => {
+  it('does not dock against a foreign shore alone', () => {
     map.tiles = [portAt(0, 0), villageAt(1, 0, 1)];
     expect(portDirection(map, map.tiles[0]!)).toBeNull();
   });

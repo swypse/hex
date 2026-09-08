@@ -438,6 +438,25 @@ describe('MapView hp bar anchoring', () => {
     expect(fill.alpha).toBe(0.3);
   });
 
+  it('keeps an own unit dimmed while it is not the local turn even if it can act', () => {
+    view.update(map, players, null, new Set(), new Set(), 0, new Set(), {
+      x: 400,
+      y: 300,
+      scale: 1,
+      width: 800,
+      height: 600,
+    }, new Set(), false);
+    const el = hpBarItem().el;
+    const labelIndex = el.children.findIndex((c) => c instanceof Text);
+    const labelBg = el.children[labelIndex - 1] as Graphics;
+    const context = labelBg.context as unknown as {
+      instructions: Array<{ action: string; data: { style: { color: number; alpha: number } } }>;
+    };
+    const fill = context.instructions.find((i) => i.action === 'fill')!.data.style;
+    expect(fill.color).toBe(0x000000);
+    expect(fill.alpha).toBe(0.3);
+  });
+
   it('does not draw the red can-act dot on an own unit hp bar', () => {
     const el = hpBarItem().el;
     const graphicsCount = el.children.filter((c) => c instanceof Graphics).length;
@@ -520,7 +539,7 @@ describe('MapView hp bar anchoring', () => {
     expect(actions).not.toContain('closePath');
   });
 
-  it('renders a directional port texture pointing at the nearest owned village', () => {
+  it('renders a directional port texture pointing at the adjacent owned land', () => {
     const portTile: MapTile = {
       q: 0, r: 0, terrain: TileType.Water, height: 0.1, settlement: null,
       building: { kind: 'port', level: 1 }, roadOwner: null, unit: null,

@@ -51,7 +51,7 @@ describe('multiplayer presence', () => {
     useGameStore.setState({
       lobby: { role: 'host', code: 'ABC123', mode: 'capture', totalPlayers: 2, aiCount: 0, players: [] },
     });
-    net().hostConfig = { mode: 'capture', totalPlayers: 2, aiCount: 0 };
+    net().hostConfig = { mode: 'capture', totalPlayers: 2, aiCount: 0, mapSize: 'normal' };
     net().hostName = 'Host';
     net().hostTribe = Tribe.Cats;
     net().hostPlayers = [

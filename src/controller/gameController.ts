@@ -6,7 +6,7 @@ import { GameEvent, BuildingKind } from '../game/events';
 import type { HostMessage } from '../net/peerSession';
 import { axialKey, hexToPixel } from '../game/hex';
 import { TileType } from '../game/tileTypes';
-import { generateMap, type GameMap } from '../game/mapGen';
+import { generateMap, type GameMap, type MapSize } from '../game/mapGen';
 import { buildPlayers } from '../game/players';
 import { AiDifficulty, DEFAULT_AI_DIFFICULTY } from '../game/aiDifficulty';
 import { hasSkill, SKILLS, SkillId } from '../game/skills';
@@ -339,7 +339,7 @@ class GameController {
     });
   }
 
-  async startGame(tribe: Tribe, enemyCount: number, mode: GameMode, difficulty: AiDifficulty = DEFAULT_AI_DIFFICULTY): Promise<void> {
+  async startGame(tribe: Tribe, enemyCount: number, mode: GameMode, difficulty: AiDifficulty = DEFAULT_AI_DIFFICULTY, mapSize: MapSize = 'normal'): Promise<void> {
     const store = useGameStore.getState();
     this.tutorial = null;
     store.setTutorial(false);
@@ -347,7 +347,7 @@ class GameController {
     store.setTutorialHighlightSkills([]);
     store.setTutorialHighlightEndTurn(false);
     const players = buildPlayers(tribe, enemyCount, new SeededRandom(Math.floor(Math.random() * 100000)), difficulty);
-    const map = generateMap(players.length, Math.floor(Math.random() * 100000));
+    const map = generateMap(players.length, Math.floor(Math.random() * 100000), mapSize);
     for (const p of players) initialExplorationFor(map, p.index);
     this.sim = new Simulator(map, players, mode);
     this.sim.startGame();
@@ -823,7 +823,7 @@ class GameController {
     this.sendCommand({ type: 'endTurn' });
   }
 
-  hostGame(opts: { mode: GameMode; totalPlayers: number; aiCount: number; name: string; tribe: Tribe }): string {
+  hostGame(opts: { mode: GameMode; totalPlayers: number; aiCount: number; name: string; tribe: Tribe; mapSize?: MapSize }): string {
     return this.getNetwork().hostGame(opts);
   }
 
