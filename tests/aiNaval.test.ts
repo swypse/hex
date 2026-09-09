@@ -196,3 +196,44 @@ describe('Naval port building', () => {
     }
   });
 });
+
+describe('Naval boarding', () => {
+  it('walks a spare unit onto an owned port to become a ship', () => {
+    const map = makeTestMap(6);
+    tileAt(map, 0, 0)!.unit = makeUnit('crew', 1, 'warrior', 0, 0);
+    tileAt(map, 0, 1)!.terrain = TileType.Water;
+    tileAt(map, 0, 1)!.ownedBy = 1;
+    tileAt(map, 0, 1)!.building = { kind: 'port', level: 1 };
+    tileAt(map, 4, 0)!.terrain = TileType.Water;
+    tileAt(map, 4, 0)!.unit = pirate('p1', 4, 0);
+    const player = aiPlayer({
+      skills: ['water', 'navigation'],
+      resources: { wood: 0, stone: 0, money: 100, ore: 0 },
+    });
+    const actions = planAiActions(map, player, new SeededRandom(1), 'capture');
+    const board = actions.find((a) => a.type === 'move' && a.unitId === 'crew');
+    expect(board).toBeDefined();
+    if (board && board.type === 'move') {
+      expect(board.q).toBe(0);
+      expect(board.r).toBe(1);
+    }
+  });
+
+  it('does not board when the AI already has a ship', () => {
+    const map = makeTestMap(6);
+    tileAt(map, 0, 0)!.unit = makeUnit('crew', 1, 'warrior', 0, 0);
+    tileAt(map, 0, 1)!.terrain = TileType.Water;
+    tileAt(map, 0, 1)!.ownedBy = 1;
+    tileAt(map, 0, 1)!.building = { kind: 'port', level: 1 };
+    tileAt(map, 2, 0)!.terrain = TileType.Water;
+    tileAt(map, 2, 0)!.unit = shipUnit('s1', 1, 2, 0);
+    tileAt(map, 4, 0)!.terrain = TileType.Water;
+    tileAt(map, 4, 0)!.unit = pirate('p1', 4, 0);
+    const player = aiPlayer({
+      skills: ['water', 'navigation'],
+      resources: { wood: 0, stone: 0, money: 100, ore: 0 },
+    });
+    const actions = planAiActions(map, player, new SeededRandom(1), 'capture');
+    expect(actions.some((a) => a.type === 'move' && a.unitId === 'crew')).toBe(false);
+  });
+});
