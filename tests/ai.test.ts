@@ -202,7 +202,7 @@ describe('planAiActions', () => {
 
 describe('AI bridge building', () => {
   it('plans a bridge over a water gap when it has the skill and owns a shore', () => {
-    const tiles = [makeTile(0, 0, 1), makeTile(1, 0, null), makeTile(2, 0, 1)];
+    const tiles = [makeTile(0, 0, 1), makeTile(1, 0, null), makeTile(2, 0, 1, { owner: null, level: 1, captureReady: false })];
     tiles[1]!.terrain = TileType.Water;
     const map: GameMap = { radius: 4, tiles, spawns: [] };
     const p = aiPlayer();

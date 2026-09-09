@@ -1,6 +1,6 @@
 import { canBuildSawmill, canBuildForestTemple, canBuildMine, canBuildPort, canBuildTemple, BUILDING_COSTS } from './buildings';
 import { hexDistance, hexNeighbors } from './hex';
-import { canBuildBridge, BRIDGE_COST } from './bridges';
+import { canBuildBridge, bridgeCoastOffsets, bridgeDirFor, BRIDGE_COST } from './bridges';
 import { canBuildRoad } from './roads';
 import { GameMap, MapTile } from './mapGen';
 import { Player } from './players';
@@ -13,13 +13,17 @@ import { buildingsInVillage, villageBuildingLimit } from './village';
 import { isMountainType } from './tileTypes';
 import { AI_PATTERNS, AiPatternContext, bestSpawnableUnitType, enemyCanAttackNext, enemyCanReach, isFrontierTile, landEnemyCanReach, nearestEnemyDistanceFrom, nearestFreeVillageDistanceFrom, nearestOwnUnitDistanceFrom, nearestVillageDistanceFrom } from './aiPatterns';
 import { AiAction, AiPlannerState } from './aiTypes';
-import { chooseBestAttack, tradeIsFavorable } from './combat';
+import { attackableTargets, chooseBestAttack, tradeIsFavorable } from './combat';
 import { isExploredFor } from './explore';
 import { GameMode } from './gameMode';
-import { AiSituation, analyzeSituation } from './aiSituation';
+import { AiSituation, analyzeSituation, coastExposedTile, isNavalEnemy, navalCanStrikeTile } from './aiSituation';
 import { AiDifficultyProfile, profileFor } from './aiDifficulty';
+import { isShip } from './ship';
 
 const MAX_PLAN_STEPS = 200;
+
+/** Strong penalty for idle land units standing where a naval enemy can hit. */
+const NAVAL_EXPOSURE_PENALTY = 400;
 
 function key(q: number, r: number): string {
   return `${q},${r}`;
@@ -76,6 +80,22 @@ function reserveLastSlotForMine(map: GameMap, player: Player, tile: MapTile): bo
   return claimsUnbuiltMountain(map, player, v);
 }
 
+/** A bridge pays off only when its far shore leads to something worth
+ *  crossing for: unexplored ground, a foreign/free settlement, or foreign
+ *  territory. */
+function bridgeLeadsSomewhere(map: GameMap, tile: MapTile, player: Player): boolean {
+  const dir = bridgeDirFor(map, tile);
+  if (!dir) return false;
+  for (const o of bridgeCoastOffsets(dir)) {
+    const shore = tileAt(map, tile.q + o.q, tile.r + o.r);
+    if (!shore) continue;
+    if (!isExploredFor(shore, player.index)) return true;
+    if (shore.settlement && shore.settlement.owner !== player.index) return true;
+    if (shore.ownedBy !== null && shore.ownedBy !== player.index) return true;
+  }
+  return false;
+}
+
 function bestAvailableAction(
   map: GameMap,
   player: Player,
@@ -98,6 +118,9 @@ function bestAvailableAction(
     }
     if (!state.spawned.has(k) && !v.unit) {
       const threatened = landEnemyCanReach(map, v, player.index);
+      // A fresh spawn cannot act this turn, so never drop one into a village a
+      // naval enemy can already hit — it would just feed the pirate.
+      if (situation?.navalThreat && !threatened && navalCanStrikeTile(v, situation.navalEnemies)) continue;
       const freeVillageToGrab = map.tiles.some(
         (t) =>
           t.settlement &&
@@ -188,6 +211,10 @@ function bestAvailableAction(
         const ownDist = nearestOwnUnitDistanceFrom(map, player.index, c);
         if (Number.isFinite(ownDist)) s += Math.max(0, 30 - ownDist * 4);
       }
+      if (situation?.navalThreat && !isShip(unit) && unit.type !== 'catapult' && coastExposedTile(map, c, situation.navalEnemies)) {
+        const canStrike = attackableTargets(map, ghost, unit.owner).some((a) => a.unit && isNavalEnemy(a.unit));
+        if (!canStrike && !(c.settlement && c.settlement.owner === unit.owner)) s -= NAVAL_EXPOSURE_PENALTY;
+      }
       if (s > bestMoveScore) {
         bestMoveScore = s;
         bestMove = c;
@@ -255,11 +282,14 @@ function bestAvailableAction(
     if (state.built.has(key(tile.q, tile.r))) continue;
     if (!canBuildBridge(map, tile, player)) continue;
     if (!canAfford(player.resources, BRIDGE_COST)) continue;
+    // While a naval threat is active, spend on the naval response instead.
+    if (situation?.navalThreat) continue;
     const touchesOwnNetwork = hexNeighbors(tile).some((n) => {
       const t = tileAt(map, n.q, n.r);
       return t !== undefined && (t.ownedBy === player.index || t.roadOwner === player.index);
     });
     if (!touchesOwnNetwork) continue;
+    if (!bridgeLeadsSomewhere(map, tile, player)) continue;
     candidates.push({ score: 250 + jitter(), action: { type: 'buildBridge', q: tile.q, r: tile.r } });
   }
 

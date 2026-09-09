@@ -479,7 +479,7 @@ export const AI_PATTERNS: AiPattern[] = [
         const k = key(v.q, v.r);
         if (state.spawned.has(k)) continue;
         if (v.unit) continue;
-        if (!enemyCanReach(map, v, player.index)) continue;
+        if (!landEnemyCanReach(map, v, player.index)) continue;
         const type = bestSpawnableUnitType(player, 'defense');
         if (!type) continue;
         return [{ type: 'spawn', q: v.q, r: v.r, unitType: type }];
@@ -539,7 +539,7 @@ export const AI_PATTERNS: AiPattern[] = [
         if (v.unit) continue;
         const vk = key(v.q, v.r);
         if (state.occupied.has(vk)) continue;
-        if (!enemyCanReach(map, v, player.index)) continue;
+        if (!landEnemyCanReach(map, v, player.index)) continue;
         let best: { unit: Unit; dist: number } | null = null;
         for (const t of map.tiles) {
           const unit = t.unit;
@@ -936,7 +936,7 @@ export const AI_PATTERNS: AiPattern[] = [
   {
     id: 'explore-frontier',
     priority: 70,
-    evaluate({ map, player, state }): AiAction[] | null {
+    evaluate({ map, player, state, situation }): AiAction[] | null {
       const canClimb = hasSkill(player, 'climbing');
       const canDock = hasSkill(player, 'navigation');
       let best: { unit: Unit; target: MapTile } | null = null;
@@ -948,6 +948,9 @@ export const AI_PATTERNS: AiPattern[] = [
         if (t.settlement && t.settlement.owner === player.index && enemyCanReach(map, t, player.index)) continue;
         for (const c of reachableTargets(map, unit, undefined, canClimb, canDock, player.index)) {
           if (state.occupied.has(key(c.q, c.r))) continue;
+          // Don't explore into a beach a naval enemy can hit with land units
+          // that cannot fight back (catapults and ships are the naval answer).
+          if (situation?.navalThreat && !isShip(unit) && unit.type !== 'catapult' && coastExposedTile(map, c, situation.navalEnemies)) continue;
           if (!isFrontierTile(map, c, player.index)) continue;
           const unexplored = hexNeighbors(c).filter((n) => {
             const nt = tileAt(map, n.q, n.r);

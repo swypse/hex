@@ -339,3 +339,67 @@ describe('Naval catapults', () => {
     expect(actions.some((a) => a.type === 'spawn' && a.unitType === 'catapult')).toBe(true);
   });
 });
+
+describe('Naval defensive guards', () => {
+  it('keeps a melee unit from marching toward or attacking an unreachable pirate', () => {
+    const map = makeTestMap(6);
+    tileAt(map, 0, 0)!.unit = makeUnit('w1', 1, 'warrior', 0, 0);
+    tileAt(map, 1, 0)!.terrain = TileType.Water;
+    tileAt(map, 2, 0)!.terrain = TileType.Water;
+    tileAt(map, 2, 0)!.unit = pirate('p1', 2, 0);
+    const player = aiPlayer({ resources: { wood: 0, stone: 0, money: 100, ore: 0 } });
+    const actions = planAiActions(map, player, new SeededRandom(1), 'capture');
+    expect(actions.some((a) => a.type === 'attack' && a.q === 2 && a.r === 0)).toBe(false);
+    const start = hexDistance({ q: 0, r: 0 }, { q: 2, r: 0 });
+    for (const a of actions) {
+      if (a.type === 'move' && a.unitId === 'w1') {
+        expect(hexDistance({ q: a.q, r: a.r }, { q: 2, r: 0 })).toBeGreaterThanOrEqual(start);
+      }
+    }
+  });
+
+  it('does not drop a fresh unit into an empty coastal village a pirate can hit', () => {
+    const map = makeTestMap(6);
+    tileAt(map, 0, 0)!.settlement = { owner: 1, level: 1, captureReady: false };
+    tileAt(map, 0, 0)!.ownedBy = 1;
+    tileAt(map, 1, 0)!.terrain = TileType.Water;
+    tileAt(map, 1, 0)!.unit = pirate('p1', 1, 0);
+    const player = aiPlayer({
+      skills: ['shields'],
+      resources: { wood: 0, stone: 0, money: 100, ore: 3 },
+    });
+    const actions = planAiActions(map, player, new SeededRandom(1), 'capture');
+    expect(actions.some((a) => a.type === 'spawn')).toBe(false);
+  });
+
+  it('skips bridge building while a naval threat is active', () => {
+    const map = makeTestMap(6);
+    // Two own land tiles with a water gap between them -> buildable bridge.
+    tileAt(map, 0, 0)!.ownedBy = 1;
+    tileAt(map, 2, 0)!.ownedBy = 1;
+    tileAt(map, 1, 0)!.terrain = TileType.Water;
+    // Pirate elsewhere on the coast to create the threat.
+    tileAt(map, 0, -3)!.terrain = TileType.Water;
+    tileAt(map, 0, -3)!.unit = pirate('p1', 0, -3);
+    tileAt(map, 0, 0)!.unit = makeUnit('w1', 1, 'warrior', 0, 0);
+    const player = aiPlayer({
+      skills: ['riding', 'bridges'],
+      resources: { wood: 100, stone: 100, money: 100, ore: 0 },
+    });
+    const actions = planAiActions(map, player, new SeededRandom(1), 'capture');
+    expect(actions.some((a) => a.type === 'buildBridge')).toBe(false);
+  });
+
+  it('does not build a pointless bridge across a gap between two quiet own tiles when unthreatened', () => {
+    const map = makeTestMap(6);
+    tileAt(map, 0, 0)!.ownedBy = 1;
+    tileAt(map, 2, 0)!.ownedBy = 1;
+    tileAt(map, 1, 0)!.terrain = TileType.Water;
+    const player = aiPlayer({
+      skills: ['riding', 'bridges'],
+      resources: { wood: 100, stone: 100, money: 100, ore: 0 },
+    });
+    const actions = planAiActions(map, player, new SeededRandom(1), 'capture');
+    expect(actions.some((a) => a.type === 'buildBridge')).toBe(false);
+  });
+});
