@@ -20,8 +20,10 @@ import { SKILLS } from '../game/skills';
 import { achievementIcon, achievementNameKey } from '../game/achievements';
 import { CameraController } from './cameraController';
 import { initialAttackHpOverrides, hpOverrideAfterAttack } from './attackHp';
+import { attackPresenceParticipants, type AttackPresenceParticipant } from './attackPresence';
 import { t } from '../i18n';
 import { sfx } from '../sound/sfx';
+import { attackSound } from '../sound/attackSounds';
 
 const HEX_SIZE = 40;
 
@@ -186,6 +188,8 @@ export class EventPresenter {
       const mapView = this.host.mapView();
       for (const [unitId, hp] of initialHp) mapView?.setHpOverride(unitId, hp);
     }
+    const initialPresence = this.presenceOverrides(events, 0);
+    if (initialPresence.size > 0) this.host.mapView()?.setUnitOverrides(initialPresence);
     let hadAttack = false;
     try {
       for (let i = 0; i < events.length; i++) {
@@ -196,17 +200,24 @@ export class EventPresenter {
             break;
           case 'attack':
             hadAttack = true;
-            await this.presentAttack(e);
+            await this.presentAttack(e, this.presenceOverrides(events, i + 1));
             this.applyPostAttackHp(events, i);
             break;
           case 'spawned':
+            if (e.playerIndex === local) sfx.play('spawn');
             break;
           case 'captured':
             this.presentCaptured(e);
             break;
-          case 'villageUpgraded':
+          case 'villageUpgraded': {
             if (e.playerIndex === local) sfx.play('upgrade');
+            const tile = tileAt(sim.map, e.q, e.r);
+            if (tile && isExploredFor(tile, local)) {
+              this.host.render();
+              this.host.mapView()?.bounceHex(e.q, e.r);
+            }
             break;
+          }
           case 'built':
             break;
           case 'templeGrown':
@@ -300,7 +311,10 @@ export class EventPresenter {
     this.host.render();
   }
 
-  private async presentAttack(e: Extract<GameEvent, { type: 'attack' }>): Promise<void> {
+  private async presentAttack(
+    e: Extract<GameEvent, { type: 'attack' }>,
+    keep: Map<string, Unit>,
+  ): Promise<void> {
     const sim = this.host.sim();
     if (!sim) return;
     const local = useGameStore.getState().localPlayerIndex;
@@ -310,7 +324,10 @@ export class EventPresenter {
     const targetVisible = targetTile !== undefined && isExploredFor(targetTile, local);
     const mapView = this.host.mapView();
 
-    if (!e.missed && (attackerVisible || targetVisible)) sfx.play('hit');
+    const audible = attackerVisible || targetVisible;
+    const plan = attackSound(e.attackerPre?.type, e.missed, e.attackerPre?.shipLevel !== undefined);
+    const impact = audible ? plan.impact : undefined;
+    if (audible && plan.launch) sfx.play(plan.launch);
 
     // In the final sim state a melee attacker that killed its target already
     // stands on the target tile; detect that so we can animate the advance.
@@ -332,9 +349,9 @@ export class EventPresenter {
 
     if (mapView && !e.missed && attackerTile && targetTile && attackerVisible && e.attackerPre && e.targetPre) {
       try {
-        await this.presentStagedAttack(e, attackerTile, targetTile, targetVisible, attackerAdvanced, facing);
+        await this.presentStagedAttack(e, attackerTile, targetTile, targetVisible, attackerAdvanced, facing, impact, keep);
       } finally {
-        mapView.setUnitOverrides(null);
+        mapView.setUnitOverrides(keep);
         this.host.render();
       }
     } else {
@@ -353,6 +370,7 @@ export class EventPresenter {
         mapView.clearHpOverrides();
         this.host.render();
       }
+      if (!e.missed && impact) sfx.play(impact);
       if (e.missed) {
         if (targetTile && attackerVisible) this.spawnHpText(targetTile, 'Miss', 0xffa500);
       } else {
@@ -361,8 +379,48 @@ export class EventPresenter {
       }
       if (e.targetDied && targetTile && targetVisible) this.spawnDeath(targetTile);
       if (e.attackerDied && attackerTile && attackerVisible) this.spawnDeath(attackerTile);
+      if (mapView) {
+        mapView.setUnitOverrides(keep);
+        this.host.render();
+      }
     }
     this.keepAttackerSelected(e);
+  }
+
+  private presenceOverrides(events: GameEvent[], fromIndex: number): Map<string, Unit> {
+    const sim = this.host.sim();
+    const out = new Map<string, Unit>();
+    if (!sim) return out;
+    const local = useGameStore.getState().localPlayerIndex;
+    const hidden = this.host.hiddenUnitIds();
+    for (const p of attackPresenceParticipants(events.slice(fromIndex)).values()) {
+      const tile = tileAt(sim.map, p.tile.q, p.tile.r);
+      if (!tile || !isExploredFor(tile, local)) continue;
+      if (hidden.has(p.unitId)) continue;
+      const key = axialKey(p.tile);
+      if (out.has(key)) continue;
+      out.set(key, this.stagedPresenceUnit(p));
+    }
+    return out;
+  }
+
+  private stagedPresenceUnit(p: AttackPresenceParticipant): Unit {
+    const info = UNIT_TYPES[p.pre.type];
+    return {
+      id: p.unitId,
+      owner: p.pre.owner,
+      type: p.pre.type,
+      q: p.tile.q,
+      r: p.tile.r,
+      hasMoved: false,
+      hasAttacked: false,
+      hasHealed: false,
+      hp: p.pre.hp,
+      attack: info.attack,
+      attackDistance: info.attackDistance,
+      spawnVillage: null,
+      shipLevel: p.pre.shipLevel,
+    };
   }
 
   /** Keep a local unit highlighted after an attack when it may still act:
@@ -398,6 +456,8 @@ export class EventPresenter {
     targetVisible: boolean,
     attackerAdvanced: boolean,
     facing: 'left' | 'right',
+    impact?: 'swordHit' | 'hit',
+    keep: Map<string, Unit> = new Map(),
   ): Promise<void> {
     const mapView = this.host.mapView();
     if (!mapView) return;
@@ -406,16 +466,16 @@ export class EventPresenter {
     const targetKey = axialKey(targetTile);
     const attacker = this.stageUnit(e.attackerPre!, e.attackerId, attackerTile.q, attackerTile.r);
     const target = this.stageUnit(e.targetPre!, e.targetId, targetTile.q, targetTile.r);
-    const staged = new Map<string, Unit | null>([
-      [attackerKey, attacker],
-      [targetKey, target],
-    ]);
+    const staged = new Map<string, Unit | null>(keep);
+    staged.set(attackerKey, attacker);
+    staged.set(targetKey, target);
     mapView.setUnitOverrides(staged);
     this.host.render();
     mapView.faceUnitAtKey(attackerKey, facing);
 
     const scale = this.host.camera().scale;
     await mapView.lungeUnit(attackerKey, targetKey, 10 / scale);
+    if (impact) sfx.play(impact);
 
     // Attacker's blow lands on the target first.
     if (e.attackerDamage > 0) {
@@ -568,6 +628,9 @@ export class EventPresenter {
           : undefined;
     if (!unitTex) return;
     const texture = unitTex.texture;
+    const startTile = tileAt(map, e.from.q, e.from.r);
+    const startVisible = unit.owner === local || (startTile !== undefined && isExploredFor(startTile, local));
+    if (startVisible && e.shipLevel !== undefined) sfx.play('waterSplash');
     this.removeMoveGhost(unit.id);
     this.host.hiddenUnitIds().add(unit.id);
     this.host.render();
@@ -590,6 +653,11 @@ export class EventPresenter {
     mapView.container.removeChild(sprite);
     sprite.destroy();
     this.host.render();
+    const boarded = e.shipLevel === undefined && unit.shipLevel !== undefined;
+    if (boarded) {
+      const destVisible = unit.owner === local || isExploredFor(dest, local);
+      if (destVisible) sfx.play('waterSquish');
+    }
   }
 
   private presentBonusClaimed(e: Extract<GameEvent, { type: 'bonusClaimed' }>): void {

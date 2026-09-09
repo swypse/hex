@@ -987,6 +987,53 @@ describe('MapView hp bar anchoring', () => {
     });
     expect(tvs.get(axialKey(bonusTile))!.bonusSprite).toBeNull();
   });
+
+  it('bounces the whole village hex up and back down like a selection', () => {
+    const callbacks: Array<() => void> = [];
+    const app = {
+      screen: { width: 800, height: 600 },
+      ticker: { add: (fn: () => void) => callbacks.push(fn), remove: (): void => {} },
+    } as unknown as Application;
+    const villageTile: MapTile = {
+      q: 0, r: 0, terrain: TileType.GrasslandLand, height: 0.1,
+      settlement: { owner: 0, level: 1, captureReady: false },
+      building: null, roadOwner: null, unit: null, ownedBy: 0,
+      claimedByVillage: null, exploredBy: [0],
+    };
+    const m: GameMap = { radius: 1, spawns: [], tiles: [villageTile] };
+    const texs = buildTextures(m);
+    const v = new MapView(app, texs, HEX, SPRITE_SCALE, 2);
+    const origNow = performance.now;
+    let now = 0;
+    (performance as { now: () => number }).now = () => now;
+    try {
+      v.update(m, players, null, new Set(), new Set(), 0, new Set(), {
+        x: 400, y: 300, scale: 1, width: 800, height: 600,
+      });
+      const tvs = (v as unknown as { tileViews: Map<string, { terrainSprite: Sprite; villageSprite: Sprite | null }> }).tileViews;
+      const tv = tvs.get('0,0')!;
+      expect(tv.villageSprite).not.toBeNull();
+
+      v.bounceHex(0, 0);
+      const bounceFn = callbacks[callbacks.length - 1]!;
+      const terrainBase = tv.terrainSprite.position.y;
+      const villageBase = tv.villageSprite!.position.y;
+
+      now = 75; // half of the 150ms duration -> peak lift
+      bounceFn();
+      const amp = HEX * 0.2;
+      expect(tv.terrainSprite.position.y).toBeCloseTo(terrainBase - amp, 5);
+      expect(tv.villageSprite!.position.y).toBeCloseTo(villageBase - amp, 5);
+
+      now = 200; // past the duration -> sprites restored
+      bounceFn();
+      expect(tv.terrainSprite.position.y).toBeCloseTo(terrainBase, 5);
+      expect(tv.villageSprite!.position.y).toBeCloseTo(villageBase, 5);
+    } finally {
+      (performance as { now: () => number }).now = origNow;
+      v.destroy();
+    }
+  });
 });
 
 interface TileViewShape {

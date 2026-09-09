@@ -941,23 +941,41 @@ export class MapView {
     }
     if (sprites.length === 0) return;
     const CLAIM_DELAY_MS = 80;
-    this.hexBounceSprites = sprites.map((sprite) => ({
-      sprite,
-      baseY: sprite.position.y,
-      delay: delayed.has(sprite) ? CLAIM_DELAY_MS : 0,
-    }));
+    this.runHexBounce(
+      sprites.map((sprite) => ({
+        sprite,
+        baseY: sprite.position.y,
+        delay: delayed.has(sprite) ? CLAIM_DELAY_MS : 0,
+      })),
+    );
+  }
+
+  bounceHex(q: number, r: number): void {
+    if (!this.map) return;
+    const tv = this.tileViews.get(axialKey({ q, r }));
+    if (!tv) return;
+    const sprites = this.hexSurfaceSprites(tv);
+    if (sprites.length === 0) return;
+    this.runHexBounce(sprites.map((sprite) => ({ sprite, baseY: sprite.position.y, delay: 0 })));
+  }
+
+  private runHexBounce(entries: { sprite: Sprite; baseY: number; delay: number }[]): void {
+    this.stopHexBounce();
+    this.hexBounceSprites = entries;
+    if (entries.length === 0) return;
     const amp = this.hexSize * 0.2;
     const DURATION = 150;
     const start = performance.now();
-    const endAt = start + DURATION + (delayed.size > 0 ? CLAIM_DELAY_MS : 0);
+    const maxDelay = entries.reduce((m, e) => Math.max(m, e.delay), 0);
+    const endAt = start + DURATION + maxDelay;
     const fn = (): void => {
-      const entries = this.hexBounceSprites.filter((e) => !e.sprite.destroyed);
-      if (entries.length === 0) {
+      const active = this.hexBounceSprites.filter((e) => !e.sprite.destroyed);
+      if (active.length === 0) {
         this.stopHexBounce();
         return;
       }
       const elapsed = performance.now() - start;
-      for (const e of entries) {
+      for (const e of active) {
         const local = elapsed - e.delay;
         if (local < 0) continue;
         const t = Math.min(1, local / DURATION);

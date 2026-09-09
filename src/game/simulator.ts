@@ -792,6 +792,21 @@ export class Simulator {
     } else {
       pirate.hp = Math.max(0, pirate.hp - 20);
       ship.hp = Math.max(0, ship.hp - 10);
+      const victim = this.players[targetOwner];
+      if (ship.hp <= 0) {
+        targetTile.unit = null;
+        if (victim) this.statsOf(victim).killedUnits += 1;
+      }
+      if (pirate.hp <= 0) {
+        const pirateTile = tileAt(this.map, pirate.q, pirate.r);
+        if (pirateTile && pirateTile.unit === pirate) pirateTile.unit = null;
+        if (victim) {
+          victim.kills += 1;
+          this.statsOf(victim).pirateKills += 1;
+          awardScore(victim, PIRATE_KILL_SCORE);
+          if (pirateTile) this.emitScoreFly(victim.index, PIRATE_KILL_SCORE, pirateTile);
+        }
+      }
     }
     this.emit({ type: 'pirateCapture', q: targetTile.q, r: targetTile.r, playerIndex: targetOwner, success });
   }

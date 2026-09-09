@@ -29,7 +29,7 @@ function makePirate(id: string, q: number, r: number): Unit {
     hp: PIRATE_HP,
     attack: 30,
     attackDistance: 3,
-    defense: 10,
+    defense: 5,
     spawnVillage: null,
   };
 }
@@ -86,6 +86,51 @@ describe('Pirates', () => {
     expect(pirate.hp).toBe(PIRATE_HP - 20);
     expect(ship.hp).toBe(50 - 10);
     expect(events.some((e) => e.type === 'pirateCapture' && (e as { success: boolean }).success === false)).toBe(true);
+  });
+
+  it('removes a pirate that drops to 0 hp on a failed capture', () => {
+    const map = makeTestMap();
+    tileAt(map, 0, 0)!.terrain = TileType.Water;
+    tileAt(map, 0, 1)!.terrain = TileType.Water;
+    const pirate = makePirate('pirate-1', 0, 0);
+    pirate.hp = 20;
+    tileAt(map, 0, 0)!.unit = pirate;
+    const ship = makeShip('ship-1', 0, 0, 1);
+    tileAt(map, 0, 1)!.unit = ship;
+
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    const sim = new Simulator(map, players, 'turns30', { rng: () => 0.5 });
+    sim.startGame();
+    sim.drainEvents();
+
+    sim.applyCommand({ type: 'endTurn' });
+    sim.drainEvents();
+    expect(pirate.hp).toBe(0);
+    expect(tileAt(map, 0, 0)!.unit).toBeNull();
+    expect(tileAt(map, 0, 1)!.unit).toBe(ship);
+  });
+
+  it('removes a player ship that drops to 0 hp when a capture fails', () => {
+    const map = makeTestMap();
+    tileAt(map, 0, 0)!.terrain = TileType.Water;
+    tileAt(map, 0, 1)!.terrain = TileType.Water;
+    const pirate = makePirate('pirate-1', 0, 0);
+    tileAt(map, 0, 0)!.unit = pirate;
+    const ship = makeShip('ship-1', 0, 0, 1);
+    ship.hp = 10;
+    ship.hasAttacked = true;
+    tileAt(map, 0, 1)!.unit = ship;
+
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    const sim = new Simulator(map, players, 'turns30', { rng: () => 0.5 });
+    sim.startGame();
+    sim.drainEvents();
+
+    sim.applyCommand({ type: 'endTurn' });
+    sim.drainEvents();
+    expect(ship.hp).toBe(0);
+    expect(tileAt(map, 0, 1)!.unit).toBeNull();
+    expect(tileAt(map, 0, 0)!.unit).toBe(pirate);
   });
 
   it('a successful capture converts the ship into a pirate ship keeping its hp', () => {
@@ -147,7 +192,7 @@ describe('Pirates', () => {
     sim.applyCommand({ type: 'endTurn' });
     sim.drainEvents();
     expect(defender.hp).toBe(20);
-    expect(tileAt(map, 0, 0)!.unit!.hp).toBe(140);
+    expect(tileAt(map, 0, 0)!.unit!.hp).toBe(90);
   });
 
   it('does not step onto the land tile of a unit it kills', () => {
@@ -185,8 +230,8 @@ describe('Pirates', () => {
     const ok = sim.applyCommand({ type: 'attack', unitId: 'att', q: 0, r: 0 });
     expect(ok).toBe(true);
     sim.drainEvents();
-    expect(attacker.hp).toBe(22);
-    expect(tileAt(map, 0, 0)!.unit!.hp).toBe(140);
+    expect(attacker.hp).toBe(24);
+    expect(tileAt(map, 0, 0)!.unit!.hp).toBe(85);
   });
 
   it('moves toward the nearest player unit over sea when it is out of range', () => {

@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Application, Container, Graphics, ImageSource, Text, Texture } from 'pixi.js';
 import { gameController } from '../src/controller/gameController';
 import { Simulator } from '../src/game/simulator';
@@ -12,6 +12,7 @@ import { axialKey } from '../src/game/hex';
 import { type GameEvent } from '../src/game/events';
 import { MapView } from '../src/render/mapRenderer';
 import { useGameStore } from '../src/store/gameStore';
+import { sfx } from '../src/sound/sfx';
 import { type TextureSet, type TileTexture } from '../src/render/textureFactory';
 import { installCamera } from './helpers/testMap';
 
@@ -386,5 +387,268 @@ describe('combat animation ordering', () => {
     // Both the attacker's lunge and the defender's counter-lunge must move.
     expect(aMax).toBeGreaterThan(1);
     expect(dMax).toBeGreaterThan(1);
+  });
+
+  it('keeps a unit visible while earlier pirate animations run before the attack that kills it', async () => {
+    const map = makeOpenMap();
+    const players = [player(0, Tribe.Cats), player(1, Tribe.Barbarians)];
+    h = setup(map, players);
+
+    unitAt(map, 1, 0).terrain = TileType.Water;
+    unitAt(map, 2, 0).terrain = TileType.Water;
+    const mine = makeUnit('mine', 0, 0, 0, 50);
+    unitAt(map, 0, 0).unit = mine;
+    const decoy = makeUnit('decoy', 0, -1, 0, 50);
+    unitAt(map, -1, 0).unit = decoy;
+    const pirate = (id: string, q: number, r: number): Unit => {
+      const u = makeUnit(id, -1, q, r, 15);
+      u.type = 'pirate';
+      return u;
+    };
+    unitAt(map, 1, 0).unit = pirate('p1', 1, 0);
+    unitAt(map, 2, 0).unit = pirate('p2', 2, 0);
+    h.mapView.update(map, players, null, new Set(), new Set(), 0, new Set(), {
+      x: 0, y: 0, scale: 1, width: 800, height: 600,
+    });
+    // The sim already ran the whole batch: the pirate kills removed the unit.
+    unitAt(map, 0, 0).unit = null;
+
+    const events: GameEvent[] = [
+      {
+        type: 'attack', attackerId: 'p1', targetId: 'decoy',
+        attackerIndex: -1, targetIndex: 0,
+        attackerTile: { q: 1, r: 0 }, targetTile: { q: -1, r: 0 },
+        attackerDamage: 3, targetDamage: 0, missed: false,
+        attackerDied: false, targetDied: false,
+        attackerPre: { type: 'pirate', owner: -1, hp: 15 },
+        targetPre: { type: 'warrior', owner: 0, hp: 50 },
+      },
+      {
+        type: 'attack', attackerId: 'p2', targetId: 'mine',
+        attackerIndex: -1, targetIndex: 0,
+        attackerTile: { q: 2, r: 0 }, targetTile: { q: 0, r: 0 },
+        attackerDamage: 3, targetDamage: 0, missed: false,
+        attackerDied: false, targetDied: true,
+        attackerPre: { type: 'pirate', owner: -1, hp: 15 },
+        targetPre: { type: 'warrior', owner: 0, hp: 50 },
+      },
+    ];
+    const p = h.gc.presentEvents(events, h.gc.exploredKeysFor(0));
+
+    // While the first pirate's attack animates (before the killing attack event
+    // is presented), the doomed target must still be visible on its tile.
+    await new Promise((r) => setTimeout(r, 20));
+    const mineView = h.tileViews().get(axialKey({ q: 0, r: 0 }))!;
+    expect(mineView?.unitSprite?.visible).toBe(true);
+
+    let settled = false;
+    const pEnd = p.finally(() => { settled = true; });
+    for (let i = 0; i < 400 && !settled; i++) {
+      h.advanceTicks(100);
+      await new Promise((r) => setTimeout(r, 5));
+    }
+    await pEnd;
+    const endView = h.tileViews().get(axialKey({ q: 0, r: 0 }))!;
+    expect(endView?.unitSprite).toBeFalsy();
+  });
+
+  it('keeps a unit visible while earlier enemy animations run before the melee attack that kills it', async () => {
+    const map = makeOpenMap();
+    const players = [player(0, Tribe.Cats), player(1, Tribe.Barbarians)];
+    h = setup(map, players);
+
+    const mine = makeUnit('mine', 0, 0, 0, 50);
+    unitAt(map, 0, 0).unit = mine;
+    const decoy = makeUnit('decoy', 0, -1, 0, 50);
+    unitAt(map, -1, 0).unit = decoy;
+    const attacker = makeUnit('att', 1, 1, 0, 50);
+    unitAt(map, 1, 0).unit = attacker;
+    const other = makeUnit('ea', 1, 2, 0, 50);
+    unitAt(map, 2, 0).unit = other;
+    h.mapView.update(map, players, null, new Set(), new Set(), 0, new Set(), {
+      x: 0, y: 0, scale: 1, width: 800, height: 600,
+    });
+    // The sim already ran the batch: the melee kill removed the unit and the
+    // attacker advanced onto its tile.
+    unitAt(map, 0, 0).unit = attacker;
+    attacker.q = 0;
+    attacker.r = 0;
+    unitAt(map, 1, 0).unit = null;
+
+    const events: GameEvent[] = [
+      {
+        type: 'attack', attackerId: 'ea', targetId: 'decoy',
+        attackerIndex: 1, targetIndex: 0,
+        attackerTile: { q: 2, r: 0 }, targetTile: { q: -1, r: 0 },
+        attackerDamage: 10, targetDamage: 0, missed: false,
+        attackerDied: false, targetDied: false,
+        attackerPre: { type: 'warrior', owner: 1, hp: 50 },
+        targetPre: { type: 'warrior', owner: 0, hp: 50 },
+      },
+      {
+        type: 'attack', attackerId: 'att', targetId: 'mine',
+        attackerIndex: 1, targetIndex: 0,
+        attackerTile: { q: 1, r: 0 }, targetTile: { q: 0, r: 0 },
+        attackerDamage: 40, targetDamage: 0, missed: false,
+        attackerDied: false, targetDied: true,
+        attackerPre: { type: 'warrior', owner: 1, hp: 50 },
+        targetPre: { type: 'warrior', owner: 0, hp: 50 },
+      },
+    ];
+    const p = h.gc.presentEvents(events, h.gc.exploredKeysFor(0));
+
+    await new Promise((r) => setTimeout(r, 20));
+    const mineView = h.tileViews().get(axialKey({ q: 0, r: 0 }))!;
+    const attackerView = h.tileViews().get(axialKey({ q: 1, r: 0 }))!;
+    expect(mineView?.unitSprite?.visible).toBe(true);
+    expect(attackerView?.unitSprite?.visible).toBe(true);
+
+    let settled = false;
+    const pEnd = p.finally(() => { settled = true; });
+    for (let i = 0; i < 400 && !settled; i++) {
+      h.advanceTicks(100);
+      await new Promise((r) => setTimeout(r, 5));
+    }
+    await pEnd;
+    const endView = h.tileViews().get(axialKey({ q: 0, r: 0 }))!;
+    expect(endView?.unitSprite?.visible).toBe(true);
+    expect(endView?.unitSprite).toBeTruthy();
+  });
+
+  it('plays the arc-shot launch immediately and the hit impact when an archer shot lands', async () => {
+    const map = makeOpenMap();
+    const players = [player(0, Tribe.Cats), player(1, Tribe.Barbarians)];
+    h = setup(map, players);
+
+    const archer = makeUnit('att', 0, 0, 0, 30);
+    archer.type = 'archer';
+    unitAt(map, 0, 0).unit = archer;
+    unitAt(map, 1, 0).unit = makeUnit('def', 1, 1, 0, 40);
+    h.mapView.update(map, players, null, new Set(), new Set(), 0, new Set(), {
+      x: 0, y: 0, scale: 1, width: 800, height: 600,
+    });
+
+    const played: string[] = [];
+    const spy = vi.spyOn(sfx, 'play').mockImplementation((name) => { played.push(name); });
+    try {
+      const attack: GameEvent = {
+        type: 'attack', attackerId: 'att', targetId: 'def',
+        attackerIndex: 0, targetIndex: 1,
+        attackerTile: { q: 0, r: 0 }, targetTile: { q: 1, r: 0 },
+        attackerDamage: 10, targetDamage: 0, missed: false,
+        attackerDied: false, targetDied: false,
+        attackerPre: { type: 'archer', owner: 0, hp: 30 },
+        targetPre: { type: 'warrior', owner: 1, hp: 40 },
+      };
+      const p = h.gc.presentEvents([attack], h.gc.exploredKeysFor(0));
+
+      // The launch fires as the shot starts, before the lunge completes.
+      await waitFor(() => played.includes('arcShot'));
+      expect(played).not.toContain('hit');
+
+      // The impact plays once the blow lands (after the 160ms lunge).
+      h.advanceTicks(200);
+      await waitFor(() => played.includes('hit'));
+      expect(played.indexOf('arcShot')).toBeLessThan(played.indexOf('hit'));
+
+      let settled = false;
+      const pEnd = p.finally(() => { settled = true; });
+      for (let i = 0; i < 400 && !settled; i++) {
+        h.advanceTicks(100);
+        await new Promise((r) => setTimeout(r, 5));
+      }
+      await pEnd;
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('plays the sword-hit instead of the generic hit for a landed swordsman attack', async () => {
+    const map = makeOpenMap();
+    const players = [player(0, Tribe.Cats), player(1, Tribe.Barbarians)];
+    h = setup(map, players);
+
+    const swordsman = makeUnit('att', 0, 0, 0, 80);
+    swordsman.type = 'swordsman';
+    unitAt(map, 0, 0).unit = swordsman;
+    unitAt(map, 1, 0).unit = makeUnit('def', 1, 1, 0, 40);
+    h.mapView.update(map, players, null, new Set(), new Set(), 0, new Set(), {
+      x: 0, y: 0, scale: 1, width: 800, height: 600,
+    });
+
+    const played: string[] = [];
+    const spy = vi.spyOn(sfx, 'play').mockImplementation((name) => { played.push(name); });
+    try {
+      const attack: GameEvent = {
+        type: 'attack', attackerId: 'att', targetId: 'def',
+        attackerIndex: 0, targetIndex: 1,
+        attackerTile: { q: 0, r: 0 }, targetTile: { q: 1, r: 0 },
+        attackerDamage: 20, targetDamage: 0, missed: false,
+        attackerDied: false, targetDied: false,
+        attackerPre: { type: 'swordsman', owner: 0, hp: 80 },
+        targetPre: { type: 'warrior', owner: 1, hp: 40 },
+      };
+      const p = h.gc.presentEvents([attack], h.gc.exploredKeysFor(0));
+
+      h.advanceTicks(200);
+      await waitFor(() => played.includes('swordHit'));
+      expect(played).not.toContain('hit');
+      expect(played).not.toContain('arcShot');
+
+      let settled = false;
+      const pEnd = p.finally(() => { settled = true; });
+      for (let i = 0; i < 400 && !settled; i++) {
+        h.advanceTicks(100);
+        await new Promise((r) => setTimeout(r, 5));
+      }
+      await pEnd;
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('plays the generic hit, not the crew shot sound, for an archer-crewed ship attack', async () => {
+    const map = makeOpenMap();
+    const players = [player(0, Tribe.Cats), player(1, Tribe.Barbarians)];
+    h = setup(map, players);
+
+    const ship = makeUnit('att', 0, 0, 0, 30);
+    ship.type = 'archer';
+    ship.shipLevel = 1;
+    unitAt(map, 0, 0).unit = ship;
+    unitAt(map, 1, 0).unit = makeUnit('def', 1, 1, 0, 40);
+    h.mapView.update(map, players, null, new Set(), new Set(), 0, new Set(), {
+      x: 0, y: 0, scale: 1, width: 800, height: 600,
+    });
+
+    const played: string[] = [];
+    const spy = vi.spyOn(sfx, 'play').mockImplementation((name) => { played.push(name); });
+    try {
+      const attack: GameEvent = {
+        type: 'attack', attackerId: 'att', targetId: 'def',
+        attackerIndex: 0, targetIndex: 1,
+        attackerTile: { q: 0, r: 0 }, targetTile: { q: 1, r: 0 },
+        attackerDamage: 10, targetDamage: 0, missed: false,
+        attackerDied: false, targetDied: false,
+        attackerPre: { type: 'archer', owner: 0, hp: 30, shipLevel: 1 },
+        targetPre: { type: 'warrior', owner: 1, hp: 40 },
+      };
+      const p = h.gc.presentEvents([attack], h.gc.exploredKeysFor(0));
+
+      h.advanceTicks(200);
+      await waitFor(() => played.includes('hit'));
+      expect(played).not.toContain('arcShot');
+      expect(played).not.toContain('swordHit');
+
+      let settled = false;
+      const pEnd = p.finally(() => { settled = true; });
+      for (let i = 0; i < 400 && !settled; i++) {
+        h.advanceTicks(100);
+        await new Promise((r) => setTimeout(r, 5));
+      }
+      await pEnd;
+    } finally {
+      spy.mockRestore();
+    }
   });
 });

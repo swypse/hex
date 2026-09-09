@@ -8,7 +8,7 @@ export type UnitType = 'warrior' | 'rider' | 'archer' | 'swordsman' | 'shield' |
 export type PlayableUnitType = Exclude<UnitType, 'pirate'>;
 
 export const PIRATE_OWNER = -1;
-export const PIRATE_HP = 150;
+export const PIRATE_HP = 100;
 export const PIRATE_COLOR = 0x111111;
 
 export interface UnitTypeInfo {
@@ -31,7 +31,7 @@ export const UNIT_TYPES: Record<UnitType, UnitTypeInfo> = {
   shield: { movement: 1, attack: 10, attackDistance: 1, maxHp: 100, defense: 20, price: 10, priceWood: 0, priceOre: 3, shape: 'square' },
   catapult: { movement: 1, attack: 40, attackDistance: 4, maxHp: 30, defense: 0, price: 30, priceWood: 20, priceOre: 5, shape: 'square' },
   knight: { movement: 3, attack: 50, attackDistance: 1, maxHp: 50, defense: 10, price: 20, priceWood: 0, priceOre: 10, shape: 'swordsman' },
-  pirate: { movement: 5, attack: 30, attackDistance: 3, maxHp: PIRATE_HP, defense: 10, price: 0, priceWood: 0, priceOre: 0, shape: 'square' },
+  pirate: { movement: 5, attack: 30, attackDistance: 3, maxHp: PIRATE_HP, defense: 5, price: 0, priceWood: 0, priceOre: 0, shape: 'square' },
 };
 
 export const UNIT_IMAGE_FILES: Record<Tribe, Record<PlayableUnitType, string>> = {

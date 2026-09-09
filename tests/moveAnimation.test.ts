@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Application, Container, Graphics, ImageSource, Text, Texture } from 'pixi.js';
 import { gameController } from '../src/controller/gameController';
 import { Simulator, type Command } from '../src/game/simulator';
@@ -12,6 +12,7 @@ import { allTiles, axialKey } from '../src/game/hex';
 import { type GameEvent } from '../src/game/events';
 import { MapView } from '../src/render/mapRenderer';
 import { useGameStore } from '../src/store/gameStore';
+import { sfx } from '../src/sound/sfx';
 import { type TextureSet, type TileTexture } from '../src/render/textureFactory';
 import { installCamera } from './helpers/testMap';
 
@@ -476,5 +477,146 @@ describe('move animation', () => {
     await p;
 
     expect(mapRoot.children.length).toBe(0);
+  });
+
+  it('plays a water-splash when a ship move starts', async () => {
+    const map = makeOpenMap();
+    const players = [player(0, Tribe.Cats)];
+    h = setupGame(map, players);
+    const from = unitAt(map, 0, 0);
+    from.terrain = TileType.Water;
+    const ship: Unit = {
+      id: 's1', owner: 0, type: 'warrior', q: 0, r: 0,
+      hasMoved: false, hasAttacked: false, hasHealed: false,
+      hp: 5, attack: 2, attackDistance: 1, spawnVillage: { q: 0, r: 0 }, shipLevel: 1,
+    };
+    from.unit = ship;
+    const dest = unitAt(map, 1, 0);
+    dest.terrain = TileType.Water;
+    from.unit = null;
+    dest.unit = { ...ship, q: 1, r: 0 };
+    h.mapView.update(map, players, null, new Set(), new Set(), 0, new Set(), {
+      x: 0, y: 0, scale: 1, width: 800, height: 600,
+    });
+
+    const played: string[] = [];
+    const spy = vi.spyOn(sfx, 'play').mockImplementation((name) => { played.push(name); });
+    try {
+      const events: GameEvent[] = [
+        { type: 'unitMoved', unitId: 's1', from: { q: 0, r: 0 }, path: [{ q: 1, r: 0 }], to: { q: 1, r: 0 }, shipLevel: 1 },
+      ];
+      const p = h.gc.presentEvents(events, h.gc.exploredKeysFor(0));
+      await waitFor(() => played.includes('waterSplash'));
+      await p;
+
+      expect(played).toContain('waterSplash');
+      expect(played).not.toContain('waterSquish');
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('plays a water-squish when a unit arrives as a ship (boarding at a port)', async () => {
+    const map = makeOpenMap();
+    const players = [player(0, Tribe.Cats)];
+    h = setupGame(map, players);
+    const from = unitAt(map, 0, 0);
+    const land: Unit = {
+      id: 'u1', owner: 0, type: 'warrior', q: 0, r: 0,
+      hasMoved: false, hasAttacked: false, hasHealed: false,
+      hp: 5, attack: 2, attackDistance: 1, spawnVillage: { q: 0, r: 0 },
+    };
+    from.unit = land;
+    const dest = unitAt(map, 1, 0);
+    from.unit = null;
+    dest.unit = { ...land, q: 1, r: 0, shipLevel: 1 };
+    h.mapView.update(map, players, null, new Set(), new Set(), 0, new Set(), {
+      x: 0, y: 0, scale: 1, width: 800, height: 600,
+    });
+
+    const played: string[] = [];
+    const spy = vi.spyOn(sfx, 'play').mockImplementation((name) => { played.push(name); });
+    try {
+      const events: GameEvent[] = [
+        { type: 'unitMoved', unitId: 'u1', from: { q: 0, r: 0 }, path: [{ q: 1, r: 0 }], to: { q: 1, r: 0 } },
+      ];
+      const p = h.gc.presentEvents(events, h.gc.exploredKeysFor(0));
+      await waitFor(() => played.includes('waterSquish'));
+      await p;
+
+      expect(played).toContain('waterSquish');
+      expect(played).not.toContain('waterSplash');
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('plays the spawn sound only when the local player spawns a unit', async () => {
+    const map = makeOpenMap();
+    const players = [player(0, Tribe.Cats), player(1, Tribe.Barbarians)];
+    h = setupGame(map, players);
+
+    const played: string[] = [];
+    const spy = vi.spyOn(sfx, 'play').mockImplementation((name) => { played.push(name); });
+    try {
+      const localSpawn: GameEvent[] = [{ type: 'spawned', unitType: 'warrior', q: 0, r: 0, playerIndex: 0 }];
+      const enemySpawn: GameEvent[] = [{ type: 'spawned', unitType: 'warrior', q: 1, r: 0, playerIndex: 1 }];
+      await h.gc.presentEvents(localSpawn, h.gc.exploredKeysFor(0));
+      await h.gc.presentEvents(enemySpawn, h.gc.exploredKeysFor(0));
+
+      expect(played).toContain('spawn');
+      expect(played.filter((n) => n === 'spawn')).toHaveLength(1);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('bounces the village hex when a visible village upgrades', async () => {
+    const map = makeOpenMap();
+    const players = [player(0, Tribe.Cats), player(1, Tribe.Barbarians)];
+    h = setupGame(map, players);
+    const v = unitAt(map, 1, 0);
+    v.settlement = { owner: 0, level: 1, captureReady: false };
+    h.mapView.update(map, players, null, new Set(), new Set(), 0, new Set(), {
+      x: 0, y: 0, scale: 1, width: 800, height: 600,
+    });
+
+    const spy = vi.spyOn(h.mapView, 'bounceHex');
+    try {
+      const events: GameEvent[] = [
+        { type: 'villageUpgraded', q: 1, r: 0, level: 2, playerIndex: 0 },
+      ];
+      const p = h.gc.presentEvents(events, h.gc.exploredKeysFor(0));
+      await p;
+
+      expect(spy).toHaveBeenCalledWith(1, 0);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('does not bounce a village upgrade on an unexplored hex', async () => {
+    const map = makeOpenMap();
+    const players = [player(0, Tribe.Cats), player(1, Tribe.Barbarians)];
+    h = setupGame(map, players);
+    const v = unitAt(map, 1, 0);
+    v.settlement = { owner: 0, level: 1, captureReady: false };
+    v.exploredBy = [];
+    h.mapView.update(map, players, null, new Set(), new Set(), 0, new Set(), {
+      x: 0, y: 0, scale: 1, width: 800, height: 600,
+    });
+
+    const spy = vi.spyOn(h.mapView, 'bounceHex');
+    try {
+      const events: GameEvent[] = [
+        { type: 'villageUpgraded', q: 1, r: 0, level: 2, playerIndex: 0 },
+      ];
+      const p = h.gc.presentEvents(events, h.gc.exploredKeysFor(0));
+      await p;
+
+      expect(spy).not.toHaveBeenCalled();
+    } finally {
+      spy.mockRestore();
+    }
   });
 });

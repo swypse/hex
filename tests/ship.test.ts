@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { Tribe } from '../src/game/tribes';
 import { Player } from '../src/game/players';
 import { Unit } from '../src/game/units';
+import { makeUnit } from '../src/game/units';
 import { MapTile } from '../src/game/mapGen';
 import { TileType } from '../src/game/tileTypes';
 import {
@@ -113,5 +114,17 @@ describe('ship', () => {
     expect(p.resources.money).toBe(4);
     expect(p.resources.wood).toBe(2);
     expect(p.resources.ore).toBe(0);
+  });
+
+  it('keeps the crew defense when a unit becomes a ship', () => {
+    const u = makeUnit(0, 'swordsman', 0, 0);
+    expect(u.defense).toBe(10);
+    gainShipAbility(u);
+    expect(u.shipLevel).toBe(1);
+    expect(u.defense).toBe(10);
+
+    const shield = makeUnit(0, 'shield', 0, 0);
+    gainShipAbility(shield);
+    expect(shield.defense).toBe(20);
   });
 });

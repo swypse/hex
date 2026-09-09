@@ -35,10 +35,10 @@ Archer (5 each) that the old whole-point scale could not represent.
 
 | Unit   | HP  | Atk | Def | Move      | Atk range | Cost           |
 |--------|-----|-----|-----|-----------|-----------|----------------|
-| Pirate | 150 | 30  | 10  | 5 (water) | 3         | — (AI-spawned) |
+| Pirate | 100 | 30  | 5   | 5 (water) | 3         | — (AI-spawned) |
 
-Pirates are not spawnable and sit outside the player balance graph. Their Def 10 is the kind of light armour the new
-scale allows.
+Pirates are not spawnable and sit outside the player balance graph. Their Def 5 matches the light armour of riders/archers,
+so their threat comes from HP and numbers rather than armour.
 
 ## Naval units (ships)
 
@@ -51,8 +51,9 @@ determines movement, attack and range.
 | 2          | crew's | 20  | 0   | 3    | 2         | 16 + 8🪵 + 2⛏ (→ lvl 3)   |
 | 3          | crew's | 30  | 0   | 4    | 3         | —                          |
 
-Ships have no armour of their own (`Def 0`); only the crew's defense would apply, mirroring how HP already works. A
-level-1 ship is created by moving a unit onto its own **port** (10🪵 + 30 + 2⛏), which ends the turn.
+Ships have no armour of their own (`Def 0`); a ship's effective Def is its crew's, i.e. the original land unit's
+defense, mirroring how HP already works. A level-1 ship is created by moving a unit onto its own **port** (10🪵 + 30 + 2⛏),
+which ends the turn.
 
 ---
 
@@ -123,11 +124,11 @@ answer", not "always wins 1v1".
 - **How to play against it:** shields, ideally backed by a second unit; otherwise screen archers/catapults from its
   3-move reach. Do not let it chain kills — every kill grants it another attack.
 
-### Pirate (reference, 150 HP, 10 Def)
+### Pirate (reference, 100 HP, 5 Def)
 
-- **Countered by:** coastal **catapults** (range 4, 30–50 per volley after Def 10) and concentrated **ships** — a
-  level-3 ship matches its range (3) and deals 20/volley, while level 1–2 ships are out-ranged by the Pirate's range 3
-  and should not duel it alone. Its 150 HP makes it a multi-volley target. Killing it scores 30.
+- **Countered by:** coastal **catapults** (range 4, 35–55 per volley after Def 5) and concentrated **ships** — a
+  level-3 ship matches its range (3) and deals 25/volley, while level 1–2 ships are out-ranged by the Pirate's range 3
+  and should not duel it alone. Its 100 HP makes it a multi-volley target. Killing it scores 30.
 
 ### Ships
 
