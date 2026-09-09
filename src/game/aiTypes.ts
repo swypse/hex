@@ -12,6 +12,7 @@ export type AiAction =
   | { type: 'build'; q: number; r: number; kind: BuildingKind }
   | { type: 'buildRoad'; q: number; r: number }
   | { type: 'buildBridge'; q: number; r: number }
+  | { type: 'upgradeShip'; unitId: string }
   | { type: 'openSkill'; skill: SkillId };
 
 export interface AiPlannerState {

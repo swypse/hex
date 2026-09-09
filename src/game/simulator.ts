@@ -707,6 +707,9 @@ export class Simulator {
         case 'buildBridge':
           this.doBuildBridge(a.q, a.r);
           break;
+        case 'upgradeShip':
+          this.doUpgradeShip(a.unitId);
+          break;
         case 'openSkill':
           this.doOpenSkill(a.skill);
           break;

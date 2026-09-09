@@ -1,6 +1,7 @@
 import { GameMap, MapTile } from './mapGen';
 import { Player } from './players';
 import { canAfford, villageUpgradeCost } from './resources';
+import { isWaterType } from './tileTypes';
 import { canOpenSkill, hasSkill, SkillId } from './skills';
 import { reachableTargets, tileAt } from './selection';
 import { UNIT_ATTACK_DISTANCE, UNIT_MOVEMENT, UNIT_TYPES, canHeal, HEAL_AMOUNT, Unit, UnitType } from './units';
@@ -13,7 +14,7 @@ import { isExploredFor } from './explore';
 import { AiAction, AiPlannerState } from './aiTypes';
 import { AiDifficultyProfile } from './aiDifficulty';
 import { AiSituation, coastExposedTile, isMelee, isNavalEnemy } from './aiSituation';
-import { isShip, shipAttackDistance } from './ship';
+import { isShip, shipAttackDistance, canUpgradeShip } from './ship';
 
 export interface AiPatternContext {
   map: GameMap;
@@ -852,6 +853,9 @@ export const AI_PATTERNS: AiPattern[] = [
           }
           for (const c of reachableTargets(map, ship, undefined, canClimb, true, player.index)) {
             if (state.occupied.has(key(c.q, c.r))) continue;
+            // Ships sail, they do not land through the AI planner; only water
+            // destinations are real moves.
+            if (!isWaterType(c.terrain)) continue;
             if (!safeTile(c)) continue;
             const nd = hexDistance(c, enemyTile);
             const moveDist = hexDistance(ship, c);
@@ -877,6 +881,22 @@ export const AI_PATTERNS: AiPattern[] = [
       }
       if (!best) return null;
       return best.action;
+    },
+  },
+  {
+    id: 'naval-upgrade-ship',
+    priority: 74,
+    evaluate({ map, player, state, situation }): AiAction[] | null {
+      if (!situation || !situation.navalThreat) return null;
+      for (const t of map.tiles) {
+        const unit = t.unit;
+        if (!unit || unit.owner !== player.index) continue;
+        if (unit.shipLevel === undefined || unit.shipLevel >= 3) continue;
+        if (state.acted.has(unit.id) || state.moved.has(unit.id)) continue;
+        if (!canUpgradeShip(unit, t, player)) continue;
+        return [{ type: 'upgradeShip', unitId: unit.id }];
+      }
+      return null;
     },
   },
   {

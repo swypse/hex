@@ -272,3 +272,22 @@ describe('Naval hunting', () => {
     }
   });
 });
+
+describe('Naval ship upgrades', () => {
+  it('plans to upgrade an idle ship while threatened and affordable', () => {
+    const map = makeTestMap(6);
+    // Owned water tile under the ship so it may be upgraded there.
+    tileAt(map, 0, 0)!.terrain = TileType.Water;
+    tileAt(map, 0, 0)!.ownedBy = 1;
+    tileAt(map, 0, 0)!.unit = shipUnit('ship1', 1, 0, 0);
+    tileAt(map, 3, 0)!.terrain = TileType.Water;
+    tileAt(map, 3, 0)!.unit = pirate('p1', 3, 0);
+    const player = aiPlayer({
+      skills: ['water', 'navigation'],
+      resources: { wood: 10, stone: 0, money: 100, ore: 0 },
+    });
+    const actions = planAiActions(map, player, new SeededRandom(1), 'capture');
+    const up = actions.find((a) => a.type === 'upgradeShip' && a.unitId === 'ship1');
+    expect(up).toBeDefined();
+  });
+});

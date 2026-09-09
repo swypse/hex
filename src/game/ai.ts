@@ -310,6 +310,9 @@ function markUsed(state: AiPlannerState, action: AiAction): void {
       state.built.add(key(action.q, action.r));
       state.occupied.add(key(action.q, action.r));
       break;
+    case 'upgradeShip':
+      state.acted.add(action.unitId);
+      break;
     case 'openSkill':
       state.opened.add(action.skill);
       break;
