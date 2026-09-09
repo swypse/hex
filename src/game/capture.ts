@@ -1,7 +1,6 @@
 import { GameMap, MapTile } from './mapGen';
 import { Unit, unitMaintenance } from './units';
-import { villageCapacity, unitsInVillage } from './village';
-import { exploreVillageTiles } from './explore';
+import { villageCapacity, unitsInVillage, exploreVillageSight } from './village';
 
 export function setCaptureReady(villageTile: MapTile, ready: boolean): void {
   if (villageTile.settlement) {
@@ -73,7 +72,7 @@ export function captureVillage(
     }
   }
 
-  exploreVillageTiles(map, villageTile, capturer.owner);
+  exploreVillageSight(map, villageTile, capturer.owner);
 
   const redistributable = map.tiles.filter(
     (t) => t.settlement && t.settlement.owner === oldOwner,

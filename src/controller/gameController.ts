@@ -15,6 +15,7 @@ import { moveRange, canMove, canAttack, canDisband, makeUnit, PIRATE_OWNER, type
 import { cycleSelection, reachableTargets, tileAt } from '../game/selection';
 import { type GameMode } from '../game/gameMode';
 import { isExploredFor, initialExplorationFor } from '../game/explore';
+import { exploreVillageSights } from '../game/village';
 import { RESOURCE_CHEAT_AMOUNT } from '../game/cheats';
 import { TRIBES, Tribe } from '../game/tribes';
 import { MapView, type OverlayItem } from '../render/mapRenderer';
@@ -348,7 +349,10 @@ class GameController {
     store.setTutorialHighlightEndTurn(false);
     const players = buildPlayers(tribe, enemyCount, new SeededRandom(Math.floor(Math.random() * 100000)), difficulty);
     const map = generateMap(players.length, Math.floor(Math.random() * 100000), mapSize);
-    for (const p of players) initialExplorationFor(map, p.index);
+    for (const p of players) {
+      initialExplorationFor(map, p.index);
+      exploreVillageSights(map, p.index);
+    }
     this.sim = new Simulator(map, players, mode);
     this.sim.startGame();
     this.sim.drainEvents();

@@ -1,5 +1,5 @@
 import { claimTileForVillage } from './claim';
-import { exploreVillageTiles } from './explore';
+import { exploreAround } from './explore';
 import { hexDistance } from './hex';
 import { canAfford, pay } from './resources';
 import { hasSkill } from './skills';
@@ -28,6 +28,24 @@ export function claimRadius(level: number): number {
   return level === 1 ? 1 : 2;
 }
 
+/** Fog-sight radius of a village: its territory radius plus a one-hex ring. */
+export function villageSightRadius(level: number): number {
+  return claimRadius(level) + 1;
+}
+
+/** Reveals the tiles within a village's sight radius for the player. */
+export function exploreVillageSight(map: GameMap, villageTile: MapTile, playerIndex: number): MapTile[] {
+  const level = villageTile.settlement?.level ?? 1;
+  return exploreAround(map, villageTile, villageSightRadius(level), playerIndex);
+}
+
+/** Reveals every owned village's sight radius for the player (game start). */
+export function exploreVillageSights(map: GameMap, playerIndex: number): void {
+  for (const t of map.tiles) {
+    if (t.settlement && t.settlement.owner === playerIndex) exploreVillageSight(map, t, playerIndex);
+  }
+}
+
 export function ownedTilesFor(map: GameMap, tile: MapTile): MapTile[] {
   const owner = tile.settlement!.owner;
   return map.tiles.filter((t) => t.ownedBy === owner);
@@ -42,7 +60,7 @@ export function upgradeVillage(map: GameMap, tile: MapTile): void {
     if (hexDistance(t, tile) > radius) continue;
     claimTileForVillage(t, tile);
   }
-  exploreVillageTiles(map, tile, settlement.owner);
+  exploreVillageSight(map, tile, settlement.owner);
 }
 
 export function villageCapacity(level: number): number {

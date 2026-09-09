@@ -1,4 +1,4 @@
-import { axialKey, hexDistance } from './hex';
+import { hexDistance } from './hex';
 import { GameMap, MapTile } from './mapGen';
 import { shipAttackDistance } from './ship';
 import { isMountainType } from './tileTypes';
@@ -60,23 +60,6 @@ export function initialExplorationFor(map: GameMap, playerIndex: number): MapTil
   for (const t of map.tiles) {
     if (isExploredFor(t, playerIndex)) continue;
     if (t.ownedBy !== playerIndex) continue;
-    markExplored(t, playerIndex);
-    newly.push(t);
-  }
-  return newly;
-}
-
-export function exploreVillageTiles(
-  map: GameMap,
-  villageTile: MapTile,
-  playerIndex: number,
-): MapTile[] {
-  const villageKey = axialKey(villageTile);
-  const newly: MapTile[] = [];
-  for (const t of map.tiles) {
-    if (!t.claimedByVillage) continue;
-    if (axialKey(t.claimedByVillage) !== villageKey) continue;
-    if (isExploredFor(t, playerIndex)) continue;
     markExplored(t, playerIndex);
     newly.push(t);
   }

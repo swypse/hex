@@ -103,8 +103,9 @@ player's own tiles are explored.
 
 - When a unit moves, each cell it visits reveals all tiles within that unit's attack distance for its owner — revealed
   cells show a gray hex that flies up and fades away, uncovering the map underneath (animated for the human view).
-- Upgrading a village explores the whole village's territory for its owner.
-- Capturing a village explores all the village's tiles for the capturer.
+- A village reveals the surrounding tiles for its owner in a circle of `territory radius + 1` hexes (level 1 → 2, level
+  2–4 → 3, level 5+ → 4). This happens on game start for each owned village, when a village is upgraded, and when a
+  village is captured.
 - Units standing on unexplored cells are not visible; they appear only when they move onto an explored cell.
 
 The camera follows enemy actions only when they happen on explored cells.

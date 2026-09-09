@@ -5,10 +5,10 @@ import { Unit } from '../src/game/units';
 import {
   exploreAround,
   exploreUnitPath,
-  exploreVillageTiles,
   initialExplorationFor,
   isExploredFor,
 } from '../src/game/explore';
+import { villageSightRadius, exploreVillageSight, exploreVillageSights } from '../src/game/village';
 
 function makeTile(q: number, r: number, ownedBy: number | null = null): MapTile {
   return {
@@ -17,14 +17,14 @@ function makeTile(q: number, r: number, ownedBy: number | null = null): MapTile 
   };
 }
 
-function makeMap(): GameMap {
+function makeMap(radius = 2): GameMap {
   const tiles: MapTile[] = [];
-  for (let q = -2; q <= 2; q++) {
-    for (let r = -2; r <= 2; r++) {
+  for (let q = -radius; q <= radius; q++) {
+    for (let r = -radius; r <= radius; r++) {
       tiles.push(makeTile(q, r));
     }
   }
-  return { radius: 2, tiles, spawns: [] };
+  return { radius, tiles, spawns: [] };
 }
 
 function unit(attackDistance: number): Unit {
@@ -144,17 +144,47 @@ describe('exploreUnitPath', () => {
   });
 });
 
-describe('exploreVillageTiles', () => {
-  it('explores all tiles claimed by the village for the player', () => {
-    const map = makeMap();
+describe('villageSightRadius', () => {
+  it('is the territory radius plus one', () => {
+    expect(villageSightRadius(1)).toBe(2);
+    expect(villageSightRadius(2)).toBe(3);
+    expect(villageSightRadius(4)).toBe(3);
+    expect(villageSightRadius(5)).toBe(4);
+  });
+});
+
+describe('exploreVillageSight', () => {
+  it('reveals tiles within the sight radius for the village owner', () => {
+    const map = makeMap(3);
     const village = map.tiles.find((t) => t.q === 0 && t.r === 0)!;
-    for (const t of map.tiles) {
-      if (t === village) continue;
-      t.claimedByVillage = { q: 0, r: 0 };
-    }
-    const newly = exploreVillageTiles(map, village, 0);
-    expect(newly.length).toBe(map.tiles.length - 1);
-    expect(isExploredFor(village, 0)).toBe(false);
-    expect(new Set(newly).size).toBe(newly.length);
+    village.settlement = { owner: 0, level: 1, captureReady: false };
+    const newly = exploreVillageSight(map, village, 0);
+    expect(newly).toContain(village);
+    expect(isExploredFor(map.tiles.find((t) => t.q === 2 && t.r === 0)!, 0)).toBe(true);
+    expect(isExploredFor(map.tiles.find((t) => t.q === 3 && t.r === 0)!, 0)).toBe(false);
+  });
+
+  it('reveals a wider ring for higher-level villages', () => {
+    const map = makeMap(4);
+    const village = map.tiles.find((t) => t.q === 0 && t.r === 0)!;
+    village.settlement = { owner: 0, level: 2, captureReady: false };
+    exploreVillageSight(map, village, 0);
+    expect(isExploredFor(map.tiles.find((t) => t.q === 3 && t.r === 0)!, 0)).toBe(true);
+    expect(isExploredFor(map.tiles.find((t) => t.q === 4 && t.r === 0)!, 0)).toBe(false);
+  });
+});
+
+describe('exploreVillageSights', () => {
+  it('reveals the sight of every village a player owns', () => {
+    const map = makeMap(3);
+    const village = map.tiles.find((t) => t.q === 0 && t.r === 0)!;
+    village.settlement = { owner: 0, level: 1, captureReady: false };
+    const other = map.tiles.find((t) => t.q === 0 && t.r === 3)!;
+    other.settlement = { owner: 1, level: 1, captureReady: false };
+    exploreVillageSights(map, 0);
+    expect(isExploredFor(village, 0)).toBe(true);
+    expect(isExploredFor(map.tiles.find((t) => t.q === 1 && t.r === 1)!, 0)).toBe(true);
+    // Another player's village is not revealed for player 0.
+    expect(isExploredFor(other, 0)).toBe(false);
   });
 });

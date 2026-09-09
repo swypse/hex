@@ -7,6 +7,7 @@ import { RelayHostSession, RelayClientSession } from '../net/relaySession';
 import { buildMultiplayerPlayers } from '../game/players';
 import { generateMap, type MapSize } from '../game/mapGen';
 import { initialExplorationFor } from '../game/explore';
+import { exploreVillageSights } from '../game/village';
 import { Tribe } from '../game/tribes';
 import { useGameStore } from '../store/gameStore';
 import { loadSettings } from '../storage/settings';
@@ -259,7 +260,10 @@ export class NetworkController {
     ];
     const players = buildMultiplayerPlayers(humans, this.hostConfig.aiCount, new SeededRandom(Math.floor(Math.random() * 100000)), loadSettings().aiDifficulty);
     const map = generateMap(players.length, Math.floor(Math.random() * 100000), this.hostConfig.mapSize);
-    for (const p of players) initialExplorationFor(map, p.index);
+    for (const p of players) {
+      initialExplorationFor(map, p.index);
+      exploreVillageSights(map, p.index);
+    }
     const sim = new Simulator(map, players, this.hostConfig.mode);
     this.host.setSim(sim);
     sim.startGame();
