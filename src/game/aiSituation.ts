@@ -3,9 +3,10 @@ import { Player } from './players';
 import { GameMode } from './gameMode';
 import { AiDifficultyProfile } from './aiDifficulty';
 import { isExploredFor } from './explore';
-import { hexDistance } from './hex';
-import { shipMovement } from './ship';
-import { UNIT_MOVEMENT, Unit, UnitType } from './units';
+import { hexDistance, hexNeighbors } from './hex';
+import { isShip, shipAttackDistance, shipMovement } from './ship';
+import { UNIT_ATTACK_DISTANCE, UNIT_MOVEMENT, Unit, UnitType } from './units';
+import { isWaterType } from './tileTypes';
 import { attackDamage } from './combat';
 
 export type AiStance = 'settle' | 'defend' | 'war';
@@ -26,6 +27,65 @@ export interface FreeVillageTarget {
   distance: number;
 }
 
+export interface NavalEnemy {
+  tile: MapTile;
+  unit: Unit;
+  distance: number;
+}
+
+/** A unit that fights from water: a pirate or any unit currently on a ship. */
+export function isNavalEnemy(unit: Unit): boolean {
+  return unit.type === 'pirate' || unit.shipLevel !== undefined;
+}
+
+/** Farthest range from which a naval enemy can hit a tile this turn. */
+function navalStrikeRange(unit: Unit): number {
+  return isShip(unit) ? shipAttackDistance(unit) : UNIT_ATTACK_DISTANCE[unit.type];
+}
+
+/** True when a tile lies within the attack range of any listed naval enemy
+ *  (terrain-ignoring). Used to keep fresh spawns and land units out of a
+ *  pirate's reach. */
+export function navalCanStrikeTile(tile: MapTile, navalEnemies: NavalEnemy[]): boolean {
+  return navalEnemies.some((e) => hexDistance(tile, e.tile) <= navalStrikeRange(e.unit));
+}
+
+/** True when `tile` is a land tile bordering water that a naval enemy in
+ *  `navalEnemies` can currently hit with an attack. */
+export function coastExposedTile(map: GameMap, tile: MapTile, navalEnemies: NavalEnemy[]): boolean {
+  if (isWaterType(tile.terrain)) return false;
+  const isCoast = hexNeighbors(tile).some((n) => {
+    const nt = map.tiles.find((t) => t.q === n.q && t.r === n.r);
+    return nt !== undefined && isWaterType(nt.terrain);
+  });
+  if (!isCoast) return false;
+  return navalCanStrikeTile(tile, navalEnemies);
+}
+
+function nearestOwnNavalTarget(map: GameMap, playerIndex: number, from: MapTile): number {
+  let best = Infinity;
+  for (const t of map.tiles) {
+    const ownUnit = t.unit !== null && t.unit.owner === playerIndex;
+    const ownSettlement = t.settlement !== null && t.settlement.owner === playerIndex;
+    const ownPort = t.building !== null && t.building.kind === 'port' && t.ownedBy === playerIndex;
+    if (ownUnit || ownSettlement || ownPort) {
+      const d = hexDistance(from, t);
+      if (d < best) best = d;
+    }
+  }
+  return best;
+}
+
+function collectNavalThreats(map: GameMap, playerIndex: number, enemies: EnemyUnit[], radius: number): NavalEnemy[] {
+  const out: NavalEnemy[] = [];
+  for (const e of enemies) {
+    if (!isNavalEnemy(e.unit)) continue;
+    const distance = nearestOwnNavalTarget(map, playerIndex, e.tile);
+    if (distance <= radius) out.push({ tile: e.tile, unit: e.unit, distance });
+  }
+  return out.sort((a, b) => a.distance - b.distance);
+}
+
 export interface AiSituation {
   stance: AiStance;
   enemies: EnemyUnit[];
@@ -37,6 +97,9 @@ export interface AiSituation {
   huntTarget: MapTile | null;
   ownPower: number;
   enemyPower: number;
+  navalThreat: boolean;
+  navalEnemies: NavalEnemy[];
+  nearestNaval: NavalEnemy | null;
 }
 
 const MELEE_TYPES = new Set<UnitType>(['warrior', 'rider', 'swordsman', 'shield', 'knight']);
@@ -178,6 +241,10 @@ export function analyzeSituation(
     }
   }
 
+  const navalEnemies = collectNavalThreats(map, player.index, enemies, profile.navalThreatRadius);
+  const navalThreat = navalEnemies.length > 0;
+  const nearestNaval = navalEnemies[0] ?? null;
+
   return {
     stance,
     enemies,
@@ -188,5 +255,8 @@ export function analyzeSituation(
     huntTarget,
     ownPower: pow,
     enemyPower: epow,
+    navalThreat,
+    navalEnemies,
+    nearestNaval,
   };
 }
