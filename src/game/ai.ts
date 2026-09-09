@@ -17,7 +17,7 @@ import { AiAction, AiPlannerState } from './aiTypes';
 import { attackableTargets, chooseBestAttack, tradeIsFavorable } from './combat';
 import { isExploredFor } from './explore';
 import { GameMode } from './gameMode';
-import { AiSituation, analyzeSituation, coastExposedTile, isNavalEnemy, navalCanStrikeTile } from './aiSituation';
+import { AiSituation, analyzeSituation, coastExposedTile, isNavalEnemy } from './aiSituation';
 import { AiDifficultyProfile, profileFor } from './aiDifficulty';
 import { isShip } from './ship';
 
@@ -25,6 +25,9 @@ const MAX_PLAN_STEPS = 200;
 
 /** Strong penalty for idle land units standing where a naval enemy can hit. */
 const NAVAL_EXPOSURE_PENALTY = 400;
+
+/** Hexes from a naval enemy within which an own village prefers shield spawns. */
+const NAVAL_VILLAGE_GUARD_RADIUS = 6;
 
 /** When true, planAiActions logs each AI's situation and every decision. */
 let AI_DEBUG_LOGGING = false;
@@ -193,9 +196,9 @@ function bestAvailableAction(
     }
     if (!state.spawned.has(k) && !v.unit) {
       const threatened = landEnemyCanReach(map, v, player.index);
-      // A fresh spawn cannot act this turn, so never drop one into a village a
-      // naval enemy can already hit — it would just feed the pirate.
-      if (situation?.navalThreat && !threatened && navalCanStrikeTile(v, situation.navalEnemies)) continue;
+      const threatenedByNaval =
+        situation?.navalEnemies.some((e) => hexDistance(v, e.tile) <= NAVAL_VILLAGE_GUARD_RADIUS) ?? false;
+      const urgent = threatened || threatenedByNaval;
       const freeVillageToGrab = map.tiles.some(
         (t) =>
           t.settlement &&
@@ -204,7 +207,7 @@ function bestAvailableAction(
           !state.occupied.has(key(t.q, t.r)),
       );
       const prefer =
-        threatened || situation?.stance === 'defend'
+        urgent || situation?.stance === 'defend'
           ? 'defense'
           : situation?.navalThreat
             ? 'naval'
@@ -216,9 +219,9 @@ function bestAvailableAction(
         const cost = { wood: UNIT_TYPES[type].priceWood, stone: 0, money: UNIT_TYPES[type].price, ore: UNIT_TYPES[type].priceOre };
         if (canAfford(player.resources, cost)) {
           const after = pay(player.resources, cost);
-          const reserveOk = threatened || after.money >= (difficulty?.spawnReserve ?? UNIT_TYPES.warrior.price);
+          const reserveOk = urgent || after.money >= (difficulty?.spawnReserve ?? UNIT_TYPES.warrior.price);
           if (reserveOk) {
-            candidates.push({ score: (threatened ? 500 : 250) + jitter(), action: { type: 'spawn', q: v.q, r: v.r, unitType: type } });
+            candidates.push({ score: (urgent ? 500 : 250) + jitter(), action: { type: 'spawn', q: v.q, r: v.r, unitType: type } });
           }
         }
       }
@@ -368,11 +371,16 @@ function bestAvailableAction(
     candidates.push({ score: 250 + jitter(), action: { type: 'buildBridge', q: tile.q, r: tile.r } });
   }
 
-  for (const id of AI_SKILL_ORDER) {
-    if (state.opened.has(id)) continue;
-    if (canOpenSkill(player, id)) {
-      const rank = AI_SKILL_ORDER.indexOf(id);
-      candidates.push({ score: 240 - rank * 8 + jitter(), action: { type: 'openSkill', skill: id } });
+  // While a naval threat is active the AI saves money for the naval skill
+  // chain (opened by the naval-open-skills pattern) instead of following the
+  // normal economy skill order.
+  if (!situation?.navalThreat) {
+    for (const id of AI_SKILL_ORDER) {
+      if (state.opened.has(id)) continue;
+      if (canOpenSkill(player, id)) {
+        const rank = AI_SKILL_ORDER.indexOf(id);
+        candidates.push({ score: 240 - rank * 8 + jitter(), action: { type: 'openSkill', skill: id } });
+      }
     }
   }
 

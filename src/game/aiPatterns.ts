@@ -970,7 +970,9 @@ export const AI_PATTERNS: AiPattern[] = [
   {
     id: 'economy-opening',
     priority: 25,
-    evaluate({ map, player, state }): AiAction[] | null {
+    evaluate({ map, player, state, situation }): AiAction[] | null {
+      // Naval threats take priority: save the money for the naval response.
+      if (situation?.navalThreat) return null;
       const ownUnits = map.tiles.filter((t) => t.unit && t.unit.owner === player.index).length;
       if (ownUnits > 4) return null;
       for (const t of map.tiles) {

@@ -141,6 +141,15 @@ describe('Naval skill priority', () => {
     expect(firstSkill).toBeDefined();
     if (firstSkill && firstSkill.type === 'openSkill') expect(firstSkill.skill).toBe('forestry');
   });
+
+  it('opens only the naval skill chain while threatened, never economy skills', () => {
+    const allowed = new Set(['water', 'navigation', 'science', 'catapult']);
+    const player = aiPlayer({ resources: { wood: 0, stone: 0, money: 200, ore: 0 } });
+    const actions = planAiActions(coastalMap(), player, new SeededRandom(1), 'capture');
+    for (const a of actions) {
+      if (a.type === 'openSkill') expect(allowed.has(a.skill), a.skill).toBe(true);
+    }
+  });
 });
 
 describe('Naval port building', () => {
@@ -358,7 +367,7 @@ describe('Naval defensive guards', () => {
     }
   });
 
-  it('does not drop a fresh unit into an empty coastal village a pirate can hit', () => {
+  it('spawns a shield in an empty village a pirate is near', () => {
     const map = makeTestMap(6);
     tileAt(map, 0, 0)!.settlement = { owner: 1, level: 1, captureReady: false };
     tileAt(map, 0, 0)!.ownedBy = 1;
@@ -369,7 +378,7 @@ describe('Naval defensive guards', () => {
       resources: { wood: 0, stone: 0, money: 100, ore: 3 },
     });
     const actions = planAiActions(map, player, new SeededRandom(1), 'capture');
-    expect(actions.some((a) => a.type === 'spawn')).toBe(false);
+    expect(actions.some((a) => a.type === 'spawn' && a.unitType === 'shield')).toBe(true);
   });
 
   it('skips bridge building while a naval threat is active', () => {
