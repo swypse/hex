@@ -1,7 +1,7 @@
 import { GameMap, MapTile } from './mapGen';
 import { Player } from './players';
 import { canAfford, villageUpgradeCost } from './resources';
-import { hasSkill } from './skills';
+import { canOpenSkill, hasSkill, SkillId } from './skills';
 import { reachableTargets, tileAt } from './selection';
 import { UNIT_ATTACK_DISTANCE, UNIT_MOVEMENT, UNIT_TYPES, canHeal, HEAL_AMOUNT, Unit, UnitType } from './units';
 import { SeededRandom } from '../util/random';
@@ -728,6 +728,25 @@ export const AI_PATTERNS: AiPattern[] = [
       }
       if (!best) return null;
       return best.action;
+    },
+  },
+  {
+    id: 'naval-open-skills',
+    priority: 78,
+    evaluate({ player, state, situation }): AiAction[] | null {
+      if (!situation || !situation.navalThreat) return null;
+      const chain: SkillId[] = ['water', 'navigation', 'catapult'];
+      for (const skill of chain) {
+        if (state.opened.has(skill)) continue;
+        if (skill === 'catapult' && !hasSkill(player, 'science')) {
+          if (!state.opened.has('science') && canOpenSkill(player, 'science')) {
+            return [{ type: 'openSkill', skill: 'science' }];
+          }
+          continue;
+        }
+        if (canOpenSkill(player, skill)) return [{ type: 'openSkill', skill }];
+      }
+      return null;
     },
   },
   {

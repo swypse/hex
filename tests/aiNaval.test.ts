@@ -99,3 +99,46 @@ describe('AiDifficulty naval profile', () => {
     expect(normal).toBe(10);
   });
 });
+
+describe('Naval skill priority', () => {
+  function coastalMap(): ReturnType<typeof makeTestMap> {
+    const map = makeTestMap(6);
+    // The AI settlement at (0,0) anchors the threat measurement; water is off
+    // the coast with a pirate further out at (3,0).
+    tileAt(map, 0, 0)!.ownedBy = 1;
+    tileAt(map, 0, 0)!.settlement = { owner: 1, level: 1, captureReady: false };
+    tileAt(map, 1, 0)!.terrain = TileType.Water;
+    tileAt(map, 3, 0)!.terrain = TileType.Water;
+    tileAt(map, 3, 0)!.unit = pirate('p1', 3, 0);
+    return map;
+  }
+
+  it('opens Water first while threatened instead of the economy order', () => {
+    const player = aiPlayer({ resources: { wood: 0, stone: 0, money: 10, ore: 0 } });
+    const actions = planAiActions(coastalMap(), player, new SeededRandom(1), 'capture');
+    const firstSkill = actions.find((a) => a.type === 'openSkill');
+    expect(firstSkill).toBeDefined();
+    if (firstSkill && firstSkill.type === 'openSkill') expect(firstSkill.skill).toBe('water');
+  });
+
+  it('opens Navigation when Water is already open and the coast is threatened', () => {
+    const player = aiPlayer({
+      skills: ['water'],
+      resources: { wood: 0, stone: 0, money: 40, ore: 0 },
+    });
+    const actions = planAiActions(coastalMap(), player, new SeededRandom(1), 'capture');
+    expect(actions.some((a) => a.type === 'openSkill' && a.skill === 'navigation')).toBe(true);
+  });
+
+  it('does not prioritize Water when no naval enemy is near', () => {
+    const map = makeTestMap(6);
+    tileAt(map, 0, 0)!.ownedBy = 1;
+    tileAt(map, 0, 0)!.settlement = { owner: 1, level: 1, captureReady: false };
+    const player = aiPlayer({ resources: { wood: 0, stone: 0, money: 10, ore: 0 } });
+    const actions = planAiActions(map, player, new SeededRandom(1), 'capture');
+    const firstSkill = actions.find((a) => a.type === 'openSkill');
+    // Without a threat the economy order leads with Forestry, never Water.
+    expect(firstSkill).toBeDefined();
+    if (firstSkill && firstSkill.type === 'openSkill') expect(firstSkill.skill).toBe('forestry');
+  });
+});
