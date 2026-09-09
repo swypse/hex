@@ -1,4 +1,4 @@
-import { planAiActions, logAiTurnStart } from './ai';
+import { planAiActions, logAiTurnStart, aiLoggingEnabled, formatAiAction, type AiActionMarker } from './ai';
 import { buildingIncome, buildBuilding, canUsePort } from './buildings';
 import { captureVillage, setCaptureReady, villageIncomeTotal } from './capture';
 import { attackableTargets, missChanceFor, performAttack } from './combat';
@@ -678,42 +678,51 @@ export class Simulator {
     this.doClaimBonus();
     this.markCaptureReadyFor(playerIndex);
     this.emit({ type: 'aiTurn', playerIndex });
-    const actions = planAiActions(this.map, ai, this.aiRng(), this.mode);
+    const markers: AiActionMarker[] = [];
+    const actions = planAiActions(this.map, ai, this.aiRng(), this.mode, markers);
+    let actionNo = 0;
     for (const a of actions) {
+      actionNo += 1;
+      let ok = false;
       switch (a.type) {
         case 'upgrade':
-          this.doUpgradeVillage(a.q, a.r);
+          ok = this.doUpgradeVillage(a.q, a.r);
           break;
         case 'move':
-          this.doMove(a.unitId, a.q, a.r);
+          ok = this.doMove(a.unitId, a.q, a.r);
           break;
         case 'attack':
-          this.doAttack(a.unitId, a.q, a.r);
+          ok = this.doAttack(a.unitId, a.q, a.r);
           break;
         case 'spawn':
-          this.doSpawn(a.q, a.r, a.unitType);
+          ok = this.doSpawn(a.q, a.r, a.unitType);
           break;
         case 'capture':
-          this.doCapture(a.q, a.r, a.unitId);
+          ok = this.doCapture(a.q, a.r, a.unitId);
           break;
         case 'heal':
-          this.doHeal(a.unitId);
+          ok = this.doHeal(a.unitId);
           break;
         case 'build':
-          this.doBuild(a.q, a.r, a.kind);
+          ok = this.doBuild(a.q, a.r, a.kind);
           break;
         case 'buildRoad':
-          this.doBuildRoad(a.q, a.r);
+          ok = this.doBuildRoad(a.q, a.r);
           break;
         case 'buildBridge':
-          this.doBuildBridge(a.q, a.r);
+          ok = this.doBuildBridge(a.q, a.r);
           break;
         case 'upgradeShip':
-          this.doUpgradeShip(a.unitId);
+          ok = this.doUpgradeShip(a.unitId);
           break;
         case 'openSkill':
-          this.doOpenSkill(a.skill);
+          ok = this.doOpenSkill(a.skill);
           break;
+      }
+      if (aiLoggingEnabled()) {
+        const marker = actionNo - 1 < markers.length ? markers[actionNo - 1]! : undefined;
+        const tag = marker ? `<${marker.label}>${marker.note}` : '<unknown>';
+        console.log(`[AI]   exec ${ok ? 'OK  ' : 'FAIL'} #${actionNo} ${formatAiAction(a)} ${tag}`);
       }
     }
     this.evaluateAchievementsForAll();

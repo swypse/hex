@@ -66,7 +66,13 @@ function situationSummary(situation: AiSituation): string {
   );
 }
 
-function describeAction(a: AiAction): string {
+/** Debug tag describing how one planned action was produced. */
+export interface AiActionMarker {
+  label: string;
+  note: string;
+}
+
+export function formatAiAction(a: AiAction): string {
   switch (a.type) {
     case 'move':
       return `move ${a.unitId} (${a.q},${a.r})`;
@@ -427,6 +433,7 @@ export function planAiActions(
   player: Player,
   rng: SeededRandom,
   mode: GameMode = 'capture',
+  markers?: AiActionMarker[],
 ): AiAction[] {
   const difficulty = profileFor(player);
   const situation = analyzeSituation(map, player, mode, difficulty);
@@ -441,6 +448,7 @@ export function planAiActions(
     occupied: new Set(),
   };
   const actions: AiAction[] = [];
+  let stepNo = 0;
   for (let i = 0; i < MAX_PLAN_STEPS; i++) {
     const ctx: AiPatternContext = { map, player, rng, state, situation, difficulty };
     let next: AiAction[] | null = null;
@@ -460,9 +468,11 @@ export function planAiActions(
       if (next && source.kind === 'random') label = 'fallback(RANDOM mistake)';
     }
     if (!next) break;
-    aiLog(`  step ${actions.length + 1}. ${label} -> ${next.map(describeAction).join(' | ')}${note}`);
+    stepNo += 1;
+    aiLog(`  step ${stepNo}. ${label} -> ${next.map(formatAiAction).join(' | ')}${note}`);
     for (const a of next) {
       actions.push(a);
+      if (markers) markers.push({ label, note });
       markUsed(state, a);
     }
   }
