@@ -1,4 +1,4 @@
-import { planAiActions } from './ai';
+import { planAiActions, logAiTurnStart } from './ai';
 import { buildingIncome, buildBuilding, canUsePort } from './buildings';
 import { captureVillage, setCaptureReady, villageIncomeTotal } from './capture';
 import { attackableTargets, missChanceFor, performAttack } from './combat';
@@ -674,6 +674,7 @@ export class Simulator {
 
   private runAiTurn(playerIndex: number): void {
     const ai = this.players[playerIndex]!;
+    logAiTurnStart(ai, this.turn);
     this.doClaimBonus();
     this.markCaptureReadyFor(playerIndex);
     this.emit({ type: 'aiTurn', playerIndex });

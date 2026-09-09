@@ -27,6 +27,7 @@ import { saveRepository } from '../storage/saveGame';
 import { attackConfirmationEnabled } from '../storage/settings';
 import { sfx } from '../sound/sfx';
 import { SeededRandom } from '../util/random';
+import { setAiLogging, aiLoggingEnabled } from '../game/ai';
 import { CameraController } from './cameraController';
 import { type Viewport } from '../render/tileSignature';
 import { EventPresenter } from './eventPresenter';
@@ -873,6 +874,11 @@ class GameController {
     this.saveGame();
     this.render();
     return true;
+  }
+
+  /** Cheat: toggles AI decision logging; returns the new on/off state. */
+  cheatToggleAiLogs(): boolean {
+    return setAiLogging(!aiLoggingEnabled());
   }
 
   confirmShipLanding(): void {

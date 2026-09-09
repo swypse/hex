@@ -96,6 +96,8 @@ export default {
   'msg.cheatSkills': 'Открыты все навыки (чит)',
   'msg.cheatFog': 'Карта открыта (чит)',
   'msg.cheatPirates': '5 пиратских кораблей у племён ИИ (чит)',
+  'msg.aiLogsOn': 'Логи решений ИИ ВКЛ',
+  'msg.aiLogsOff': 'Логи решений ИИ ВЫКЛ',
 
   // Achievements
   'ach.title': 'Достижения',

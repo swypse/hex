@@ -96,6 +96,8 @@ export default {
   'msg.cheatSkills': 'All skills unlocked (cheat)',
   'msg.cheatFog': 'Map revealed (cheat)',
   'msg.cheatPirates': '5 pirate ships spawned near AI tribes (cheat)',
+  'msg.aiLogsOn': 'AI decision logs ON',
+  'msg.aiLogsOff': 'AI decision logs OFF',
 
   // Achievements
   'ach.title': 'Achievements',

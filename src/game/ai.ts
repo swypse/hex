@@ -11,6 +11,7 @@ import { canHeal, UNIT_TYPES, Unit } from './units';
 import { SeededRandom } from '../util/random';
 import { buildingsInVillage, villageBuildingLimit } from './village';
 import { isMountainType } from './tileTypes';
+import { TRIBES } from './tribes';
 import { AI_PATTERNS, AiPatternContext, bestSpawnableUnitType, enemyCanAttackNext, enemyCanReach, isFrontierTile, landEnemyCanReach, nearestEnemyDistanceFrom, nearestFreeVillageDistanceFrom, nearestOwnUnitDistanceFrom, nearestVillageDistanceFrom } from './aiPatterns';
 import { AiAction, AiPlannerState } from './aiTypes';
 import { attackableTargets, chooseBestAttack, tradeIsFavorable } from './combat';
@@ -24,6 +25,73 @@ const MAX_PLAN_STEPS = 200;
 
 /** Strong penalty for idle land units standing where a naval enemy can hit. */
 const NAVAL_EXPOSURE_PENALTY = 400;
+
+/** When true, planAiActions logs each AI's situation and every decision. */
+let AI_DEBUG_LOGGING = false;
+
+export function aiLoggingEnabled(): boolean {
+  return AI_DEBUG_LOGGING;
+}
+
+/** Toggles AI decision logging; returns the new state. */
+export function setAiLogging(enabled: boolean): boolean {
+  AI_DEBUG_LOGGING = enabled;
+  return AI_DEBUG_LOGGING;
+}
+
+function aiLog(...parts: unknown[]): void {
+  if (AI_DEBUG_LOGGING) console.log('[AI]', ...parts);
+}
+
+function tribeName(player: Player): string {
+  return TRIBES.find((x) => x.id === player.tribe)?.name ?? String(player.tribe);
+}
+
+/** Debug header printed at the start of an AI turn. */
+export function logAiTurnStart(player: Player, turn: number): void {
+  if (!AI_DEBUG_LOGGING) return;
+  aiLog(`${tribeName(player)} "${player.name}" — turn ${turn} START`);
+}
+
+function situationSummary(situation: AiSituation): string {
+  const naval = situation.navalThreat
+    ? ` navalThreat=true x${situation.navalEnemies.length} d=${situation.nearestNaval?.distance ?? '?'}`
+    : ' navalThreat=false';
+  const front = situation.frontTarget ? ` front=(${situation.frontTarget.q},${situation.frontTarget.r})` : '';
+  return (
+    `stance=${situation.stance} endangered=${situation.endangered} dangers=${situation.dangers.length}` +
+    ` enemies=${situation.enemies.length} freeVillages=${situation.freeVillages.length}` +
+    ` ownPower=${situation.ownPower} enemyPower=${situation.enemyPower}` +
+    naval + front
+  );
+}
+
+function describeAction(a: AiAction): string {
+  switch (a.type) {
+    case 'move':
+      return `move ${a.unitId} (${a.q},${a.r})`;
+    case 'attack':
+      return `attack ${a.unitId} -> (${a.q},${a.r})`;
+    case 'heal':
+      return `heal ${a.unitId}`;
+    case 'capture':
+      return `capture ${a.unitId} (${a.q},${a.r})`;
+    case 'spawn':
+      return `spawn ${a.unitType} (${a.q},${a.r})`;
+    case 'upgrade':
+      return `upgrade village (${a.q},${a.r})`;
+    case 'upgradeShip':
+      return `upgradeShip ${a.unitId}`;
+    case 'build':
+      return `build ${a.kind} (${a.q},${a.r})`;
+    case 'buildRoad':
+      return `buildRoad (${a.q},${a.r})`;
+    case 'buildBridge':
+      return `buildBridge (${a.q},${a.r})`;
+    case 'openSkill':
+      return `openSkill ${a.skill}`;
+  }
+}
 
 function key(q: number, r: number): string {
   return `${q},${r}`;
@@ -103,6 +171,7 @@ function bestAvailableAction(
   state: AiPlannerState,
   situation: AiSituation | undefined,
   difficulty: AiDifficultyProfile | undefined,
+  source?: { kind: 'best' | 'random' },
 ): AiAction[] | null {
   const jitter = (): number => rng.next() * 60;
   const candidates: { score: number; action: AiAction | AiAction[] }[] = [];
@@ -302,11 +371,13 @@ function bestAvailableAction(
   }
 
   if (difficulty && difficulty.mistakeChance > 0 && candidates.length > 0 && rng.next() < difficulty.mistakeChance) {
+    if (source) source.kind = 'random';
     const pick = candidates[Math.floor(rng.next() * candidates.length)]!;
     return Array.isArray(pick.action) ? pick.action : [pick.action];
   }
 
   if (candidates.length === 0) return null;
+  if (source) source.kind = 'best';
   let best = candidates[0]!;
   for (const c of candidates) if (c.score > best.score) best = c;
   return Array.isArray(best.action) ? best.action : [best.action];
@@ -359,6 +430,7 @@ export function planAiActions(
 ): AiAction[] {
   const difficulty = profileFor(player);
   const situation = analyzeSituation(map, player, mode, difficulty);
+  if (AI_DEBUG_LOGGING) aiLog(`  situation: ${situationSummary(situation)}`);
   const state: AiPlannerState = {
     moved: new Set(),
     acted: new Set(),
@@ -372,12 +444,23 @@ export function planAiActions(
   for (let i = 0; i < MAX_PLAN_STEPS; i++) {
     const ctx: AiPatternContext = { map, player, rng, state, situation, difficulty };
     let next: AiAction[] | null = null;
+    let label = 'fallback(best-score)';
+    let note = '';
     for (const pattern of AI_PATTERNS) {
       next = pattern.evaluate(ctx);
-      if (next) break;
+      if (next) {
+        label = `pattern=${pattern.id}`;
+        if (pattern.id.startsWith('naval-')) note = ` (navalThreat=${situation.navalThreat})`;
+        break;
+      }
     }
-    if (!next) next = bestAvailableAction(map, player, rng, state, situation, difficulty);
+    if (!next) {
+      const source: { kind: 'best' | 'random' } = { kind: 'best' };
+      next = bestAvailableAction(map, player, rng, state, situation, difficulty, source);
+      if (next && source.kind === 'random') label = 'fallback(RANDOM mistake)';
+    }
     if (!next) break;
+    aiLog(`  step ${actions.length + 1}. ${label} -> ${next.map(describeAction).join(' | ')}${note}`);
     for (const a of next) {
       actions.push(a);
       markUsed(state, a);
