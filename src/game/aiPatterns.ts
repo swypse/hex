@@ -68,12 +68,13 @@ export function enemyCanAttackNext(map: GameMap, tile: MapTile, playerIndex: num
   );
 }
 
-export type SpawnPreference = 'offense' | 'defense' | 'scout';
+export type SpawnPreference = 'offense' | 'defense' | 'scout' | 'naval';
 
 const SPAWN_ORDER: Record<SpawnPreference, UnitType[]> = {
   offense: ['knight', 'swordsman', 'catapult', 'warrior', 'rider', 'archer', 'shield'],
   defense: ['shield', 'knight', 'catapult', 'archer', 'swordsman', 'warrior', 'rider'],
   scout: ['rider', 'knight', 'swordsman', 'warrior', 'archer', 'shield', 'catapult'],
+  naval: ['catapult', 'archer', 'shield', 'warrior', 'rider', 'swordsman', 'knight'],
 };
 
 export function bestSpawnableUnitType(
@@ -897,6 +898,39 @@ export const AI_PATTERNS: AiPattern[] = [
         return [{ type: 'upgradeShip', unitId: unit.id }];
       }
       return null;
+    },
+  },
+  {
+    id: 'naval-position-catapult',
+    priority: 73,
+    evaluate({ map, player, state, situation }): AiAction[] | null {
+      if (!situation || !situation.navalThreat || !situation.nearestNaval) return null;
+      if (!hasSkill(player, 'catapult')) return null;
+      const naval = situation.nearestNaval;
+      const canClimb = hasSkill(player, 'climbing');
+      let best: { unit: Unit; step: MapTile; score: number } | null = null;
+      for (const t of map.tiles) {
+        const unit = t.unit;
+        if (!unit || unit.owner !== player.index) continue;
+        if (unit.type !== 'catapult') continue;
+        if (state.acted.has(unit.id) || state.moved.has(unit.id)) continue;
+        // Already able to fire: leave it to the attack logic.
+        if (attackableTargets(map, unit, player.index).some((a) => a.unit && isNavalEnemy(a.unit))) continue;
+        const before = hexDistance(unit, naval.tile);
+        for (const c of reachableTargets(map, unit, undefined, canClimb, false, player.index)) {
+          if (state.occupied.has(key(c.q, c.r))) continue;
+          if (c.settlement) continue;
+          const after = hexDistance(c, naval.tile);
+          // Step closer each turn but never park within a pirate's easy reach
+          // (range 3): hold the catapult at distance >= 4.
+          if (after >= before || after < 4) continue;
+          if (coastExposedTile(map, c, situation.navalEnemies)) continue;
+          const score = -after;
+          if (!best || score > best.score) best = { unit, step: c, score };
+        }
+      }
+      if (!best) return null;
+      return [{ type: 'move', unitId: best.unit.id, q: best.step.q, r: best.step.r }];
     },
   },
   {

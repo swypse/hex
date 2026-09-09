@@ -291,3 +291,51 @@ describe('Naval ship upgrades', () => {
     expect(up).toBeDefined();
   });
 });
+
+describe('Naval catapults', () => {
+  function catapultMap(): ReturnType<typeof makeTestMap> {
+    const map = makeTestMap(6);
+    // Catapult at (0,0), pirate at (5,0): distance 5, out of range. The only
+    // land step that closes to firing range (distance 4) is (1,0); the two
+    // alternate approach tiles (1,1) and (1,-1) are water so the choice is
+    // deterministic. (1,0) is distance 4 -> safe from the pirate's range 3.
+    tileAt(map, 0, 0)!.unit = makeUnit('cat1', 1, 'catapult', 0, 0);
+    tileAt(map, 1, 0);
+    tileAt(map, 1, 1)!.terrain = TileType.Water;
+    tileAt(map, 1, -1)!.terrain = TileType.Water;
+    tileAt(map, 5, 0)!.terrain = TileType.Water;
+    tileAt(map, 5, 0)!.unit = pirate('p1', 5, 0);
+    return map;
+  }
+
+  it('moves an idle catapult into firing range of the pirate', () => {
+    const player = aiPlayer({
+      skills: ['science', 'catapult'],
+      resources: { wood: 0, stone: 0, money: 100, ore: 0 },
+    });
+    const actions = planAiActions(catapultMap(), player, new SeededRandom(1), 'capture');
+    const move = actions.find((a) => a.type === 'move' && a.unitId === 'cat1');
+    expect(move).toBeDefined();
+    if (move && move.type === 'move') {
+      expect(move.q).toBe(1);
+      expect(move.r).toBe(0);
+    }
+  });
+
+  it('spawns a catapult instead of a land attacker while the coast is threatened', () => {
+    const map = makeTestMap(6);
+    tileAt(map, 0, 0)!.settlement = { owner: 1, level: 1, captureReady: false };
+    tileAt(map, 0, 0)!.ownedBy = 1;
+    tileAt(map, 0, 1)!.ownedBy = 1;
+    tileAt(map, 1, 0)!.terrain = TileType.Water;
+    tileAt(map, 1, 0)!.ownedBy = 1;
+    tileAt(map, 4, 0)!.terrain = TileType.Water;
+    tileAt(map, 4, 0)!.unit = pirate('p1', 4, 0);
+    const player = aiPlayer({
+      skills: ['science', 'catapult', 'water'],
+      resources: { wood: 100, stone: 0, money: 100, ore: 10 },
+    });
+    const actions = planAiActions(map, player, new SeededRandom(1), 'capture');
+    expect(actions.some((a) => a.type === 'spawn' && a.unitType === 'catapult')).toBe(true);
+  });
+});

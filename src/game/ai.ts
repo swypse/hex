@@ -11,7 +11,7 @@ import { canHeal, UNIT_TYPES, Unit } from './units';
 import { SeededRandom } from '../util/random';
 import { buildingsInVillage, villageBuildingLimit } from './village';
 import { isMountainType } from './tileTypes';
-import { AI_PATTERNS, AiPatternContext, bestSpawnableUnitType, enemyCanAttackNext, enemyCanReach, isFrontierTile, nearestEnemyDistanceFrom, nearestFreeVillageDistanceFrom, nearestOwnUnitDistanceFrom, nearestVillageDistanceFrom } from './aiPatterns';
+import { AI_PATTERNS, AiPatternContext, bestSpawnableUnitType, enemyCanAttackNext, enemyCanReach, isFrontierTile, landEnemyCanReach, nearestEnemyDistanceFrom, nearestFreeVillageDistanceFrom, nearestOwnUnitDistanceFrom, nearestVillageDistanceFrom } from './aiPatterns';
 import { AiAction, AiPlannerState } from './aiTypes';
 import { chooseBestAttack, tradeIsFavorable } from './combat';
 import { isExploredFor } from './explore';
@@ -97,7 +97,7 @@ function bestAvailableAction(
       candidates.push({ score: (front ? 700 : 400) + boost + jitter(), action: { type: 'upgrade', q: v.q, r: v.r } });
     }
     if (!state.spawned.has(k) && !v.unit) {
-      const threatened = enemyCanReach(map, v, player.index);
+      const threatened = landEnemyCanReach(map, v, player.index);
       const freeVillageToGrab = map.tiles.some(
         (t) =>
           t.settlement &&
@@ -106,11 +106,13 @@ function bestAvailableAction(
           !state.occupied.has(key(t.q, t.r)),
       );
       const prefer =
-        situation?.stance === 'defend' || threatened
+        threatened || situation?.stance === 'defend'
           ? 'defense'
-          : situation?.stance === 'settle' && freeVillageToGrab
-            ? 'scout'
-            : 'offense';
+          : situation?.navalThreat
+            ? 'naval'
+            : situation?.stance === 'settle' && freeVillageToGrab
+              ? 'scout'
+              : 'offense';
       const type = bestSpawnableUnitType(player, prefer);
       if (type) {
         const cost = { wood: UNIT_TYPES[type].priceWood, stone: 0, money: UNIT_TYPES[type].price, ore: UNIT_TYPES[type].priceOre };
