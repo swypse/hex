@@ -69,10 +69,11 @@ it:
 - `navalEnemiesVisible(map, playerIndex)` — visible (explored) naval enemies of
   other owners.
 - `coastExposedTile(map, tile, navalEnemies)` — true when `tile` is a **land
-  tile bordering water** and some naval enemy is within `move + attack range`
-  of it (uses the existing `UNIT_MOVEMENT`/`UNIT_ATTACK_DISTANCE` style
-  distance check, terrain-ignoring, like `enemyCanAttackNext`). Coast tiles
-  only — inland movement is never restricted.
+  tile bordering water** and some naval enemy is within that enemy's *attack
+  range* of it (pirates 3, ships by level 2/2/3). Coast tiles only — inland
+  movement is never restricted. Catapult and ship units are exempt when they
+  are the ones responding (a catapult must stand within 4 of a pirate to fire,
+  so exposure never blocks it).
 
 `AiSituation` gains:
 
@@ -213,9 +214,12 @@ Files touched (all `src/game/`):
 - `ai.ts` — expose situation fields to the generic move scorer; exposure
   penalty; bridge-worth gate; port bypass of `reserveLastSlotForMine`.
 - `aiDifficulty.ts` — `navalThreatRadius` knob per profile.
-- `aiTypes.ts` — only if the situation type shape requires it.
-- No new `AiAction` types: existing `move`/`attack`/`spawn`/`build`/`openSkill`
-  cover everything. `GAME.md` unchanged (no rules change).
+- `aiTypes.ts` — add the `upgradeShip` AiAction (`{ type: 'upgradeShip';
+  unitId: string }`); `ai.ts` `markUsed` treats it as an acted unit; the
+  simulator's `runAiTurn` executes it via the existing `doUpgradeShip`.
+- No new `AiAction` types beyond `upgradeShip`: existing `move`/`attack`/
+  `spawn`/`build`/`openSkill` cover the rest. `GAME.md` unchanged (no rules
+  change).
 
 Tests — new `tests/aiNaval.test.ts` with targeted scenario maps (water + coast +
 settlements; helpers similar to `tests/ai.test.ts` but with water tiles):
