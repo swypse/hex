@@ -237,3 +237,38 @@ describe('Naval boarding', () => {
     expect(actions.some((a) => a.type === 'move' && a.unitId === 'crew')).toBe(false);
   });
 });
+
+describe('Naval hunting', () => {
+  it('sails a ship into firing range of a pirate and attacks without stopping adjacent', () => {
+    const map = makeTestMap(6);
+    // Continuous water row r=0: ship at (0,0), pirate at (3,0). The ship has
+    // move 2 and attack range 2, so the only reachable firing tile is (1,0)
+    // (distance 2 from the pirate). It must NOT stop at (2,0), which is
+    // adjacent to the pirate and invites a capture attempt. The pirate is at
+    // full strength so the generic favorable-trade check would refuse to fire;
+    // only the dedicated naval-hunt pattern engages it.
+    for (let q = 0; q <= 3; q++) tileAt(map, q, 0)!.terrain = TileType.Water;
+    const p = pirate('p1', 3, 0);
+    p.hp = 150;
+    tileAt(map, 3, 0)!.unit = p;
+    tileAt(map, 0, 0)!.unit = shipUnit('ship1', 1, 0, 0);
+    const player = aiPlayer({
+      skills: ['water', 'navigation'],
+      resources: { wood: 0, stone: 0, money: 100, ore: 0 },
+    });
+    const actions = planAiActions(map, player, new SeededRandom(1), 'capture');
+    const moveIdx = actions.findIndex((a) => a.type === 'move' && a.unitId === 'ship1');
+    const attackIdx = actions.findIndex((a) => a.type === 'attack' && a.unitId === 'ship1');
+    expect(moveIdx).toBeGreaterThanOrEqual(0);
+    expect(attackIdx).toBe(moveIdx + 1);
+    const move = actions[moveIdx]!;
+    if (move.type === 'move') {
+      expect(hexDistance({ q: move.q, r: move.r }, { q: 3, r: 0 })).toBe(2);
+    }
+    const attack = actions[attackIdx]!;
+    if (attack.type === 'attack') {
+      expect(attack.q).toBe(3);
+      expect(attack.r).toBe(0);
+    }
+  });
+});

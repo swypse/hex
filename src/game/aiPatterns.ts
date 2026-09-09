@@ -13,6 +13,7 @@ import { isExploredFor } from './explore';
 import { AiAction, AiPlannerState } from './aiTypes';
 import { AiDifficultyProfile } from './aiDifficulty';
 import { AiSituation, coastExposedTile, isMelee, isNavalEnemy } from './aiSituation';
+import { isShip, shipAttackDistance } from './ship';
 
 export interface AiPatternContext {
   map: GameMap;
@@ -821,6 +822,61 @@ export const AI_PATTERNS: AiPattern[] = [
       }
       if (!best) return null;
       return [{ type: 'move', unitId: best.unit.id, q: best.step.q, r: best.step.r }];
+    },
+  },
+  {
+    id: 'naval-hunt',
+    priority: 75,
+    evaluate({ map, player, state, situation }): AiAction[] | null {
+      if (!situation || !situation.navalThreat) return null;
+      if (situation.navalEnemies.length === 0) return null;
+      const pirates = situation.navalEnemies.filter((e) => e.unit.type === 'pirate');
+      const safeTile = (c: MapTile): boolean => !pirates.some((p) => hexDistance(c, p.tile) < 2);
+      const canClimb = hasSkill(player, 'climbing');
+      let best: { action: AiAction[]; score: number } | null = null;
+      for (const t of map.tiles) {
+        const ship = t.unit;
+        if (!ship || ship.owner !== player.index || ship.shipLevel === undefined) continue;
+        if (state.acted.has(ship.id) || state.moved.has(ship.id)) continue;
+        const range = shipAttackDistance(ship);
+        for (const e of situation.navalEnemies) {
+          const enemyTile = e.tile;
+          if (!enemyTile.unit) continue;
+          const dist = hexDistance(ship, enemyTile);
+          if (dist >= 2 && dist <= range) {
+            const score = 600 - dist * 10;
+            if (!best || score > best.score) {
+              best = { action: [{ type: 'attack', unitId: ship.id, q: enemyTile.q, r: enemyTile.r }], score };
+            }
+            continue;
+          }
+          for (const c of reachableTargets(map, ship, undefined, canClimb, true, player.index)) {
+            if (state.occupied.has(key(c.q, c.r))) continue;
+            if (!safeTile(c)) continue;
+            const nd = hexDistance(c, enemyTile);
+            const moveDist = hexDistance(ship, c);
+            if (nd >= 2 && nd <= range) {
+              const score = 550 - nd * 10 - moveDist;
+              if (!best || score > best.score) {
+                best = {
+                  action: [
+                    { type: 'move', unitId: ship.id, q: c.q, r: c.r },
+                    { type: 'attack', unitId: ship.id, q: enemyTile.q, r: enemyTile.r },
+                  ],
+                  score,
+                };
+              }
+            } else if (nd < dist && nd >= 2) {
+              const score = 250 - nd * 10 - moveDist;
+              if (!best || score > best.score) {
+                best = { action: [{ type: 'move', unitId: ship.id, q: c.q, r: c.r }], score };
+              }
+            }
+          }
+        }
+      }
+      if (!best) return null;
+      return best.action;
     },
   },
   {
