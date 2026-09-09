@@ -142,3 +142,57 @@ describe('Naval skill priority', () => {
     if (firstSkill && firstSkill.type === 'openSkill') expect(firstSkill.skill).toBe('forestry');
   });
 });
+
+describe('Naval port building', () => {
+  it('builds a port on the threatened coast when Water is known', () => {
+    const map = makeTestMap(6);
+    // Owned coast: land (0,0) with the AI settlement (so a naval threat is
+    // detected) + water (1,0), with the pirate further out.
+    tileAt(map, 0, 0)!.ownedBy = 1;
+    tileAt(map, 0, 0)!.settlement = { owner: 1, level: 1, captureReady: false };
+    tileAt(map, 1, 0)!.terrain = TileType.Water;
+    tileAt(map, 1, 0)!.ownedBy = 1;
+    tileAt(map, 4, 0)!.terrain = TileType.Water;
+    tileAt(map, 4, 0)!.unit = pirate('p1', 4, 0);
+    const player = aiPlayer({
+      skills: ['water'],
+      resources: { wood: 20, stone: 0, money: 100, ore: 5 },
+    });
+    const actions = planAiActions(map, player, new SeededRandom(1), 'capture');
+    const build = actions.find((a) => a.type === 'build');
+    expect(build).toBeDefined();
+    if (build && build.type === 'build') {
+      expect(build.kind).toBe('port');
+      expect(build.q).toBe(1);
+      expect(build.r).toBe(0);
+    }
+  });
+
+  it('builds the port on the coast nearest the pirate when several are possible', () => {
+    const map = makeTestMap(6);
+    tileAt(map, 0, 0)!.ownedBy = 1;
+    tileAt(map, 0, 0)!.settlement = { owner: 1, level: 1, captureReady: false };
+    // Two candidate own-coast water tiles: (1,0) next to the settlement and
+    // (0,2) next to owned land (0,1).
+    tileAt(map, 1, 0)!.terrain = TileType.Water;
+    tileAt(map, 1, 0)!.ownedBy = 1;
+    tileAt(map, 0, 1)!.ownedBy = 1;
+    tileAt(map, 0, 2)!.terrain = TileType.Water;
+    tileAt(map, 0, 2)!.ownedBy = 1;
+    // Pirate is closer to (0,2) than to (1,0).
+    tileAt(map, 0, 4)!.terrain = TileType.Water;
+    tileAt(map, 0, 4)!.unit = pirate('p1', 0, 4);
+    const player = aiPlayer({
+      skills: ['water'],
+      resources: { wood: 20, stone: 0, money: 100, ore: 5 },
+    });
+    const actions = planAiActions(map, player, new SeededRandom(1), 'capture');
+    const build = actions.find((a) => a.type === 'build');
+    expect(build).toBeDefined();
+    if (build && build.type === 'build') {
+      expect(build.kind).toBe('port');
+      expect(build.q).toBe(0);
+      expect(build.r).toBe(2);
+    }
+  });
+});

@@ -217,7 +217,7 @@ function bestAvailableAction(
       candidates.push({ score: 500 + jitter(), action: { type: 'build', q: tile.q, r: tile.r, kind: 'mine' } });
     }
     if (canBuildPort(map, tile, player) && canAfford(player.resources, BUILDING_COSTS.port)) {
-      if (!reserveLastSlotForMine(map, player, tile)) {
+      if (!reserveLastSlotForMine(map, player, tile) || situation?.navalThreat) {
         candidates.push({ score: 200 + jitter(), action: { type: 'build', q: tile.q, r: tile.r, kind: 'port' } });
       }
     }

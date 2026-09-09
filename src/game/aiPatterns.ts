@@ -7,7 +7,7 @@ import { UNIT_ATTACK_DISTANCE, UNIT_MOVEMENT, UNIT_TYPES, canHeal, HEAL_AMOUNT, 
 import { SeededRandom } from '../util/random';
 import { hexDistance, hexNeighbors } from './hex';
 import { attackableTargets, attackDamage, tradeIsFavorable } from './combat';
-import { canBuildSawmill, canBuildMine, BUILDING_COSTS } from './buildings';
+import { canBuildPort, canBuildSawmill, canBuildMine, BUILDING_COSTS } from './buildings';
 import { unitsInVillage, villageCapacity } from './village';
 import { isExploredFor } from './explore';
 import { AiAction, AiPlannerState } from './aiTypes';
@@ -747,6 +747,29 @@ export const AI_PATTERNS: AiPattern[] = [
         if (canOpenSkill(player, skill)) return [{ type: 'openSkill', skill }];
       }
       return null;
+    },
+  },
+  {
+    id: 'naval-build-port',
+    priority: 77,
+    evaluate({ map, player, state, situation }): AiAction[] | null {
+      if (!situation || !situation.navalThreat || !situation.nearestNaval) return null;
+      if (!hasSkill(player, 'water')) return null;
+      const naval = situation.nearestNaval;
+      let best: MapTile | null = null;
+      let bestDist = Infinity;
+      for (const tile of map.tiles) {
+        if (state.built.has(key(tile.q, tile.r))) continue;
+        if (!canBuildPort(map, tile, player)) continue;
+        if (!canAfford(player.resources, BUILDING_COSTS.port)) continue;
+        const d = hexDistance(tile, naval.tile);
+        if (d < bestDist) {
+          bestDist = d;
+          best = tile;
+        }
+      }
+      if (!best) return null;
+      return [{ type: 'build', q: best.q, r: best.r, kind: 'port' }];
     },
   },
   {
