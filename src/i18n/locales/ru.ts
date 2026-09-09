@@ -95,6 +95,7 @@ export default {
   'msg.cheatResources': '+100 к каждому ресурсу (чит)',
   'msg.cheatSkills': 'Открыты все навыки (чит)',
   'msg.cheatFog': 'Карта открыта (чит)',
+  'msg.cheatPirates': '5 пиратских кораблей у племён ИИ (чит)',
 
   // Achievements
   'ach.title': 'Достижения',

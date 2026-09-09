@@ -6,6 +6,7 @@ import {
   RESOURCE_CHEAT_WORD,
   SKILLS_CHEAT_WORD,
   FOG_CHEAT_WORD,
+  PIRATES_CHEAT_WORD,
 } from '../src/game/cheats';
 
 function type(word: string, buffer = ''): string {
@@ -30,6 +31,13 @@ describe('cheat code buffer', () => {
     const buffer = type('fog');
     expect(buffer).toBe(FOG_CHEAT_WORD);
     expect(triggeredCheat(type('abcxfog'))).toBe(FOG_CHEAT_WORD);
+  });
+
+  it('triggers the pirates cheat', () => {
+    const buffer = type('pirates');
+    expect(buffer).toBe(PIRATES_CHEAT_WORD);
+    expect(triggeredCheat(type('xxpirates'))).toBe(PIRATES_CHEAT_WORD);
+    expect(cheatCodeTriggered(type('pira'))).toBe(false);
   });
 
   it('does not trigger on a partial word', () => {

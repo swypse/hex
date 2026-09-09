@@ -95,6 +95,7 @@ export default {
   'msg.cheatResources': '+100 of each resource (cheat)',
   'msg.cheatSkills': 'All skills unlocked (cheat)',
   'msg.cheatFog': 'Map revealed (cheat)',
+  'msg.cheatPirates': '5 pirate ships spawned near AI tribes (cheat)',
 
   // Achievements
   'ach.title': 'Achievements',

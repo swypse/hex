@@ -2,7 +2,7 @@ import { Container, Graphics } from 'pixi.js';
 import { gameController } from '../../controller/gameController';
 import { useGameStore } from '../../store/gameStore';
 import { t } from '../../i18n';
-import { advanceCheatBuffer, triggeredCheat, SKILLS_CHEAT_WORD, RESOURCE_CHEAT_WORD, FOG_CHEAT_WORD } from '../../game/cheats';
+import { advanceCheatBuffer, triggeredCheat, SKILLS_CHEAT_WORD, RESOURCE_CHEAT_WORD, FOG_CHEAT_WORD, PIRATES_CHEAT_WORD } from '../../game/cheats';
 import { type ScreenController, type UIHost, type Widget } from '../host';
 import { HudScore } from '../hud/HudScore';
 import { HudPlayers } from '../hud/HudPlayers';
@@ -43,6 +43,8 @@ export class GameScreen implements ScreenController {
       useGameStore.getState().setCenterMessage(t('msg.cheatSkills'));
     } else if (cheat === FOG_CHEAT_WORD && gameController.cheatRemoveFog()) {
       useGameStore.getState().setCenterMessage(t('msg.cheatFog'));
+    } else if (cheat === PIRATES_CHEAT_WORD && gameController.cheatSpawnPirates()) {
+      useGameStore.getState().setCenterMessage(t('msg.cheatPirates'));
     }
   };
 

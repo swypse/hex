@@ -4,14 +4,14 @@ import { localizeVillageName } from '../i18n/lists';
 import { GameStateSnapshot } from '../game/state';
 import { GameEvent, BuildingKind } from '../game/events';
 import type { HostMessage } from '../net/peerSession';
-import { axialKey, hexToPixel } from '../game/hex';
-import { TileType } from '../game/tileTypes';
-import { generateMap, type GameMap, type MapSize } from '../game/mapGen';
+import { axialKey, hexDistance, hexToPixel } from '../game/hex';
+import { TileType, isWaterType } from '../game/tileTypes';
+import { generateMap, type GameMap, type MapSize, type MapTile } from '../game/mapGen';
 import { buildPlayers } from '../game/players';
 import { AiDifficulty, DEFAULT_AI_DIFFICULTY } from '../game/aiDifficulty';
 import { hasSkill, SKILLS, SkillId } from '../game/skills';
 import { attackableTargets } from '../game/combat';
-import { moveRange, canMove, canAttack, canDisband, type UnitType } from '../game/units';
+import { moveRange, canMove, canAttack, canDisband, makeUnit, PIRATE_OWNER, type Unit, type UnitType } from '../game/units';
 import { cycleSelection, reachableTargets, tileAt } from '../game/selection';
 import { type GameMode } from '../game/gameMode';
 import { isExploredFor, initialExplorationFor } from '../game/explore';
@@ -789,6 +789,82 @@ class GameController {
     }
     const tribes = this.sim.players.filter((p) => p.index !== local.index).map((p) => p.tribe);
     local.knownTribes = Array.from(new Set([...(local.knownTribes ?? []), ...tribes]));
+    this.syncStore();
+    this.saveGame();
+    this.render();
+    return true;
+  }
+
+  /** Distance from `tile` to the AI's nearest own unit, settlement or port. */
+  private nearestAiAssetDistance(aiIndex: number, tile: { q: number; r: number }): number {
+    const map = this.sim!.map;
+    let best = Infinity;
+    for (const t of map.tiles) {
+      const ownUnit = t.unit !== null && t.unit.owner === aiIndex;
+      const ownSettlement = t.settlement !== null && t.settlement.owner === aiIndex;
+      const ownPort = t.building !== null && t.building.kind === 'port' && t.ownedBy === aiIndex;
+      if (ownUnit || ownSettlement || ownPort) {
+        const d = hexDistance(tile, t);
+        if (d < best) best = d;
+      }
+    }
+    return best;
+  }
+
+  /** Pick an empty water tile the AI can see near its territory, falling back
+   *  to any empty water tile. */
+  private pirateSpawnTileFor(aiIndex: number): MapTile | null {
+    const map = this.sim!.map;
+    const water = map.tiles.filter(
+      (t) => t.terrain === TileType.Water && !t.unit,
+    );
+    const explored = water.filter((t) => (t.exploredBy ?? []).includes(aiIndex));
+    // Prefer water the AI has explored that sits 4-9 hexes from its assets:
+    // close enough to trigger the naval response, far enough not to be an
+    // instant ambush.
+    const near = explored.filter((t) => {
+      const d = this.nearestAiAssetDistance(aiIndex, t);
+      return Number.isFinite(d) && d >= 4 && d <= 9;
+    });
+    const pool = near.length > 0 ? near : explored.length > 0 ? explored : water;
+    if (pool.length === 0) return null;
+    return pool[Math.floor(Math.random() * pool.length)] ?? null;
+  }
+
+  /** Next free pirate unit id (`pirate-N`), matching natural spawn ids. */
+  private nextPirateId(): string {
+    const used = new Set<string>();
+    for (const t of this.sim!.map.tiles) if (t.unit && t.unit.type === 'pirate') used.add(t.unit.id);
+    let n = 1;
+    while (used.has(`pirate-${n}`)) n++;
+    return `pirate-${n}`;
+  }
+
+  /** Cheat (single-player only): spawns 5 pirates near randomly chosen AI
+   *  tribes so their naval response can be observed. Returns true when at
+   *  least one pirate was placed. */
+  cheatSpawnPirates(): boolean {
+    if (!this.sim) return false;
+    const store = useGameStore.getState();
+    if (store.screen !== 'game' || store.netMode !== 'single') return false;
+    const local = this.sim.players[store.localPlayerIndex];
+    if (!local) return false;
+    const ais = this.sim.players.filter(
+      (p) => p.index !== local.index && p.isActive && !p.isHuman,
+    );
+    if (ais.length === 0) return false;
+    const map = this.sim.map;
+    let spawned = 0;
+    for (let i = 0; i < 5; i++) {
+      const ai = ais[Math.floor(Math.random() * ais.length)]!;
+      const tile = this.pirateSpawnTileFor(ai.index);
+      if (!tile) continue;
+      tile.unit = makeUnit(PIRATE_OWNER, 'pirate', tile.q, tile.r, {
+        id: this.nextPirateId(),
+      });
+      spawned++;
+    }
+    if (spawned === 0) return false;
     this.syncStore();
     this.saveGame();
     this.render();
