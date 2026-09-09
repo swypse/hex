@@ -901,7 +901,7 @@ export const AI_PATTERNS: AiPattern[] = [
   },
   {
     id: 'explore-frontier',
-    priority: 75,
+    priority: 70,
     evaluate({ map, player, state }): AiAction[] | null {
       const canClimb = hasSkill(player, 'climbing');
       const canDock = hasSkill(player, 'navigation');
