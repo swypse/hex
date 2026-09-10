@@ -26,7 +26,17 @@ export function villageMaintenance(map: GameMap, villageTile: MapTile): number {
   return upkeep;
 }
 
+/** True when a hostile unit currently stands on the village tile, blocking
+ *  its money income and the income of buildings on its territory. */
+export function villageEnemyOccupied(villageTile: MapTile): boolean {
+  const owner = villageTile.settlement?.owner;
+  if (owner === null || owner === undefined) return false;
+  const u = villageTile.unit;
+  return u !== null && u.owner !== owner;
+}
+
 export function villageIncome(map: GameMap, villageTile: MapTile): number {
+  if (villageEnemyOccupied(villageTile)) return 0;
   const level = villageTile.settlement!.level;
   const base = 3 + level * 2;
   return Math.max(0, base - villageMaintenance(map, villageTile));

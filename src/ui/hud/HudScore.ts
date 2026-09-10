@@ -24,6 +24,7 @@ export class HudScore implements Widget {
   private unsub: (() => void) | null = null;
   private lastScore = 0;
   private tooltip: Tooltip | null = null;
+  private bounceRemove: (() => void) | null = null;
 
   mount(host: UIHost, root: Container): void {
     this.host = host;
@@ -116,6 +117,7 @@ export class HudScore implements Widget {
 
   private bounce(): void {
     if (!this.host || !this.el) return;
+    this.stopBounce();
     const start = performance.now();
     const fn = (): void => {
       const t = Math.min(1, (performance.now() - start) / 300);
@@ -124,14 +126,24 @@ export class HudScore implements Widget {
       if (t >= 1) {
         this.el!.scale.set(1, 1);
         this.host!.app.ticker.remove(fn);
+        this.bounceRemove = null;
       }
     };
     this.host.app.ticker.add(fn);
+    this.bounceRemove = () => this.host!.app.ticker.remove(fn);
+  }
+
+  private stopBounce(): void {
+    if (this.bounceRemove) {
+      this.bounceRemove();
+      this.bounceRemove = null;
+    }
   }
 
   destroy(): void {
     if (this.unsub) this.unsub();
     window.removeEventListener('resize', this.layout);
+    this.stopBounce();
     this.tooltip?.destroy();
     this.tooltip = null;
     this.unsub = null;

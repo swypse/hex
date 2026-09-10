@@ -11,7 +11,6 @@ export interface IconButtonOpts {
   color?: number;
   hoverColor?: number;
   pressedColor?: number;
-  borderColor?: number;
   borderWidth?: number;
   disabledAlpha?: number;
   transparentDisabled?: boolean;
@@ -25,7 +24,6 @@ export class IconButton extends Container {
   private readonly baseColor: number;
   private readonly hoverColor: number;
   private readonly pressedColor: number;
-  private readonly borderColor: number;
   private readonly borderWidth: number;
   private readonly disabledAlpha: number;
   private readonly transparentDisabled: boolean;
@@ -40,7 +38,6 @@ export class IconButton extends Container {
     this.baseColor = opts.color ?? THEME.button;
     this.hoverColor = opts.hoverColor ?? THEME.buttonHover;
     this.pressedColor = opts.pressedColor ?? THEME.buttonPressed;
-    this.borderColor = opts.borderColor ?? THEME.highlight;
     this.borderWidth = opts.borderWidth ?? 2;
     this.disabledAlpha = opts.disabledAlpha ?? 0.5;
     this.transparentDisabled = opts.transparentDisabled ?? false;
@@ -63,35 +60,34 @@ export class IconButton extends Container {
     this.disabled = opts.disabled ?? false;
   }
 
-  private redraw(fill: number, ring: boolean): void {
+  private redraw(fill: number): void {
     this.bg.clear().circle(this.size / 2, this.size / 2, this.size / 2).fill(fill);
-    if (ring && this.borderWidth > 0) this.bg.stroke({ width: this.borderWidth, color: this.borderColor, alignment: 0 });
   }
 
   private redrawDisabled(): void {
     if (this.transparentDisabled) {
       this.bg.clear().circle(this.size / 2, this.size / 2, this.size / 2).fill({ color: 0xffffff, alpha: 0 });
     } else {
-      this.redraw(this.baseColor, false);
+      this.redraw(this.baseColor);
     }
   }
 
   private onOver = (): void => {
     this._hover = true;
-    if (!this._disabled) this.redraw(this.hoverColor, true);
+    if (!this._disabled) this.redraw(this.hoverColor);
   };
   private onOut = (): void => {
     this._hover = false;
-    if (!this._disabled) this.redraw(this.baseColor, false);
+    if (!this._disabled) this.redraw(this.baseColor);
   };
   private onDown = (): void => {
-    if (!this._disabled) this.redraw(this.pressedColor, true);
+    if (!this._disabled) this.redraw(this.pressedColor);
   };
   private onUp = (): void => {
     if (this._disabled) {
       this.redrawDisabled();
     } else {
-      this.redraw(this._hover ? this.hoverColor : this.baseColor, this._hover);
+      this.redraw(this._hover ? this.hoverColor : this.baseColor);
     }
   };
   private onTap = (): void => {

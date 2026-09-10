@@ -9,6 +9,13 @@ export interface WebSocketLike {
   onerror: (() => void) | null;
 }
 
+export interface RelaySessionOptions {
+  /** Once in a game, keep retrying for ~5 min instead of the short lobby cap. */
+  inGame?: boolean;
+  /** Override the retry interval (tests use small values). */
+  retryDelayMs?: number;
+}
+
 export interface RelayHostEvents {
   onReady: () => void;
   onClientJoined: (clientId: string) => void;
@@ -47,6 +54,10 @@ type ServerMessage =
   | { type: 'data'; from: string; data: unknown };
 
 const MAX_ATTEMPTS = 12;
+/** Once a game has started a client keeps trying to reach the host for ~5
+ *  minutes (transient drops, e.g. host laptop sleep), instead of the short
+ *  lobby cap. */
+const MAX_ATTEMPTS_IN_GAME = 300;
 const RETRY_DELAY_MS = 1000;
 
 abstract class RelaySessionBase {
@@ -56,11 +67,17 @@ abstract class RelaySessionBase {
   protected closed = false;
   protected attempts = 0;
   protected retryTimer: ReturnType<typeof setTimeout> | null = null;
+  protected inGame = false;
+  protected retryDelayMs: number | undefined;
 
   constructor(
     protected readonly url: string = relayUrl(),
     protected readonly createSocket: (url: string) => WebSocketLike = defaultWebSocket,
-  ) {}
+    protected readonly opts: RelaySessionOptions = {},
+  ) {
+    this.inGame = opts.inGame ?? false;
+    this.retryDelayMs = opts.retryDelayMs;
+  }
 
   protected openSocket(): void {
     if (this.closed) return;
@@ -98,7 +115,8 @@ abstract class RelaySessionBase {
 
   protected scheduleRetry(fn: () => void): void {
     if (this.closed || this.retryTimer) return;
-    if (this.attempts >= MAX_ATTEMPTS) {
+    const maxAttempts = this.inGame ? MAX_ATTEMPTS_IN_GAME : MAX_ATTEMPTS;
+    if (this.attempts >= maxAttempts) {
       console.error(`[relay:${this.roleName}] giving up after ${this.attempts} attempts`);
       this.fail(new Error('Could not reach the game server. Check your connection and try again.'));
       return;
@@ -107,7 +125,7 @@ abstract class RelaySessionBase {
     this.retryTimer = setTimeout(() => {
       this.retryTimer = null;
       fn();
-    }, RETRY_DELAY_MS);
+    }, this.retryDelayMs ?? RETRY_DELAY_MS);
   }
 
   protected clearRetry(): void {
@@ -234,13 +252,20 @@ export class RelayClientSession extends RelaySessionBase {
     private readonly events: RelayClientEvents,
     url?: string,
     createSocket?: (url: string) => WebSocketLike,
+    opts?: RelaySessionOptions,
   ) {
-    super(url, createSocket);
+    super(url, createSocket, opts);
     this.roleName = 'client';
   }
 
   getPeerId(): string | null {
     return this.selfId;
+  }
+
+  /** Called once a game has started so reconnect retries wait much longer
+   *  (transient host drops) instead of giving up at the lobby cap. */
+  setInGame(v: boolean): void {
+    this.inGame = v;
   }
 
   join(code: string, name: string): void {

@@ -174,6 +174,23 @@ describe('villageIncome', () => {
     map.tiles.push(foreign);
     expect(villageIncome(map, village)).toBe(5);
   });
+
+  it('yields nothing while an enemy unit stands on the village itself', () => {
+    const { map, village } = mapWithVillage(3); // base 9
+    const enemy = makeUnit('e', 1, 0, 0);
+    enemy.spawnVillage = null;
+    village.unit = enemy;
+    expect(villageIncome(map, village)).toBe(0);
+  });
+
+  it('respects the owner after the enemy leaves', () => {
+    const { map, village } = mapWithVillage(1); // base 5
+    const enemy = makeUnit('e', 1, 0, 0);
+    village.unit = enemy;
+    expect(villageIncome(map, village)).toBe(0);
+    village.unit = null;
+    expect(villageIncome(map, village)).toBe(5);
+  });
 });
 
 describe('villageIncomeTotal', () => {

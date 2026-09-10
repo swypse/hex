@@ -11,6 +11,7 @@ import { buildMultiplayerPlayers } from '../src/game/players';
 import { initialExplorationFor } from '../src/game/explore';
 import { SeededRandom } from '../src/util/random';
 import { type TextureSet, type TileTexture } from '../src/render/textureFactory';
+import { villageTexturesForTest } from './helpers/villageTextures';
 
 const HEX = 40;
 const TEX_H = 100;
@@ -40,10 +41,10 @@ function buildTextures(map: GameMap): TextureSet {
     tileTextures: new Map(map.tiles.map((t) => [axialKey(t), tileTex(50, 50)])),
     fogTextures: new Map(map.tiles.map((t) => [axialKey(t), tileTex(50, 50)])),
     fogTopTexture: tileTex(50, 50),
-    villageTextures: {
-      level1: { texture: tex(40, 40), anchorY: 0.7 },
-      level2: { texture: tex(50, 50), anchorY: 0.75 },
-    },
+    villageTextures: villageTexturesForTest(
+      { texture: tex(40, 40), anchorY: 0.7 },
+      { texture: tex(50, 50), anchorY: 0.75 },
+    ),
     freeVillageTexture: tileTex(30, 30),
     unitTextures,
     pirateTexture: unitTex,
@@ -109,12 +110,12 @@ describe('village texture anchor across lifecycle', () => {
     settlement.owner = 0;
     view.update(map, pl, null, new Set(), new Set(), 0, new Set(), viewport);
     sprite = villageSprite(view, tile)!;
-    expect(sprite.anchor.y).toBe(textures.villageTextures.level1.anchorY);
+    expect(sprite.anchor.y).toBe(textures.villageTextures[Tribe.Cats].level1.anchorY);
 
     // Upgrade to level 2: anchor should follow the level2 texture anchor.
     settlement.level = 2;
     view.update(map, pl, null, new Set(), new Set(), 0, new Set(), viewport);
     sprite = villageSprite(view, tile)!;
-    expect(sprite.anchor.y).toBe(textures.villageTextures.level2.anchorY);
+    expect(sprite.anchor.y).toBe(textures.villageTextures[Tribe.Cats].level2.anchorY);
   });
 });

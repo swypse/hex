@@ -24,7 +24,6 @@ import { createTextures } from '../render/textureFactory';
 import { useGameStore } from '../store/gameStore';
 import { TOOLBAR_HEIGHT, isWideScreen } from '../ui/layout';
 import { saveRepository } from '../storage/saveGame';
-import { attackConfirmationEnabled } from '../storage/settings';
 import { sfx } from '../sound/sfx';
 import { SeededRandom } from '../util/random';
 import { setAiLogging, aiLoggingEnabled } from '../game/ai';
@@ -519,6 +518,8 @@ class GameController {
     this.mapView.container.scale.set(scale, scale);
     this.mapView.container.position.set(camera.pan.x, camera.pan.y);
     this.mapView.container.hitArea = camera.viewportRect();
+    this.mapView.markerLayer.scale.set(scale, scale);
+    this.mapView.markerLayer.position.set(camera.pan.x, camera.pan.y);
     for (const item of this.overlayItems) {
       item.el.position.set(camera.pan.x + item.world.x * scale, camera.pan.y + item.world.y * scale);
     }
@@ -581,6 +582,7 @@ class GameController {
     if (!this.sim || !this.app) return;
     const store = useGameStore.getState();
     if (store.gameOver) return;
+    if (store.paused) return;
     const canAct = !store.aiActive;
     const tile = tileAt(this.sim.map, q, r);
     if (!tile) return;
@@ -596,11 +598,7 @@ class GameController {
     if (selection && selection.kind === 'unit' && canAct) {
       const unit = tileAt(this.sim.map, selection.q, selection.r)?.unit;
       if (unit && unit.owner === store.localPlayerIndex && this.attackableKeys.has(axialKey(tile))) {
-        if (attackConfirmationEnabled()) {
-          store.setOverlay({ kind: 'confirm', target: { q, r } });
-          return;
-        }
-        // Confirmation disabled: attack immediately.
+        // Attack immediately, no confirmation dialog.
         store.setSelection(null);
         this.sendCommand({ type: 'attack', unitId: unit.id, q, r });
         return;
@@ -641,18 +639,6 @@ class GameController {
     this.upgradeSelectedVillage();
   }
 
-  confirmAttack(): void {
-    const store = useGameStore.getState();
-    const pending = store.overlay?.kind === 'confirm' ? store.overlay.target : null;
-    const selection = store.selection;
-    store.setOverlay(null);
-    if (!pending || !selection || selection.kind !== 'unit' || !this.sim) return;
-    const unit = tileAt(this.sim.map, selection.q, selection.r)!.unit;
-    if (!unit) return;
-    this.sendCommand({ type: 'attack', unitId: unit.id, q: pending.q, r: pending.r });
-    store.setSelection(null);
-  }
-
   spawnSelectedVillage(type: UnitType): void {
     const store = useGameStore.getState();
     if (store.aiActive) return;
@@ -666,9 +652,9 @@ class GameController {
     const store = useGameStore.getState();
     if (store.aiActive) return;
     const selection = store.selection;
-    if (!selection || selection.kind !== 'unit' || !this.sim) return;
-    const unit = tileAt(this.sim.map, selection.q, selection.r)!.unit;
-    if (!unit) return;
+    if (!selection || !this.sim) return;
+    const unit = tileAt(this.sim.map, selection.q, selection.r)?.unit;
+    if (!unit || unit.owner !== store.localPlayerIndex) return;
     this.sendCommand({ type: 'heal', unitId: unit.id });
     store.setSelection(null);
   }
@@ -898,13 +884,9 @@ class GameController {
     useGameStore.getState().setOverlay(null);
   }
 
-  cancelAttack(): void {
-    useGameStore.getState().setOverlay(null);
-  }
-
   endTurn(): void {
     const store = useGameStore.getState();
-    if (store.aiActive || store.gameOver) return;
+    if (store.aiActive || store.gameOver || store.paused) return;
     store.setAiActive(true);
     this.sendCommand({ type: 'endTurn' });
   }
@@ -927,6 +909,31 @@ class GameController {
 
   handleClientClosed(peerId: string): void {
     this.getNetwork().handleClientClosed(peerId);
+  }
+
+  /** Host: dismiss the disconnect modal but keep the game paused (wait). */
+  waitForDisconnected(): void {
+    this.getNetwork().waitForDisconnected();
+  }
+
+  /** Host: hand the offline player's seat to the AI and resume. */
+  giveDisconnectedToAI(): Promise<void> {
+    const index = this.getNetwork().offlinePlayerIndex();
+    if (index === null) {
+      useGameStore.getState().setPaused(null);
+      return Promise.resolve();
+    }
+    return this.getNetwork().giveDisconnectedToAI(index);
+  }
+
+  /** Host: forfeit the offline player and resume. */
+  forfeitDisconnected(): Promise<void> {
+    const index = this.getNetwork().offlinePlayerIndex();
+    if (index === null) {
+      useGameStore.getState().setPaused(null);
+      return Promise.resolve();
+    }
+    return this.getNetwork().forfeitDisconnected(index);
   }
 
   joinGame(code: string, name: string): void {
@@ -1018,6 +1025,7 @@ class GameController {
       });
       this.mapRoot!.addChild(this.mapView.container);
       this.mapRoot!.addChild(this.mapView.overlay);
+      this.mapRoot!.addChild(this.mapView.markerLayer);
       if (this.edgeLayerTarget) this.mapView.attachEdgeLayerTo(this.edgeLayerTarget);
     }
 

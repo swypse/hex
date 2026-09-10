@@ -64,6 +64,12 @@ const BRIDGE_IMAGE_FILES: Record<BridgeDir, string> = {
 };
 const VILLAGE_IMAGE_FILE = 'village.png';
 const VILLAGE_LEVEL2_IMAGE_FILE = 'village-2.png';
+
+/** Tribe-specific owned-village texture files. Only tribes with bespoke files
+ *  are listed; every other tribe uses the generic `village*.png` textures. */
+const VILLAGE_TRIBE_FILES: Partial<Record<Tribe, { level1: string; level2: string }>> = {
+  [Tribe.Cats]: { level1: 'village-cats.png', level2: 'village-cats-2.png' },
+};
 const CAPTURE_IMAGE_FILE = 'capture-map.png';
 const PIRATE_IMAGE_FILE = 'pirates-ship.png';
 
@@ -103,7 +109,8 @@ export interface TextureSet {
   tileTextures: Map<string, TileTexture>;
   fogTextures: Map<string, TileTexture>;
   fogTopTexture: TileTexture;
-  villageTextures: { level1: TileTexture; level2: TileTexture };
+  /** Owned village textures per tribe, resolved by the settlement owner's tribe. */
+  villageTextures: Record<Tribe, { level1: TileTexture; level2: TileTexture }>;
   freeVillageTexture: TileTexture;
   bonusTexture: TileTexture;
   unitTextures: Record<Tribe, Record<UnitType, TileTexture>>;
@@ -383,13 +390,22 @@ export async function createTextures(app: Application, map: GameMap, hexSize = 4
       ),
     );
   }
-  const villageTexture1 =
+  const genericVillage1 =
     makeUnitImageTexture(app, await loadImageTexture(TEXTURE_BASE + VILLAGE_IMAGE_FILE), hexSize) ??
     { texture: makeVillageTexture(app, 0x9a9a9a, hexSize), anchorY: 1 };
-  const villageTexture2 =
+  const genericVillage2 =
     makeUnitImageTexture(app, await loadImageTexture(TEXTURE_BASE + VILLAGE_LEVEL2_IMAGE_FILE), hexSize) ??
     { texture: makeVillageTexture(app, 0x6a6a6a, hexSize), anchorY: 1 };
-  const villageTextures = { level1: villageTexture1, level2: villageTexture2 };
+  const villageTextures = {} as Record<Tribe, { level1: TileTexture; level2: TileTexture }>;
+  for (const tribe of TRIBES) {
+    const files = VILLAGE_TRIBE_FILES[tribe.id];
+    const lvl1 = files ? await loadImageTexture(TEXTURE_BASE + files.level1) : null;
+    const lvl2 = files ? await loadImageTexture(TEXTURE_BASE + files.level2) : null;
+    villageTextures[tribe.id] = {
+      level1: (lvl1 ? makeUnitImageTexture(app, lvl1, hexSize) : null) ?? genericVillage1,
+      level2: (lvl2 ? makeUnitImageTexture(app, lvl2, hexSize) : null) ?? genericVillage2,
+    };
+  }
   const unitTextures = {} as Record<Tribe, Record<UnitType, TileTexture>>;
   for (const tribe of TRIBES) {
     const perTribe = {} as Record<UnitType, TileTexture>;

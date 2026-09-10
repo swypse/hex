@@ -23,6 +23,9 @@ export function canBuildRoad(map: GameMap, tile: MapTile, player: Player): boole
  *  the Roads skill or the money to pay for it (used by the open-Roads hint). */
 export function canBuildRoadHere(map: GameMap, tile: MapTile, player: Player): boolean {
   if (tile.roadOwner !== null && tile.roadOwner !== undefined) return false;
+  // Roads may only cross the player's own or unclaimed territory, never an
+  // enemy's.
+  if (tile.ownedBy !== null && tile.ownedBy !== player.index) return false;
   if (isWaterType(tile.terrain)) return false;
   if (tile.settlement !== null) return false;
   if (tile.building !== null && tile.building.kind === 'port') return false;

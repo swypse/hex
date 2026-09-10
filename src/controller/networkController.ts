@@ -50,8 +50,11 @@ export class NetworkController {
   hostConfig: { mode: GameMode; totalPlayers: number; aiCount: number; mapSize: MapSize } | null = null;
   clientSession: RelayClientSession | null = null;
   clientName = '';
-  private hostStarted = false;
+  hostStarted = false;
   private canceled = false;
+  /** Seats handed to the AI after a disconnect. If the owner rejoins they are
+   *  flipped back to human and take the seat over again. */
+  private aiTakeoverSeats = new Set<number>();
   private pendingClientEvents: GameEvent[] = [];
   private pendingPreExplored: Set<string> | null = null;
   private predictedPending = 0;
@@ -198,12 +201,24 @@ export class NetworkController {
       stripUndefinedValues(events);
       this.hostSession.broadcast({ type: 'events', events });
     }
+    // The turn may have rotated to a player whose connection is still down:
+    // freeze the game so the host can resolve it.
+    this.pauseForDisconnect(sim.currentPlayerIndex);
   }
 
   private bindInGameClient(peerId: string, name: string): void {
     const sim = this.host.sim();
     if (!sim) return;
-    const human = sim.players.find((p) => p.isHuman && p.index !== 0 && p.name === name);
+    let human = sim.players.find((p) => p.isHuman && p.index !== 0 && p.name === name);
+    if (!human) {
+      // A seat that was handed to the AI after a disconnect can be taken back.
+      const takeover = sim.players.find((p) => p.index !== 0 && p.name === name && this.aiTakeoverSeats.has(p.index));
+      if (takeover) {
+        takeover.isHuman = true;
+        this.aiTakeoverSeats.delete(takeover.index);
+        human = takeover;
+      }
+    }
     if (!human) return;
     let entry = this.hostPlayers.find((h) => h.playerIndex === human.index);
     if (entry) {
@@ -219,6 +234,7 @@ export class NetworkController {
     stripUndefinedValues(snap);
     this.hostSession?.sendTo(peerId, { type: 'state', state: snap, playerIndex: human.index });
     this.broadcastPlayersOnline();
+    useGameStore.getState().setPaused(null);
   }
 
   handleClientClosed(peerId: string): void {
@@ -230,7 +246,79 @@ export class NetworkController {
     } else {
       entry.online = false;
       this.broadcastPlayersOnline();
+      this.pauseForDisconnect(entry.playerIndex);
     }
+  }
+
+  /** Freeze the game when it is a just-dropped human player's turn: play
+   *  cannot proceed anyway, and the host can decide to wait / hand the seat to
+   *  the AI / forfeit. */
+  private pauseForDisconnect(playerIndex: number): void {
+    const sim = this.host.sim();
+    const store = useGameStore.getState();
+    if (!this.hostStarted || !sim || store.screen !== 'game') return;
+    if (sim.currentPlayerIndex !== playerIndex) return;
+    const player = sim.players[playerIndex];
+    if (!player || !player.isHuman) return;
+    store.setPaused('disconnect', player.name);
+  }
+
+  /** Host decision: keep waiting — clear the modal but stay paused until the
+   *  player rejoins or the host resolves it. */
+  waitForDisconnected(): void {
+    const store = useGameStore.getState();
+    if (store.paused === 'disconnect') store.setOverlay(null);
+  }
+
+  /** Index of the human player whose seat is currently in a disconnected-pause
+   *  (used by the host's disconnect modal). Null when nothing is paused. */
+  offlinePlayerIndex(): number | null {
+    const sim = this.host.sim();
+    const store = useGameStore.getState();
+    if (store.paused !== 'disconnect' || !sim) return null;
+    for (const p of sim.players) {
+      if (!p.isHuman) continue;
+      const entry = this.hostPlayers.find((h) => h.playerIndex === p.index);
+      if (entry && !entry.online) return p.index;
+    }
+    return null;
+  }
+
+  /** Host decision: hand the dropped player's seat to the AI and resume. */
+  giveDisconnectedToAI(playerIndex: number): Promise<void> {
+    const sim = this.host.sim();
+    if (!sim) return Promise.resolve();
+    return this.host.enqueue(async () => {
+      const pre = this.host.exploredKeysFor(useGameStore.getState().localPlayerIndex);
+      sim.applyCommand({ type: 'giveToAI', playerIndex });
+      this.aiTakeoverSeats.add(playerIndex);
+      const wasCurrent = sim.currentPlayerIndex === playerIndex;
+      if (wasCurrent && !sim.gameOver) sim.applyCommand({ type: 'endTurn' });
+      const events = sim.drainEvents();
+      this.host.syncStore();
+      this.broadcastBatch(events);
+      await this.host.presentEvents(events, pre);
+      this.host.render();
+      useGameStore.getState().setPaused(null);
+    });
+  }
+
+  /** Host decision: forfeit the dropped player (frees their villages/units) and
+   *  resume the game for the rest. */
+  forfeitDisconnected(playerIndex: number): Promise<void> {
+    const sim = this.host.sim();
+    if (!sim) return Promise.resolve();
+    return this.host.enqueue(async () => {
+      const pre = this.host.exploredKeysFor(useGameStore.getState().localPlayerIndex);
+      sim.applyCommand({ type: 'forfeit', playerIndex });
+      if (sim.currentPlayerIndex === playerIndex && !sim.gameOver) sim.applyCommand({ type: 'endTurn' });
+      const events = sim.drainEvents();
+      this.host.syncStore();
+      this.broadcastBatch(events);
+      await this.host.presentEvents(events, pre);
+      this.host.render();
+      useGameStore.getState().setPaused(null);
+    });
   }
 
   private broadcastPlayersOnline(): void {
@@ -334,11 +422,13 @@ export class NetworkController {
         if (this.canceled) return;
         store.setConnection('error');
         store.setConnectionMessage('Disconnected from the host.');
+        this.noteHostDisconnected();
       },
       onError: (err) => {
         if (this.canceled) return;
         store.setConnection('error');
         store.setConnectionMessage(err?.message ?? 'Connection failed.');
+        this.noteHostDisconnected();
       },
     });
     this.clientSession.join(code, name);
@@ -352,6 +442,19 @@ export class NetworkController {
       players: [{ peerId: '', name, tribeId: null, isHost: false, ready: false }],
     });
     store.setScreen('lobby');
+  }
+
+  /** Fired on a relay socket close/error: pause the game while it is running
+   *  so the client waits for the host to return. */
+  noteHostDisconnected(): void {
+    const store = useGameStore.getState();
+    if (store.screen !== 'game' || store.netMode !== 'client') return;
+    if (store.paused === 'disconnect') return;
+    store.setPaused('disconnect', '');
+  }
+
+  private markClientInGame(): void {
+    this.clientSession?.setInGame(true);
   }
 
   cancelLobby(): void {
@@ -399,6 +502,8 @@ export class NetworkController {
         } else {
           this.skipNextEvents = false;
         }
+        this.markClientInGame();
+        useGameStore.getState().setPaused(null);
         this.pendingPreExplored = this.host.exploredKeysFor(store.localPlayerIndex);
         store.setLocalPlayerIndex(msg.playerIndex);
         store.setPendingSnapshot(msg.state);

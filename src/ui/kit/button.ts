@@ -76,7 +76,7 @@ export class Button extends Container {
     this.shadow = opts.shadow ?? true;
     this.corners = opts.corners ?? [THEME.radius, THEME.radius, THEME.radius, THEME.radius];
     this.bg = new Graphics();
-    this.render(THEME.button, false);
+    this.render(THEME.button);
     this.text.position.set((this.w - this.text.width) / 2, (this.h - this.text.height) / 2);
     this.addChild(this.bg, this.text);
     this.eventMode = 'static';
@@ -91,7 +91,7 @@ export class Button extends Container {
     this.selected = opts.selected ?? false;
   }
 
-  private render(fill: number, ring: boolean): void {
+  private render(fill: number): void {
     this.bg.clear();
     const uniform = this.shadow && this.corners[0] === this.corners[1] && this.corners[1] === this.corners[2] && this.corners[2] === this.corners[3];
     if (uniform) {
@@ -102,8 +102,6 @@ export class Button extends Container {
       this.bg.roundRect(0, 0, this.w, this.h, r).fill(fill);
       if (this._selected) {
         this.bg.roundRect(1.5, 1.5, this.w - 3, this.h - 3, r).stroke({ width: 3, color: THEME.white });
-      } else if (ring) {
-        this.bg.roundRect(1, 1, this.w - 2, this.h - 2, r).stroke({ width: 2, color: THEME.highlight });
       }
       return;
     }
@@ -113,41 +111,36 @@ export class Button extends Container {
     }
     traceRoundedRect(this.bg, 0, 0, this.w, this.h, this.corners);
     this.bg.fill(fill);
-    const inset = (s: number, i: number): number => Math.max(0, this.corners[i]! - s);
     if (this._selected) {
+      const inset = (s: number, i: number): number => Math.max(0, this.corners[i]! - s);
       traceRoundedRect(this.bg, 1.5, 1.5, this.w - 3, this.h - 3, [
         inset(1.5, 0), inset(1.5, 1), inset(1.5, 2), inset(1.5, 3),
       ] as ButtonCorners);
       this.bg.stroke({ width: 3, color: THEME.white });
-    } else if (ring) {
-      traceRoundedRect(this.bg, 1, 1, this.w - 2, this.h - 2, [
-        inset(1, 0), inset(1, 1), inset(1, 2), inset(1, 3),
-      ] as ButtonCorners);
-      this.bg.stroke({ width: 2, color: THEME.highlight });
     }
   }
 
   private redraw(): void {
-    this.render(THEME.button, this._selected);
+    this.render(THEME.button);
   }
 
   private onOver = (): void => {
     if (this._disabled) return;
     this._hover = true;
-    this.render(THEME.buttonHover, true);
+    this.render(THEME.buttonHover);
   };
   private onOut = (): void => {
     this._hover = false;
-    this.render(THEME.button, false);
+    this.render(THEME.button);
   };
   private onDown = (): void => {
-    if (!this._disabled) this.render(THEME.buttonPressed, true);
+    if (!this._disabled) this.render(THEME.buttonPressed);
   };
   private onUp = (): void => {
     if (this._disabled) {
-      this.render(THEME.button, false);
+      this.render(THEME.button);
     } else {
-      this.render(this._hover ? THEME.buttonHover : THEME.button, this._hover || this._selected);
+      this.render(this._hover ? THEME.buttonHover : THEME.button);
     }
   };
   private onTap = (): void => {

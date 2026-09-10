@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
 import { WebSocket as WsWebSocket } from 'ws';
 import { createRelayServer, type RelayServerHandle } from '../server/relay.mjs';
 import { RelayHostSession, RelayClientSession, type WebSocketLike } from '../src/net/relaySession';
@@ -147,7 +147,51 @@ describe('WebSocket relay', () => {
     client.close();
   }, 10000);
 
-  it('client reconnects and rejoins when the host goes away and comes back', async () => {
+  it('gives up after the lobby retry cap but keeps trying when inGame is set', async () => {
+    const failures: string[] = [];
+    const makeSocket = (): WebSocketLike => {
+      const like: WebSocketLike = {
+        send: () => {},
+        close: () => {},
+        onopen: null,
+        onmessage: null,
+        onclose: null,
+        onerror: null,
+      };
+      // The socket opens then immediately closes, so the client sees a
+      // permanent drop and retries until its cap.
+      setTimeout(() => {
+        like.onopen?.();
+        setTimeout(() => like.onclose?.(), 1);
+      }, 1);
+      return like;
+    };
+    const make = (inGame: boolean, onFail: () => void): RelayClientSession =>
+      new RelayClientSession(
+        { onRegistered: () => {}, onJoined: () => {}, onData: () => {}, onClose: () => onFail(), onError: () => onFail() },
+        relay.url,
+        makeSocket,
+        { inGame, retryDelayMs: 5 },
+      );
+
+    // Lobby: after 12 attempts the client gives up and reports failure.
+    const lobbyCalled = vi.fn();
+    const lobby = make(false, lobbyCalled);
+    lobby.join('RETRY00', 'G');
+    await new Promise((r) => setTimeout(r, 200));
+    expect(lobbyCalled).toHaveBeenCalled();
+    lobby.close();
+
+    // In-game: same short window should NOT give up (cap is far higher).
+    const gameCalled = vi.fn();
+    const inGame = make(true, gameCalled);
+    inGame.join('RETRY01', 'G');
+    await new Promise((r) => setTimeout(r, 200));
+    expect(gameCalled).not.toHaveBeenCalled();
+    inGame.close();
+    void failures;
+  });
+    it('client reconnects and rejoins when the host goes away and comes back', async () => {
     const host1Ready = deferred();
     const host2Ready = deferred();
     const registrations: string[] = [];

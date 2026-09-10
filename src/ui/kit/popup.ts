@@ -49,11 +49,15 @@ export interface PopupOpts {
   /** For position 'top': distance from the top of the screen to the card. */
   topY?: number;
   onClose?: () => void;
+  /** Called when the interactive card itself is tapped. */
+  onTap?: () => void;
 }
 
 export class Popup {
   /** Root container: [backdrop, card]. Added by the caller to a parent container. */
   readonly el: Container;
+  /** The card container; the area whose taps trigger onTap. */
+  readonly cardEl: Container;
   /** The content group. Add popup content children here (y starts at 0). It is clipped and can scroll. */
   readonly content: Container;
   readonly footer: Container;
@@ -149,9 +153,10 @@ export class Popup {
     this.el.addChild(this.shadow);
 
     this.card = new Container();
+    this.cardEl = this.card;
     const interactive = opts.interactive ?? true;
     this.card.eventMode = interactive ? 'static' : 'none';
-    if (interactive) this.card.on('pointertap', () => {});
+    if (interactive) this.card.on('pointertap', () => opts.onTap?.());
     this.bg = new Graphics();
     this.titleText = opts.title
       ? makeLabel(opts.title, { fontSize: 18, fill: 0xffffff, fontWeight: '700', wordWrap: true, wordWrapWidth: Math.max(120, this.contentWidth) })

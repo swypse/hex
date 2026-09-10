@@ -24,6 +24,7 @@ export function toolbarSpecs(): ToolbarSpec[] {
   const selection = store.selection;
   const map = gameController.getMap();
   if (!selection || !map) return [];
+  if (store.paused) return [];
   const tile = tileAt(map, selection.q, selection.r);
   const player = store.players[store.localPlayerIndex];
   if (!tile || !player) return [];

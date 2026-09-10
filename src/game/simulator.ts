@@ -42,7 +42,9 @@ export type Command =
   | { type: 'disband'; unitId: string }
   | { type: 'shipLanding'; unitId: string; q: number; r: number }
   | { type: 'claimBonus' }
-  | { type: 'endTurn' };
+  | { type: 'endTurn' }
+  | { type: 'giveToAI'; playerIndex: number }
+  | { type: 'forfeit'; playerIndex: number };
 
 /** Commands whose outcome on the authoritative sim is fully deterministic and
  *  therefore safe for a client to predict locally and replay later. */
@@ -191,6 +193,12 @@ export class Simulator {
       case 'endTurn':
         this.doEndTurn();
         ok = true;
+        break;
+      case 'giveToAI':
+        ok = this.doGiveToAI(cmd.playerIndex);
+        break;
+      case 'forfeit':
+        ok = this.doForfeit(cmd.playerIndex);
         break;
     }
     this.syncDiscoveries();
@@ -641,6 +649,40 @@ export class Simulator {
       tile.bonus.claimer = unit.owner;
       tile.bonus.arrivalTurn = this.turn;
     }
+  }
+
+  /** Host-only: hand a disconnected human's seat to the AI. */
+  private doGiveToAI(playerIndex: number): boolean {
+    const player = this.players[playerIndex];
+    if (!player || !player.isHuman) return false;
+    player.isHuman = false;
+    this.emit({ type: 'aiTakeover', playerIndex });
+    return true;
+  }
+
+  /** Host-only: forfeit a disconnected player — free their villages (ownerless),
+   *  remove all their units and territories, and mark the tribe inactive so the
+   *  end conditions can resolve. */
+  private doForfeit(playerIndex: number): boolean {
+    const player = this.players[playerIndex];
+    if (!player || !player.isActive) return false;
+    for (const t of this.map.tiles) {
+      if (t.settlement && t.settlement.owner === playerIndex) {
+        t.settlement.owner = null;
+        t.settlement.captureReady = false;
+      }
+      if (t.unit && t.unit.owner === playerIndex) t.unit = null;
+      if (t.ownedBy === playerIndex) {
+        t.ownedBy = null;
+        t.claimedByVillage = null;
+      } else if (t.claimedByVillage && t.settlement?.owner === playerIndex) {
+        // handled above; nothing extra
+      }
+    }
+    player.isActive = false;
+    this.emit({ type: 'playerForfeited', playerIndex });
+    if (!this.gameOver) this.checkEndConditions();
+    return true;
   }
 
   private doEndTurn(): void {

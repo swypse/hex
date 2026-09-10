@@ -228,6 +228,39 @@ describe('buildingIncome', () => {
     expect(buildingIncome(map, player(0))).toEqual({ wood: 2, stone: 0, ore: 0 });
   });
 
+  it('yields nothing from a territory whose owning village has an enemy on it', () => {
+    const map: GameMap = { radius: 2, tiles: [], spawns: [] };
+    const village = tile(0, 0, TileType.GrasslandLand, 0, { owner: 0, level: 2, captureReady: false });
+    village.claimedByVillage = { q: 0, r: 0 };
+    village.unit = {
+      id: 'e', owner: 1, type: 'warrior', q: 0, r: 0,
+      hasMoved: false, hasAttacked: false, hasHealed: false,
+      hp: 5, attack: 2, attackDistance: 1, spawnVillage: null,
+    };
+    const sawmill = tile(1, 0, TileType.GrasslandLand, 0, null, { kind: 'sawmill', level: 1 });
+    sawmill.claimedByVillage = { q: 0, r: 0 };
+    map.tiles.push(village, sawmill, tile(2, 0, TileType.GrasslandForest, 0));
+    expect(buildingIncome(map, player(0))).toEqual({ wood: 0, stone: 0, ore: 0 });
+  });
+
+  it('keeps yielding from other villages when one is enemy-occupied', () => {
+    const map: GameMap = { radius: 2, tiles: [], spawns: [] };
+    const blocked = tile(0, 0, TileType.GrasslandLand, 0, { owner: 0, level: 2, captureReady: false });
+    blocked.claimedByVillage = { q: 0, r: 0 };
+    blocked.unit = {
+      id: 'e', owner: 1, type: 'warrior', q: 0, r: 0,
+      hasMoved: false, hasAttacked: false, hasHealed: false,
+      hp: 5, attack: 2, attackDistance: 1, spawnVillage: null,
+    };
+    const blockedSaw = tile(1, 0, TileType.GrasslandLand, 0, null, { kind: 'sawmill', level: 1 });
+    blockedSaw.claimedByVillage = { q: 0, r: 0 };
+    const free = tile(3, 0, TileType.GrasslandLand, 0, null, { kind: 'sawmill', level: 1 });
+    free.claimedByVillage = { q: 3, r: 0 };
+    map.tiles.push(blocked, blockedSaw, free, tile(2, 0, TileType.GrasslandForest, 0));
+    // Free sawmill still sees its own adjacent forest at (2,0).
+    expect(buildingIncome(map, player(0))).toEqual({ wood: 1, stone: 0, ore: 0 });
+  });
+
   it('two factories near the same forest count it twice', () => {
     const map: GameMap = { radius: 2, tiles: [], spawns: [] };
     map.tiles.push(

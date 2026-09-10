@@ -119,7 +119,7 @@ describe('HudTips', () => {
 
   it('shows nothing when tips are disabled in settings', () => {
     vi.spyOn(storageService, 'getItem').mockReturnValue(
-      JSON.stringify({ attackConfirmation: true, aiDifficulty: 'normal', disableTips: true }),
+      JSON.stringify({ aiDifficulty: 'normal', disableTips: true }),
     );
     startGame(3);
     tips = new HudTips();

@@ -6,7 +6,6 @@ const SETTINGS_KEY = 'hex-settings-v1';
 export type Language = 'en' | 'ru';
 
 export interface GameSettings {
-  attackConfirmation: boolean;
   aiDifficulty: AiDifficulty;
   disableTips: boolean;
   lang: Language;
@@ -14,7 +13,6 @@ export interface GameSettings {
 }
 
 const DEFAULTS: GameSettings = {
-  attackConfirmation: true,
   aiDifficulty: DEFAULT_AI_DIFFICULTY,
   disableTips: false,
   lang: 'en',
@@ -40,14 +38,6 @@ export function saveSettings(settings: GameSettings): void {
   } catch {
     // storage unavailable — ignore.
   }
-}
-
-export function attackConfirmationEnabled(): boolean {
-  return loadSettings().attackConfirmation;
-}
-
-export function setAttackConfirmation(enabled: boolean): void {
-  saveSettings({ ...loadSettings(), attackConfirmation: enabled });
 }
 
 export function tipsDisabled(): boolean {

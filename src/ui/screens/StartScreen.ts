@@ -2,7 +2,7 @@ import { Application, Container, FillGradient, Graphics, Sprite, Text, Texture }
 import { gameController } from '../../controller/gameController';
 import { useGameStore } from '../../store/gameStore';
 import { saveRepository } from '../../storage/saveGame';
-import { loadSettings, setAiDifficulty, setAttackConfirmation, setSoundEnabled, setTipsDisabled } from '../../storage/settings';
+import { loadSettings, setAiDifficulty, setSoundEnabled, setTipsDisabled } from '../../storage/settings';
 import { AiDifficulty } from '../../game/aiDifficulty';
 import { isTouchDevice } from '../touch';
 import { type ScreenController, type UIHost } from '../host';
@@ -63,19 +63,6 @@ class SettingsPanel {
     const rowH = 30;
     const blockGap = 10;
     let y = 0;
-
-    const attackLabel = makeLabel(t('settings.attackConfirm'), { fontSize: 14, fill: 0xeeeeee });
-    const attackCheckbox = makeCheckbox(loadSettings().attackConfirmation, (v) => {
-      setAttackConfirmation(v);
-      attackCheckbox.setChecked(v);
-    });
-    attackLabel.eventMode = 'static';
-    attackLabel.cursor = 'pointer';
-    attackLabel.on('pointertap', () => attackCheckbox.tap());
-    attackLabel.position.set(0, y + (rowH - attackLabel.height) / 2);
-    attackCheckbox.el.position.set(cw - 22, y + (rowH - 22) / 2);
-    content.addChild(attackLabel, attackCheckbox.el);
-    y += rowH + blockGap;
 
     const difficultyLabel = makeLabel(t('settings.difficulty'), { fontSize: 14, fill: 0xeeeeee });
     difficultyLabel.position.set(0, y);

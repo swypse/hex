@@ -14,13 +14,13 @@ function tile(
   q: number,
   r: number,
   terrain: TileType,
-  opts: { settlement?: Settlement | null; unit?: Unit | null; roadOwner?: number | null; building?: MapTile['building'] | null } = {},
+  opts: { settlement?: Settlement | null; unit?: Unit | null; roadOwner?: number | null; building?: MapTile['building'] | null; ownedBy?: number | null } = {},
 ): MapTile {
   return {
     q, r, terrain,
     settlement: opts.settlement ?? null,
     unit: opts.unit ?? null,
-    ownedBy: opts.settlement ? opts.settlement.owner : null,
+    ownedBy: opts.ownedBy !== undefined ? opts.ownedBy : (opts.settlement ? opts.settlement.owner : null),
     claimedByVillage: null,
     building: opts.building ?? null,
     roadOwner: opts.roadOwner ?? null,
@@ -65,6 +65,22 @@ describe('roads', () => {
       tile(2, 0, TileType.GrasslandLand),
     ]);
     expect(canBuildRoad(map, map.tiles[2]!, player(100,10,10,0,['forestry','roads']))).toBe(true);
+  });
+
+  it('does not build a road on enemy territory', () => {
+    const map = mapWith([
+      villageTile(0, 0, 0),
+      tile(1, 0, TileType.GrasslandLand, { ownedBy: 1 }),
+    ]);
+    expect(canBuildRoad(map, map.tiles[1]!, player(100,10,10,0,['forestry','roads']))).toBe(false);
+  });
+
+  it('builds a road on own territory', () => {
+    const map = mapWith([
+      villageTile(0, 0, 0),
+      tile(1, 0, TileType.GrasslandLand, { ownedBy: 0 }),
+    ]);
+    expect(canBuildRoad(map, map.tiles[1]!, player(100,10,10,0,['forestry','roads']))).toBe(true);
   });
 
   it('rejects hexes not adjacent to a village or road', () => {

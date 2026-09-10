@@ -5,6 +5,7 @@ import { TRIBES } from '../src/game/tribes';
 import { axialKey } from '../src/game/hex';
 import { type GameMap } from '../src/game/mapGen';
 import type { TextureSet, TileTexture } from '../src/render/textureFactory';
+import { villageTexturesForTest } from './helpers/villageTextures';
 import { GameScreen } from '../src/ui/screens/GameScreen';
 import { gameController } from '../src/controller/gameController';
 import { useGameStore } from '../src/store/gameStore';
@@ -30,7 +31,7 @@ vi.mock('../src/render/textureFactory', async () => {
     tileTextures: new Map(map.tiles.map((t) => [axialKey(t), tileTex(50, 50)])),
     fogTextures: new Map(map.tiles.map((t) => [axialKey(t), tileTex(50, 50)])),
     fogTopTexture: tileTex(50, 50),
-    villageTextures: { level1: tileTex(40, 40, 0.7), level2: tileTex(40, 40, 0.7) },
+    villageTextures: villageTexturesForTest(tileTex(40, 40, 0.7), tileTex(40, 40, 0.7)),
     freeVillageTexture: tileTex(40, 40),
     unitTextures,
     pirateTexture: unitTex,
@@ -69,7 +70,12 @@ function makeHost(app: Application): UIHost {
 const controller = gameController as unknown as {
   mapRoot: Container | null;
   textures: TextureSet | null;
-  mapView: { container: Container; destroy(): void } | null;
+  mapView: {
+    container: Container;
+    overlay: Container;
+    markerLayer: Container;
+    destroy(): void;
+  } | null;
   recoverFromContextLoss(): Promise<void>;
   shutdown(): void;
 };
@@ -113,6 +119,11 @@ describe('WebGL context loss recovery', () => {
     const before = controller.mapView!;
     const root = controller.mapRoot!;
     expect(root.children).toContain(before.container);
+    // Ground markers mount above the overlay so they never sit under the
+    // village labels / hp bars / capture icons drawn there.
+    const rootIdx = (c: Container): number => root.children.indexOf(c);
+    expect(rootIdx(before.markerLayer)).toBeGreaterThan(rootIdx(before.overlay));
+    expect(rootIdx(before.overlay)).toBeGreaterThan(rootIdx(before.container));
 
     const texturesBefore = controller.textures!;
     await controller.recoverFromContextLoss();

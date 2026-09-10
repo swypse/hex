@@ -62,10 +62,11 @@ export class CenterMessage {
         : new Popup({
             app: this.host.app,
             modal: false,
-            interactive: false,
+            interactive: true,
             fitContent: true,
             closeOnBackdrop: false,
             closeOnEscape: false,
+            onTap: () => this.close(),
           });
       if (iconFile) {
         this.addIconContent(popup, message, iconFile);
@@ -101,10 +102,11 @@ export class CenterMessage {
     return new Popup({
       app: host.app,
       modal: false,
-      interactive: false,
+      interactive: true,
       width: Math.min(Math.ceil(desired), Math.floor(screenW * 0.9)),
       closeOnBackdrop: false,
       closeOnEscape: false,
+      onTap: () => this.close(),
     });
   }
 

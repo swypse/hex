@@ -10,6 +10,7 @@ import { ActionTooltip } from '../kit/actionTooltip';
 import { tooltipsEnabled } from '../kit/tooltipGate';
 import { TOOLBAR_HEIGHT, isWideScreen, ACTION_TOOLBAR_MAX_WIDTH } from '../layout';
 import { toolbarSpecs } from './toolbarSpecs';
+import { hasAnyAvailableAction } from '../../game/playerActions';
 import { STEP_CONFIG } from '../../game/tutorial/tutorialSteps';
 
 const ICON_ACTIONS: Record<string, string> = {
@@ -226,6 +227,24 @@ export class HudToolbar implements Widget {
     if (tooltipsEnabled()) this.tooltips.push(new ActionTooltip(this.el!, endTurn, t('hud.endTurn')));
 
     if (store.tutorialHighlightEndTurn && !store.aiActive) {
+      const ring = new Graphics();
+      ring.circle(24, 24, 26).stroke({ width: 4, color: 0xffd700, alpha: 0.9 });
+      this.endTurnRow.addChild(ring);
+      this.endTurnPulse = ring;
+      this.startEndTurnPulse();
+    }
+
+    const human = store.players[store.localPlayerIndex];
+    const map = gameController.getMap();
+    const noActions =
+      !store.aiActive &&
+      !store.gameOver &&
+      !store.paused &&
+      !store.tutorial &&
+      !!human &&
+      !!map &&
+      !hasAnyAvailableAction(map, human, store.turn);
+    if (noActions && !store.tutorialHighlightEndTurn && !this.endTurnPulse) {
       const ring = new Graphics();
       ring.circle(24, 24, 26).stroke({ width: 4, color: 0xffd700, alpha: 0.9 });
       this.endTurnRow.addChild(ring);

@@ -2,7 +2,6 @@ import { Container } from 'pixi.js';
 import { useGameStore } from '../../store/gameStore';
 import { type UIHost } from '../host';
 import { CenterMessage } from './CenterMessage';
-import { ConfirmDialog } from './ConfirmDialog';
 import { DisbandDialog } from './DisbandDialog';
 import { LeaveGameDialog } from './LeaveGameDialog';
 import { ShipLandingDialog } from './ShipLandingDialog';
@@ -14,6 +13,7 @@ import { GameStats } from './GameStats';
 import { AchievementsDialog } from './AchievementsDialog';
 import { WelcomeDialog } from './WelcomeDialog';
 import { TutorialOverlay } from './TutorialOverlay';
+import { DisconnectDialog } from './DisconnectDialog';
 
 interface Overlay {
   mount(host: UIHost, root: Container): void;
@@ -33,7 +33,6 @@ export class OverlayManager {
   private readonly root: Container;
   private readonly entries: Record<string, Entry> = {
     center: { make: () => new CenterMessage(), mounted: null, hiding: false },
-    confirm: { make: () => new ConfirmDialog(), mounted: null, hiding: false },
     disband: { make: () => new DisbandDialog(), mounted: null, hiding: false },
     leave: { make: () => new LeaveGameDialog(), mounted: null, hiding: false },
     ship: { make: () => new ShipLandingDialog(), mounted: null, hiding: false },
@@ -49,6 +48,7 @@ export class OverlayManager {
     bridgehelp: { make: () => new UnitHelpDialog(), mounted: null, hiding: false },
     welcome: { make: () => new WelcomeDialog(), mounted: null, hiding: false },
     tutorial: { make: () => new TutorialOverlay(), mounted: null, hiding: false },
+    disconnect: { make: () => new DisconnectDialog(), mounted: null, hiding: false },
   };
   private unsub: (() => void) | null = null;
   private refreshing = false;
@@ -68,11 +68,9 @@ export class OverlayManager {
     if (inGame && s.centerMessage !== null) active.add('center');
     if (inGame && s.tutorial) active.add('tutorial');
     if (inGame && s.gameOver && s.winnerIndex !== null) active.add('gameover');
+    if (inGame && s.paused === 'disconnect') active.add('disconnect');
     if (inGame) {
       switch (s.overlay?.kind) {
-        case 'confirm':
-          active.add('confirm');
-          break;
         case 'disband':
           active.add('disband');
           break;

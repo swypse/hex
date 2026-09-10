@@ -11,6 +11,7 @@ import { useGameStore } from '../src/store/gameStore';
 import { GameScreen } from '../src/ui/screens/GameScreen';
 import { axialKey } from '../src/game/hex';
 import type { TextureSet, TileTexture } from '../src/render/textureFactory';
+import { villageTexturesForTest } from './helpers/villageTextures';
 import type { HostMessage } from '../src/net/peerSession';
 import type { UIHost } from '../src/ui/host';
 
@@ -34,7 +35,7 @@ vi.mock('../src/render/textureFactory', async () => {
     tileTextures: new Map(map.tiles.map((t) => [axialKey(t), tileTex(50, 50)])),
     fogTextures: new Map(map.tiles.map((t) => [axialKey(t), tileTex(50, 50)])),
     fogTopTexture: tileTex(50, 50),
-    villageTextures: { level1: tileTex(40, 40, 0.7), level2: tileTex(40, 40, 0.7) },
+    villageTextures: villageTexturesForTest(tileTex(40, 40, 0.7), tileTex(40, 40, 0.7)),
     freeVillageTexture: tileTex(40, 40),
     unitTextures,
     pirateTexture: unitTex,

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { Application, Container, Graphics, ImageSource, Sprite, Text, Texture } from 'pixi.js';
-import { MapView, FIRE_SIZE_MIN, FIRE_SIZE_MAX } from '../src/render/mapRenderer';
+import { MapView, FIRE_SIZE_MIN, FIRE_SIZE_MAX, captureMarkerPoints } from '../src/render/mapRenderer';
 import { GameMap, MapTile } from '../src/game/mapGen';
 import { TileType } from '../src/game/tileTypes';
 import { Player } from '../src/game/players';
@@ -10,6 +10,7 @@ import { Unit, UNIT_TYPES } from '../src/game/units';
 import { axialKey, hexToPixel } from '../src/game/hex';
 import { tileElevation } from '../src/render/elevation';
 import { type TextureSet, type TileTexture } from '../src/render/textureFactory';
+import { villageTexturesForTest } from './helpers/villageTextures';
 
 const HEX = 40;
 const SPRITE_SCALE = 0.5;
@@ -31,7 +32,7 @@ function buildTextures(map: GameMap): TextureSet {
     tileTextures: new Map(map.tiles.map((t) => [axialKey(t), tileTex(50, 50)])),
     fogTextures: new Map(map.tiles.map((t) => [axialKey(t), tileTex(50, 50)])),
     fogTopTexture: tileTex(50, 50),
-    villageTextures: { level1: tileTex(40, 40, 0.7), level2: tileTex(40, 40, 0.7) },
+    villageTextures: villageTexturesForTest(tileTex(40, 40, 0.7), tileTex(40, 40, 0.7)),
     freeVillageTexture: tileTex(40, 40),
     unitTextures: {
       [Tribe.Cats]: { warrior: unitTex, rider: unitTex, archer: unitTex, swordsman: unitTex },
@@ -408,6 +409,126 @@ describe('MapView hp bar anchoring', () => {
     v.destroy();
   });
 
+  it('does not restart the edge marker animation on repeated marker rebuilds', () => {
+    const farVillage: MapTile = {
+      q: 10, r: 0, terrain: TileType.GrasslandLand, height: 0.1,
+      settlement: { owner: 1, level: 1, captureReady: true },
+      building: null, roadOwner: null,
+      unit: {
+        id: 'cap', owner: 0, type: 'warrior', q: 10, r: 0,
+        hasMoved: true, hasAttacked: false, hasHealed: false,
+        hp: 50, attack: 2, attackDistance: 1, spawnVillage: null,
+      },
+      ownedBy: 1, claimedByVillage: null, exploredBy: [0, 1],
+    };
+    const m: GameMap = { radius: 11, spawns: [], tiles: [farVillage] };
+    const markerTextures = buildTextures(m);
+    const app = {
+      screen: { width: 800, height: 600 },
+      ticker: { add: (): void => {}, remove: (): void => {} },
+    } as unknown as Application;
+    const enemy: Player = {
+      index: 1, tribe: Tribe.Warriors, isHuman: false, name: 'E',
+      resources: { ...START_RESOURCES }, score: 0, kills: 0, skills: [], isActive: true,
+    };
+    const v = new MapView(app, markerTextures, HEX, SPRITE_SCALE, 2);
+    const viewport = { x: 0, y: 0, scale: 1, width: 120, height: 120 };
+    v.update(m, [players[0]!, enemy], null, new Set(), new Set(), 0, new Set(), viewport);
+    v.repositionEdgeMarkers(viewport);
+    const edgePulseRunning = (): boolean =>
+      (v as unknown as { stopEdgePulseFn: (() => void) | null }).stopEdgePulseFn !== null;
+    expect(edgePulseRunning()).toBe(true);
+
+    // An unrelated map/action update triggers a marker rebuild. The animation
+    // ticker callback must NOT be taken down (its phase clock would reset and
+    // the marker would visibly jump back to the start of the slide).
+    v.repositionEdgeMarkers(viewport);
+    v.repositionEdgeMarkers(viewport);
+    expect(edgePulseRunning()).toBe(true);
+    v.destroy();
+    expect(edgePulseRunning()).toBe(false);
+  });
+
+  it('positions a top-edge capture marker at the village screen x', () => {
+    const v: MapTile = {
+      q: 5, r: -2, terrain: TileType.GrasslandLand, height: 0.1,
+      settlement: { owner: 1, level: 1, captureReady: true },
+      building: null, roadOwner: null,
+      unit: {
+        id: 'cap', owner: 0, type: 'warrior', q: 5, r: -2,
+        hasMoved: false, hasAttacked: false, hasHealed: false,
+        hp: 50, attack: 2, attackDistance: 1, spawnVillage: null,
+      },
+      ownedBy: 1, claimedByVillage: null, exploredBy: [0, 1],
+    };
+    const m: GameMap = { radius: 11, spawns: [], tiles: [v] };
+    const markerTextures = buildTextures(m);
+    const app = {
+      screen: { width: 800, height: 600 },
+      ticker: { add: (): void => {}, remove: (): void => {} },
+    } as unknown as Application;
+    const enemy: Player = {
+      index: 1, tribe: Tribe.Warriors, isHuman: false, name: 'E',
+      resources: { ...START_RESOURCES }, score: 0, kills: 0, skills: [], isActive: true,
+    };
+    const view = new MapView(app, markerTextures, HEX, SPRITE_SCALE, 2);
+    const W = 800;
+    const H = 600;
+    const p = hexToPixel(v, HEX);
+    view.update(m, [players[0]!, enemy], null, new Set(), new Set(), 0, new Set(), {
+      x: 0, y: 0, scale: 1, width: W, height: H,
+    });
+    expect(p.y).toBeLessThan(0);
+    expect(p.x).toBeGreaterThanOrEqual(0);
+    expect(p.x).toBeLessThanOrEqual(W);
+    view.repositionEdgeMarkers({ x: 0, y: 0, scale: 1, width: W, height: H });
+    const parts = (view as unknown as { edgeMarkerParts: { side: 'l' | 'r' | 't' | 'b'; along: number; W: number; H: number }[] }).edgeMarkerParts;
+    expect(parts.length).toBe(1);
+    expect(parts[0]!.side).toBe('t');
+    expect(parts[0]!.along).toBe(p.x);
+    view.destroy();
+  });
+
+  it('positions a left-edge capture marker at the village screen y', () => {
+    const v: MapTile = {
+      q: -8, r: 3, terrain: TileType.GrasslandLand, height: 0.1,
+      settlement: { owner: 1, level: 1, captureReady: true },
+      building: null, roadOwner: null,
+      unit: {
+        id: 'cap', owner: 0, type: 'warrior', q: -8, r: 3,
+        hasMoved: false, hasAttacked: false, hasHealed: false,
+        hp: 50, attack: 2, attackDistance: 1, spawnVillage: null,
+      },
+      ownedBy: 1, claimedByVillage: null, exploredBy: [0, 1],
+    };
+    const m: GameMap = { radius: 11, spawns: [], tiles: [v] };
+    const markerTextures = buildTextures(m);
+    const app = {
+      screen: { width: 800, height: 600 },
+      ticker: { add: (): void => {}, remove: (): void => {} },
+    } as unknown as Application;
+    const enemy: Player = {
+      index: 1, tribe: Tribe.Warriors, isHuman: false, name: 'E',
+      resources: { ...START_RESOURCES }, score: 0, kills: 0, skills: [], isActive: true,
+    };
+    const view = new MapView(app, markerTextures, HEX, SPRITE_SCALE, 2);
+    const W = 800;
+    const H = 600;
+    const p = hexToPixel(v, HEX);
+    view.update(m, [players[0]!, enemy], null, new Set(), new Set(), 0, new Set(), {
+      x: 0, y: 0, scale: 1, width: W, height: H,
+    });
+    expect(p.x).toBeLessThan(0);
+    expect(p.y).toBeGreaterThanOrEqual(0);
+    expect(p.y).toBeLessThanOrEqual(H);
+    view.repositionEdgeMarkers({ x: 0, y: 0, scale: 1, width: W, height: H });
+    const parts = (view as unknown as { edgeMarkerParts: { side: 'l' | 'r' | 't' | 'b'; along: number; W: number; H: number }[] }).edgeMarkerParts;
+    expect(parts.length).toBe(1);
+    expect(parts[0]!.side).toBe('l');
+    expect(parts[0]!.along).toBe(p.y);
+    view.destroy();
+  });
+
   it('lays the hp label text above its black background', () => {
     const el = hpBarItem().el;
     expect(el.sortableChildren).toBe(true);
@@ -461,6 +582,74 @@ describe('MapView hp bar anchoring', () => {
     const el = hpBarItem().el;
     const graphicsCount = el.children.filter((c) => c instanceof Graphics).length;
     expect(graphicsCount).toBe(3);
+  });
+
+  it('draws move and attack markers in the marker layer above tiles and overlays', () => {
+    const t00: MapTile = {
+      q: 0, r: 0, terrain: TileType.GrasslandLand, height: 0.1, settlement: null, building: null,
+      roadOwner: null, unit: null, ownedBy: 0, claimedByVillage: null, exploredBy: [0],
+    };
+    const t10: MapTile = {
+      q: 1, r: 0, terrain: TileType.GrasslandLand, height: 0.1, settlement: null, building: null,
+      roadOwner: null, unit: null, ownedBy: null, claimedByVillage: null, exploredBy: [0],
+    };
+    const t01: MapTile = {
+      q: 0, r: 1, terrain: TileType.GrasslandLand, height: 0.1, settlement: null, building: null,
+      roadOwner: null, unit: null, ownedBy: null, claimedByVillage: null, exploredBy: [0],
+    };
+    const m: GameMap = { radius: 1, spawns: [], tiles: [t00, t10, t01] };
+    const app = {
+      screen: { width: 800, height: 600 },
+      ticker: { add: (): void => {}, remove: (): void => {} },
+    } as unknown as Application;
+    const v = new MapView(app, textures, HEX, SPRITE_SCALE, 2);
+    const selection = { kind: 'unit', q: 0, r: 0 } as const;
+    v.update(m, players, selection, new Set(['1,0']), new Set(['0,1']), 0, new Set(), {
+      x: 400, y: 300, scale: 1, width: 800, height: 600,
+    });
+    const markerLayer = v.markerLayer;
+    expect(markerLayer.children.length).toBe(2);
+    expect(markerLayer.children.some((c) => c instanceof Graphics)).toBe(true);
+    // The container holds tiles but no ground marker dots.
+    expect(v.container.children.every((c) => c instanceof Container)).toBe(true);
+    // The marker layer is a dedicated sibling of the tile/scene layers, not a
+    // child of either, so it can be mounted above the overlay by the host.
+    expect(markerLayer).not.toBe(v.container);
+    expect(markerLayer).not.toBe(v.overlay);
+    expect(markerLayer.parent).toBeNull();
+    v.destroy();
+  });
+
+  it('adds a larger unfilled white ring around the move marker dot', () => {
+    const t00: MapTile = {
+      q: 0, r: 0, terrain: TileType.GrasslandLand, height: 0.1, settlement: null, building: null,
+      roadOwner: null, unit: null, ownedBy: 0, claimedByVillage: null, exploredBy: [0],
+    };
+    const t10: MapTile = {
+      q: 1, r: 0, terrain: TileType.GrasslandLand, height: 0.1, settlement: null, building: null,
+      roadOwner: null, unit: null, ownedBy: null, claimedByVillage: null, exploredBy: [0],
+    };
+    const m: GameMap = { radius: 1, spawns: [], tiles: [t00, t10] };
+    const app = {
+      screen: { width: 800, height: 600 },
+      ticker: { add: (): void => {}, remove: (): void => {} },
+    } as unknown as Application;
+    const v = new MapView(app, textures, HEX, SPRITE_SCALE, 2);
+    const selection = { kind: 'unit', q: 0, r: 0 } as const;
+    v.update(m, players, selection, new Set(['1,0']), new Set(), 0, new Set(), {
+      x: 400, y: 300, scale: 1, width: 800, height: 600,
+    });
+    const moveMarker = v.markerLayer.children[0] as Graphics;
+    const ctx = moveMarker.context as unknown as { instructions: Array<{ action: string; data: { style: { width: number; color: number; alpha: number; alignment: number } } }> };
+    const strokes = ctx.instructions.filter((i) => i.action === 'stroke');
+    const fills = ctx.instructions.filter((i) => i.action === 'fill');
+    // Inner filled circle + outer unfilled ring (two strokes, one fill).
+    expect(strokes.length).toBe(2);
+    expect(fills.length).toBe(1);
+    // Both strokes sit outside the circle path so the ring outline does not
+    // cover the filled dot.
+    for (const s of strokes) expect(s.data.style.alignment).toBe(0);
+    v.destroy();
   });
 
   it('keeps the selected tile el above same-row neighbors so the top border stays visible', () => {
@@ -1033,6 +1222,117 @@ describe('MapView hp bar anchoring', () => {
       (performance as { now: () => number }).now = origNow;
       v.destroy();
     }
+  });
+});
+
+describe('MapView road fog visibility', () => {
+  let map: GameMap;
+  let players: Player[];
+  let textures: TextureSet;
+  let view: MapView;
+
+  const roadTile = (q: number, r: number, exploredBy: number[]): MapTile => ({
+    q, r, terrain: TileType.GrasslandLand, height: 0.1,
+    settlement: null, building: null, roadOwner: 0, unit: null,
+    ownedBy: 0, claimedByVillage: null, exploredBy,
+  });
+
+  beforeEach(() => {
+    Object.defineProperty(Text.prototype, 'width', { configurable: true, get: () => 40 });
+    Object.defineProperty(Text.prototype, 'height', { configurable: true, get: () => 14 });
+    map = { radius: 1, spawns: [], tiles: [roadTile(0, 0, [0]), roadTile(1, 0, [1])] };
+    players = [
+      { index: 0, tribe: Tribe.Cats, isHuman: true, name: 'Cats', resources: { ...START_RESOURCES }, score: 0, kills: 0, skills: [], isActive: true },
+    ];
+    textures = buildTextures(map);
+    const app = {
+      screen: { width: 800, height: 600 },
+      ticker: { add: (): void => {}, remove: (): void => {} },
+    } as unknown as Application;
+    view = new MapView(app, textures, HEX, SPRITE_SCALE, 2);
+  });
+
+  afterEach(() => {
+    view.destroy();
+  });
+
+  it('hides the road on an unexplored (fogged) tile', () => {
+    view.update(map, players, null, new Set(), new Set(), 0, new Set(), {
+      x: 400, y: 300, scale: 1, width: 800, height: 600,
+    });
+    const tvs = (view as unknown as { tileViews: Map<string, { roadGraphics: Graphics | null }> }).tileViews;
+    // The first tile is explored: road drawn.
+    expect(tvs.get(axialKey({ q: 0, r: 0 }))!.roadGraphics).not.toBeNull();
+    // The second tile is unexplored: road absent.
+    const keys = [...tvs.keys()];
+    const fogKey = keys.find((k) => k !== '0,0')!;
+    expect(tvs.get(fogKey)!.roadGraphics).toBeNull();
+  });
+
+  it('reveals the road once the tile is explored', () => {
+    // Initial fogged state.
+    view.update(map, players, null, new Set(), new Set(), 0, new Set(), {
+      x: 400, y: 300, scale: 1, width: 800, height: 600,
+    });
+    const tvs = (view as unknown as { tileViews: Map<string, { roadGraphics: Graphics | null }> }).tileViews;
+    const keys = [...tvs.keys()];
+    const fogKey = keys.find((k) => k !== '0,0')!;
+    expect(tvs.get(fogKey)!.roadGraphics).toBeNull();
+    // Explore it.
+    const fogTile = map.tiles.find((t) => `${t.q},${t.r}` === fogKey)!;
+    fogTile.exploredBy!.push(0);
+    view.update(map, players, null, new Set(), new Set(), 0, new Set(), {
+      x: 400, y: 300, scale: 1, width: 800, height: 600,
+    });
+    expect(tvs.get(fogKey)!.roadGraphics).not.toBeNull();
+  });
+});
+
+describe('captureMarkerPoints', () => {
+  it('keeps the top-edge triangle visible, vertex on the edge pointing up at the village', () => {
+    // Resting: vertex on the top edge (y=0) pointing UP at the village above,
+    // base 20px below on-screen so the triangle body is visible.
+    const rest = captureMarkerPoints('t', 100, 0, 800, 600);
+    expect(rest[3]).toBe(0); // vertex on the top edge
+    expect(rest[1]).toBe(20); // base inside the screen
+    expect(Math.min(rest[1], rest[3], rest[5])).toBe(0); // vertex is the top-most point
+    expect(rest[2]).toBe(100); // vertex sits at the village screen x
+    // Slid: vertex moved 10px out past the edge; base still on-screen (10px).
+    const slid = captureMarkerPoints('t', 100, 10, 800, 600);
+    expect(slid[3]).toBe(-10);
+    expect(slid[1]).toBe(10);
+    expect(slid[2]).toBe(100);
+  });
+
+  it('keeps the bottom-edge triangle visible, vertex pointing down at the village', () => {
+    const rest = captureMarkerPoints('b', 100, 0, 800, 600);
+    expect(rest[3]).toBe(600); // vertex on the bottom edge
+    expect(rest[1]).toBe(580); // base inside the screen
+    expect(Math.max(rest[1], rest[3], rest[5])).toBe(600); // vertex is the bottom-most point
+    expect(rest[2]).toBe(100);
+    const slid = captureMarkerPoints('b', 100, 10, 800, 600);
+    expect(slid[3]).toBe(610);
+    expect(slid[1]).toBe(590);
+  });
+
+  it('keeps left/right triangles visible, vertex pointing toward the village', () => {
+    const l = captureMarkerPoints('l', 50, 0, 800, 600);
+    expect(l[2]).toBe(0); // vertex on the left edge
+    expect(l[0]).toBe(20); // base inside the screen
+    expect(Math.min(l[0], l[2], l[4])).toBe(0); // vertex is the left-most point
+    expect(l[3]).toBe(50); // vertex sits at the village screen y
+    const lSlid = captureMarkerPoints('l', 50, 10, 800, 600);
+    expect(lSlid[2]).toBe(-10);
+    expect(lSlid[0]).toBe(10);
+
+    const r = captureMarkerPoints('r', 50, 0, 800, 600);
+    expect(r[2]).toBe(800); // vertex on the right edge
+    expect(r[0]).toBe(780); // base inside the screen
+    expect(Math.max(r[0], r[2], r[4])).toBe(800); // vertex is the right-most point
+    expect(r[3]).toBe(50);
+    const rSlid = captureMarkerPoints('r', 50, 10, 800, 600);
+    expect(rSlid[2]).toBe(810);
+    expect(rSlid[0]).toBe(790);
   });
 });
 

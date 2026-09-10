@@ -17,7 +17,7 @@ import { isVillageRoadConnected } from '../game/roads';
 import { SELECTION_COLOR } from '../config';
 import { tileElevation } from './elevation';
 import { type TextureSet, type TileTexture } from './textureFactory';
-import { villageTextureFor } from './villageTexture';
+import { villageTextureFor, villageOwnerTribe } from './villageTexture';
 import { tileSignature, tileInView, type Viewport } from './tileSignature';
 
 export interface OverlayItem {
@@ -36,14 +36,65 @@ const SELECTED_BORDER_COLOR = 0xEB1F00;
 const SELECTED_BORDER_ALPHA = 1;
 const TUTORIAL_MARKER_COLOR = 0xffd700;
 const CAPTURE_EDGE_MARKER_COLOR = 0xEB1F00;
-const CAPTURE_EDGE_MARKER_ALPHA = 0.7;
-const CAPTURE_EDGE_MARKER_LEN = 40;
-const CAPTURE_EDGE_MARKER_MIN_W = 4;
-const CAPTURE_EDGE_MARKER_MAX_W = 8;
+const CAPTURE_EDGE_MARKER_ALPHA = 1;
+/** Side length of the capture triangle in screen px. */
+const CAPTURE_EDGE_MARKER_SIZE = 20;
+/** Distance (px) the capture triangle slides outward past the screen edge. */
+const CAPTURE_EDGE_MARKER_SLIDE = 10;
 const CAPTURE_EDGE_PULSE_MS = 600;
 /** Vertical squash applied to move/attack marker circles so they sit flat on
  *  the ground plane like the hexes. */
 const MARKER_Y_SCALE = 0.75;
+
+export type CaptureMarkerSide = 'l' | 'r' | 't' | 'b';
+
+/** The 6 polygon points of the off-screen capture marker triangle.
+ *
+ *  A red triangle of `size` px whose sharp vertex sits on the given screen
+ *  edge pointing at the capturing village (off-screen beyond that edge). Its
+ *  body extends `size` px INTO the screen so it is always visible. `slide` is
+ *  the distance the marker has moved outward past the edge (0 = resting with
+ *  the vertex on the edge, `CAPTURE_EDGE_MARKER_SLIDE` = fully extended with
+ *  the vertex poking out that far).
+ *
+ *  - top edge (village above): vertex on the top edge aims up
+ *  - bottom edge (village below): vertex on the bottom edge aims down
+ *  - left edge (village left): vertex on the left edge aims left
+ *  - right edge (village right): vertex on the right edge aims right
+ */
+export function captureMarkerPoints(
+  side: CaptureMarkerSide,
+  along: number,
+  slide: number,
+  W: number,
+  H: number,
+  size = CAPTURE_EDGE_MARKER_SIZE,
+): [number, number, number, number, number, number] {
+  const half = size / 2;
+  const z = (v: number): number => (v === 0 ? 0 : v);
+  switch (side) {
+    case 't': {
+      const vertexY = z(-slide);
+      const baseY = size - slide;
+      return [along - half, baseY, along, vertexY, along + half, baseY];
+    }
+    case 'b': {
+      const vertexY = H + slide;
+      const baseY = H - size + slide;
+      return [along - half, baseY, along, vertexY, along + half, baseY];
+    }
+    case 'l': {
+      const vertexX = z(-slide);
+      const baseX = size - slide;
+      return [baseX, along - half, vertexX, along, baseX, along + half];
+    }
+    case 'r': {
+      const vertexX = W + slide;
+      const baseX = W - size + slide;
+      return [baseX, along - half, vertexX, along, baseX, along + half];
+    }
+  }
+}
 
 interface FireParticle {
   g: Graphics;
@@ -78,6 +129,9 @@ interface TileView {
 export class MapView {
   readonly container: Container;
   readonly overlay: Container;
+  /** World-space layer held above `overlay` where move/attack ground markers
+   *  render, so they never sit under village labels, HP bars or buildings. */
+  readonly markerLayer = new Container();
   readonly overlayItems: OverlayItem[] = [];
   private map: GameMap | null = null;
   private tileIndex = new Map<string, MapTile>();
@@ -117,6 +171,7 @@ export class MapView {
   readonly edgeMarkers = new Container();
   private edgeMarkerParts: { g: Graphics; side: 'l' | 'r' | 't' | 'b'; along: number; W: number; H: number }[] = [];
   private stopEdgePulseFn: (() => void) | null = null;
+  private edgePulseStart: number | null = null;
 
   constructor(
     private readonly app: Application,
@@ -173,6 +228,7 @@ export class MapView {
     this.stopHexBounce();
     this.container.destroy({ children: true });
     this.overlay.destroy({ children: true });
+    this.markerLayer.destroy({ children: true });
     if (this.edgeMarkers.parent) this.edgeMarkers.parent.removeChild(this.edgeMarkers);
     this.edgeMarkers.destroy({ children: true });
     this.graphicsPool = [];
@@ -379,7 +435,7 @@ export class MapView {
     tv.terrainSprite.visible = explored;
     tv.fogSprite.visible = !explored;
 
-    const village = villageTextureFor(tile.settlement, this.textures);
+    const village = villageTextureFor(tile.settlement, this.textures, villageOwnerTribe(tile.settlement, players));
     this.syncSprite(tv, 'villageSprite', village.texture, p.x, y, village.anchorY);
     if (tv.villageSprite) tv.villageSprite.visible = explored;
     const wallTex = tile.settlement?.wall ? this.textures.wallTexture : null;
@@ -413,7 +469,7 @@ export class MapView {
     this.drawTileTerritory(tv.territory, tile, players, explored);
     tv.territory.visible = explored;
 
-    this.drawRoad(tv, tile);
+    this.drawRoad(tv, tile, explored);
 
     const bonusTex = tile.bonus ? this.textures.bonusTexture : null;
     this.syncSprite(tv, 'bonusSprite', bonusTex ? bonusTex.texture : null, p.x, y, bonusTex?.anchorY ?? 0.5);
@@ -477,10 +533,10 @@ export class MapView {
     if (sprite) this.faceUnitSprite(sprite, facing);
   }
 
-  private drawRoad(tv: TileView, tile: MapTile): void {
+  private drawRoad(tv: TileView, tile: MapTile, explored: boolean): void {
     const owner = tile.roadOwner;
     const isBridge = tile.bridge !== undefined && tile.bridge !== null;
-    if (owner === undefined || owner === null || isBridge) {
+    if (owner === undefined || owner === null || isBridge || !explored) {
       if (tv.roadGraphics) {
         tv.el.removeChild(tv.roadGraphics);
         tv.roadGraphics.destroy();
@@ -605,12 +661,8 @@ export class MapView {
       if (reachableKeys.has(key) && key !== selectedKey) {
         const p = hexToPixel(tile, this.hexSize);
         const dot = this.takeGraphics();
-        dot.ellipse(p.x, y, dotRadius, dotRadius * MARKER_Y_SCALE).fill({ color: reachableColor, alpha: 0.5 }).stroke({
-          width: 2,
-          color: 0xffffff,
-          alpha: 0.9
-        });
-        this.container.addChild(dot);
+        this.drawMarkerShape(dot, p.x, y, dotRadius, reachableColor);
+        this.markerLayer.addChild(dot);
         this.highlights.push(dot);
         this.movePulseParts.push({ g: dot, x: p.x, y, base: dotRadius, color: reachableColor });
         continue;
@@ -631,15 +683,28 @@ export class MapView {
         }
         continue;
       }
-      // Attackable targets: a pulsing translucent red circle at the hex centre.
+      // Attackable targets: a pulsing red circle at the hex centre.
       const p = hexToPixel(tile, this.hexSize);
       const attackDot = this.takeGraphics();
       this.attackPulseParts.push({ g: attackDot, x: p.x, y, base: dotRadius });
-      this.container.addChild(attackDot);
+      this.markerLayer.addChild(attackDot);
       this.highlights.push(attackDot);
     }
     this.startAttackPulse();
     this.startMovePulse();
+  }
+
+  /** Draws the ground marker a move/attack target sits on: a filled circle
+   *  with a white border and a 2x-large unfilled white outline ring, both
+   *  strokes drawn outside the path. Only the centre colour differs between
+   *  marker kinds, so this is the single source of truth for their look. */
+  private drawMarkerShape(g: Graphics, x: number, y: number, radius: number, color: number): void {
+    g.clear();
+    g.ellipse(x, y, radius, radius * MARKER_Y_SCALE)
+      .fill({ color, alpha: 1 })
+      .stroke({ width: 2, color: 0xffffff, alpha: 0.7, alignment: 0 });
+    g.ellipse(x, y, radius * 2, radius * 2 * MARKER_Y_SCALE)
+      .stroke({ width: 2, color: 0xffffff, alpha: 0.7, alignment: 0 });
   }
 
   private startMovePulse(): void {
@@ -651,11 +716,7 @@ export class MapView {
     if (parts.length === 0) return;
     const draw = (r: number): void => {
       for (const part of parts) {
-        part.g.clear();
-        part.g
-          .ellipse(part.x, part.y, r, r * MARKER_Y_SCALE)
-          .fill({ color: part.color, alpha: 0.5 })
-          .stroke({ width: 2, color: 0xffffff, alpha: 0.5 });
+        this.drawMarkerShape(part.g, part.x, part.y, r, part.color);
       }
     };
     const ticker = this.app.ticker;
@@ -666,7 +727,7 @@ export class MapView {
         this.stopMovePulse = null;
         return;
       }
-      const t = ((performance.now() - start) % 800) / 800;
+      const t = ((performance.now() - start) % 1000) / 1000;
       // Pulse faster and stay tighter: 0.6x .. 1.5x of the base radius.
       const scale = 0.6 + 0.9 * Math.abs(t * 2 - 1);
       draw(parts[0]!.base * scale);
@@ -684,11 +745,7 @@ export class MapView {
     if (parts.length === 0) return;
     const draw = (r: number): void => {
       for (const part of parts) {
-        part.g.clear();
-        part.g
-          .ellipse(part.x, part.y, r, r * MARKER_Y_SCALE)
-          .fill({ color: SELECTED_BORDER_COLOR, alpha: 0.7 })
-          .stroke({ width: 4, color: 0xffffff, alpha: 0.5 });
+        this.drawMarkerShape(part.g, part.x, part.y, r, SELECTED_BORDER_COLOR);
       }
     };
     const ticker = this.app.ticker;
@@ -699,7 +756,7 @@ export class MapView {
         this.stopAttackPulse = null;
         return;
       }
-      const t = ((performance.now() - start) % 800) / 800;
+      const t = ((performance.now() - start) % 1000) / 1000;
       // Pulse faster and stay tighter: 0.6x .. 1.5x of the base radius.
       const scale = 0.6 + 0.9 * Math.abs(t * 2 - 1);
       draw(parts[0]!.base * scale);
@@ -1347,10 +1404,12 @@ export class MapView {
   }
 
   private syncEdgeMarkers(viewport: Viewport): void {
-    this.stopEdgePulse();
     this.edgeMarkers.removeChildren().forEach((c) => c.destroy());
     this.edgeMarkerParts = [];
-    if (!this.map || viewport.width <= 0 || viewport.height <= 0) return;
+    if (!this.map || viewport.width <= 0 || viewport.height <= 0) {
+      this.stopEdgePulse();
+      return;
+    }
     const W = viewport.width;
     const H = viewport.height;
     const parts: { g: Graphics; side: 'l' | 'r' | 't' | 'b'; along: number; W: number; H: number }[] = [];
@@ -1367,67 +1426,60 @@ export class MapView {
       const dx = sx < 0 ? -sx : sx > W ? sx - W : 0;
       const dy = sy < 0 ? -sy : sy > H ? sy - H : 0;
       const side: 'l' | 'r' | 't' | 'b' = dx >= dy ? (sx < 0 ? 'l' : 'r') : sy < 0 ? 't' : 'b';
-      // The marker centre is where the line from the screen centre to the
-      // village crosses the chosen screen edge.
-      const cx = W / 2;
-      const cy = H / 2;
-      const vx = sx - cx;
-      const vy = sy - cy;
+      // The marker sits exactly on the village's own screen coordinate along
+      // the chosen edge: its x for top/bottom edges and its y for left/right
+      // edges, so it points precisely at the off-screen village.
+      const halfLen = CAPTURE_EDGE_MARKER_SIZE / 2;
       let along: number;
-      if (side === 'l') along = cy + (vy / vx) * -cx;
-      else if (side === 'r') along = cy + (vy / vx) * (W - cx);
-      else if (side === 't') along = cx + (vx / vy) * -cy;
-      else along = cx + (vx / vy) * (H - cy);
-      const halfLen = CAPTURE_EDGE_MARKER_LEN / 2;
-      along =
-        side === 'l' || side === 'r'
-          ? Math.max(halfLen, Math.min(H - halfLen, along))
-          : Math.max(halfLen, Math.min(W - halfLen, along));
+      if (side === 'l' || side === 'r') along = Math.max(halfLen, Math.min(H - halfLen, sy));
+      else along = Math.max(halfLen, Math.min(W - halfLen, sx));
       const g = new Graphics();
       g.alpha = CAPTURE_EDGE_MARKER_ALPHA;
       this.edgeMarkers.addChild(g);
       parts.push({ g, side, along, W, H });
     }
     this.edgeMarkerParts = parts;
-    if (parts.length === 0) return;
-    this.drawEdgeMarkers(CAPTURE_EDGE_MARKER_MIN_W);
+    if (parts.length === 0) {
+      this.stopEdgePulse();
+      return;
+    }
+    // The slide animation is continuous: rebuilding the marker set must not
+    // restart its phase clock, or the marker would visibly jump back on every
+    // unrelated map update. Just (re)draw at the current phase instead.
+    this.redrawEdgeMarkers();
     this.startEdgePulse();
   }
 
-  private drawEdgeMarkers(thickness: number): void {
-    const len = CAPTURE_EDGE_MARKER_LEN;
+  private drawEdgeMarkers(slide: number): void {
+    const white = 0xffffff;
     for (const part of this.edgeMarkerParts) {
       part.g.clear();
-      const half = thickness / 2;
-      if (part.side === 'l' || part.side === 'r') {
-        // Vertical screen edges: a thin vertical strip pointing into the map.
-        const x = part.side === 'l' ? 0 : part.W - thickness;
-        part.g.rect(x, part.along - len / 2, thickness, len).fill(CAPTURE_EDGE_MARKER_COLOR);
-      } else {
-        // Horizontal screen edges: rotated — a wide flat bar lying on the edge.
-        const y = part.side === 't' ? 0 : part.H - thickness;
-        part.g.rect(part.along - len / 2, y, len, thickness).fill(CAPTURE_EDGE_MARKER_COLOR);
-      }
+      const pts = captureMarkerPoints(part.side, part.along, slide, part.W, part.H, CAPTURE_EDGE_MARKER_SIZE);
+      part.g.poly(pts).fill(CAPTURE_EDGE_MARKER_COLOR).stroke({ width: 2, color: white, alignment: 0 });
     }
   }
 
+  /** Draw the markers at the animation phase in effect right now. */
+  private redrawEdgeMarkers(): void {
+    const t = ((performance.now() - (this.edgePulseStart ?? performance.now())) % CAPTURE_EDGE_PULSE_MS) / CAPTURE_EDGE_PULSE_MS;
+    const slide = CAPTURE_EDGE_MARKER_SLIDE * (0.5 - 0.5 * Math.cos(t * Math.PI * 2));
+    this.drawEdgeMarkers(slide);
+  }
+
   private startEdgePulse(): void {
-    if (this.stopEdgePulseFn) {
-      this.stopEdgePulseFn();
-      this.stopEdgePulseFn = null;
-    }
+    if (this.stopEdgePulseFn) return; // already running — keep the same phase clock
     if (this.edgeMarkerParts.length === 0) return;
     const ticker = this.app.ticker;
-    const start = performance.now();
+    this.edgePulseStart = performance.now();
     const fn = (): void => {
       if (this.edgeMarkerParts.length === 0) {
         ticker.remove(fn);
         this.stopEdgePulseFn = null;
         return;
       }
-      const t = ((performance.now() - start) % CAPTURE_EDGE_PULSE_MS) / CAPTURE_EDGE_PULSE_MS;
-      const width = CAPTURE_EDGE_MARKER_MIN_W + (CAPTURE_EDGE_MARKER_MAX_W - CAPTURE_EDGE_MARKER_MIN_W) * (0.5 - 0.5 * Math.cos(t * Math.PI * 2));
-      this.drawEdgeMarkers(width);
+      const t = ((performance.now() - this.edgePulseStart!) % CAPTURE_EDGE_PULSE_MS) / CAPTURE_EDGE_PULSE_MS;
+      const slide = CAPTURE_EDGE_MARKER_SLIDE * (0.5 - 0.5 * Math.cos(t * Math.PI * 2));
+      this.drawEdgeMarkers(slide);
     };
     ticker.add(fn);
     this.stopEdgePulseFn = () => ticker.remove(fn);
@@ -1438,6 +1490,7 @@ export class MapView {
       this.stopEdgePulseFn();
       this.stopEdgePulseFn = null;
     }
+    this.edgePulseStart = null;
   }
 
   private addVillageLabel(

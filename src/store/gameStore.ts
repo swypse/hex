@@ -31,7 +31,6 @@ export type OverlayState =
   | { kind: 'buildingHelp' }
   | { kind: 'buildingLimitHelp' }
   | { kind: 'bridgeHelp' }
-  | { kind: 'confirm'; target: { q: number; r: number } }
   | { kind: 'shipLanding'; target: { q: number; r: number } }
   | { kind: 'disband'; unitId: string };
 
@@ -72,6 +71,8 @@ interface GameStore {
   myPeerId: string;
   playersOnline: boolean[];
   texturesLoading: boolean;
+  paused: 'disconnect' | null;
+  pausedName: string;
   tutorial: boolean;
   tutorialStep: TutorialStepId | null;
   tutorialHighlightSkills: SkillId[];
@@ -99,6 +100,7 @@ interface GameStore {
   setMyPeerId: (peerId: string) => void;
   setPlayersOnline: (online: boolean[]) => void;
   setTexturesLoading: (loading: boolean) => void;
+  setPaused: (paused: 'disconnect' | null, name?: string) => void;
   setTutorial: (v: boolean) => void;
   setTutorialStep: (v: TutorialStepId | null) => void;
   setTutorialHighlightSkills: (v: SkillId[]) => void;
@@ -133,6 +135,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
   myPeerId: '',
   playersOnline: [],
   texturesLoading: false,
+  paused: null,
+  pausedName: '',
   tutorial: false,
   tutorialStep: null,
   tutorialHighlightSkills: [],
@@ -148,6 +152,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
         centerIconQueue: [],
         centerChipStyle: null,
         centerChipQueue: [],
+        paused: null,
+        pausedName: '',
       });
     }
     set({ screen });
@@ -196,6 +202,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   setMyPeerId: (myPeerId) => set({ myPeerId }),
   setPlayersOnline: (playersOnline) => set({ playersOnline }),
   setTexturesLoading: (texturesLoading) => set({ texturesLoading }),
+  setPaused: (paused, name) => set({ paused, pausedName: paused === null ? '' : (name ?? '') }),
   setTutorial: (tutorial) => set({ tutorial }),
   setTutorialStep: (tutorialStep) => set({ tutorialStep }),
   setTutorialHighlightSkills: (tutorialHighlightSkills) => set({ tutorialHighlightSkills }),

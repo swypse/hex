@@ -8,8 +8,6 @@ import { useGameStore } from '../src/store/gameStore';
 import { toolbarSpecs } from '../src/ui/hud/toolbarSpecs';
 import { TileType } from '../src/game/tileTypes';
 import { UNIT_TYPES } from '../src/game/units';
-import { storageService } from '../src/storage/storageService';
-import { setAttackConfirmation } from '../src/storage/settings';
 import { sfx } from '../src/sound/sfx';
 
 describe('toolbarSpecs', () => {
@@ -96,6 +94,39 @@ describe('toolbarSpecs', () => {
     expect(toolbarSpecs().some((a) => a.key === 'disband')).toBe(false);
   });
 
+  it('heals when only the unit cell (not the unit layer) is selected', () => {
+    const tile = map.tiles.find((t) => t.unit === null)!;
+    tile.ownedBy = 0;
+    tile.unit = {
+      id: 'h', owner: 0, type: 'warrior', q: tile.q, r: tile.r,
+      hasMoved: false, hasAttacked: false, hasHealed: false,
+      hp: 10, attack: 2, attackDistance: 1, spawnVillage: null,
+    };
+    useGameStore.getState().setSelection({ kind: 'terrain', q: tile.q, r: tile.r });
+    expect(toolbarSpecs().some((a) => a.key === 'heal')).toBe(true);
+    const spy = vi
+      .spyOn(gameController as unknown as { runCommand: (c: unknown) => Promise<void> }, 'runCommand')
+      .mockResolvedValue(undefined);
+    gameController.healSelectedUnit();
+    expect(spy).toHaveBeenCalledWith({ type: 'heal', unitId: 'h' });
+    spy.mockRestore();
+  });
+
+  it('offers no actions while the game is paused for a disconnect', () => {
+    const tile = map.tiles.find((t) => t.unit === null)!;
+    tile.ownedBy = 0;
+    tile.unit = {
+      id: 'w', owner: 0, type: 'warrior', q: tile.q, r: tile.r,
+      hasMoved: false, hasAttacked: false, hasHealed: false,
+      hp: UNIT_TYPES.warrior.maxHp, attack: 2, attackDistance: 1, spawnVillage: null,
+    };
+    select(tile);
+    expect(toolbarSpecs().length).toBeGreaterThan(0);
+    useGameStore.getState().setPaused('disconnect', 'Other');
+    expect(toolbarSpecs()).toEqual([]);
+    useGameStore.getState().setPaused(null);
+  });
+
   it('applies the ship upgrade when only the ship cell (not the unit) is selected', () => {
     const tile = map.tiles.find((t) => t.unit === null)!;
     tile.ownedBy = 0;
@@ -114,14 +145,7 @@ describe('toolbarSpecs', () => {
     spy.mockRestore();
   });
 
-  it('attacks immediately when the attack confirmation setting is disabled', async () => {
-    const store = new Map<string, string>();
-    vi.spyOn(storageService, 'getItem').mockImplementation((k) => store.get(k) ?? null);
-    vi.spyOn(storageService, 'setItem').mockImplementation((k, v) => {
-      store.set(k, v);
-    });
-    setAttackConfirmation(false);
-
+  it('attacks an enemy on click without a confirmation dialog', async () => {
     const own = map.tiles.find((t) => t.unit === null)!;
     const enemy = map.tiles.find((t) => t !== own && t.unit === null)!;
     own.exploredBy = [0];
@@ -148,19 +172,6 @@ describe('toolbarSpecs', () => {
     expect(useGameStore.getState().overlay).toBeNull();
     expect(spy).toHaveBeenCalledWith({ type: 'attack', unitId: 'u1', q: enemy.q, r: enemy.r });
     spy.mockRestore();
-
-    // Re-enable: the click now shows the confirmation popup instead of attacking.
-    setAttackConfirmation(true);
-    useGameStore.getState().setSelection({ kind: 'unit', q: own.q, r: own.r });
-    (gameController as unknown as { attackableKeys: Set<string> }).attackableKeys = new Set([key]);
-    const spy2 = vi
-      .spyOn(gameController as unknown as { runCommand: (c: unknown) => Promise<void> }, 'runCommand')
-      .mockResolvedValue(undefined);
-    await gameController.handleMapClick(enemy.q, enemy.r);
-    expect(useGameStore.getState().overlay).toEqual({ kind: 'confirm', target: { q: enemy.q, r: enemy.r } });
-    expect(spy2).not.toHaveBeenCalled();
-    spy2.mockRestore();
-    useGameStore.getState().setOverlay(null);
   });
 
   it('offers the build water temple action on an own water tile with the skill', () => {

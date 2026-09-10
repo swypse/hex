@@ -42,4 +42,6 @@ export type GameEvent =
   | { type: 'achievementUnlocked'; playerIndex: number; achievement: AchievementId }
   | { type: 'turnStarted'; playerIndex: number; turn: number }
   | { type: 'aiTurn'; playerIndex: number }
+  | { type: 'aiTakeover'; playerIndex: number }
+  | { type: 'playerForfeited'; playerIndex: number }
   | { type: 'gameOver'; winnerIndex: number; bonus: number };

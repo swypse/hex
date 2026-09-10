@@ -56,7 +56,7 @@ describe('spawnUnit', () => {
     expect(player.resources.money).toBe(6);
   });
 
-  it('spawns a shield unit for 10 money + 3 ore with 100 hp when the Shields skill is open', () => {
+  it('spawns a shield unit for 10 money + 3 ore with 80 hp when the Shields skill is open', () => {
     const map = makeMap();
     const village = map.tiles[0]!;
     const player = makePlayer(0, 10);
@@ -64,7 +64,7 @@ describe('spawnUnit', () => {
     player.skills = ['shields'];
     expect(spawnUnit(map, village, 'shield', player)).toBe(true);
     expect(village.unit!.type).toBe('shield');
-    expect(village.unit!.hp).toBe(100);
+    expect(village.unit!.hp).toBe(80);
     expect(player.resources.money).toBe(0);
     expect(player.resources.ore).toBe(0);
   });

@@ -29,8 +29,8 @@ describe('UNIT_TYPES', () => {
     expect(UNIT_TYPES.swordsman).toEqual({ movement: 1, attack: 40, attackDistance: 1, maxHp: 80, defense: 10, price: 15, priceWood: 0, priceOre: 3, shape: 'swordsman' });
   });
 
-  it('defines the shield unit with 100 hp, 1 movement and a 10 money + 3 ore price', () => {
-    expect(UNIT_TYPES.shield).toEqual({ movement: 1, attack: 10, attackDistance: 1, maxHp: 100, defense: 20, price: 10, priceWood: 0, priceOre: 3, shape: 'square' });
+  it('defines the shield unit with 80 hp, 1 movement and a 10 money + 3 ore price', () => {
+    expect(UNIT_TYPES.shield).toEqual({ movement: 1, attack: 10, attackDistance: 1, maxHp: 80, defense: 20, price: 10, priceWood: 0, priceOre: 3, shape: 'square' });
   });
 
   it('defines the catapult unit with siege stats and a wood cost', () => {

@@ -1,11 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { storageService } from '../src/storage/storageService';
 import {
-  attackConfirmationEnabled,
   loadSettings,
-  saveSettings,
   setAiDifficulty,
-  setAttackConfirmation,
   setSoundEnabled,
   setTipsDisabled,
   soundEnabled,
@@ -26,19 +23,13 @@ describe('settings storage', () => {
     vi.restoreAllMocks();
   });
 
-  it('defaults attack confirmation to enabled', () => {
+  it('loads defaults when storage is empty', () => {
     fakeStorage();
-    expect(loadSettings().attackConfirmation).toBe(true);
-    expect(attackConfirmationEnabled()).toBe(true);
-  });
-
-  it('persists an attack confirmation value', () => {
-    fakeStorage();
-    saveSettings({ attackConfirmation: false, aiDifficulty: 'normal', disableTips: false, lang: 'en', soundOn: true });
-    expect(loadSettings().attackConfirmation).toBe(false);
-    expect(attackConfirmationEnabled()).toBe(false);
-    setAttackConfirmation(true);
-    expect(attackConfirmationEnabled()).toBe(true);
+    const s = loadSettings();
+    expect(s.aiDifficulty).toBe('normal');
+    expect(s.disableTips).toBe(false);
+    expect(s.lang).toBe('en');
+    expect(s.soundOn).toBe(true);
   });
 });
 

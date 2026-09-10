@@ -13,6 +13,7 @@ import { type GameEvent } from '../src/game/events';
 import { MapView } from '../src/render/mapRenderer';
 import { useGameStore } from '../src/store/gameStore';
 import { type TextureSet, type TileTexture } from '../src/render/textureFactory';
+import { villageTexturesForTest } from './helpers/villageTextures';
 import { installCamera } from './helpers/testMap';
 
 function tex(w: number, h: number): Texture {
@@ -34,7 +35,7 @@ function buildTextures(map: GameMap): TextureSet {
     tileTextures: new Map(map.tiles.map((t) => [axialKey(t), tileTex(50, 50)])),
     fogTextures: new Map(map.tiles.map((t) => [axialKey(t), tileTex(50, 50)])),
     fogTopTexture: tileTex(50, 50),
-    villageTextures: { level1: tileTex(40, 40, 0.7), level2: tileTex(40, 40, 0.7) },
+    villageTextures: villageTexturesForTest(tileTex(40, 40, 0.7), tileTex(40, 40, 0.7)),
     freeVillageTexture: tileTex(40, 40),
     unitTextures,
     pirateTexture: unitTex,

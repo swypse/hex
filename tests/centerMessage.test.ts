@@ -138,6 +138,24 @@ describe('CenterMessage', () => {
     msg.destroy();
   });
 
+  it('closes immediately when the card is clicked', () => {
+    Object.defineProperty(Text.prototype, 'width', { configurable: true, get: () => 120 });
+    Object.defineProperty(Text.prototype, 'height', { configurable: true, get: () => 14 });
+    installCanvas();
+    useGameStore.setState({ centerMessage: 'Hello' });
+    const root = new Container();
+    const msg = new CenterMessage();
+    msg.mount(makeHost(), root);
+
+    const el = root.children[0] as Container;
+    const popupRoot = el.children[0] as Container;
+    const card = popupRoot.children[2] as Container;
+    (card as unknown as { emit: (e: string) => void }).emit('pointertap');
+
+    expect(useGameStore.getState().centerMessage).toBeNull();
+    msg.destroy();
+  });
+
   it('closes "Your turn" after 0.8s and other messages after 1.4s', () => {
     vi.useFakeTimers();
     try {

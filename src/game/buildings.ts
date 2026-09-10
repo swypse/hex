@@ -5,6 +5,7 @@ import { canAfford, pay, Resources } from './resources';
 import { hasSkill } from './skills';
 import { isForestType, isLandType, isMountainType, isWaterType } from './tileTypes';
 import { buildingsInVillage, villageBuildingLimit } from './village';
+import { villageEnemyOccupied } from './capture';
 import type { BuildingKind } from './events';
 
 export const SAWMILL_COST = 10;
@@ -171,6 +172,13 @@ export function buildingIncome(
   let ore = 0;
   for (const tile of map.tiles) {
     if (tile.ownedBy !== player.index || !tile.building) continue;
+    // Buildings on the territory of a village an enemy unit stands on stop
+    // producing until the enemy leaves.
+    const c = tile.claimedByVillage;
+    if (c) {
+      const village = neighborTile(map, c);
+      if (village && villageEnemyOccupied(village)) continue;
+    }
     if (tile.building.kind === 'mine') {
       stone += tile.building.level;
       ore += tile.building.level + (hasSkill(player, 'geology') ? 1 : 0);

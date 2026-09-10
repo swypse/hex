@@ -13,7 +13,7 @@ import { TileType } from '../src/game/tileTypes';
 
 function makeHost(): UIHost {
   return {
-    app: { screen: { width: 1280, height: 800 }, stage: new Container(), ticker: { add: () => {} } },
+    app: { screen: { width: 1280, height: 800 }, stage: new Container(), ticker: { add: () => {}, remove: () => {} } },
     screenLayer: new Container(),
     overlayLayer: new Container(),
   } as unknown as UIHost;
@@ -69,5 +69,40 @@ describe('HudScore buff icons', () => {
   it('shows no buff icon with only 2 water temples', () => {
     const r = mount(2);
     expect(allSprites(r).length).toBe(0);
+  });
+
+  it('cancels the bounce animation when destroyed mid-bounce', () => {
+    const map = makeTestMap(3);
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(42));
+    Object.defineProperty(Text.prototype, 'width', { configurable: true, get: () => 60 });
+    Object.defineProperty(Text.prototype, 'height', { configurable: true, get: () => 14 });
+    useGameStore.setState({ screen: 'game', players, localPlayerIndex: 0 });
+
+    const registered: Array<(t: { deltaMS: number }) => void> = [];
+    const removed: Array<unknown> = [];
+    const host = makeHost();
+    const ticker = host.app.ticker as unknown as {
+      add: (fn: (t: { deltaMS: number }) => void) => void;
+      remove: (fn: unknown) => void;
+    };
+    ticker.add = (fn) => {
+      registered.push(fn);
+    };
+    ticker.remove = (fn) => {
+      removed.push(fn);
+    };
+    const root = new Container();
+    const score = new HudScore();
+    score.mount(host, root);
+
+    // A score change starts the bounce animation's ticker callback.
+    players[0]!.score += 10;
+    useGameStore.setState({ players });
+    expect(registered.length).toBeGreaterThan(0);
+
+    // Destroy mid-bounce (e.g. quitting the skill tree): the ticker callback
+    // must be cancelled, otherwise the next tick dereferences a null element.
+    score.destroy();
+    expect(removed).toContain(registered[0]);
   });
 });

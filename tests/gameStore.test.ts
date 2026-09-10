@@ -31,9 +31,7 @@ describe('gameStore', () => {
     expect(useGameStore.getState().overlay).toBeNull();
   });
 
-  it('setOverlay carries the target for confirm and shipLanding overlays', () => {
-    useGameStore.getState().setOverlay({ kind: 'confirm', target: { q: 3, r: 4 } });
-    expect(useGameStore.getState().overlay).toEqual({ kind: 'confirm', target: { q: 3, r: 4 } });
+  it('setOverlay carries the target for the shipLanding overlay', () => {
     useGameStore.getState().setOverlay({ kind: 'shipLanding', target: { q: 1, r: 2 } });
     expect(useGameStore.getState().overlay).toEqual({ kind: 'shipLanding', target: { q: 1, r: 2 } });
     useGameStore.getState().setOverlay(null);
@@ -67,6 +65,15 @@ describe('gameStore', () => {
   it('setPlayersOnline updates playersOnline', () => {
     useGameStore.getState().setPlayersOnline([true, false, true]);
     expect(useGameStore.getState().playersOnline).toEqual([true, false, true]);
+  });
+
+  it('setPaused stores the disconnect pause and its label', () => {
+    useGameStore.getState().setPaused('disconnect', 'Guest');
+    expect(useGameStore.getState().paused).toBe('disconnect');
+    expect(useGameStore.getState().pausedName).toBe('Guest');
+    useGameStore.getState().setPaused(null);
+    expect(useGameStore.getState().paused).toBeNull();
+    expect(useGameStore.getState().pausedName).toBe('');
   });
 
   it('setTexturesLoading updates texturesLoading', () => {
