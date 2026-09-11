@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { Container, Text } from 'pixi.js';
+import { Container, Sprite, Text } from 'pixi.js';
 import { HudSelected } from '../src/ui/hud/HudSelected';
 import { useGameStore } from '../src/store/gameStore';
 import { gameController } from '../src/controller/gameController';
@@ -126,7 +126,7 @@ describe('HudSelected village building constraints', () => {
   it('does not show Owner or Village lines for an owned village with a unit', () => {
     mount(1, 1, 0, { unitOnVillage: true });
     const all = texts().join('\n');
-    expect(all).toContain('Warrior HP');
+    expect(all).toContain('Warrior');
     expect(all).toContain('Alpha');
     expect(all).not.toContain('Village:');
     expect(all).not.toContain('Owner:');
@@ -135,9 +135,21 @@ describe('HudSelected village building constraints', () => {
   it('shows the unit defense and walled-village buff on the selected unit', () => {
     mount(1, 1, 0, { unitOnVillage: true, wall: true });
     const all = texts().join('\n');
-    expect(all).toContain('DEF 0');
-    expect(all).toContain('UPKEEP 1');
+    const labels = texts();
+    expect(labels).toContain('50/50');
+    expect(labels).toContain('20');
+    expect(labels).toContain('0');
+    expect(labels).toContain('1');
     expect(all).toContain('+3 DEF — village wall');
+    expect(all).not.toContain('DEF 0');
+    expect(all).not.toContain('UPKEEP');
+  });
+
+  it('renders 4 stat icons inline on the selected unit line', () => {
+    mount(1, 1, 0, { unitOnVillage: true });
+    const widths = findSprites((hud as unknown as { el: Container }).el!)
+      .map((s) => s.width);
+    expect(widths).toEqual([16, 16, 16, 16]);
   });
 
   it('shows one help button on the Buildings line of an owned village', () => {
@@ -276,4 +288,16 @@ function findText(root: Container, prefix: string): Text | undefined {
     }
   }
   return undefined;
+}
+
+function findSprites(root: Container): Sprite[] {
+  const out: Sprite[] = [];
+  const walk = (c: Container): void => {
+    for (const ch of c.children) {
+      if (ch instanceof Sprite) out.push(ch as Sprite);
+      if (ch instanceof Container) walk(ch as Container);
+    }
+  };
+  walk(root);
+  return out;
 }
