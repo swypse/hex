@@ -319,7 +319,7 @@ export default {
   'disconnect.clientHint': 'Connection to the host was lost. The game is paused while we wait. If the host does not return, you can leave.',
   'disconnect.leave': 'Leave game',
   'hud.selected.settlementDefault': 'Settlement',
-  'hud.selected.unit': '{name} HP {hp}/{max}{active} ATK {atk} DEF {def} UPKEEP {upkeep}',
+  'hud.selected.unit': '{name}{active}',
   'hud.buff.wall': '+{n} DEF — village wall',
   'hud.buff.village': '+{n} DEF — village',
   'hud.buff.forestProtection': '+{n} DEF — forest protection',

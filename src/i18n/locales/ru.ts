@@ -320,7 +320,7 @@ export default {
   'disconnect.clientHint': 'Связь с хостом потеряна. Игра приостановлена в ожидании. Если хост не вернётся, можно выйти.',
   'disconnect.leave': 'Выйти из игры',
   'hud.selected.settlementDefault': 'Поселение',
-  'hud.selected.unit': '{name} HP {hp}/{max}{active} ATK {atk} ЗАЩ {def} СОД {upkeep}',
+  'hud.selected.unit': '{name}{active}',
   'hud.buff.wall': '+{n} ЗАЩ — стена деревни',
   'hud.buff.village': '+{n} ЗАЩ — деревня',
   'hud.buff.forestProtection': '+{n} ЗАЩ — защита леса',

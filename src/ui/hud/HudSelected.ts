@@ -23,6 +23,7 @@ import type { GameMap, MapTile } from '../../game/mapGen';
 import { useGameStore } from '../../store/gameStore';
 import { type UIHost, type Widget } from '../host';
 import { makeLabel } from '../kit/label';
+import { makeIcon } from '../kit/icon';
 import { makeSkillMedallion } from '../kit/skillMedallion';
 import { makePanel } from '../kit/panel';
 import { isLightColor } from '../kit/theme';
@@ -92,6 +93,7 @@ export class HudSelected implements Widget {
     let buildingLineIndex = -1;
     let buildingLimitLineIndex = -1;
     let bridgeLineIndex = -1;
+    let unitRow: { name: string; pairs: { icon: string; value: string }[] } | null = null;
 
     if (hasBridge(tile)) {
       bridgeLineIndex = lines.length;
@@ -105,7 +107,16 @@ export class HudSelected implements Widget {
       const maxHp = UNIT_TYPES[unit.type].maxHp;
       const canAct = unit.type === 'pirate' ? false : unitCanAct(map, tile, unit, player!);
       unitLineIndex = lines.length;
-      lines.push(t('hud.selected.unit', { name: UNIT_TYPE_NAMES[unit.type], hp: unit.hp, max: maxHp, active: canAct ? ' •' : '', atk: attackDamage(unit), def: unit.defense ?? 0, upkeep: unitMaintenance(unit) }));
+      unitRow = {
+        name: t('hud.selected.unit', { name: UNIT_TYPE_NAMES[unit.type], active: canAct ? ' •' : '' }),
+        pairs: [
+          { icon: '16/hp-16.png', value: `${unit.hp}/${maxHp}` },
+          { icon: '16/attack-16.png', value: String(attackDamage(unit)) },
+          { icon: '16/def-16.png', value: String(unit.defense ?? 0) },
+          { icon: '16/gold-16.png', value: String(unitMaintenance(unit)) },
+        ],
+      };
+      lines.push(''); // placeholder — the unit line renders as a composite icon row
       bolds.push(true);
       for (const buff of unitDefenseBuffs(map, unit, tile)) {
         lines.push(t(buff.key, { n: buff.amount }));
@@ -160,6 +171,29 @@ export class HudSelected implements Widget {
     let y = 8;
     const lineWidths: number[] = [];
     for (let i = 0; i < lines.length; i++) {
+      if (i === unitLineIndex && unitRow) {
+        const fill = darkText ? 0x111111 : 0xeeeeee;
+        const title = makeLabel(unitRow.name, { fontSize: 13, fill, fontWeight: '700' });
+        title.position.set(10, y);
+        const row = new Container();
+        row.addChild(title);
+        let x = 10 + title.width + 7;
+        for (const pair of unitRow.pairs) {
+          const icon = makeIcon(pair.icon, 16);
+          icon.anchor.set(0, 0);
+          icon.position.set(x, y + (lineH - 16) / 2);
+          const value = makeLabel(pair.value, { fontSize: 13, fill });
+          value.position.set(x + 19, y);
+          row.addChild(icon, value);
+          x += 19 + value.width + 7;
+        }
+        this.el.addChild(row);
+        const contentW = x - 17;
+        lineWidths[i] = contentW;
+        maxW = Math.max(maxW, contentW);
+        y += lineH;
+        continue;
+      }
       const highlight = highlightBuildingsLine && i === buildingLimitLineIndex;
       const t = makeLabel(lines[i]!, {
         fontSize: 13,
