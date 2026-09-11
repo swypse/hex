@@ -1,5 +1,5 @@
-import { UNIT_TYPE_NAMES, Unit, UnitType } from './units';
-import { SHIP_ATTACK, SHIP_ATTACK_DISTANCE, SHIP_MOVEMENT, SHIP_UPGRADE_COST } from './ship';
+import { UNIT_TYPE_NAMES, UNIT_TYPES, Unit, UnitType, unitMaintenance } from './units';
+import { SHIP_ATTACK, SHIP_ATTACK_DISTANCE, SHIP_MOVEMENT, SHIP_UPGRADE_COST, shipMovement } from './ship';
 import { t } from '../i18n';
 
 /** i18n keys for the short feature bullets shown for each land unit. */
@@ -14,9 +14,51 @@ const LAND_KEYS: Record<UnitType, string[]> = {
   pirate: ['help.pirate.base', 'help.pirate.spawn', 'help.pirate.act', 'help.pirate.capture', 'help.pirate.steal', 'help.pirate.reward'],
 };
 
+/** i18n key for the one-line unit description shown atop the info popup. */
+const DESC_KEYS: Record<UnitType, string> = {
+  warrior: 'help.warrior.desc',
+  rider: 'help.rider.desc',
+  archer: 'help.archer.desc',
+  swordsman: 'help.swordsman.desc',
+  shield: 'help.shield.desc',
+  catapult: 'help.catapult.desc',
+  knight: 'help.knight.desc',
+  pirate: 'help.pirate.desc',
+};
+
 export function unitHelpTitle(unit: Unit): string {
   if (unit.shipLevel !== undefined) return t('help.ship.title', { level: unit.shipLevel });
   return UNIT_TYPE_NAMES[unit.type];
+}
+
+/** One-line flavour description shown as the popup's first line. */
+export function unitHelpDescription(unit: Unit): string {
+  if (unit.shipLevel !== undefined) return t('help.ship.desc', { crew: UNIT_TYPE_NAMES[unit.type] });
+  return t(DESC_KEYS[unit.type]);
+}
+
+export interface UnitHelpStat {
+  /** 16px icon file, e.g. '16/move-16.png'. */
+  icon: string;
+  /** Localized stat text, e.g. '1 movement'. */
+  text: string;
+}
+
+/** The five stat rows shown in the unit info popup, using current ship-level
+ *  values when the unit is a ship (movement/attack/upkeep by level). */
+export function unitHelpStats(unit: Unit): UnitHelpStat[] {
+  const movement = unit.shipLevel !== undefined ? shipMovement(unit) : UNIT_TYPES[unit.type].movement;
+  const attack = unit.shipLevel !== undefined ? SHIP_ATTACK[unit.shipLevel] : UNIT_TYPES[unit.type].attack;
+  const hp = UNIT_TYPES[unit.type].maxHp;
+  const upkeep = unitMaintenance(unit);
+  const defense = unit.defense ?? 0;
+  return [
+    { icon: '16/move-16.png', text: t('help.stat.movement', { n: movement }) },
+    { icon: '16/attack-16.png', text: t('help.stat.attack', { n: attack }) },
+    { icon: '16/hp-16.png', text: t('help.stat.hp', { n: hp }) },
+    { icon: '16/gold-16.png', text: t('help.stat.upkeep', { n: upkeep }) },
+    { icon: '16/def-16.png', text: t('help.stat.defense', { n: defense }) },
+  ];
 }
 
 export function unitHelpLines(unit: Unit): string[] {

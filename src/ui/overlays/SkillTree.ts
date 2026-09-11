@@ -14,6 +14,7 @@ import { Popup } from '../kit/popup';
 import { HudMoney } from '../hud/HudMoney';
 import { HudScore } from '../hud/HudScore';
 import { makeSkillMedallion } from '../kit/skillMedallion';
+import { THEME } from '../kit/theme';
 
 const RING_SPACING = 110;
 const CX = 400;
@@ -104,7 +105,7 @@ export class SkillTree {
     };
     const el = new Container();
     const bg = new Graphics();
-    bg.rect(0, 0, host.app.screen.width, host.app.screen.height).fill(0x1a1a2e);
+    bg.rect(0, 0, host.app.screen.width, host.app.screen.height).fill(THEME.skillTree.bg);
     el.addChild(bg);
     root.addChild(el);
     this.el = el;
@@ -374,7 +375,9 @@ export class SkillTree {
     }
 
     const rootCircle = new Graphics();
-    rootCircle.circle(CX, CY, 34).fill(tribe.color).stroke({ width: 3, color: 0xffffff });
+    rootCircle.circle(CX, CY, 34)
+      .fill(tribe.color)
+      .stroke({ width: 4, color: THEME.skillTree.openedSkillStroke, alignment: 0 });
     ring.addChild(rootCircle);
     const rootName = makeLabel(tribe.name, { fontSize: 12, fill: 0xffffff });
     rootName.anchor.set(0.5, 0.5);
@@ -403,7 +406,10 @@ export class SkillTree {
       medallion.position.set(pos.x, pos.y);
       node.addChild(medallion);
 
-      const name = makeLabel(SKILLS[id].name, { fontSize: 13, fill: 0xeeeeee });
+      const name = makeLabel(SKILLS[id].name, {
+        fontSize: 13,
+        fill: opened ? THEME.skillTree.openedLabelText : THEME.skillTree.closedLabelText,
+      });
       name.anchor.set(0.5, 0.5);
       name.position.set(pos.x, pos.y + 50);
       node.addChild(name);
@@ -459,7 +465,12 @@ export class SkillTree {
     y += desc.height + 12;
 
     const stateText = opened ? t('skill.opened') : t('skill.cost', { cost: skillCost(id, human.skills.length) });
-    const state = makeLabel(stateText, { fontSize: 14, fill: 0xeeeeee, wordWrap: true, wordWrapWidth: popup.contentWidth });
+    const state = makeLabel(stateText, {
+      fontSize: 14,
+      fill: 0xeeeeee,
+      wordWrap: true,
+      wordWrapWidth: popup.contentWidth
+    });
     state.position.set(0, y);
     content.addChild(state);
 

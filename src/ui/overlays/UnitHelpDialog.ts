@@ -2,7 +2,7 @@ import { t } from '../../i18n';
 import { Container } from 'pixi.js';
 import { gameController } from '../../controller/gameController';
 import { tileAt } from '../../game/selection';
-import { unitHelpLines, unitHelpTitle } from '../../game/unitDescriptions';
+import { unitHelpLines, unitHelpTitle, unitHelpDescription, unitHelpStats } from '../../game/unitDescriptions';
 import {
   bridgeHelpLines,
   bridgeHelpTitle,
@@ -18,6 +18,7 @@ import { useGameStore } from '../../store/gameStore';
 import { type UIHost } from '../host';
 import { Button } from '../kit/button';
 import { makeLabel } from '../kit/label';
+import { makeIcon } from '../kit/icon';
 import { Popup } from '../kit/popup';
 
 export class UnitHelpDialog {
@@ -95,6 +96,49 @@ export class UnitHelpDialog {
     });
 
     let y = 0;
+    if (s.overlay?.kind !== 'unitHelp' && s.overlay?.kind !== undefined) {
+      for (const line of lines) {
+        const bullet = makeLabel(line, {
+          fontSize: 14,
+          fill: 0xeeeeee,
+          wordWrap: true,
+          wordWrapWidth: popup.contentWidth,
+        });
+        bullet.position.set(0, y);
+        y += bullet.height + 6;
+        popup.content.addChild(bullet);
+      }
+      root.addChild(popup.el);
+      this.el = popup.el;
+      this.popup = popup;
+      popup.finish();
+      return;
+    }
+
+    // Unit info: description, then stat icon rows, then feature bullets.
+    const unit = tile.unit!;
+    const desc = makeLabel(unitHelpDescription(unit), {
+      fontSize: 14,
+      fill: 0xeeeeee,
+      wordWrap: true,
+      wordWrapWidth: popup.contentWidth,
+    });
+    desc.position.set(0, y);
+    y += desc.height + 10;
+    popup.content.addChild(desc);
+
+    const statH = 18;
+    for (const stat of unitHelpStats(unit)) {
+      const icon = makeIcon(stat.icon, 16);
+      icon.anchor.set(0, 0);
+      icon.position.set(0, y + (statH - 16) / 2);
+      const label = makeLabel(stat.text, { fontSize: 14, fill: 0xeeeeee });
+      label.position.set(19, y);
+      popup.content.addChild(icon, label);
+      y += statH;
+    }
+    y += 8;
+
     for (const line of lines) {
       const bullet = makeLabel(line, {
         fontSize: 14,

@@ -4,6 +4,7 @@ import { t } from '../../i18n';
 import { type UIHost } from '../host';
 import { makeLabel } from '../kit/label';
 import { makeIconChip } from '../kit/tribeChip';
+import { makeAchievementChip, ACHIEVEMENT_ATLAS_KEYS } from '../kit/achievementIcons';
 import { Popup, POPUP_BODY_SIZE } from '../kit/popup';
 
 const MESSAGE_MS = 1400;
@@ -127,7 +128,9 @@ export class CenterMessage {
     label.anchor.set(0.5, 0);
     label.position.set(contentW / 2, chipSize + ICON_ICON_GAP);
     popup.content.addChild(label);
-    const chip = makeIconChip(iconFile, chipSize, style ? { bgColor: style.bgColor } : undefined);
+    const chip = ACHIEVEMENT_ATLAS_KEYS.has(iconFile)
+      ? makeAchievementChip(iconFile, chipSize, style ? { bgColor: style.bgColor } : undefined)
+      : makeIconChip(iconFile, chipSize, style ? { bgColor: style.bgColor } : undefined);
     chip.position.set(contentW / 2, chipSize / 2);
     popup.content.addChild(chip);
   }

@@ -5,7 +5,7 @@ import { useGameStore } from '../../store/gameStore';
 import { type UIHost } from '../host';
 import { Button } from '../kit/button';
 import { makeLabel } from '../kit/label';
-import { makeIconChip } from '../kit/tribeChip';
+import { makeAchievementChip } from '../kit/achievementIcons';
 import { Popup } from '../kit/popup';
 
 const ROW_ICON = 64;
@@ -58,7 +58,7 @@ export class AchievementsDialog {
     ];
     for (const a of ordered) {
       const row = new Container();
-      const chip = makeIconChip(a.icon, ROW_ICON, {
+      const chip = makeAchievementChip(a.icon, ROW_ICON, {
         bgColor: CHIP_BG,
         border: opened.has(a.id) ? { width: OPENED_BORDER_WIDTH, color: OPENED_BORDER_COLOR } : undefined,
       });
@@ -109,7 +109,7 @@ export class AchievementsDialog {
       onClose: () => this.closeDetail(),
     });
     const cw = popup.contentWidth;
-    const chip = makeIconChip(a.icon, DETAIL_ICON, {
+    const chip = makeAchievementChip(a.icon, DETAIL_ICON, {
       bgColor: CHIP_BG,
       border: opened.has(a.id) ? { width: OPENED_BORDER_WIDTH, color: OPENED_BORDER_COLOR } : undefined,
     });

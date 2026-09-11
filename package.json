@@ -9,6 +9,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
+    "pack:skills": "node tools/packSkills.mjs",
+    "pack:achievements": "node tools/packAchievements.mjs",
     "relay": "node server/relay.mjs"
   },
   "dependencies": {

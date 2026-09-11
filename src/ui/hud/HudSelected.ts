@@ -179,13 +179,13 @@ export class HudSelected implements Widget {
         row.addChild(title);
         let x = 10 + title.width + 7;
         for (const pair of unitRow.pairs) {
-          const icon = makeIcon(pair.icon, 16);
+          const icon = makeIcon(pair.icon, 13);
           icon.anchor.set(0, 0);
           icon.position.set(x, y + (lineH - 16) / 2);
-          const value = makeLabel(pair.value, { fontSize: 13, fill });
-          value.position.set(x + 19, y);
+          const value = makeLabel(pair.value, { fontSize: 11, fill });
+          value.position.set(x + 16, y);
           row.addChild(icon, value);
-          x += 19 + value.width + 7;
+          x += 17 + value.width + 7;
         }
         this.el.addChild(row);
         const contentW = x - 17;

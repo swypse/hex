@@ -26,15 +26,15 @@ export interface AchievementInfo {
 }
 
 const ACHIEVEMENT_ICON: Record<AchievementId, string> = {
-  greatConnector: 'achivements/achievement-great-connector.png',
-  perfectChain: 'achivements/achievement-perfect-chain.png',
-  piratePurger: 'achivements/achievement-pirate-purger.png',
-  pirateLuckyDay: 'achivements/achievement-pirates-lucky-day.png',
-  nothingLeftToLearn: 'achivements/achievement-nothing-to-learn.png',
-  tenFoesNoSurvivors: 'achivements/achievement-10-kills.png',
-  tripleSinkJob: 'achivements/achievement-3-ships-killed.png',
-  bonusHunter: 'achivements/achievement-bonus-hunter.png',
-  masterCartographer: 'achivements/achievement-explorer.png',
+  greatConnector: 'achievement-great-connector',
+  perfectChain: 'achievement-perfect-chain',
+  piratePurger: 'achievement-pirate-purger',
+  pirateLuckyDay: 'achievement-pirates-lucky-day',
+  nothingLeftToLearn: 'achievement-nothing-to-learn',
+  tenFoesNoSurvivors: 'achievement-10-kills',
+  tripleSinkJob: 'achievement-3-ships-killed',
+  bonusHunter: 'achievement-bonus-hunter',
+  masterCartographer: 'achievement-explorer',
 };
 
 function statsOf(player: Player): PlayerStats {

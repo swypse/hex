@@ -46,8 +46,8 @@ describe('attackDamage', () => {
 
 describe('counterAttackDamage', () => {
   it('scales a shield counter-attack by 50', () => {
-    expect(counterAttackDamage(makeShield('s', 0, 0, 0, 100))).toBe(50);
-    expect(counterAttackDamage(makeShield('s', 0, 0, 0, 50))).toBe(25);
+    expect(counterAttackDamage(makeShield('s', 0, 0, 0, 80))).toBe(50);
+    expect(counterAttackDamage(makeShield('s', 0, 0, 0, 40))).toBe(25);
     expect(counterAttackDamage(makeShield('s', 0, 0, 0, 1))).toBe(1);
   });
 
@@ -251,14 +251,14 @@ describe('performAttack', () => {
   it('a defending shield counters with 50-based damage', () => {
     const map: GameMap = { radius: 4, tiles: [], spawns: [] };
     const attacker = makeWarrior('a', 0, 0, 0, 50);
-    const shield = makeTile(1, 0, TileType.GrasslandLand, makeShield('s', 1, 1, 0, 100));
+    const shield = makeTile(1, 0, TileType.GrasslandLand, makeShield('s', 1, 1, 0, 80));
     map.tiles.push(makeTile(0, 0, TileType.GrasslandLand, attacker), shield);
     const result = performAttack(map, attacker, shield, noMiss);
     expect(result.attackerDamage).toBe(10);
-    // The shield counters with its hp after the hit (90): round(50 * 90 / 100) = 45.
-    expect(result.targetDamage).toBe(45);
-    expect(shield.unit!.hp).toBe(90);
-    expect(attacker.hp).toBe(5);
+    // The shield counters with its hp after the hit (70): round(50 * 70 / 80) = 44.
+    expect(result.targetDamage).toBe(44);
+    expect(shield.unit!.hp).toBe(70);
+    expect(attacker.hp).toBe(6);
     expect(result.attackerDied).toBe(false);
   });
 

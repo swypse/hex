@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { Container, Text } from 'pixi.js';
+import { Container, Sprite, Text } from 'pixi.js';
 import { UnitHelpDialog } from '../src/ui/overlays/UnitHelpDialog';
 import { gameController } from '../src/controller/gameController';
 import { useGameStore } from '../src/store/gameStore';
@@ -39,6 +39,30 @@ describe('UnitHelpDialog', () => {
   let host: UIHost;
   let root: Container;
   let map: GameMap;
+
+  function allTexts(c: Container): string[] {
+    const out: string[] = [];
+    const walk = (n: Container): void => {
+      for (const ch of n.children) {
+        if (ch instanceof Text) out.push(String((ch as Text).text));
+        if (ch instanceof Container) walk(ch as Container);
+      }
+    };
+    walk(c);
+    return out;
+  }
+
+  function allSprites(c: Container): Sprite[] {
+    const out: Sprite[] = [];
+    const walk = (n: Container): void => {
+      for (const ch of n.children) {
+        if (ch instanceof Sprite) out.push(ch as Sprite);
+        if (ch instanceof Container) walk(ch as Container);
+      }
+    };
+    walk(c);
+    return out;
+  }
 
   beforeEach(() => {
     Object.defineProperty(Text.prototype, 'width', { configurable: true, get: () => 40 });
@@ -82,6 +106,21 @@ describe('UnitHelpDialog', () => {
     const card = el.children[2] as Container;
     // card background + title + close button + at least one bullet label
     expect(card.children.length).toBeGreaterThanOrEqual(4);
+    dialog.destroy();
+  });
+
+  it('renders the description line and five 16px stat icon rows before the bullets', () => {
+    const dialog = new UnitHelpDialog();
+    dialog.mount(host, root);
+    const texts = allTexts(root);
+    expect(texts).toContain('Basic melee unit. Moves onto the tile of a unit it kills in melee.');
+    expect(texts).toContain('1 movement');
+    expect(texts).toContain('20 attack');
+    expect(texts).toContain('50 HP');
+    expect(texts).toContain('1 upkeep');
+    expect(texts).toContain('0 defense');
+    const sprites = allSprites(root).filter((s) => s.width === 16);
+    expect(sprites.length).toBe(5);
     dialog.destroy();
   });
 

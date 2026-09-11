@@ -1,29 +1,8 @@
 import { Container, Graphics } from 'pixi.js';
 import type { SkillId } from '../../game/skills';
-import { makeIcon } from './icon';
 import { makeLabel } from './label';
-
-/** Skill icon texture files, shared by the skill tree and the info-panel
- * helper buttons so both always look the same. */
-export const SKILL_ICON_FILES: Partial<Record<SkillId, string>> = {
-  climbing: 'mountain.png',
-  smithery: 'build-mine.png',
-  swordsman: 'sword.png',
-  geology: 'ore-increase.png',
-  water: 'build-port.png',
-  waterTemples: 'water-temple.png',
-  navigation: 'ship.png',
-  forestry: 'build-sawmill.png',
-  forestTemple: 'forest-temple.png',
-  science: 'miss-decrease.png',
-  roads: 'skill-roads.png',
-  shields: 'shield.png',
-  defense: 'build-wall.png',
-  catapult: 'catapult.png',
-  riding: 'horse.png',
-  bridges: 'build-bridge.png',
-  knights: 'knight.png',
-};
+import { makeSkillIcon, SKILL_ICON_FILES } from './skillIcons';
+import { THEME } from './theme';
 
 export interface SkillMedallionOpts {
   skill: SkillId;
@@ -44,13 +23,18 @@ export function makeSkillMedallion(opts: SkillMedallionOpts): Container {
 
   const bg = new Graphics();
   bg.circle(0, 0, R)
-    .fill(opts.opened ? 0xff8c00 : 0x373748)
-    .stroke({ width: Math.max(2, Math.round(size / 12)), color: opts.opened ? 0xff8c00 : 0x333333 });
+    .fill(opts.opened ? THEME.skillTree.openedSkillBg : THEME.skillTree.closedSkillBg)
+    .stroke({
+      width: Math.max(2, Math.round(size / 12)),
+      color: opts.opened ? THEME.skillTree.openedSkillStroke : THEME.skillTree.closedSkillStroke,
+      alpha: 1,
+      alignment: 0
+    });
   el.addChild(bg);
 
-  const iconFile = SKILL_ICON_FILES[opts.skill];
-  if (iconFile) {
-    const icon = makeIcon(iconFile, Math.round(size * 0.72));
+  const iconKey = SKILL_ICON_FILES[opts.skill];
+  if (iconKey) {
+    const icon = makeSkillIcon(iconKey, Math.round(size * 0.72));
     icon.position.set(0, 0);
     el.addChild(icon);
   }
@@ -59,12 +43,12 @@ export function makeSkillMedallion(opts: SkillMedallionOpts): Container {
   const badgeY = -Math.round(R * 0.78);
   const badgeR = Math.max(6, Math.round(size * 0.21));
   const badge = new Graphics();
-  badge.circle(badgeX, badgeY, badgeR).fill(0xff8c00).stroke({ width: 1, color: 0xffffff });
+  badge.circle(badgeX, badgeY, badgeR).fill(opts.opened ? THEME.skillTree.openedSkillStroke : THEME.skillTree.closedSkillStroke);
   el.addChild(badge);
 
   const label = makeLabel(opts.priceText, {
     fontSize: Math.max(8, Math.round(size * 0.26)),
-    fill: 0xffffff,
+    fill: THEME.white,
     fontWeight: '800',
   });
   label.anchor.set(0.5, 0.5);

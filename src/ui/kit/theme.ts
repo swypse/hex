@@ -10,6 +10,15 @@ export const THEME = {
   fontFamily: 'Roboto, system-ui, sans-serif',
   text: 0xeeeeee,
   white: 0xffffff,
+  skillTree: {
+    bg: 0x1a1a2e,
+    openedLabelText: 0xffffff,
+    closedLabelText: 0x444444,
+    openedSkillBg: 0x373748,
+    openedSkillStroke: 0xff8c00,
+    closedSkillBg: 0x373748,
+    closedSkillStroke: 0x333333,
+  }
 } as const;
 
 export const TEXT_BUTTON = {
