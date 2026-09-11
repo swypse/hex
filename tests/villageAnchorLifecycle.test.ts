@@ -64,6 +64,8 @@ function buildTextures(map: GameMap): TextureSet {
     captureTexture: null,
 
     wallTexture: null,
+    arrowTexture: tex(67, 13),
+    cannonballTexture: tex(35, 15),
   };
 }
 

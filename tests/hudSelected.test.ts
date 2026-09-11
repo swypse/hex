@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { Container, Sprite, Text } from 'pixi.js';
+import { Container, Graphics, Sprite, Text } from 'pixi.js';
 import { HudSelected } from '../src/ui/hud/HudSelected';
 import { useGameStore } from '../src/store/gameStore';
 import { gameController } from '../src/controller/gameController';
@@ -150,6 +150,20 @@ describe('HudSelected village building constraints', () => {
     const widths = findSprites((hud as unknown as { el: Container }).el!)
       .map((s) => s.width);
     expect(widths).toEqual([16, 16, 16, 16]);
+  });
+
+  it('draws a button-style drop shadow behind the info panel', () => {
+    mount(1, 1, 0, { unitOnVillage: true });
+    const el = (hud as unknown as { el: Container }).el!;
+    const shapes = el.children.filter((c) => c instanceof Graphics) as Graphics[];
+    const panel = shapes[0]!;
+    const shadow = shapes[1]!;
+    expect(shadow.position.x).toBe(4);
+    expect(shadow.position.y).toBe(4);
+    // The shadow card has the same footprint as the panel (before its 4px offset).
+    expect(shadow.getLocalBounds().maxX).toBeGreaterThan(0);
+    expect(shadow.getLocalBounds().maxX).toBeCloseTo(panel.getLocalBounds().maxX, 0);
+    expect(shadow.getLocalBounds().maxY).toBeCloseTo(panel.getLocalBounds().maxY, 0);
   });
 
   it('shows one help button on the Buildings line of an owned village', () => {

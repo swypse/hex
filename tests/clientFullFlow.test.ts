@@ -55,6 +55,8 @@ vi.mock('../src/render/textureFactory', async () => {
     captureTexture: null,
 
     wallTexture: null,
+    arrowTexture: tex(67, 13),
+    cannonballTexture: tex(35, 15),
   });
   return { createTextures: async (_app: Application, map: GameMap): Promise<TextureSet> => build(map) };
 });

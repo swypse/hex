@@ -179,13 +179,13 @@ export class HudSelected implements Widget {
         row.addChild(title);
         let x = 10 + title.width + 7;
         for (const pair of unitRow.pairs) {
-          const icon = makeIcon(pair.icon, 13);
+          const icon = makeIcon(pair.icon, 16);
           icon.anchor.set(0, 0);
           icon.position.set(x, y + (lineH - 16) / 2);
-          const value = makeLabel(pair.value, { fontSize: 11, fill });
-          value.position.set(x + 16, y);
+          const value = makeLabel(pair.value, { fontSize: 13, fill });
+          value.position.set(x + 19, y);
           row.addChild(icon, value);
-          x += 17 + value.width + 7;
+          x += 19 + value.width + 7;
         }
         this.el.addChild(row);
         const contentW = x - 17;
@@ -255,8 +255,17 @@ export class HudSelected implements Widget {
       contentW = Math.max(contentW, lineWidths[row.index]! + 6 + HELP_SIZE);
     }
     const bgW = contentW + 20;
+    // Button-style drop shadow under the info panel.
+    const SHADOW_OFFSET = 4;
+    const shadow = makePanel(bgW, this.measured, {
+      fill: 0x000000,
+      alpha: 0.3,
+      rightRadiusOnly: true,
+    });
+    shadow.position.set(SHADOW_OFFSET, SHADOW_OFFSET);
     const bg = makePanel(bgW, this.measured, { fill: terrainColor, alpha: 1, rightRadiusOnly: true });
     bg.position.set(0, 0);
+    this.el.addChildAt(shadow, 0);
     this.el.addChildAt(bg, 0);
 
     for (const row of helpRows) {

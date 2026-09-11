@@ -126,6 +126,10 @@ export interface TextureSet {
   villageConnectedTexture: Texture | null;
   captureTexture: Texture | null;
   wallTexture: TileTexture | null;
+  /** arrow.png projectile texture used by the archer attack animation */
+  arrowTexture: Texture | null;
+  /** cannonball.png projectile texture used by ship attacks */
+  cannonballTexture: Texture | null;
 }
 
 function hexagonPoints(size: number): number[] {
@@ -468,6 +472,8 @@ export async function createTextures(app: Application, map: GameMap, hexSize = 4
   }
   const villageConnectedTexture = await loadImageTexture(TEXTURE_BASE + VILLAGE_CONNECTED_IMAGE_FILE);
   const captureTexture = await loadImageTexture(TEXTURE_BASE + CAPTURE_IMAGE_FILE);
+  const arrowTexture = await loadImageTexture(TEXTURE_BASE + 'arrow.png');
+  const cannonballTexture = await loadImageTexture(TEXTURE_BASE + 'cannonball.png');
   const wallImg = await loadImageTexture(TEXTURE_BASE + 'wall.png');
   // Bake the wall at the same hex image-scale as villages/units so its on-map
   // footprint always matches the tile, regardless of the camera quality factor.
@@ -498,5 +504,7 @@ export async function createTextures(app: Application, map: GameMap, hexSize = 4
     villageConnectedTexture,
     captureTexture,
     wallTexture,
+    arrowTexture,
+    cannonballTexture,
   };
 }

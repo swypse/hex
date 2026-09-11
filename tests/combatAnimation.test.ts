@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { Application, Container, Graphics, ImageSource, Text, Texture } from 'pixi.js';
+import { Application, Container, Graphics, ImageSource, Sprite, Text, Texture } from 'pixi.js';
 import { gameController } from '../src/controller/gameController';
 import { Simulator } from '../src/game/simulator';
 import { GameMap, MapTile } from '../src/game/mapGen';
@@ -57,14 +57,20 @@ function buildTextures(map: GameMap): TextureSet {
     captureTexture: null,
 
     wallTexture: null,
+    arrowTexture: tex(67, 13),
+    cannonballTexture: tex(35, 15),
   };
 }
 
 function makeOpenMap(): GameMap {
+  return makeMap(3);
+}
+
+function makeMap(radius: number): GameMap {
   const tiles: MapTile[] = [];
-  for (let q = -3; q <= 3; q++) {
-    for (let r = -3; r <= 3; r++) {
-      if (Math.abs(q + r) > 3) continue;
+  for (let q = -radius; q <= radius; q++) {
+    for (let r = -radius; r <= radius; r++) {
+      if (Math.abs(q + r) > radius) continue;
       tiles.push({
         q, r,
         terrain: TileType.GrasslandLand,
@@ -79,7 +85,7 @@ function makeOpenMap(): GameMap {
       });
     }
   }
-  return { radius: 3, spawns: [], tiles };
+  return { radius, spawns: [], tiles };
 }
 
 function unitAt(map: GameMap, q: number, r: number): MapTile {
@@ -651,5 +657,710 @@ describe('combat animation ordering', () => {
     } finally {
       spy.mockRestore();
     }
+  });
+
+  it('shoots an arrow sprite from the archer toward the target and removes it on arrival', async () => {
+    const map = makeOpenMap();
+    const players = [player(0, Tribe.Cats), player(1, Tribe.Barbarians)];
+    h = setup(map, players);
+
+    const archer = makeUnit('att', 0, 0, 0, 30);
+    archer.type = 'archer';
+    unitAt(map, 0, 0).unit = archer;
+    unitAt(map, 1, 0).unit = makeUnit('def', 1, 1, 0, 40);
+    h.mapView.update(map, players, null, new Set(), new Set(), 0, new Set(), {
+      x: 0, y: 0, scale: 1, width: 800, height: 600,
+    });
+
+    const attack: GameEvent = {
+      type: 'attack', attackerId: 'att', targetId: 'def',
+      attackerIndex: 0, targetIndex: 1,
+      attackerTile: { q: 0, r: 0 }, targetTile: { q: 1, r: 0 },
+      attackerDamage: 10, targetDamage: 0, missed: false,
+      attackerDied: false, targetDied: false,
+      attackerPre: { type: 'archer', owner: 0, hp: 30 },
+      targetPre: { type: 'warrior', owner: 1, hp: 40 },
+    };
+    const p = h.gc.presentEvents([attack], h.gc.exploredKeysFor(0));
+    const findArrow = (): Sprite =>
+      h.mapRoot.children.find((c) => c instanceof Sprite && c !== null) as Sprite;
+
+    // The arrow appears near the attacker's tile once the shot launches.
+    await waitFor(() => findArrow() !== undefined);
+    const start = { x: findArrow().position.x, y: findArrow().position.y };
+    // The arrow is 5px tall (drawing its 13px-tall texture at 5/13 scale).
+    expect(findArrow().scale.y * 13).toBeCloseTo(5, 0);
+    expect(start.x).toBeGreaterThan(0);
+    expect(start.y).toBeGreaterThan(0);
+
+    // Mid-flight (~half of the 1-tile 150ms flight), the arrow has moved.
+    h.advanceTicks(80);
+    await waitFor(() => {
+      const a = findArrow();
+      return a !== undefined && Math.abs(a.position.x - start.x) > 10;
+    });
+
+    // The lunge/impact finish and the popup settles; the arrow is gone by then.
+    let settled = false;
+    const pEnd = p.finally(() => { settled = true; });
+    for (let i = 0; i < 400 && !settled; i++) {
+h.advanceTicks(100);
+      await new Promise((r) => setTimeout(r, 5));
+    }
+    await pEnd;
+  });
+
+  it('flies the arrow ~150ms per tile of distance (1 tile)', async () => {
+    const map = makeOpenMap();
+    const players = [player(0, Tribe.Cats), player(1, Tribe.Barbarians)];
+    h = setup(map, players);
+
+    const archer = makeUnit('att', 0, 0, 0, 30);
+    archer.type = 'archer';
+    unitAt(map, 0, 0).unit = archer;
+    unitAt(map, 1, 0).unit = makeUnit('def', 1, 1, 0, 40);
+    h.mapView.update(map, players, null, new Set(), new Set(), 0, new Set(), {
+      x: 0, y: 0, scale: 1, width: 800, height: 600,
+    });
+
+    const attack: GameEvent = {
+      type: 'attack', attackerId: 'att', targetId: 'def',
+      attackerIndex: 0, targetIndex: 1,
+      attackerTile: { q: 0, r: 0 }, targetTile: { q: 1, r: 0 },
+      attackerDamage: 10, targetDamage: 0, missed: false,
+      attackerDied: false, targetDied: false,
+      attackerPre: { type: 'archer', owner: 0, hp: 30 },
+      targetPre: { type: 'warrior', owner: 1, hp: 40 },
+    };
+    const p = h.gc.presentEvents([attack], h.gc.exploredKeysFor(0));
+    const findArrow = (): Sprite =>
+      h.mapRoot.children.find((c) => c instanceof Sprite && (c as Sprite).texture.width === 67) as Sprite;
+
+    await waitFor(() => findArrow() !== undefined);
+
+    let settled = false;
+    const pEnd = p.finally(() => { settled = true; });
+    let elapsed = 0;
+    // Measure how long the arrow stays on screen.
+    for (let i = 0; i < 60 && !settled; i++) {
+      h.advanceTicks(20);
+      await new Promise((r) => setTimeout(r, 5));
+      if (findArrow() === undefined) break;
+      elapsed += 20;
+    }
+    await pEnd;
+    // 1 tile -> ~150ms flight.
+    expect(elapsed).toBeGreaterThan(100);
+    expect(elapsed).toBeLessThan(300);
+  });
+
+  it('scales the cannonball flight with distance (2 tiles ~300ms)', async () => {
+    const map = makeOpenMap();
+    const players = [player(0, Tribe.Cats), player(1, Tribe.Barbarians)];
+    h = setup(map, players);
+
+    const ship = makeUnit('att', 0, 0, 0, 30);
+    ship.type = 'archer';
+    ship.shipLevel = 1;
+    unitAt(map, 0, 0).unit = ship;
+    unitAt(map, 2, 0).unit = makeUnit('def', 1, 2, 0, 40);
+    h.mapView.update(map, players, null, new Set(), new Set(), 0, new Set(), {
+      x: 0, y: 0, scale: 1, width: 800, height: 600,
+    });
+
+    const attack: GameEvent = {
+      type: 'attack', attackerId: 'att', targetId: 'def',
+      attackerIndex: 0, targetIndex: 1,
+      attackerTile: { q: 0, r: 0 }, targetTile: { q: 2, r: 0 },
+      attackerDamage: 10, targetDamage: 0, missed: false,
+      attackerDied: false, targetDied: false,
+      attackerPre: { type: 'warrior', owner: 0, hp: 30, shipLevel: 1 },
+      targetPre: { type: 'warrior', owner: 1, hp: 40 },
+    };
+    const p = h.gc.presentEvents([attack], h.gc.exploredKeysFor(0));
+    const findCannonball = (): Sprite =>
+      h.mapRoot.children.find((c) => c instanceof Sprite && (c as Sprite).texture.width === 35) as Sprite;
+
+    await waitFor(() => findCannonball() !== undefined);
+
+    let settled = false;
+    const pEnd = p.finally(() => { settled = true; });
+    let elapsed = 0;
+    for (let i = 0; i < 80 && !settled; i++) {
+      h.advanceTicks(20);
+      await new Promise((r) => setTimeout(r, 5));
+      if (findCannonball() === undefined) break;
+      elapsed += 20;
+    }
+    await pEnd;
+    // 2 tiles -> ~300ms flight (double the 1-tile duration).
+    expect(elapsed).toBeGreaterThan(220);
+    expect(elapsed).toBeLessThan(420);
+  });
+
+  it('shoots a cannonball from a pirate ship attack', async () => {
+    const map = makeOpenMap();
+    const players = [player(0, Tribe.Cats), player(1, Tribe.Barbarians)];
+    h = setup(map, players);
+
+    // A captured ship becomes a pirate unit but keeps its ship level.
+    const pirateShip = makeUnit('att', -1, 0, 0, 30);
+    pirateShip.type = 'pirate';
+    pirateShip.shipLevel = 2;
+    unitAt(map, 0, 0).unit = pirateShip;
+    unitAt(map, 1, 0).unit = makeUnit('def', 0, 1, 0, 20);
+    h.mapView.update(map, players, null, new Set(), new Set(), 0, new Set(), {
+      x: 0, y: 0, scale: 1, width: 800, height: 600,
+    });
+
+    const attack: GameEvent = {
+      type: 'attack', attackerId: 'att', targetId: 'def',
+      attackerIndex: -1, targetIndex: 0,
+      attackerTile: { q: 0, r: 0 }, targetTile: { q: 1, r: 0 },
+      attackerDamage: 6, targetDamage: 0, missed: false,
+      attackerDied: false, targetDied: false,
+      attackerPre: { type: 'pirate', owner: -1, hp: 30, shipLevel: 2 },
+      targetPre: { type: 'warrior', owner: 0, hp: 20 },
+    };
+    const p = h.gc.presentEvents([attack], h.gc.exploredKeysFor(0));
+    const findCannonball = (): Sprite =>
+      h.mapRoot.children.find((c) => c instanceof Sprite && (c as Sprite).texture.width === 35) as Sprite;
+
+    let launched = false;
+    for (let i = 0; i < 40 && !launched; i++) {
+      h.advanceTicks(50);
+      await new Promise((r) => setTimeout(r, 5));
+      launched = findCannonball() !== undefined;
+    }
+    expect(launched).toBe(true);
+
+    let settled = false;
+    const pEnd = p.finally(() => { settled = true; });
+    for (let i = 0; i < 100 && !settled; i++) {
+      h.advanceTicks(100);
+      await new Promise((r) => setTimeout(r, 5));
+    }
+    await pEnd;
+    expect(findCannonball()).toBeUndefined();
+  });
+
+  it('fires a cannonball back from a pirate ship counter-attack', async () => {
+    const map = makeOpenMap();
+    const players = [player(0, Tribe.Cats), player(1, Tribe.Barbarians)];
+    h = setup(map, players);
+
+    const attacker = makeUnit('att', 0, 0, 0, 50);
+    unitAt(map, 0, 0).unit = attacker;
+    const pirateShip = makeUnit('def', -1, 1, 0, 30);
+    pirateShip.type = 'pirate';
+    pirateShip.shipLevel = 2;
+    unitAt(map, 1, 0).unit = pirateShip;
+    h.mapView.update(map, players, null, new Set(), new Set(), 0, new Set(), {
+      x: 0, y: 0, scale: 1, width: 800, height: 600,
+    });
+
+    const attack: GameEvent = {
+      type: 'attack', attackerId: 'att', targetId: 'def',
+      attackerIndex: 0, targetIndex: -1,
+      attackerTile: { q: 0, r: 0 }, targetTile: { q: 1, r: 0 },
+      attackerDamage: 5, targetDamage: 5, missed: false,
+      attackerDied: false, targetDied: false,
+      attackerPre: { type: 'warrior', owner: 0, hp: 50 },
+      targetPre: { type: 'pirate', owner: -1, hp: 30, shipLevel: 2 },
+    };
+    const p = h.gc.presentEvents([attack], h.gc.exploredKeysFor(0));
+    const findCannonball = (): Sprite =>
+      h.mapRoot.children.find((c) => c instanceof Sprite && (c as Sprite).texture.width === 35) as Sprite;
+
+    let launched = false;
+    for (let i = 0; i < 60 && !launched; i++) {
+      h.advanceTicks(50);
+      await new Promise((r) => setTimeout(r, 5));
+      launched = findCannonball() !== undefined;
+    }
+    expect(launched).toBe(true);
+
+    let settled = false;
+    const pEnd = p.finally(() => { settled = true; });
+    for (let i = 0; i < 100 && !settled; i++) {
+      h.advanceTicks(100);
+      await new Promise((r) => setTimeout(r, 5));
+    }
+    await pEnd;
+    expect(findCannonball()).toBeUndefined();
+  });
+
+  it('fires an arrow back from the target archer during its counter-attack', async () => {
+    const map = makeOpenMap();
+    const players = [player(0, Tribe.Cats), player(1, Tribe.Barbarians)];
+    h = setup(map, players);
+
+    // Attacker is melee (no attack projectile), so any arrow sprite that shows
+    // up is the counter-attack shot from the archer target.
+    const attacker = makeUnit('att', 0, 0, 0, 50);
+    unitAt(map, 0, 0).unit = attacker;
+    const archer = makeUnit('def', 1, 1, 0, 30);
+    archer.type = 'archer';
+    unitAt(map, 1, 0).unit = archer;
+    h.mapView.update(map, players, null, new Set(), new Set(), 0, new Set(), {
+      x: 0, y: 0, scale: 1, width: 800, height: 600,
+    });
+
+    const attack: GameEvent = {
+      type: 'attack', attackerId: 'att', targetId: 'def',
+      attackerIndex: 0, targetIndex: 1,
+      attackerTile: { q: 0, r: 0 }, targetTile: { q: 1, r: 0 },
+      attackerDamage: 5, targetDamage: 5, missed: false,
+      attackerDied: false, targetDied: false,
+      attackerPre: { type: 'warrior', owner: 0, hp: 50 },
+      targetPre: { type: 'archer', owner: 1, hp: 30 },
+    };
+    const p = h.gc.presentEvents([attack], h.gc.exploredKeysFor(0));
+    const findCounterArrow = (): Sprite =>
+      h.mapRoot.children.find((c) => c instanceof Sprite && (c as Sprite).texture.width === 67) as Sprite;
+
+    // The counter shot appears after the attack lands (drive the lunge ticker)
+    // and flies toward the attacker (leftward, from target hex 1,0).
+    let launched = false;
+    for (let i = 0; i < 40 && !launched; i++) {
+      h.advanceTicks(50);
+      await new Promise((r) => setTimeout(r, 5));
+      launched = findCounterArrow() !== undefined;
+    }
+    expect(launched).toBe(true);
+    const start = findCounterArrow().position.x;
+    h.advanceTicks(80);
+    expect(findCounterArrow().position.x).toBeLessThan(start - 10);
+
+    let settled = false;
+    const pEnd = p.finally(() => { settled = true; });
+    for (let i = 0; i < 400 && !settled; i++) {
+      h.advanceTicks(100);
+      await new Promise((r) => setTimeout(r, 5));
+    }
+    await pEnd;
+    expect(findCounterArrow()).toBeUndefined();
+  });
+
+  it('fires a cannonball back from a ship during its counter-attack', async () => {
+    const map = makeOpenMap();
+    const players = [player(0, Tribe.Cats), player(1, Tribe.Barbarians)];
+    h = setup(map, players);
+
+    const attacker = makeUnit('att', 0, 0, 0, 50);
+    unitAt(map, 0, 0).unit = attacker;
+    const ship = makeUnit('def', 1, 1, 0, 30);
+    ship.type = 'archer';
+    ship.shipLevel = 1;
+    unitAt(map, 1, 0).unit = ship;
+    h.mapView.update(map, players, null, new Set(), new Set(), 0, new Set(), {
+      x: 0, y: 0, scale: 1, width: 800, height: 600,
+    });
+
+    const attack: GameEvent = {
+      type: 'attack', attackerId: 'att', targetId: 'def',
+      attackerIndex: 0, targetIndex: 1,
+      attackerTile: { q: 0, r: 0 }, targetTile: { q: 1, r: 0 },
+      attackerDamage: 5, targetDamage: 5, missed: false,
+      attackerDied: false, targetDied: false,
+      attackerPre: { type: 'warrior', owner: 0, hp: 50 },
+      targetPre: { type: 'archer', owner: 1, hp: 30, shipLevel: 1 },
+    };
+    const p = h.gc.presentEvents([attack], h.gc.exploredKeysFor(0));
+    const findCounterCannonball = (): Sprite =>
+      h.mapRoot.children.find((c) => c instanceof Sprite && (c as Sprite).texture.width === 35) as Sprite;
+
+    let launched = false;
+    for (let i = 0; i < 40 && !launched; i++) {
+      h.advanceTicks(50);
+      await new Promise((r) => setTimeout(r, 5));
+      launched = findCounterCannonball() !== undefined;
+    }
+    expect(launched).toBe(true);
+    expect(findCounterCannonball().position.x).toBeGreaterThan(0);
+
+    let settled = false;
+    const pEnd = p.finally(() => { settled = true; });
+    for (let i = 0; i < 400 && !settled; i++) {
+      h.advanceTicks(100);
+      await new Promise((r) => setTimeout(r, 5));
+    }
+    await pEnd;
+    expect(findCounterCannonball()).toBeUndefined();
+  });
+
+  it('flips the arrow horizontally when the archer shoots left (RTL)', async () => {
+    const map = makeOpenMap();
+    const players = [player(0, Tribe.Cats), player(1, Tribe.Barbarians)];
+    h = setup(map, players);
+
+    const archer = makeUnit('att', 0, 0, 0, 30);
+    archer.type = 'archer';
+    unitAt(map, 0, 0).unit = archer;
+    unitAt(map, -1, 0).unit = makeUnit('def', 1, -1, 0, 40);
+    h.mapView.update(map, players, null, new Set(), new Set(), 0, new Set(), {
+      x: 0, y: 0, scale: 1, width: 800, height: 600,
+    });
+
+    const attack: GameEvent = {
+      type: 'attack', attackerId: 'att', targetId: 'def',
+      attackerIndex: 0, targetIndex: 1,
+      attackerTile: { q: 0, r: 0 }, targetTile: { q: -1, r: 0 },
+      attackerDamage: 10, targetDamage: 0, missed: false,
+      attackerDied: false, targetDied: false,
+      attackerPre: { type: 'archer', owner: 0, hp: 30 },
+      targetPre: { type: 'warrior', owner: 1, hp: 40 },
+    };
+    const p = h.gc.presentEvents([attack], h.gc.exploredKeysFor(0));
+    const findArrow = (): Sprite =>
+      h.mapRoot.children.find((c) => c instanceof Sprite && c !== null) as Sprite;
+
+    await waitFor(() => findArrow() !== undefined);
+    h.advanceTicks(80);
+    expect(findArrow().scale.x).toBeLessThan(0);
+
+    let settled = false;
+    const pEnd = p.finally(() => { settled = true; });
+    for (let i = 0; i < 400 && !settled; i++) {
+      h.advanceTicks(100);
+      await new Promise((r) => setTimeout(r, 5));
+    }
+    await pEnd;
+  });
+
+  it('shoots an arrow even on a missed archer attack', async () => {
+    const map = makeOpenMap();
+    const players = [player(0, Tribe.Cats), player(1, Tribe.Barbarians)];
+    h = setup(map, players);
+
+    const archer = makeUnit('att', 0, 0, 0, 30);
+    archer.type = 'archer';
+    unitAt(map, 0, 0).unit = archer;
+    unitAt(map, 1, 0).unit = makeUnit('def', 1, 1, 0, 40);
+    h.mapView.update(map, players, null, new Set(), new Set(), 0, new Set(), {
+      x: 0, y: 0, scale: 1, width: 800, height: 600,
+    });
+
+    const attack: GameEvent = {
+      type: 'attack', attackerId: 'att', targetId: 'def',
+      attackerIndex: 0, targetIndex: 1,
+      attackerTile: { q: 0, r: 0 }, targetTile: { q: 1, r: 0 },
+      attackerDamage: 0, targetDamage: 0, missed: true,
+      attackerDied: false, targetDied: false,
+      attackerPre: { type: 'archer', owner: 0, hp: 30 },
+      targetPre: { type: 'warrior', owner: 1, hp: 40 },
+    };
+    const p = h.gc.presentEvents([attack], h.gc.exploredKeysFor(0));
+    const findArrow = (): Sprite =>
+      h.mapRoot.children.find((c) => c instanceof Sprite && c !== null) as Sprite;
+
+    await waitFor(() => findArrow() !== undefined);
+
+    let settled = false;
+    const pEnd = p.finally(() => { settled = true; });
+    for (let i = 0; i < 400 && !settled; i++) {
+      h.advanceTicks(100);
+      await new Promise((r) => setTimeout(r, 5));
+    }
+    await pEnd;
+  });
+
+  it('shoots a cannonball sprite from the ship toward the target and removes it on arrival', async () => {
+    const map = makeOpenMap();
+    const players = [player(0, Tribe.Cats), player(1, Tribe.Barbarians)];
+    h = setup(map, players);
+
+    const ship = makeUnit('att', 0, 0, 0, 30);
+    ship.type = 'archer';
+    ship.shipLevel = 1;
+    unitAt(map, 0, 0).unit = ship;
+    unitAt(map, 1, 0).unit = makeUnit('def', 1, 1, 0, 40);
+    h.mapView.update(map, players, null, new Set(), new Set(), 0, new Set(), {
+      x: 0, y: 0, scale: 1, width: 800, height: 600,
+    });
+
+    const attack: GameEvent = {
+      type: 'attack', attackerId: 'att', targetId: 'def',
+      attackerIndex: 0, targetIndex: 1,
+      attackerTile: { q: 0, r: 0 }, targetTile: { q: 1, r: 0 },
+      attackerDamage: 10, targetDamage: 0, missed: false,
+      attackerDied: false, targetDied: false,
+      attackerPre: { type: 'warrior', owner: 0, hp: 30, shipLevel: 1 },
+      targetPre: { type: 'warrior', owner: 1, hp: 40 },
+    };
+    const p = h.gc.presentEvents([attack], h.gc.exploredKeysFor(0));
+    const findCannonball = (): Sprite =>
+      h.mapRoot.children.find((c) => c instanceof Sprite && (c as Sprite).texture.width === 35) as Sprite;
+
+    await waitFor(() => findCannonball() !== undefined);
+    const start = { x: findCannonball().position.x, y: findCannonball().position.y };
+    expect(start.x).toBeGreaterThan(0);
+
+    h.advanceTicks(80);
+    await waitFor(() => {
+      const c = findCannonball();
+      return c !== undefined && Math.abs(c.position.x - start.x) > 10;
+    });
+
+    let settled = false;
+    const pEnd = p.finally(() => { settled = true; });
+    for (let i = 0; i < 400 && !settled; i++) {
+      h.advanceTicks(100);
+      await new Promise((r) => setTimeout(r, 5));
+    }
+    await pEnd;
+    expect(findCannonball()).toBeUndefined();
+  });
+
+  it('flips the cannonball horizontally when the ship shoots left (RTL)', async () => {
+    const map = makeOpenMap();
+    const players = [player(0, Tribe.Cats), player(1, Tribe.Barbarians)];
+    h = setup(map, players);
+
+    const ship = makeUnit('att', 0, 0, 0, 30);
+    ship.type = 'archer';
+    ship.shipLevel = 1;
+    unitAt(map, 0, 0).unit = ship;
+    unitAt(map, -1, 0).unit = makeUnit('def', 1, -1, 0, 40);
+    h.mapView.update(map, players, null, new Set(), new Set(), 0, new Set(), {
+      x: 0, y: 0, scale: 1, width: 800, height: 600,
+    });
+
+    const attack: GameEvent = {
+      type: 'attack', attackerId: 'att', targetId: 'def',
+      attackerIndex: 0, targetIndex: 1,
+      attackerTile: { q: 0, r: 0 }, targetTile: { q: -1, r: 0 },
+      attackerDamage: 10, targetDamage: 0, missed: false,
+      attackerDied: false, targetDied: false,
+      attackerPre: { type: 'warrior', owner: 0, hp: 30, shipLevel: 1 },
+      targetPre: { type: 'warrior', owner: 1, hp: 40 },
+    };
+    const p = h.gc.presentEvents([attack], h.gc.exploredKeysFor(0));
+    const findCannonball = (): Sprite =>
+      h.mapRoot.children.find((c) => c instanceof Sprite && (c as Sprite).texture.width === 35) as Sprite;
+
+    await waitFor(() => findCannonball() !== undefined);
+    h.advanceTicks(80);
+    expect(findCannonball().scale.x).toBeLessThan(0);
+
+    let settled = false;
+    const pEnd = p.finally(() => { settled = true; });
+    for (let i = 0; i < 400 && !settled; i++) {
+      h.advanceTicks(100);
+      await new Promise((r) => setTimeout(r, 5));
+    }
+    await pEnd;
+  });
+
+  it('shoots a cannonball sprite from the catapult toward its target', async () => {
+    const map = makeOpenMap();
+    const players = [player(0, Tribe.Cats), player(1, Tribe.Barbarians)];
+    h = setup(map, players);
+
+    const catapult = makeUnit('att', 0, 0, 0, 30);
+    catapult.type = 'catapult';
+    unitAt(map, 0, 0).unit = catapult;
+    unitAt(map, 1, 0).unit = makeUnit('def', 1, 1, 0, 40);
+    h.mapView.update(map, players, null, new Set(), new Set(), 0, new Set(), {
+      x: 0, y: 0, scale: 1, width: 800, height: 600,
+    });
+
+    const attack: GameEvent = {
+      type: 'attack', attackerId: 'att', targetId: 'def',
+      attackerIndex: 0, targetIndex: 1,
+      attackerTile: { q: 0, r: 0 }, targetTile: { q: 1, r: 0 },
+      attackerDamage: 20, targetDamage: 0, missed: false,
+      attackerDied: false, targetDied: false,
+      attackerPre: { type: 'catapult', owner: 0, hp: 30 },
+      targetPre: { type: 'warrior', owner: 1, hp: 40 },
+    };
+    const p = h.gc.presentEvents([attack], h.gc.exploredKeysFor(0));
+    const findCannonball = (): Sprite =>
+      h.mapRoot.children.find((c) => c instanceof Sprite && (c as Sprite).texture.width === 35) as Sprite;
+
+    await waitFor(() => findCannonball() !== undefined);
+    const startY = findCannonball().position.y;
+    // At mid-flight the catapult ball must sit far above the launch height
+    // (higher arc than the ship's flat cannonball lob).
+    h.advanceTicks(80);
+    const midY = findCannonball().position.y;
+    expect(startY - midY).toBeGreaterThan(30);
+
+    let settled = false;
+    const pEnd = p.finally(() => { settled = true; });
+    for (let i = 0; i < 400 && !settled; i++) {
+      h.advanceTicks(100);
+      await new Promise((r) => setTimeout(r, 5));
+    }
+    await pEnd;
+    expect(findCannonball()).toBeUndefined();
+  });
+
+  it('lobs the ship cannonball on a lower arc than the catapult', async () => {
+    const map = makeOpenMap();
+    const players = [player(0, Tribe.Cats), player(1, Tribe.Barbarians)];
+    h = setup(map, players);
+
+    const ship = makeUnit('att', 0, 0, 0, 30);
+    ship.type = 'archer';
+    ship.shipLevel = 1;
+    unitAt(map, 0, 0).unit = ship;
+    unitAt(map, 1, 0).unit = makeUnit('def', 1, 1, 0, 40);
+    h.mapView.update(map, players, null, new Set(), new Set(), 0, new Set(), {
+      x: 0, y: 0, scale: 1, width: 800, height: 600,
+    });
+
+    const attack: GameEvent = {
+      type: 'attack', attackerId: 'att', targetId: 'def',
+      attackerIndex: 0, targetIndex: 1,
+      attackerTile: { q: 0, r: 0 }, targetTile: { q: 1, r: 0 },
+      attackerDamage: 10, targetDamage: 0, missed: false,
+      attackerDied: false, targetDied: false,
+      attackerPre: { type: 'warrior', owner: 0, hp: 30, shipLevel: 1 },
+      targetPre: { type: 'warrior', owner: 1, hp: 40 },
+    };
+    const p = h.gc.presentEvents([attack], h.gc.exploredKeysFor(0));
+    const findCannonball = (): Sprite =>
+      h.mapRoot.children.find((c) => c instanceof Sprite && (c as Sprite).texture.width === 35) as Sprite;
+
+    await waitFor(() => findCannonball() !== undefined);
+    const startY = findCannonball().position.y;
+    h.advanceTicks(80);
+    const midY = findCannonball().position.y;
+    // Ship (and archer) keep the flatter trajectory; well under the catapult arc.
+    expect(startY - midY).toBeLessThan(30);
+
+    let settled = false;
+    const pEnd = p.finally(() => { settled = true; });
+    for (let i = 0; i < 400 && !settled; i++) {
+      h.advanceTicks(100);
+      await new Promise((r) => setTimeout(r, 5));
+    }
+    await pEnd;
+  });
+
+  it('pans the camera toward an off-screen enemy attack', async () => {
+    const map = makeMap(12);
+    const players = [player(0, Tribe.Cats), player(1, Tribe.Barbarians)];
+    h = setup(map, players);
+    const camera = h.gc.camera as {
+      pan: { x: number; y: number };
+      isWorldPointVisible: (w: { x: number; y: number }) => boolean;
+      animateTo: (t: { x: number; y: number }) => Promise<void>;
+    };
+    const panBefore = { ...camera.pan };
+
+    // Enemy unit far to the right (screen x ~1093 with pan 400 + 2-tile margin).
+    const attacker = makeUnit('att', 1, 10, 0, 5);
+    attacker.type = 'warrior';
+    unitAt(map, 10, 0).unit = attacker;
+    unitAt(map, 9, 0).unit = makeUnit('def', 0, 9, 0, 5);
+    h.mapView.update(map, players, null, new Set(), new Set(), 0, new Set(), {
+      x: 0, y: 0, scale: 1, width: 800, height: 600,
+    });
+
+    const attack: GameEvent = {
+      type: 'attack', attackerId: 'att', targetId: 'def',
+      attackerIndex: 1, targetIndex: 0,
+      attackerTile: { q: 10, r: 0 }, targetTile: { q: 9, r: 0 },
+      attackerDamage: 2, targetDamage: 1, missed: false,
+      attackerDied: false, targetDied: false,
+      attackerPre: { type: 'warrior', owner: 1, hp: 5 },
+      targetPre: { type: 'warrior', owner: 0, hp: 5 },
+    };
+    const p = h.gc.presentEvents([attack], h.gc.exploredKeysFor(0));
+
+    let settled = false;
+    const pEnd = p.finally(() => { settled = true; });
+    for (let i = 0; i < 400 && !settled; i++) {
+      h.advanceTicks(100);
+      await new Promise((r) => setTimeout(r, 5));
+    }
+    await pEnd;
+
+    // The camera must have moved noticeably toward the off-screen attack.
+    expect(camera.pan.x).toBeLessThan(panBefore.x - 50);
+  });
+
+  it('pans the camera toward an off-screen pirate attack', async () => {
+    const map = makeMap(12);
+    const players = [player(0, Tribe.Cats), player(1, Tribe.Barbarians)];
+    h = setup(map, players);
+    const camera = h.gc.camera as {
+      pan: { x: number; y: number };
+      isWorldPointVisible: (w: { x: number; y: number }) => boolean;
+      animateTo: (t: { x: number; y: number }) => Promise<void>;
+    };
+    const panBefore = { ...camera.pan };
+
+    const pirate = makeUnit('pirate', -1, 10, 0, 15);
+    pirate.type = 'pirate';
+    unitAt(map, 10, 0).unit = pirate;
+    unitAt(map, 9, 0).unit = makeUnit('def', 0, 9, 0, 5);
+    h.mapView.update(map, players, null, new Set(), new Set(), 0, new Set(), {
+      x: 0, y: 0, scale: 1, width: 800, height: 600,
+    });
+
+    const attack: GameEvent = {
+      type: 'attack', attackerId: 'pirate', targetId: 'def',
+      attackerIndex: -1, targetIndex: 0,
+      attackerTile: { q: 10, r: 0 }, targetTile: { q: 9, r: 0 },
+      attackerDamage: 3, targetDamage: 0, missed: false,
+      attackerDied: false, targetDied: false,
+      attackerPre: { type: 'pirate', owner: -1, hp: 15 },
+      targetPre: { type: 'warrior', owner: 0, hp: 5 },
+    };
+    const p = h.gc.presentEvents([attack], h.gc.exploredKeysFor(0));
+
+    let settled = false;
+    const pEnd = p.finally(() => { settled = true; });
+    for (let i = 0; i < 400 && !settled; i++) {
+      h.advanceTicks(100);
+      await new Promise((r) => setTimeout(r, 5));
+    }
+    await pEnd;
+
+    expect(camera.pan.x).toBeLessThan(panBefore.x - 50);
+  });
+
+  it('does not repan the camera for a visible enemy attack', async () => {
+    const map = makeOpenMap();
+    const players = [player(0, Tribe.Cats), player(1, Tribe.Barbarians)];
+    h = setup(map, players);
+    const camera = h.gc.camera as {
+      pan: { x: number; y: number };
+      isWorldPointVisible: (w: { x: number; y: number }) => boolean;
+      animateTo: (t: { x: number; y: number }) => Promise<void>;
+    };
+    const panBefore = { ...camera.pan };
+
+    const attacker = makeUnit('att', 1, 1, 0, 5);
+    attacker.type = 'warrior';
+    unitAt(map, 1, 0).unit = attacker;
+    unitAt(map, 0, 0).unit = makeUnit('def', 0, 0, 0, 5);
+    h.mapView.update(map, players, null, new Set(), new Set(), 0, new Set(), {
+      x: 0, y: 0, scale: 1, width: 800, height: 600,
+    });
+
+    const attack: GameEvent = {
+      type: 'attack', attackerId: 'att', targetId: 'def',
+      attackerIndex: 1, targetIndex: 0,
+      attackerTile: { q: 1, r: 0 }, targetTile: { q: 0, r: 0 },
+      attackerDamage: 2, targetDamage: 1, missed: false,
+      attackerDied: false, targetDied: false,
+      attackerPre: { type: 'warrior', owner: 1, hp: 5 },
+      targetPre: { type: 'warrior', owner: 0, hp: 5 },
+    };
+    const p = h.gc.presentEvents([attack], h.gc.exploredKeysFor(0));
+
+    let settled = false;
+    const pEnd = p.finally(() => { settled = true; });
+    for (let i = 0; i < 400 && !settled; i++) {
+      h.advanceTicks(100);
+      await new Promise((r) => setTimeout(r, 5));
+    }
+    await pEnd;
+
+    expect(camera.pan.x).toBeCloseTo(panBefore.x, 0);
   });
 });

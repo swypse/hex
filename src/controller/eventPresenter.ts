@@ -1,4 +1,4 @@
-import { Application, Container, Graphics, Sprite, Text } from 'pixi.js';
+import { Application, Container, Graphics, Sprite, Text, Texture } from 'pixi.js';
 import { Simulator } from '../game/simulator';
 import { AttackUnitPre, GameEvent } from '../game/events';
 import { MapTile } from '../game/mapGen';
@@ -7,7 +7,7 @@ import { TRIBES } from '../game/tribes';
 import { canAttack, canMove, HEAL_AMOUNT, PIRATE_OWNER, Unit, UNIT_TYPES } from '../game/units';
 import { tileAt } from '../game/selection';
 import { isExploredFor } from '../game/explore';
-import { axialKey, hexToPixel } from '../game/hex';
+import { axialKey, hexDistance, hexToPixel } from '../game/hex';
 import { tileElevation } from '../render/elevation';
 import { MapView } from '../render/mapRenderer';
 import { TextureSet } from '../render/textureFactory';
@@ -35,6 +35,9 @@ const DEATH_STAGGER_MS = 700;
 
 const COMBAT_DEATH_GAP_MS = 350;
 const COMBAT_ADVANCE_MS = 180;
+
+/** Arrow projectile flight time for the archer attack animation (ms). */
+const PROJECTILE_MS_PER_TILE = 150;
 
 const ACH_CHIP_BG = 0x373748;
 const ACH_CHIP_SIZE = 64;
@@ -324,10 +327,49 @@ export class EventPresenter {
     const targetVisible = targetTile !== undefined && isExploredFor(targetTile, local);
     const mapView = this.host.mapView();
 
+    // Follow enemy/pirate attacks that happen off-screen, the same way moves
+    // center the camera on an off-screen enemy step.
+    const attackerIsEnemyOrPirate = e.attackerIndex !== local;
+    if (
+      attackerIsEnemyOrPirate &&
+      attackerVisible &&
+      attackerTile !== undefined
+    ) {
+      await this.host.bringCellIntoView(attackerTile.q, attackerTile.r);
+    }
+
     const audible = attackerVisible || targetVisible;
     const plan = attackSound(e.attackerPre?.type, e.missed, e.attackerPre?.shipLevel !== undefined);
     const impact = audible ? plan.impact : undefined;
     if (audible && plan.launch) sfx.play(plan.launch);
+
+    // Land archers shoot a visible arrow projectile along an arc to the target.
+    if (
+      plan.launch === 'arcShot' &&
+      attackerVisible &&
+      attackerTile !== undefined &&
+      targetTile !== undefined
+    ) {
+      this.spawnArrow(attackerTile, targetTile);
+    }
+    // Ships fire a cannonball projectile along the same trajectory.
+    if (
+      e.attackerPre?.shipLevel !== undefined &&
+      attackerVisible &&
+      attackerTile !== undefined &&
+      targetTile !== undefined
+    ) {
+      this.spawnCannonball(attackerTile, targetTile);
+    }
+    // Catapults lob a cannonball projectile on a higher arc at their ranged target.
+    if (
+      e.attackerPre?.type === 'catapult' &&
+      attackerVisible &&
+      attackerTile !== undefined &&
+      targetTile !== undefined
+    ) {
+      this.spawnCatapultBall(attackerTile, targetTile);
+    }
 
     // In the final sim state a melee attacker that killed its target already
     // stands on the target tile; detect that so we can animate the advance.
@@ -485,11 +527,20 @@ export class EventPresenter {
     }
 
     // Then the target answers with its own attack animation when it deals
-    // counter damage (sim: the target counters when it survives).
+    // counter damage (sim: the target counters when it survives). Ranged
+    // defenders (archers, ships, catapults) fire their own projectile back
+    // once the initial attack animation has finished.
     if (e.targetDamage > 0) {
       const counterFacing: 'left' | 'right' = facing === 'left' ? 'right' : 'left';
       mapView.faceUnitAtKey(targetKey, counterFacing);
-      await mapView.lungeUnit(targetKey, attackerKey, 10 / scale);
+      const targetPre = e.targetPre!;
+      if (targetPre.type === 'archer' && targetPre.shipLevel === undefined) {
+        await this.spawnArrowFromTo(targetTile, attackerTile);
+      } else if (targetPre.shipLevel !== undefined || targetPre.type === 'catapult') {
+        await this.spawnCannonballFromTo(targetTile, attackerTile, targetPre.type === 'catapult');
+      } else {
+        await mapView.lungeUnit(targetKey, attackerKey, 10 / scale);
+      }
       this.spawnHpText(attackerTile, `-${e.targetDamage}`, 0xff4444);
       attacker.hp = Math.max(0, attacker.hp - e.targetDamage);
       this.host.render();
@@ -830,6 +881,120 @@ export class EventPresenter {
       }
     };
     ticker.add(fn);
+  }
+
+  /** Spawns a projectile that flies along an arc from the attacker's hex to the
+ *  target's hex center, rotating to follow the trajectory, and removes itself
+ *  on arrival. The texture points right; leftward shots are flipped
+ *  horizontally so the projectile never appears upside-down. */
+  private spawnProjectile(
+    fromTile: MapTile,
+    toTile: MapTile,
+    texture: Texture,
+    heightPx: number,
+    /** Multiplier applied to the arc height. 1 keeps the standard archer/ship
+     *  lob; catapults use a higher value for a loftier trajectory. */
+    arcFactor = 1,
+  ): Promise<void> {
+    return new Promise<void>((resolve) => {
+      const app = this.host.app();
+      const mapRoot = this.host.mapRoot();
+      if (!app || !mapRoot) {
+        resolve();
+        return;
+      }
+      const camera = this.host.camera();
+      const scale = camera.scale;
+      const fromWorld = hexToPixel(fromTile, HEX_SIZE);
+      const toWorld = hexToPixel(toTile, HEX_SIZE);
+      const px = (world: { x: number; y: number }, tile: MapTile): { x: number; y: number } => ({
+        x: camera.pan.x + world.x * scale,
+        y: camera.pan.y + (world.y - tileElevation(tile, HEX_SIZE)) * scale,
+      });
+      const start = px(fromWorld, fromTile);
+      const end = px(toWorld, toTile);
+      const dist = Math.hypot(end.x - start.x, end.y - start.y) || 1;
+      // Arc apex above the straight line, scaled with the camera.
+      const arcHeight = Math.max(10, Math.min(44, dist * 0.3) * arcFactor) * Math.max(1, scale);
+
+      const sprite = new Sprite(texture);
+      sprite.anchor.set(0.5);
+      // Fixed `heightPx`-tall projectile; scale keeps the texture aspect ratio.
+      const base = (heightPx / (texture.height || 1)) * Math.max(1, scale);
+      sprite.scale.set(base, base);
+      sprite.zIndex = 12;
+      mapRoot.addChild(sprite);
+      sprite.position.set(start.x, start.y);
+
+      const startTime = performance.now();
+      const ticker = app.ticker;
+      let finished = false;
+      const flightMs = Math.max(1, hexDistance(fromTile, toTile)) * PROJECTILE_MS_PER_TILE;
+      const finish = (): void => {
+        if (finished) return;
+        finished = true;
+        ticker.remove(fn);
+        mapRoot.removeChild(sprite);
+        sprite.destroy();
+        resolve();
+      };
+      const fn = (): void => {
+        const t = Math.min(1, (performance.now() - startTime) / flightMs);
+        // Position follows a linear x/y path with an upward sine-bulge.
+        const k = Math.sin(t * Math.PI);
+        const x = start.x + (end.x - start.x) * t;
+        const y = start.y + (end.y - start.y) * t - arcHeight * k;
+        sprite.position.set(x, y);
+        // The tangent of the arc: derive the y-bulge term and rotate to match.
+        const dx = end.x - start.x;
+        const dy = end.y - start.y - arcHeight * Math.PI * Math.cos(t * Math.PI);
+        const angle = Math.atan2(dy, dx);
+        const leftward = Math.cos(angle) < 0;
+        // Pixi applies scale then rotation: with scale.x = -1 the sprite's +x
+        // axis maps to (-cos rot, -sin rot). Flip into the mirrored angle so the
+        // projectile still points along the trajectory while the texture stays
+        // upright (never upside-down on leftward shots).
+        if (leftward) {
+          sprite.scale.x = -base;
+          sprite.rotation = angle > 0 ? angle - Math.PI : angle + Math.PI;
+        } else {
+          sprite.scale.x = base;
+          sprite.rotation = angle;
+        }
+        if (t >= 1) finish();
+      };
+      ticker.add(fn);
+    });
+  }
+
+  /** Archer shot: a 5px-tall arrow projectile (fire-and-forget). */
+  private spawnArrow(fromTile: MapTile, toTile: MapTile): void {
+    this.spawnArrowFromTo(fromTile, toTile).catch(() => {});
+  }
+
+  /** Ship shot: a cannonball projectile (fire-and-forget). */
+  private spawnCannonball(fromTile: MapTile, toTile: MapTile): void {
+    this.spawnCannonballFromTo(fromTile, toTile, false).catch(() => {});
+  }
+
+  /** Catapult shot: a cannonball lobbed on a loftier arc (fire-and-forget). */
+  private spawnCatapultBall(fromTile: MapTile, toTile: MapTile): void {
+    this.spawnCannonballFromTo(fromTile, toTile, true).catch(() => {});
+  }
+
+  /** Arrow projectile that resolves when the shot has landed. */
+  private spawnArrowFromTo(fromTile: MapTile, toTile: MapTile): Promise<void> {
+    const texture = this.host.textures()?.arrowTexture;
+    if (!texture) return Promise.resolve();
+    return this.spawnProjectile(fromTile, toTile, texture, 5);
+  }
+
+  /** Cannonball projectile that resolves when the shot has landed; catapults
+   *  use a loftier arc. */
+  private spawnCannonballFromTo(fromTile: MapTile, toTile: MapTile, catapult: boolean): Promise<void> {
+    const texture = this.host.textures()?.cannonballTexture;
+    if (!texture) return Promise.resolve();
+    return this.spawnProjectile(fromTile, toTile, texture, 10, catapult ? 2.2 : 1);
   }
 
   private spawnDeath(tile: MapTile): void {
