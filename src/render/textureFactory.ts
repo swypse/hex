@@ -36,6 +36,7 @@ const FOG_RIGHT_WALL = 0xc2a4ca;
 const VILLAGE_CONNECTED_IMAGE_FILE = 'village-connected.png';
 const SAWMILL_IMAGE_FILE = 'sawmill.png';
 const MINE_IMAGE_FILE = 'mine.png';
+const BOTTLE_IMAGE_FILE = 'bottle-on-water.png';
 
 /** Baked left/right vertical wall colours for each terrain group. */
 const TERRAIN_SIDE_COLORS: Partial<Record<TileType, { left: number; right: number }>> = {
@@ -113,6 +114,7 @@ export interface TextureSet {
   villageTextures: Record<Tribe, { level1: TileTexture; level2: TileTexture }>;
   freeVillageTexture: TileTexture;
   bonusTexture: TileTexture;
+  bottleTexture: TileTexture;
   unitTextures: Record<Tribe, Record<UnitType, TileTexture>>;
   pirateTexture: TileTexture;
   sawmillTexture: TileTexture;
@@ -489,6 +491,9 @@ export async function createTextures(app: Application, map: GameMap, hexSize = 4
     bonusTexture:
       makeUnitImageTexture(app, await loadImageTexture(TEXTURE_BASE + 'bonus.png'), hexSize) ??
       { texture: makeVillageTexture(app, 0xffd700, hexSize), anchorY: 1 },
+    bottleTexture:
+      makeUnitImageTexture(app, await loadImageTexture(TEXTURE_BASE + BOTTLE_IMAGE_FILE), hexSize) ??
+      { texture: makeBuildingTexture(app, 0x7fd8f5, hexSize), anchorY: 0.5 },
     unitTextures,
     pirateTexture:
       makeUnitImageTexture(app, await loadImageTexture(TEXTURE_BASE + PIRATE_IMAGE_FILE), hexSize) ??

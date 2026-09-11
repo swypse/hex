@@ -266,7 +266,7 @@ export class HudSelected implements Widget {
     const bg = makePanel(bgW, this.measured, { fill: terrainColor, alpha: 1, rightRadiusOnly: true });
     bg.position.set(0, 0);
     this.el.addChildAt(shadow, 0);
-    this.el.addChildAt(bg, 0);
+    this.el.addChildAt(bg, 1);
 
     for (const row of helpRows) {
       const btn = new Container();

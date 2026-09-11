@@ -230,6 +230,84 @@ describe('roads', () => {
   });
 });
 
+describe('ports as water network', () => {
+  it('connects own villages through ports linked by own water', () => {
+    const map = mapWith([
+      villageTile(0, 0, 0),
+      tile(1, 0, TileType.GrasslandLand, { roadOwner: 0 }),
+      tile(2, 0, TileType.Water, { building: { kind: 'port', level: 1 }, ownedBy: 0 }),
+      tile(3, 0, TileType.Water, { ownedBy: 0 }),
+      tile(4, 0, TileType.Water, { building: { kind: 'port', level: 1 }, ownedBy: 0 }),
+      tile(5, 0, TileType.GrasslandLand, { roadOwner: 0 }),
+      villageTile(6, 0, 0),
+    ]);
+    expect(isVillageRoadConnected(map, map.tiles[0]!)).toBe(true);
+    expect(isVillageRoadConnected(map, map.tiles[6]!)).toBe(true);
+  });
+
+  it('does not connect villages through ports with an unowned water gap', () => {
+    const map = mapWith([
+      villageTile(0, 0, 0),
+      tile(1, 0, TileType.GrasslandLand, { roadOwner: 0 }),
+      tile(2, 0, TileType.Water, { building: { kind: 'port', level: 1 }, ownedBy: 0 }),
+      tile(3, 0, TileType.Water),
+      tile(4, 0, TileType.Water, { building: { kind: 'port', level: 1 }, ownedBy: 0 }),
+      tile(5, 0, TileType.GrasslandLand, { roadOwner: 0 }),
+      villageTile(6, 0, 0),
+    ]);
+    expect(isVillageRoadConnected(map, map.tiles[0]!)).toBe(false);
+    expect(isVillageRoadConnected(map, map.tiles[6]!)).toBe(false);
+  });
+
+  it('does not connect through a single port (a component with no pair)', () => {
+    const map = mapWith([
+      villageTile(0, 0, 0),
+      tile(1, 0, TileType.GrasslandLand, { roadOwner: 0 }),
+      tile(2, 0, TileType.Water, { building: { kind: 'port', level: 1 }, ownedBy: 0 }),
+      tile(3, 0, TileType.Water, { ownedBy: 0 }),
+      tile(4, 0, TileType.GrasslandLand),
+    ]);
+    expect(isVillageRoadConnected(map, map.tiles[0]!)).toBe(false);
+  });
+});
+
+describe('ports as water network via the simulator', () => {
+  it('connects villages once a second port is placed on the same own water', () => {
+    const map = mapWith([
+      tile(0, 0, TileType.GrasslandLand, { settlement: { owner: 0, level: 1, captureReady: false }, ownedBy: 0 }),
+      tile(1, 0, TileType.GrasslandLand, { roadOwner: 0, ownedBy: 0 }),
+      tile(2, 0, TileType.Water, { building: { kind: 'port', level: 1 }, ownedBy: 0 }),
+      tile(3, 0, TileType.Water, { ownedBy: 0 }),
+      tile(4, 0, TileType.Water, { ownedBy: 0 }),
+      tile(5, 0, TileType.GrasslandLand, { roadOwner: 0, ownedBy: 0 }),
+      tile(6, 0, TileType.GrasslandLand, { settlement: { owner: 0, level: 1, captureReady: false }, ownedBy: 0 }),
+    ]);
+    // A single port alone reaches no other node.
+    expect(isVillageRoadConnected(map, map.tiles[0]!)).toBe(false);
+    // The second port completes the water connection.
+    map.tiles[4]!.building = { kind: 'port', level: 1 };
+    expect(isVillageRoadConnected(map, map.tiles[0]!)).toBe(true);
+    expect(isVillageRoadConnected(map, map.tiles[6]!)).toBe(true);
+  });
+
+  it('drops the connection when the water bridge is no longer owned', () => {
+    const map = mapWith([
+      tile(0, 0, TileType.GrasslandLand, { settlement: { owner: 0, level: 1, captureReady: false }, ownedBy: 0 }),
+      tile(1, 0, TileType.GrasslandLand, { roadOwner: 0, ownedBy: 0 }),
+      tile(2, 0, TileType.Water, { building: { kind: 'port', level: 1 }, ownedBy: 0 }),
+      tile(3, 0, TileType.Water, { ownedBy: 0 }),
+      tile(4, 0, TileType.Water, { building: { kind: 'port', level: 1 }, ownedBy: 0 }),
+      tile(5, 0, TileType.GrasslandLand, { roadOwner: 0, ownedBy: 0 }),
+      tile(6, 0, TileType.GrasslandLand, { settlement: { owner: 0, level: 1, captureReady: false }, ownedBy: 0 }),
+    ]);
+    expect(isVillageRoadConnected(map, map.tiles[0]!)).toBe(true);
+    // The village capturing hands the middle water to another player.
+    map.tiles[3]!.ownedBy = 1;
+    expect(isVillageRoadConnected(map, map.tiles[0]!)).toBe(false);
+    expect(isVillageRoadConnected(map, map.tiles[6]!)).toBe(false);
+  });
+});
+
 describe('bridges as roads', () => {
   function bridgeMap(secondOwner: number): MapTile[] {
     const bridge = tile(1, 0, TileType.Water, { roadOwner: 0 });

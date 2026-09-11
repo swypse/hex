@@ -70,6 +70,7 @@ function buildTextures(map: GameMap): TextureSet {
     },
     shipTextures,
     bonusTexture: tileTex(50, 50),
+    bottleTexture: tileTex(50, 50),
     villageConnectedTexture: null,
     captureTexture: null,
 

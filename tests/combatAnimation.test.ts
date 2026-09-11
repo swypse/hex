@@ -53,6 +53,7 @@ function buildTextures(map: GameMap): TextureSet {
     forestTempleTextures: { 1: tileTex(1, 1), 2: tileTex(1, 1), 3: tileTex(1, 1), 4: tileTex(1, 1) },
     shipTextures,
     bonusTexture: tileTex(50, 50),
+    bottleTexture: tileTex(50, 50),
     villageConnectedTexture: null,
     captureTexture: null,
 

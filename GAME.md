@@ -71,6 +71,12 @@ freshly spawned unit must wait until the next turn.
   it. A pirate adjacent to a ship tries to **capture** it with a 25% success chance: on success the ship becomes a
   pirate ship (keeping its HP and damage); on failure the pirate loses 2 HP and the ship loses 1 HP. Killing a pirate
   gives 30 points.
+- **Bottles:** floating message-in-a-bottle treasures. Every third turn there is a 10% chance a bottle floats onto a
+  random free (non-owned) water hex; several bottles can be on the map at once, and each lives 5 turns before
+  disappearing. When a ship moves onto a bottle tile, the **Get bottle** action becomes available on the next turn
+  (shown while selecting that water hex). Collecting consumes the ship's whole turn and randomly grants one effect:
+  **+50 money**, a **random unopened skill**, or **+20 ship HP**. AI ships collect bottles automatically at the start
+  of their turn.
 
 ## Unit actions
 
@@ -94,6 +100,11 @@ freshly spawned unit must wait until the next turn.
   land hexes: the tile becomes walkable land-with-road for units, still lets ships sail under it, and connects to
   neighbouring roads. Can't be built on a port, water temple, or occupied tile, and ports/water temples can't be built
   on a bridge.
+- **Auto port connections** — a player's own ports are connected automatically, drawn as a light-blue route over the
+  shortest path of own water tiles between them. Two ports connect only when a path over own water cells exists (each of
+  a cluster's ports is reachable); otherwise they stay unconnected. Villages reached through a port's water route count
+  as connected like roads. Water-route tiles never grant movement bonuses. Connections are recomputed live as territory
+  and ownership change (a captured village can dissolve or create them).
 
 ## Fog of war
 

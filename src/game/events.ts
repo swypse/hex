@@ -3,6 +3,7 @@ import { SkillId } from './skills';
 import { UnitType } from './units';
 import type { BonusKind } from './bonus';
 import type { AchievementId } from './achievements';
+import type { BottleEffect } from './bottles';
 
 export type BuildingKind = 'sawmill' | 'mine' | 'port' | 'temple' | 'forestTemple';
 
@@ -36,6 +37,7 @@ export type GameEvent =
   | { type: 'scoreFly'; playerIndex: number; amount: number; q: number; r: number }
   | { type: 'knightCombo'; unitId: string; q: number; r: number; playerIndex: number }
   | { type: 'bonusClaimed'; q: number; r: number; kind: BonusKind; playerIndex: number; skill?: SkillId }
+  | { type: 'bottleCollected'; q: number; r: number; kind: BottleEffect; playerIndex: number; skill?: SkillId }
   | { type: 'explorer'; q: number; r: number; path: Axial[]; playerIndex: number }
   | { type: 'pirateCapture'; q: number; r: number; playerIndex: number; success: boolean }
   | { type: 'pirateSpawned'; q: number; r: number }

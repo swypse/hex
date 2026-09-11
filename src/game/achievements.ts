@@ -4,6 +4,7 @@ import type { GameMap, MapTile } from './mapGen';
 import type { Player } from './players';
 import { awardScore, EMPTY_STATS, type PlayerStats } from './score';
 import { SKILLS } from './skills';
+import { portWaterClusterJumps } from './waterRoads';
 
 export type AchievementId =
   | 'greatConnector'
@@ -56,6 +57,7 @@ function isNetworkNode(tile: MapTile, player: Player): boolean {
  *  bridges and ports. */
 function largestVillageCluster(map: GameMap, player: Player): number {
   const byKey = new Map(map.tiles.map((t) => [axialKey(t), t] as const));
+  const waterJumps = portWaterClusterJumps(map);
   const visited = new Set<string>();
   let best = 0;
   for (const start of map.tiles) {
@@ -65,6 +67,17 @@ function largestVillageCluster(map: GameMap, player: Player): number {
     visited.add(axialKey(start));
     while (queue.length > 0) {
       const cur = queue.shift()!;
+      // Ports in the same own-water cluster are effectively adjacent, so a
+      // village reached through a port's water route joins this cluster.
+      const siblings = waterJumps.get(axialKey(cur));
+      if (siblings) {
+        for (const sk of siblings) {
+          if (visited.has(sk)) continue;
+          visited.add(sk);
+          const t = byKey.get(sk);
+          if (t) queue.push(t);
+        }
+      }
       if (cur.settlement !== null && cur.settlement.owner === player.index) villages += 1;
       for (const n of hexNeighbors(cur)) {
         const tile = byKey.get(axialKey(n));

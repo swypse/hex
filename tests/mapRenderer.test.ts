@@ -64,6 +64,7 @@ function buildTextures(map: GameMap): TextureSet {
     },
     shipTextures: shipTex,
     bonusTexture: tileTex(50, 50),
+    bottleTexture: tileTex(40, 40, 0.5),
     villageConnectedTexture: null,
     captureTexture: null,
 
@@ -1287,6 +1288,171 @@ describe('MapView road fog visibility', () => {
       x: 400, y: 300, scale: 1, width: 800, height: 600,
     });
     expect(tvs.get(fogKey)!.roadGraphics).not.toBeNull();
+  });
+});
+
+describe('MapView water roads', () => {
+  function waterTile(q: number, r: number, opts: { port?: boolean; ownedBy?: number | null } = {}): MapTile {
+    return {
+      q, r, terrain: TileType.Water, height: 0.1, settlement: null,
+      building: opts.port ? { kind: 'port', level: 1 } : null, roadOwner: null, unit: null,
+      ownedBy: opts.ownedBy !== undefined ? opts.ownedBy : null,
+      claimedByVillage: null, exploredBy: [0],
+    };
+  }
+
+  let map: GameMap;
+  let players: Player[];
+  let textures: TextureSet;
+  let view: MapView;
+
+  beforeEach(() => {
+    Object.defineProperty(Text.prototype, 'width', { configurable: true, get: () => 40 });
+    Object.defineProperty(Text.prototype, 'height', { configurable: true, get: () => 14 });
+    map = {
+      radius: 1,
+      spawns: [],
+      tiles: [
+        waterTile(0, 0, { port: true, ownedBy: 0 }),
+        waterTile(1, 0, { ownedBy: 0 }),
+        waterTile(2, 0, { port: true, ownedBy: 0 }),
+      ],
+    };
+    players = [
+      { index: 0, tribe: Tribe.Cats, isHuman: true, name: 'Cats', resources: { ...START_RESOURCES }, score: 0, kills: 0, skills: [], isActive: true },
+      { index: 1, tribe: Tribe.Aqua, isHuman: false, name: 'Aqua', resources: { ...START_RESOURCES }, score: 0, kills: 0, skills: [], isActive: true },
+    ];
+    textures = buildTextures(map);
+    const app = {
+      screen: { width: 800, height: 600 },
+      ticker: { add: (): void => {}, remove: (): void => {} },
+    } as unknown as Application;
+    view = new MapView(app, textures, HEX, SPRITE_SCALE, 2);
+  });
+
+  afterEach(() => {
+    view.destroy();
+  });
+
+  it('draws a light-blue water road between connected own ports', () => {
+    view.update(map, players, null, new Set(), new Set(), 0, new Set(), {
+      x: 400, y: 300, scale: 1, width: 800, height: 600,
+    });
+    const tvs = (view as unknown as { tileViews: Map<string, { roadGraphics: Graphics | null }> }).tileViews;
+    const g = tvs.get('1,0')!.roadGraphics;
+    expect(g).not.toBeNull();
+    const ctx = g!.context as unknown as {
+      instructions: Array<{ action: string; data: { style: { color: number } } }>;
+    };
+    const strokes = ctx.instructions.filter((i) => i.action === 'stroke');
+    expect(strokes.length).toBeGreaterThan(0);
+    expect(strokes[0]!.data.style.color).toBe(0x7fd8f5);
+  });
+
+  it('does not draw a water road over an unowned gap', () => {
+    map = {
+      radius: 1,
+      spawns: [],
+      tiles: [
+        waterTile(0, 0, { port: true, ownedBy: 0 }),
+        waterTile(1, 0, { ownedBy: null }),
+        waterTile(2, 0, { port: true, ownedBy: 0 }),
+      ],
+    };
+    textures = buildTextures(map);
+    view.destroy();
+    const app = {
+      screen: { width: 800, height: 600 },
+      ticker: { add: (): void => {}, remove: (): void => {} },
+    } as unknown as Application;
+    view = new MapView(app, textures, HEX, SPRITE_SCALE, 2);
+    view.update(map, players, null, new Set(), new Set(), 0, new Set(), {
+      x: 400, y: 300, scale: 1, width: 800, height: 600,
+    });
+    const tvs = (view as unknown as { tileViews: Map<string, { roadGraphics: Graphics | null }> }).tileViews;
+    expect(tvs.get('1,0')!.roadGraphics).toBeNull();
+  });
+
+  it('reveals the water road once the route tiles become owned', () => {
+    view.update(map, players, null, new Set(), new Set(), 0, new Set(), {
+      x: 400, y: 300, scale: 1, width: 800, height: 600,
+    });
+    const tvs = (view as unknown as { tileViews: Map<string, { roadGraphics: Graphics | null }> }).tileViews;
+    expect(tvs.get('1,0')!.roadGraphics).not.toBeNull();
+    // Simulate a border change: tile 1 passes to another player, splitting the
+    // route; the road must disappear.
+    map.tiles[1]!.ownedBy = 1;
+    view.update(map, players, null, new Set(), new Set(), 0, new Set(), {
+      x: 400, y: 300, scale: 1, width: 800, height: 600,
+    });
+    expect(tvs.get('1,0')!.roadGraphics).toBeNull();
+  });
+});
+
+describe('MapView bottles', () => {
+  function waterTile(q: number, r: number, opts: { bottle?: boolean; explored?: boolean } = {}): MapTile {
+    const t: MapTile = {
+      q, r, terrain: TileType.Water, height: 0.1, settlement: null,
+      building: null, roadOwner: null, unit: null,
+      ownedBy: null, claimedByVillage: null,
+      exploredBy: opts.explored !== undefined && opts.explored ? [0] : [],
+    };
+    if (opts.bottle) t.bottle = { bornTurn: 3, arrivalTurn: 0 };
+    return t;
+  }
+
+  let players: Player[];
+  let textures: TextureSet;
+  let view: MapView;
+
+  beforeEach(() => {
+    Object.defineProperty(Text.prototype, 'width', { configurable: true, get: () => 40 });
+    Object.defineProperty(Text.prototype, 'height', { configurable: true, get: () => 14 });
+    players = [
+      { index: 0, tribe: Tribe.Cats, isHuman: true, name: 'Cats', resources: { ...START_RESOURCES }, score: 0, kills: 0, skills: [], isActive: true },
+    ];
+    const map: GameMap = { radius: 1, spawns: [], tiles: [waterTile(0, 0, { bottle: true, explored: true }), waterTile(1, 0, { explored: true })] };
+    textures = buildTextures(map);
+    const app = {
+      screen: { width: 800, height: 600 },
+      ticker: { add: (): void => {}, remove: (): void => {} },
+    } as unknown as Application;
+    view = new MapView(app, textures, HEX, SPRITE_SCALE, 2);
+  });
+
+  afterEach(() => {
+    view.destroy();
+  });
+
+  it('shows a bottle sprite floating above an explored water tile with a bottle', () => {
+    view.update({ radius: 1, spawns: [], tiles: [waterTile(0, 0, { bottle: true, explored: true }), waterTile(1, 0, { explored: true })] }, players, null, new Set(), new Set(), 0, new Set(), {
+      x: 400, y: 300, scale: 1, width: 800, height: 600,
+    });
+    const tvs = (view as unknown as { tileViews: Map<string, { bottleSprite: Sprite | null }> }).tileViews;
+    expect(tvs.get('0,0')!.bottleSprite).not.toBeNull();
+    expect(tvs.get('1,0')!.bottleSprite).toBeNull();
+  });
+
+  it('hides the bottle sprite on an unexplored tile', () => {
+    view.update({ radius: 1, spawns: [], tiles: [waterTile(0, 0, { bottle: true }), waterTile(1, 0, { explored: true })] }, players, null, new Set(), new Set(), 0, new Set(), {
+      x: 400, y: 300, scale: 1, width: 800, height: 600,
+    });
+    const tvs = (view as unknown as { tileViews: Map<string, { bottleSprite: Sprite | null }> }).tileViews;
+    expect(tvs.get('0,0')!.bottleSprite).toBeNull();
+  });
+
+  it('removes the bottle sprite once the bottle expires', () => {
+    const tiles = [waterTile(0, 0, { bottle: true, explored: true }), waterTile(1, 0, { explored: true })];
+    view.update({ radius: 1, spawns: [], tiles }, players, null, new Set(), new Set(), 0, new Set(), {
+      x: 400, y: 300, scale: 1, width: 800, height: 600,
+    });
+    const tvs = (view as unknown as { tileViews: Map<string, { bottleSprite: Sprite | null }> }).tileViews;
+    expect(tvs.get('0,0')!.bottleSprite).not.toBeNull();
+    tiles[0]!.bottle = undefined;
+    view.update({ radius: 1, spawns: [], tiles }, players, null, new Set(), new Set(), 0, new Set(), {
+      x: 400, y: 300, scale: 1, width: 800, height: 600,
+    });
+    expect(tvs.get('0,0')!.bottleSprite).toBeNull();
   });
 });
 

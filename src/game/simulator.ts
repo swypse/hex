@@ -16,12 +16,13 @@ import { awardScore, awardTempleScores, CAPTURE_SCORE, COMBO_SCORE, EMPTY_STATS,
 import { hasSkill, openSkill as applySkill, randomUnopenedSkill, SkillId } from './skills';
 import { evaluateAchievements, awardAchievementScores, currentlyMetIds, type AchievementId } from './achievements';
 import { gainShipAbility, revertShip, upgradeShip } from './ship';
-import { moveRange, canAttack, canDisband, canHeal, canMove, disbandCost, healUnit, makeUnit, unitMaintenance, PIRATE_OWNER, Unit, UnitType, UNIT_MOVEMENT } from './units';
+import { moveRange, canAttack, canDisband, canHeal, canMove, disbandCost, healUnit, makeUnit, unitMaintenance, PIRATE_OWNER, UNIT_TYPES, Unit, UnitType, UNIT_MOVEMENT } from './units';
 import { reachableTargets, moveUnit, pathBetween, tileAt } from './selection';
 import { spawnUnit } from './spawn';
 import { exploreUnitPath } from './explore';
 import { knownTribesFor } from './discovery';
 import { isWaterType, TileType } from './tileTypes';
+import { BOTTLE_HEAL, BOTTLE_MONEY, bottleCollectableFor, collectExpiredBottles, randomBottleEffectKind, touchBottle, trySpawnBottle } from './bottles';
 import { upgradeVillage, buildWall as applyWall, canBuildWall, WALL_COST } from './village';
 import { SeededRandom } from '../util/random';
 import type { GameStateSnapshot } from './state';
@@ -42,6 +43,7 @@ export type Command =
   | { type: 'disband'; unitId: string }
   | { type: 'shipLanding'; unitId: string; q: number; r: number }
   | { type: 'claimBonus' }
+  | { type: 'getBottle' }
   | { type: 'endTurn' }
   | { type: 'giveToAI'; playerIndex: number }
   | { type: 'forfeit'; playerIndex: number };
@@ -190,6 +192,9 @@ export class Simulator {
       case 'claimBonus':
         ok = this.doClaimBonus();
         break;
+      case 'getBottle':
+        ok = this.doGetBottle();
+        break;
       case 'endTurn':
         this.doEndTurn();
         ok = true;
@@ -301,6 +306,7 @@ export class Simulator {
     exploreUnitPath(this.map, path, unit, unit.owner);
     this.clearAbandonedReady(fromTile, unit.owner);
     this.touchBonus(target, unit);
+    touchBottle(target, this.turn);
     if (canUsePort(target, player) && unit.shipLevel === undefined) {
       gainShipAbility(unit);
       unit.hasAttacked = true;
@@ -556,6 +562,7 @@ export class Simulator {
     moveUnit(this.map, unit, target);
     exploreUnitPath(this.map, path, unit, unit.owner);
     this.touchBonus(target, unit);
+    touchBottle(target, this.turn);
     revertShip(unit);
     // Landing consumes the whole turn: the unit may not move, attack, or heal
     // again until the next turn.
@@ -644,6 +651,53 @@ export class Simulator {
     }
   }
 
+  /** Collects a bottle the current player's ship has reached. Consumes the
+   *  ship's whole turn and applies a random effect. */
+  private doGetBottle(): boolean {
+    const player = this.currentPlayer;
+    const tile = bottleCollectableFor(this.map, player.index, this.turn)[0];
+    if (!tile?.bottle || !tile.unit) return false;
+    const unit = tile.unit;
+    const kind = randomBottleEffectKind(this.rng);
+    let skill: SkillId | undefined;
+    if (kind === 'money') {
+      player.resources.money += BOTTLE_MONEY;
+      this.emitScoreFly(player.index, BOTTLE_MONEY, tile);
+    } else if (kind === 'skill') {
+      const s = randomUnopenedSkill(player, this.rng);
+      if (s) {
+        player.skills.push(s);
+        skill = s;
+      } else {
+        player.resources.money += BOTTLE_MONEY;
+        this.emitScoreFly(player.index, BOTTLE_MONEY, tile);
+      }
+    } else {
+      unit.hp = Math.min(UNIT_TYPES[unit.type].maxHp, unit.hp + BOTTLE_HEAL);
+    }
+    unit.hasMoved = true;
+    unit.hasAttacked = true;
+    unit.hasHealed = true;
+    delete (tile as { bottle?: unknown }).bottle;
+    this.emit({
+      type: 'bottleCollected',
+      q: tile.q,
+      r: tile.r,
+      kind: skill !== undefined ? 'skill' : kind,
+      playerIndex: player.index,
+      skill,
+    });
+    return true;
+  }
+
+  /** AI ships fish out any bottle they are standing on at the start of their
+   *  turn, before planning other actions. */
+  private collectAiBottles(playerIndex: number): void {
+    while (bottleCollectableFor(this.map, playerIndex, this.turn).length > 0) {
+      this.doGetBottle();
+    }
+  }
+
   private touchBonus(tile: MapTile, unit: Unit): void {
     if (tile.bonus) {
       tile.bonus.claimer = unit.owner;
@@ -696,6 +750,7 @@ export class Simulator {
         this.runPirateTurn();
         this.applyIncome();
         this.turn += 1;
+        this.runBottleTurn();
         this.growTemples();
         this.resetUnitFlags();
         this.evaluateAchievementsForAll();
@@ -718,6 +773,7 @@ export class Simulator {
     const ai = this.players[playerIndex]!;
     logAiTurnStart(ai, this.turn);
     this.doClaimBonus();
+    this.collectAiBottles(playerIndex);
     this.markCaptureReadyFor(playerIndex);
     this.emit({ type: 'aiTurn', playerIndex });
     const markers: AiActionMarker[] = [];
@@ -780,6 +836,12 @@ export class Simulator {
       acted.add(u.id);
       this.pirateAct(u);
     }
+  }
+
+  /** Age out old bottles and maybe float a new one in each third turn. */
+  private runBottleTurn(): void {
+    collectExpiredBottles(this.map, this.turn);
+    trySpawnBottle(this.map, this.turn, this.rng);
   }
 
   private trySpawnPirate(): void {

@@ -5,6 +5,7 @@ import { canAfford, pay, Resources } from './resources';
 import { tileAt } from './selection';
 import { hasSkill } from './skills';
 import { isWaterType } from './tileTypes';
+import { portWaterClusterJumps } from './waterRoads';
 
 export const ROAD_COST: Resources = { wood: 5, stone: 2, money: 10, ore: 0 };
 
@@ -46,7 +47,11 @@ export function buildRoad(map: GameMap, tile: MapTile, player: Player): boolean 
   return true;
 }
 
-export function isVillageRoadConnected(map: GameMap, villageTile: MapTile): boolean {
+export function isVillageRoadConnected(
+  map: GameMap,
+  villageTile: MapTile,
+  waterJumps: Map<string, Set<string>> = portWaterClusterJumps(map),
+): boolean {
   const owner = villageTile.settlement?.owner;
   if (owner === null || owner === undefined) return false;
   const byKey = new Map(map.tiles.map((t) => [axialKey(t), t] as const));
@@ -60,6 +65,17 @@ export function isVillageRoadConnected(map: GameMap, villageTile: MapTile): bool
   const queue: MapTile[] = [villageTile];
   while (queue.length > 0) {
     const cur = queue.shift()!;
+    // Ports in the same own-water cluster are effectively adjacent: a village
+    // reached through a port's water route counts as connected.
+    const siblings = waterJumps.get(axialKey(cur));
+    if (siblings) {
+      for (const sk of siblings) {
+        if (visited.has(sk)) continue;
+        visited.add(sk);
+        const t = byKey.get(sk);
+        if (t) queue.push(t);
+      }
+    }
     for (const n of hexNeighbors(cur)) {
       const t = byKey.get(axialKey(n));
       if (!t || visited.has(axialKey(t)) || !isNode(t)) continue;

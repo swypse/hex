@@ -256,6 +256,9 @@ export class EventPresenter {
             this.presentBonusClaimed(e);
             if (e.playerIndex === local) sfx.play('claim');
             break;
+          case 'bottleCollected':
+            this.presentBottleCollected(e);
+            break;
           case 'explorer':
             await this.presentExplorer(e);
             break;
@@ -735,6 +738,16 @@ export class EventPresenter {
       explorer: 'An explorer is scouting the land',
     };
     store.setCenterMessage(`Bonus: ${messages[e.kind]}`);
+  }
+
+  private presentBottleCollected(e: Extract<GameEvent, { type: 'bottleCollected' }>): void {
+    if (e.playerIndex !== useGameStore.getState().localPlayerIndex) return;
+    const messages = {
+      money: t('msg.bottleMoney'),
+      skill: e.skill ? t('msg.bottleSkill', { skill: SKILLS[e.skill].name }) : t('msg.bottleMoney'),
+      heal: t('msg.bottleHeal'),
+    };
+    useGameStore.getState().setCenterMessage(messages[e.kind], 'bottle.png');
   }
 
   private async presentExplorer(e: Extract<GameEvent, { type: 'explorer' }>): Promise<void> {

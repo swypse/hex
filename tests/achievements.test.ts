@@ -109,6 +109,42 @@ describe('achievements', () => {
     expect(evaluateAchievements(mapOf(tiles), p)).not.toContain('greatConnector');
   });
 
+  it('unlocks The Great Connector when villages are linked through ports over own water', () => {
+    const tiles = [
+      tile(0, 0, { settlement: { owner: 0, level: 1, captureReady: false }, ownedBy: 0 }),
+      tile(1, 0, { roadOwner: 0 }),
+      tile(2, 0, { terrain: TileType.Water, building: { kind: 'port', level: 1 }, ownedBy: 0 }),
+      tile(3, 0, { terrain: TileType.Water, ownedBy: 0 }),
+      tile(4, 0, { terrain: TileType.Water, building: { kind: 'port', level: 1 }, ownedBy: 0 }),
+      tile(5, 0, { roadOwner: 0 }),
+      tile(6, 0, { settlement: { owner: 0, level: 1, captureReady: false }, ownedBy: 0 }),
+      tile(7, 0, { roadOwner: 0 }),
+      tile(8, 0, { settlement: { owner: 0, level: 1, captureReady: false }, ownedBy: 0 }),
+      tile(9, 0, { roadOwner: 0 }),
+      tile(10, 0, { settlement: { owner: 0, level: 1, captureReady: false }, ownedBy: 0 }),
+    ];
+    const p = player();
+    expect(evaluateAchievements(mapOf(tiles), p)).toContain('greatConnector');
+  });
+
+  it('does not unlock The Great Connector when the water gap between ports is unowned', () => {
+    const tiles = [
+      tile(0, 0, { settlement: { owner: 0, level: 1, captureReady: false }, ownedBy: 0 }),
+      tile(1, 0, { roadOwner: 0 }),
+      tile(2, 0, { terrain: TileType.Water, building: { kind: 'port', level: 1 }, ownedBy: 0 }),
+      tile(3, 0, { terrain: TileType.Water }),
+      tile(4, 0, { terrain: TileType.Water, building: { kind: 'port', level: 1 }, ownedBy: 0 }),
+      tile(5, 0, { roadOwner: 0 }),
+      tile(6, 0, { settlement: { owner: 0, level: 1, captureReady: false }, ownedBy: 0 }),
+      tile(7, 0, { roadOwner: 0 }),
+      tile(8, 0, { settlement: { owner: 0, level: 1, captureReady: false }, ownedBy: 0 }),
+      tile(9, 0, { roadOwner: 0 }),
+      tile(10, 0, { settlement: { owner: 0, level: 1, captureReady: false }, ownedBy: 0 }),
+    ];
+    const p = player();
+    expect(evaluateAchievements(mapOf(tiles), p)).not.toContain('greatConnector');
+  });
+
   it('unlocks Master Cartographer only when every tile is explored', () => {
     const p = player();
     expect(evaluateAchievements(mapOf([tile(0, 0), tile(1, 0)]), p)).toEqual([]);

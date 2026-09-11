@@ -11,6 +11,7 @@ import { canBuildRoad, ROAD_COST } from '../../game/roads';
 import { canBuildBridge, BRIDGE_COST } from '../../game/bridges';
 import { BuildingKind } from '../../game/events';
 import { bonusEligibleFor } from '../../game/bonus';
+import { bottleCollectableFor } from '../../game/bottles';
 
 export interface ToolbarSpec {
   key: string;
@@ -123,6 +124,16 @@ export function toolbarSpecs(): ToolbarSpec[] {
     bonusEligibleFor(map, store.localPlayerIndex, store.turn).some((t) => t.q === tile.q && t.r === tile.r)
   ) {
     out.push({ key: 'bonus', label: t('ui.getthebonus'), disabled: false, onClick: () => gameController.claimBonus() });
+  }
+
+  if (
+    tile.bottle &&
+    !store.aiActive &&
+    !store.gameOver &&
+    !store.paused &&
+    bottleCollectableFor(map, store.localPlayerIndex, store.turn).some((t) => t.q === tile.q && t.r === tile.r)
+  ) {
+    out.push({ key: 'bottle', label: t('ui.getbottle'), disabled: false, onClick: () => gameController.getBottle() });
   }
 
   return out;

@@ -47,6 +47,7 @@ vi.mock('../src/render/textureFactory', async () => {
     forestTempleTextures: { 1: tileTex(40, 40, 0.7), 2: tileTex(40, 40, 0.7), 3: tileTex(40, 40, 0.7), 4: tileTex(40, 40, 0.7) },
     shipTextures,
     bonusTexture: tileTex(50, 50),
+    bottleTexture: tileTex(50, 50),
     villageConnectedTexture: null,
     captureTexture: null,
     wallTexture: null,

@@ -93,11 +93,48 @@ describe('tileSignature', () => {
     expect(a).not.toBe(b);
   });
 
+  it('changes when a tile joins a water route', () => {
+    const map = generateMap(2, 42);
+    const t = map.tiles[0]!;
+    const a = tileSignature(t, map, 0, new Set());
+    const b = tileSignature(t, map, 0, new Set(), undefined, undefined, new Map([[axialKey(t), ['1,0']]]));
+    expect(a).not.toBe(b);
+  });
+
+  it('changes when a water route reconnects to a different neighbour', () => {
+    const map = generateMap(2, 42);
+    const t = map.tiles[0]!;
+    const a = tileSignature(t, map, 0, new Set(), undefined, undefined, new Map([[axialKey(t), ['1,0']]]));
+    const b = tileSignature(t, map, 0, new Set(), undefined, undefined, new Map([[axialKey(t), ['2,0']]]));
+    expect(a).not.toBe(b);
+  });
+
   it('changes when a village wall is built', () => {
     const map = generateMap(2, 42);
     const t = map.tiles.find((x) => x.settlement)!;
     const a = tileSignature(t, map, 0, new Set());
     t.settlement!.wall = true;
+    const b = tileSignature(t, map, 0, new Set());
+    expect(a).not.toBe(b);
+  });
+
+  it('changes when a bottle appears', () => {
+    const map = generateMap(2, 42);
+    const t = map.tiles.find((x) => x.terrain === TileType.Water);
+    if (!t) return;
+    const a = tileSignature(t, map, 0, new Set());
+    t.bottle = { bornTurn: 3, arrivalTurn: 0 };
+    const b = tileSignature(t, map, 0, new Set());
+    expect(a).not.toBe(b);
+  });
+
+  it('changes when a bottle ages past its expiry', () => {
+    const map = generateMap(2, 42);
+    const t = map.tiles.find((x) => x.terrain === TileType.Water);
+    if (!t) return;
+    t.bottle = { bornTurn: 3, arrivalTurn: 0 };
+    const a = tileSignature(t, map, 0, new Set());
+    t.bottle.bornTurn = 99;
     const b = tileSignature(t, map, 0, new Set());
     expect(a).not.toBe(b);
   });

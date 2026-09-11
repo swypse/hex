@@ -954,6 +954,12 @@ class GameController {
     this.sendCommand({ type: 'claimBonus' });
   }
 
+  getBottle(): void {
+    const store = useGameStore.getState();
+    if (store.aiActive || store.gameOver) return;
+    this.sendCommand({ type: 'getBottle' });
+  }
+
   private sendCommand(cmd: Command): void {
     const store = useGameStore.getState();
     if (store.netMode === 'client') {

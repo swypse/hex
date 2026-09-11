@@ -14,6 +14,7 @@ import { isExploredFor } from '../game/explore';
 import { territoryColor } from '../game/discovery';
 import { villageCapacity, unitsInVillage } from '../game/village';
 import { isVillageRoadConnected } from '../game/roads';
+import { waterRouteEdges, portWaterClusterJumps } from '../game/waterRoads';
 import { SELECTION_COLOR } from '../config';
 import { tileElevation } from './elevation';
 import { type TextureSet, type TileTexture } from './textureFactory';
@@ -35,6 +36,10 @@ const FIRE_BASE_Y = 6;
 const SELECTED_BORDER_COLOR = 0xEB1F00;
 const SELECTED_BORDER_ALPHA = 1;
 const TUTORIAL_MARKER_COLOR = 0xffd700;
+const ROAD_COLOR = 0xff8c00;
+/** Light-blue strokes tracing the shortest own-water path between a player's
+ *  connected ports (auto water roads). */
+const WATER_ROAD_COLOR = 0x7fd8f5;
 const CAPTURE_EDGE_MARKER_COLOR = 0xEB1F00;
 const CAPTURE_EDGE_MARKER_ALPHA = 1;
 /** Side length of the capture triangle in screen px. */
@@ -120,6 +125,7 @@ interface TileView {
   buildingSprite: Sprite | null;
   bridgeSprite: Sprite | null;
   bonusSprite: Sprite | null;
+  bottleSprite: Sprite | null;
   unitSprite: Sprite | null;
   territory: Graphics;
   roadGraphics: Graphics | null;
@@ -137,10 +143,17 @@ export class MapView {
   private tileIndex = new Map<string, MapTile>();
   private knownOwners = new Set<number>();
   private tileViews = new Map<string, TileView>();
+  /** Adjacent own-water tile pairs (tileKey -> sorted neighbour keys) forming
+   *  the port water routes, recomputed each update. */
+  private waterRouteNeighbors = new Map<string, string[]>();
+  /** Port keys reachable over own water (per cluster of two or more ports). */
+  private waterJumps = new Map<string, Set<string>>();
   private exclamationBobs: Container[] = [];
   private exclamationAnimRemove: (() => void) | null = null;
   private bonusBobs: { sprite: Sprite; baseY: number }[] = [];
   private bonusAnimRemove: (() => void) | null = null;
+  private bottleBobs: { sprite: Sprite; baseY: number }[] = [];
+  private bottleAnimRemove: (() => void) | null = null;
   private fireEffects: FireEffect[] = [];
   private fireAnimRemove: (() => void) | null = null;
   private stopSelectedBorder: (() => void) | null = null;
@@ -263,6 +276,8 @@ export class MapView {
       map = { ...map, tiles };
     }
     this.tileIndex = new Map(map.tiles.map((t) => [axialKey(t), t]));
+    this.waterRouteNeighbors = waterRouteEdges(map);
+    this.waterJumps = portWaterClusterJumps(map);
     const local = players[localPlayerIndex];
     const known = new Set<number>(local ? [local.tribe, ...(local.knownTribes ?? [])] : []);
     this.knownOwners = new Set(players.filter((p) => known.has(p.tribe)).map((p) => p.index));
@@ -272,6 +287,7 @@ export class MapView {
     this.clearHighlights();
     this.exclamationBobs = [];
     this.bonusBobs = [];
+    this.bottleBobs = [];
     const hpBars: { unit: Unit; position: { x: number; y: number }; canAct: boolean; color: number; hp: number }[] = [];
     const labels: { tile: MapTile; owner: number; el: Container; world: { x: number; y: number } }[] = [];
     const exclamations: { el: Container; world: { x: number; y: number } }[] = [];
@@ -280,7 +296,7 @@ export class MapView {
     for (const tile of map.tiles) {
       const tv = this.tileViews.get(axialKey(tile))!;
       tv.el.visible = tileInView(tile, this.hexSize, viewport);
-      const sig = tileSignature(tile, map, localPlayerIndex, hiddenUnitIds, this.knownOwners, this.tileIndex);
+      const sig = tileSignature(tile, map, localPlayerIndex, hiddenUnitIds, this.knownOwners, this.tileIndex, this.waterRouteNeighbors);
       if (sig !== tv.signature) {
         tv.signature = sig;
         this.applyTile(tv, tile, players, localPlayerIndex, hiddenUnitIds);
@@ -291,6 +307,9 @@ export class MapView {
 
       if (tile.bonus && explored && tv.bonusSprite) {
         this.bonusBobs.push({ sprite: tv.bonusSprite, baseY: y });
+      }
+      if (tile.bottle && explored && tv.bottleSprite) {
+        this.bottleBobs.push({ sprite: tv.bottleSprite, baseY: y });
       }
 
       if (tile.unit && !hiddenUnitIds.has(tile.unit.id) && explored) {
@@ -369,6 +388,7 @@ export class MapView {
     this.startExclamationAnimation();
     this.startBonusAnimation();
     this.startFireAnimation();
+    this.startBottleAnimation();
     this.updateSelectedBounce(selection);
   }
 
@@ -418,6 +438,7 @@ export class MapView {
         buildingSprite: null,
         bridgeSprite: null,
         bonusSprite: null,
+        bottleSprite: null,
         unitSprite: null,
         territory,
         roadGraphics: null,
@@ -474,6 +495,10 @@ export class MapView {
     const bonusTex = tile.bonus ? this.textures.bonusTexture : null;
     this.syncSprite(tv, 'bonusSprite', bonusTex ? bonusTex.texture : null, p.x, y, bonusTex?.anchorY ?? 0.5);
     if (tv.bonusSprite) tv.bonusSprite.visible = explored;
+
+    const bottleVisible = explored && !!tile.bottle;
+    this.syncSprite(tv, 'bottleSprite', bottleVisible ? this.textures.bottleTexture.texture : null, p.x, y, this.textures.bottleTexture.anchorY);
+    if (tv.bottleSprite) tv.bottleSprite.visible = bottleVisible;
 
     const isShipUnit = tile.unit !== null && tile.unit.shipLevel !== undefined;
     const isPirateUnit = tile.unit !== null && tile.unit.type === 'pirate';
@@ -536,7 +561,35 @@ export class MapView {
   private drawRoad(tv: TileView, tile: MapTile, explored: boolean): void {
     const owner = tile.roadOwner;
     const isBridge = tile.bridge !== undefined && tile.bridge !== null;
-    if (owner === undefined || owner === null || isBridge || !explored) {
+    const p = hexToPixel(tile, this.hexSize);
+    const edgeMidY = (seg: { ay: number; by: number }): number =>
+      (seg.ay + seg.by) / 2 - tileElevation(tile, this.hexSize);
+
+    const orangeEdges: { x: number; y: number }[] = [];
+    if (owner !== undefined && owner !== null && !isBridge && explored) {
+      for (let e = 0; e < 6; e++) {
+        const n = this.tileIndex.get(axialKey(hexEdgeNeighbor(tile, e)));
+        const connected =
+          (n?.settlement && n.settlement.owner === owner) ||
+          n?.roadOwner === owner ||
+          (n?.building && n.building.kind === 'port' && n.ownedBy === owner);
+        if (!connected) continue;
+        const seg = hexEdge(tile, e, this.hexSize);
+        orangeEdges.push({ x: (seg.ax + seg.bx) / 2, y: edgeMidY(seg) });
+      }
+    }
+
+    const waterEdges: { x: number; y: number }[] = [];
+    if (explored && this.waterRouteNeighbors.has(axialKey(tile))) {
+      const route = this.waterRouteNeighbors.get(axialKey(tile))!;
+      for (let e = 0; e < 6; e++) {
+        if (!route.includes(axialKey(hexEdgeNeighbor(tile, e)))) continue;
+        const seg = hexEdge(tile, e, this.hexSize);
+        waterEdges.push({ x: (seg.ax + seg.bx) / 2, y: edgeMidY(seg) });
+      }
+    }
+
+    if (orangeEdges.length === 0 && waterEdges.length === 0) {
       if (tv.roadGraphics) {
         tv.el.removeChild(tv.roadGraphics);
         tv.roadGraphics.destroy();
@@ -551,20 +604,9 @@ export class MapView {
     }
     const g = tv.roadGraphics;
     g.clear();
-    const p = hexToPixel(tile, this.hexSize);
     const cy = p.y - tileElevation(tile, this.hexSize);
-    for (let e = 0; e < 6; e++) {
-      const n = this.tileIndex.get(axialKey(hexEdgeNeighbor(tile, e)));
-      const connected =
-        (n?.settlement && n.settlement.owner === owner) ||
-        n?.roadOwner === owner ||
-        (n?.building && n.building.kind === 'port' && n.ownedBy === owner);
-      if (!connected) continue;
-      const seg = hexEdge(tile, e, this.hexSize);
-      const mx = (seg.ax + seg.bx) / 2;
-      const my = (seg.ay + seg.by) / 2 - tileElevation(tile, this.hexSize);
-      g.moveTo(mx, my).lineTo(p.x, cy).stroke({ width: 3, color: 0xff8c00 });
-    }
+    for (const e of orangeEdges) g.moveTo(e.x, e.y).lineTo(p.x, cy).stroke({ width: 3, color: ROAD_COLOR });
+    for (const e of waterEdges) g.moveTo(e.x, e.y).lineTo(p.x, cy).stroke({ width: 3, color: WATER_ROAD_COLOR });
   }
 
   private portTileTexture(tile: MapTile): TileTexture {
@@ -575,13 +617,13 @@ export class MapView {
 
   private syncSprite(
     tv: TileView,
-    kind: 'villageSprite' | 'wallSprite' | 'buildingSprite' | 'bridgeSprite' | 'bonusSprite' | 'unitSprite',
+    kind: 'villageSprite' | 'wallSprite' | 'buildingSprite' | 'bridgeSprite' | 'bonusSprite' | 'bottleSprite' | 'unitSprite',
     texture: Texture | null,
     x: number,
     y: number,
     anchorY = 0.5,
   ): void {
-    const zIndex = kind === 'unitSprite' ? 7 : kind === 'buildingSprite' || kind === 'bridgeSprite' ? 5 : kind === 'wallSprite' ? 4 : kind === 'bonusSprite' ? 8 : 3;
+    const zIndex = kind === 'unitSprite' ? 7 : kind === 'buildingSprite' || kind === 'bridgeSprite' ? 5 : kind === 'wallSprite' ? 4 : kind === 'bonusSprite' || kind === 'bottleSprite' ? 8 : 3;
     const current = tv[kind];
     if (texture && !current) {
       const sprite = new Sprite(texture);
@@ -1153,6 +1195,28 @@ export class MapView {
     this.bonusAnimRemove = () => ticker.remove(fn);
   }
 
+  /** Gentle up-down float for floating bottles, like the ship idle bob. */
+  private startBottleAnimation(): void {
+    if (this.bottleAnimRemove || this.bottleBobs.length === 0) return;
+    const ticker = this.app.ticker;
+    const start = performance.now();
+    const fn = (): void => {
+      if (this.bottleBobs.length === 0) {
+        ticker.remove(fn);
+        this.bottleAnimRemove = null;
+        return;
+      }
+      const t = (performance.now() - start) / 2600;
+      const offset = Math.sin(t * Math.PI * 2) * 2.5;
+      for (const b of this.bottleBobs) {
+        if (b.sprite.destroyed) continue;
+        b.sprite.position.y = b.baseY + offset;
+      }
+    };
+    ticker.add(fn);
+    this.bottleAnimRemove = () => ticker.remove(fn);
+  }
+
   /** Permanent gentle up-down bob for player ship sprites. Skipped while a ship
    * is being slid or lunged by combat/movement animations. */
   private startShipBob(): void {
@@ -1504,7 +1568,7 @@ export class MapView {
     const capacity = villageCapacity(tile.settlement!.level);
     const count = unitsInVillage(map, tile);
     const tribe = TRIBES.find((t) => t.id === players[owner]!.tribe)!;
-    const connected = this.textures.villageConnectedTexture !== null && isVillageRoadConnected(map, tile);
+    const connected = this.textures.villageConnectedTexture !== null && isVillageRoadConnected(map, tile, this.waterJumps);
     const icon = connected ? new Sprite(this.textures.villageConnectedTexture!) : null;
     const iconSize = 16;
     const gap = 4;

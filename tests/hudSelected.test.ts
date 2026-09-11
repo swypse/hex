@@ -97,6 +97,23 @@ describe('HudSelected village building constraints', () => {
     (gameController as unknown as { sim: unknown }).sim = originalSim;
   });
 
+  it('lays the drop shadow beneath the info panel background', () => {
+    mount(1, 1, 0);
+    const el = (hud as unknown as { el: Container }).el!;
+    const panels = el.children.filter(
+      (c): c is Graphics => c instanceof Graphics && (c as Graphics).context.instructions.some((i) => i.action === 'fill'),
+    );
+    const fills = (g: Graphics): number[] =>
+      g.context.instructions
+        .filter((i) => i.action === 'fill')
+        .map((i) => (i as { data: { style: { alpha: number } } }).data.style.alpha);
+    const shadow = panels.find((g) => fills(g).includes(0.3))!;
+    const bg = panels.find((g) => fills(g).includes(1))!;
+    expect(shadow).toBeDefined();
+    expect(bg).toBeDefined();
+    expect(el.children.indexOf(shadow)).toBeLessThan(el.children.indexOf(bg));
+  });
+
   it('shows the building count and an upgrade hint when the village is full', () => {
     mount(2, 2, 0);
     const all = texts().join('\n');
@@ -156,8 +173,8 @@ describe('HudSelected village building constraints', () => {
     mount(1, 1, 0, { unitOnVillage: true });
     const el = (hud as unknown as { el: Container }).el!;
     const shapes = el.children.filter((c) => c instanceof Graphics) as Graphics[];
-    const panel = shapes[0]!;
-    const shadow = shapes[1]!;
+    const shadow = shapes[0]!;
+    const panel = shapes[1]!;
     expect(shadow.position.x).toBe(4);
     expect(shadow.position.y).toBe(4);
     // The shadow card has the same footprint as the panel (before its 4px offset).

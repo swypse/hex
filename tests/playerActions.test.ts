@@ -51,6 +51,35 @@ describe('hasAnyAvailableAction', () => {
     expect(hasAnyAvailableAction(map, human(p), 1)).toBe(true);
   });
 
+  it('is true when an own ship stands on a collectable bottle', () => {
+    const map = makeTestMap(2);
+    const p = players();
+    broke(p);
+    const t = tileAt(map, 1, 0)!;
+    t.terrain = TileType.Water;
+    t.unit = { ...makeUnit('s', 0, 'warrior', 1, 0), shipLevel: 2 };
+    t.bottle = { bornTurn: 1, arrivalTurn: 1 };
+    expect(hasAnyAvailableAction(map, human(p), 2)).toBe(true);
+  });
+
+  it('is false when the bottle is not yet collectable', () => {
+    const map = makeTestMap(2);
+    const p = players();
+    broke(p);
+    const t = tileAt(map, 1, 0)!;
+    t.terrain = TileType.Water;
+    const u: import('../src/game/units').Unit = { ...makeUnit('s', 0, 'warrior', 1, 0), shipLevel: 2, hasMoved: true, hasAttacked: true, hasHealed: true };
+    t.unit = u;
+    t.bottle = { bornTurn: 1, arrivalTurn: 5 };
+    expect(hasAnyAvailableAction(map, human(p), 5)).toBe(false);
+    // Once the ship has an action left and the bottle is collectable, it counts.
+    u.hasMoved = false;
+    u.hasAttacked = false;
+    u.hasHealed = false;
+    t.bottle.arrivalTurn = 1;
+    expect(hasAnyAvailableAction(map, human(p), 5)).toBe(true);
+  });
+
   it('is true when an owned village can spawn a unit', () => {
     const map = makeTestMap(2);
     const p = players();

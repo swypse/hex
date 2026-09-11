@@ -32,6 +32,13 @@ export interface Building {
   bornTurn?: number;
 }
 
+/** A floating message-in-a-bottle on a water tile. `arrivalTurn` is set when
+ *  a ship moves onto the tile; the bottle can then be collected next turn. */
+export interface Bottle {
+  bornTurn: number;
+  arrivalTurn: number;
+}
+
 export interface MapTile {
   q: number;
   r: number;
@@ -42,6 +49,7 @@ export interface MapTile {
   height?: number;
   settlement: Settlement | null;
   building: Building | null;
+  bottle?: Bottle | null;
   roadOwner?: number | null;
   bridge?: Bridge | null;
   unit: Unit | null;

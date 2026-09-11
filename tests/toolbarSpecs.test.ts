@@ -43,6 +43,38 @@ describe('toolbarSpecs', () => {
     expect(toolbarSpecs().some((a) => a.key === 'extract')).toBe(false);
   });
 
+  it('offers the get-bottle action when an own ship stands on a collectable bottle', () => {
+    const tile = map.tiles.find((t) => t.unit === null)!;
+    tile.terrain = TileType.Water;
+    tile.ownedBy = null;
+    tile.unit = {
+      id: 's', owner: 0, type: 'warrior', q: tile.q, r: tile.r,
+      hasMoved: false, hasAttacked: false, hasHealed: false,
+      hp: 5, attack: 2, attackDistance: 1, spawnVillage: null, shipLevel: 1,
+    };
+    tile.bottle = { bornTurn: 1, arrivalTurn: 1 };
+    useGameStore.getState().setTurn(2);
+    select(tile);
+    const spec = toolbarSpecs().find((a) => a.key === 'bottle');
+    expect(spec).toBeDefined();
+    expect(spec!.disabled).toBe(false);
+  });
+
+  it('does not offer the get-bottle action the turn the ship landed', () => {
+    const tile = map.tiles.find((t) => t.unit === null)!;
+    tile.terrain = TileType.Water;
+    tile.ownedBy = null;
+    tile.unit = {
+      id: 's', owner: 0, type: 'warrior', q: tile.q, r: tile.r,
+      hasMoved: false, hasAttacked: false, hasHealed: false,
+      hp: 5, attack: 2, attackDistance: 1, spawnVillage: null, shipLevel: 1,
+    };
+    tile.bottle = { bornTurn: 1, arrivalTurn: 2 };
+    useGameStore.getState().setTurn(2);
+    select(tile);
+    expect(toolbarSpecs().some((a) => a.key === 'bottle')).toBe(false);
+  });
+
   it('offers the upgrade-ship action for a level-1 ship unit', () => {
     const tile = map.tiles.find((t) => t.unit === null)!;
     tile.ownedBy = 0;

@@ -17,6 +17,7 @@ import {
 import { canBuildRoad, ROAD_COST } from './roads';
 import { canBuildBridge, BRIDGE_COST } from './bridges';
 import { bonusEligibleFor } from './bonus';
+import { bottleCollectableFor } from './bottles';
 
 const CHEAPEST_UNIT_PRICE = Math.min(
   ...Object.values(UNIT_TYPES)
@@ -71,6 +72,8 @@ export function hasAnyAvailableAction(map: GameMap, player: Player, turn: number
   }
 
   if (bonusEligibleFor(map, player.index, turn).length > 0) return true;
+
+  if (bottleCollectableFor(map, player.index, turn).length > 0) return true;
 
   for (const tile of map.tiles) {
     if (canBuildSawmill(map, tile, player) && canAfford(player.resources, BUILDING_COSTS.sawmill)) return true;

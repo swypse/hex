@@ -18,6 +18,7 @@ export function tileSignature(
   hiddenUnitIds: Set<string>,
   knownOwners?: Set<number>,
   tileIndex?: Map<string, MapTile>,
+  waterRouteNeighbors?: Map<string, string[]>,
 ): string {
   const explored = isExploredFor(tile, localPlayerIndex);
   const s = tile.settlement;
@@ -48,6 +49,7 @@ export function tileSignature(
     tile.building ? tile.building.kind : '',
     tile.building?.kind === 'port' ? (portDirection(map, tile) ?? '-') : '',
     tile.building?.kind === 'temple' || tile.building?.kind === 'forestTemple' ? String(tile.building.level) : '',
+    tile.bottle ? tile.bottle.bornTurn : '',
     tile.roadOwner ?? '-',
     tile.bridge ? `${tile.bridge.dir}${tile.bridge.owner}` : '',
     tile.ownedBy ?? '-',
@@ -55,6 +57,8 @@ export function tileSignature(
     neighborOwners,
     neighborRoads,
     tile.ownedBy === null ? '-' : (knownOwners?.has(tile.ownedBy) ? 'k' : 'u'),
+    tile.bottle ? String(tile.bottle.bornTurn) : '',
+    (waterRouteNeighbors?.get(axialKey(tile)) ?? []).join(','),
   ].join('|');
 }
 
