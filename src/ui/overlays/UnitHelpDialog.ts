@@ -18,7 +18,7 @@ import { useGameStore } from '../../store/gameStore';
 import { type UIHost } from '../host';
 import { Button } from '../kit/button';
 import { makeLabel } from '../kit/label';
-import { makeIcon } from '../kit/icon';
+import { icons16FrameForIconPath, makeIcon16 } from '../kit/icons16';
 import { Popup } from '../kit/popup';
 
 export class UnitHelpDialog {
@@ -129,7 +129,7 @@ export class UnitHelpDialog {
 
     const statH = 18;
     for (const stat of unitHelpStats(unit)) {
-      const icon = makeIcon(stat.icon, 16);
+      const icon = makeIcon16(icons16FrameForIconPath(stat.icon), 16);
       icon.anchor.set(0, 0);
       icon.position.set(0, y + (statH - 16) / 2);
       const label = makeLabel(stat.text, { fontSize: 14, fill: 0xeeeeee });

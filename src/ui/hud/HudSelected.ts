@@ -23,7 +23,7 @@ import type { GameMap, MapTile } from '../../game/mapGen';
 import { useGameStore } from '../../store/gameStore';
 import { type UIHost, type Widget } from '../host';
 import { makeLabel } from '../kit/label';
-import { makeIcon } from '../kit/icon';
+import { ICONS16_FILES, icons16FrameForIconPath, makeIcon16 } from '../kit/icons16';
 import { makeSkillMedallion } from '../kit/skillMedallion';
 import { makePanel } from '../kit/panel';
 import { isLightColor } from '../kit/theme';
@@ -179,7 +179,7 @@ export class HudSelected implements Widget {
         row.addChild(title);
         let x = 10 + title.width + 7;
         for (const pair of unitRow.pairs) {
-          const icon = makeIcon(pair.icon, 16);
+          const icon = makeIcon16(icons16FrameForIconPath(pair.icon), 16);
           icon.anchor.set(0, 0);
           icon.position.set(x, y + (lineH - 16) / 2);
           const value = makeLabel(pair.value, { fontSize: 13, fill });
@@ -274,8 +274,7 @@ export class HudSelected implements Widget {
       circle
         .circle(HELP_SIZE / 2, HELP_SIZE / 2, HELP_SIZE / 2)
         .fill({ color: 0x000000, alpha: 0.7 });
-      const mark = makeLabel('?', { fontSize: 11, fill: 0xffffff, fontWeight: '800' });
-      mark.anchor.set(0.5, 0.5);
+      const mark = makeIcon16(ICONS16_FILES['help']!, HELP_SIZE);
       mark.position.set(HELP_SIZE / 2, HELP_SIZE / 2);
       btn.addChild(circle, mark);
       btn.eventMode = 'static';

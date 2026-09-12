@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { Container, Graphics, Sprite, Text } from 'pixi.js';
+import { Circle, Container, Graphics, Sprite, Text } from 'pixi.js';
 import { HudSelected } from '../src/ui/hud/HudSelected';
 import { useGameStore } from '../src/store/gameStore';
 import { gameController } from '../src/controller/gameController';
@@ -90,7 +90,18 @@ describe('HudSelected village building constraints', () => {
     hud.mount(makeHost(), new Container());
   };
 
-  const helpButtons = (): number => texts().filter((t) => t === '?').length;
+  const helpButtons = (): number => {
+    const el = (hud as unknown as { el: Container }).el!;
+    let n = 0;
+    const walk = (c: Container): void => {
+      for (const ch of c.children) {
+        if (ch instanceof Container && ch.hitArea instanceof Circle) n++;
+        if (ch instanceof Container) walk(ch as Container);
+      }
+    };
+    walk(el);
+    return n;
+  };
 
   afterEach(() => {
     hud?.destroy();
@@ -165,7 +176,8 @@ describe('HudSelected village building constraints', () => {
   it('renders 4 stat icons inline on the selected unit line', () => {
     mount(1, 1, 0, { unitOnVillage: true });
     const widths = findSprites((hud as unknown as { el: Container }).el!)
-      .map((s) => s.width);
+      .map((s) => s.width)
+      .filter((w) => w === 16);
     expect(widths).toEqual([16, 16, 16, 16]);
   });
 
@@ -234,7 +246,18 @@ describe('HudSelected building produce and bridge info lines', () => {
     return out;
   };
 
-  const helpButtons = (): number => texts().filter((t) => t === '?').length;
+  const helpButtons = (): number => {
+    const el = (hud as unknown as { el: Container }).el!;
+    let n = 0;
+    const walk = (c: Container): void => {
+      for (const ch of c.children) {
+        if (ch instanceof Container && ch.hitArea instanceof Circle) n++;
+        if (ch instanceof Container) walk(ch as Container);
+      }
+    };
+    walk(el);
+    return n;
+  };
 
   const boot = (setup: (map: GameMap) => MapTile): void => {
     Object.defineProperty(Text.prototype, 'width', { configurable: true, get: () => 60 });
