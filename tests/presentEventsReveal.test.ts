@@ -109,7 +109,7 @@ describe('presentEvents reveals units even when a step throws', () => {
 
     realRaf = (globalThis as { requestAnimationFrame?: typeof requestAnimationFrame }).requestAnimationFrame!;
     (globalThis as { performance: Performance }).performance.now = () => 0;
-    (globalThis as { requestAnimationFrame: typeof requestAnimationFrame }).requestAnimationFrame = ((cb: (t: number) => void) => setTimeout(() => cb(0), 0)) as typeof requestAnimationFrame;
+    (globalThis as { requestAnimationFrame: typeof requestAnimationFrame }).requestAnimationFrame = ((cb: (t: number) => void) => setTimeout(() => cb(0), 0)) as unknown as typeof requestAnimationFrame;
   });
 
   afterEach(() => {

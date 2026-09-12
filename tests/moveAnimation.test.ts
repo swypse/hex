@@ -234,7 +234,7 @@ function setupGame(map: GameMap, players: Player[]): Harness {
   (globalThis as { requestAnimationFrame: typeof requestAnimationFrame }).requestAnimationFrame = ((cb: (t: number) => void) => {
     now += rafStep;
     return setTimeout(() => cb(now), 0);
-  }) as typeof requestAnimationFrame;
+  }) as unknown as typeof requestAnimationFrame;
 
   return {
     gc,

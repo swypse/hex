@@ -126,7 +126,7 @@ describe('client discovery notification', () => {
     (globalThis as { requestAnimationFrame: typeof requestAnimationFrame }).requestAnimationFrame = ((cb: (t: number) => void) => {
       rafNow += 30;
       return setTimeout(() => cb(rafNow), 0);
-    }) as typeof requestAnimationFrame;
+    }) as unknown as typeof requestAnimationFrame;
   });
 
   afterEach(() => {
