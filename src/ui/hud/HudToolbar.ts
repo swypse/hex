@@ -223,6 +223,7 @@ export class HudToolbar implements Widget {
       disabled: store.aiActive,
       onClick: () => gameController.endTurn(),
       size: 48,
+      iconFactory: makeActionButtonIcon,
       ...ACTION_BTN,
       color: isLastTurn() ? LAST_TURN_COLOR : ACTION_BTN.color,
     });
