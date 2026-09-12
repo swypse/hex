@@ -5,7 +5,7 @@ export interface WakePoint {
   y: number;
 }
 
-export const WAKE_JITTER_PX = 8;
+export const WAKE_JITTER_PX = 9;
 
 export function wakeSquarePositions(
   from: WakePoint,
@@ -32,9 +32,9 @@ export function wakeSquarePositions(
 
 const WAKE_COLOR = 0xaee8ff;
 const SQUARE_SIZE = 2;
-const PER_TILE_MIN = 10;
-const PER_TILE_MAX = 20;
-const WAKE_MS = 200;
+const PER_TILE_MIN = 20;
+const PER_TILE_MAX = 40;
+const WAKE_MS = 500;
 const WAKE_Z_INDEX = 5;
 
 export function spawnShipWake(

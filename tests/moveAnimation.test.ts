@@ -631,8 +631,8 @@ describe('move animation', () => {
     const wakeRects = [...h.mapView.container.children].filter(
       (c) => c instanceof Graphics && c.zIndex === 5,
     );
-    expect(wakeRects.length).toBeGreaterThanOrEqual(10);
-    expect(wakeRects.length).toBeLessThanOrEqual(20);
+    expect(wakeRects.length).toBeGreaterThanOrEqual(20);
+    expect(wakeRects.length).toBeLessThanOrEqual(40);
   });
 
   it('does not spawn wake squares on a landing step onto land', async () => {
@@ -692,7 +692,7 @@ describe('move animation', () => {
     const wakeRects = [...h.mapView.container.children].filter(
       (c) => c instanceof Graphics && c.zIndex === 5,
     );
-    expect(wakeRects.length).toBeGreaterThanOrEqual(10);
-    expect(wakeRects.length).toBeLessThanOrEqual(20);
+    expect(wakeRects.length).toBeGreaterThanOrEqual(20);
+    expect(wakeRects.length).toBeLessThanOrEqual(40);
   });
 });

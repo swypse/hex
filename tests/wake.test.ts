@@ -22,23 +22,23 @@ describe('wakeSquarePositions', () => {
     const xs = pts.map((p) => p.x);
     expect(Math.min(...xs)).toBeLessThan(50);
     expect(Math.max(...xs)).toBeGreaterThan(50);
-    expect(pts.every((p) => Math.abs(p.y) <= 8)).toBe(true);
+    expect(pts.every((p) => Math.abs(p.y) <= 9)).toBe(true);
   });
 
   it('works for a diagonal segment', () => {
     const pts = wakeSquarePositions({ x: 0, y: 0 }, { x: 60, y: 30 }, 12, seqRng(11));
     expect(pts).toHaveLength(12);
     for (const p of pts) {
-      expect(p.x).toBeGreaterThanOrEqual(-8);
-      expect(p.x).toBeLessThanOrEqual(68);
-      expect(p.y).toBeGreaterThanOrEqual(-8);
-      expect(p.y).toBeLessThanOrEqual(38);
+      expect(p.x).toBeGreaterThanOrEqual(-9);
+      expect(p.x).toBeLessThanOrEqual(69);
+      expect(p.y).toBeGreaterThanOrEqual(-9);
+      expect(p.y).toBeLessThanOrEqual(39);
     }
   });
 });
 
 describe('spawnShipWake', () => {
-  it('spawns 10-20 light-blue rects on the container that fade out and are removed after 200ms', () => {
+  it('spawns 20-40 light-blue rects on the container that fade out and are removed after 500ms', () => {
     const callbacks: Array<() => void> = [];
     const app = {
       screen: { width: 800, height: 600 },
@@ -54,17 +54,17 @@ describe('spawnShipWake', () => {
       spawnShipWake(app, container, { x: 0, y: 0 }, { x: 100, y: 0 });
 
       const rects = container.children.filter((c) => c instanceof Graphics);
-      expect(rects.length).toBeGreaterThanOrEqual(10);
-      expect(rects.length).toBeLessThanOrEqual(20);
+      expect(rects.length).toBeGreaterThanOrEqual(20);
+      expect(rects.length).toBeLessThanOrEqual(40);
       expect(rects.every((g) => g.zIndex === 5)).toBe(true);
       expect(callbacks).toHaveLength(1);
 
       const fn = callbacks[0]!;
-      now = 1100;
+      now = 1250;
       fn();
       expect(rects.every((g) => g.alpha > 0 && g.alpha < 1)).toBe(true);
 
-      now = 1300;
+      now = 1600;
       fn();
       expect(container.children.length).toBe(0);
     } finally {
