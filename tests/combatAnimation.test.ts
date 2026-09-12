@@ -879,6 +879,12 @@ h.advanceTicks(100);
     }
     expect(launched).toBe(true);
 
+    const smokeEl = (): Container | undefined =>
+      h.mapRoot.children.find(
+        (c) => c instanceof Container && c.children.length === 10 && c.children.every((ch) => ch instanceof Graphics),
+      ) as Container | undefined;
+    expect(smokeEl()).toBeDefined();
+
     let settled = false;
     const pEnd = p.finally(() => { settled = true; });
     for (let i = 0; i < 100 && !settled; i++) {
@@ -969,6 +975,12 @@ h.advanceTicks(100);
       launched = findCannonball() !== undefined;
     }
     expect(launched).toBe(true);
+
+    const smokeEl = (): Container | undefined =>
+      h.mapRoot.children.find(
+        (c) => c instanceof Container && c.children.length === 10 && c.children.every((ch) => ch instanceof Graphics),
+      ) as Container | undefined;
+    expect(smokeEl()).toBeDefined();
 
     let settled = false;
     const pEnd = p.finally(() => { settled = true; });
@@ -1498,5 +1510,45 @@ h.advanceTicks(100);
     await pEnd;
 
     expect(camera.pan.x).toBeCloseTo(panBefore.x, 0);
+  });
+
+  it('produces no smoke for a melee fight', async () => {
+    const map = makeOpenMap();
+    const players = [player(0, Tribe.Cats), player(1, Tribe.Barbarians)];
+    h = setup(map, players);
+
+    unitAt(map, 0, 0).unit = makeUnit('att', 0, 0, 0, 50);
+    unitAt(map, 1, 0).unit = makeUnit('def', 1, 1, 0, 50);
+    h.mapView.update(map, players, null, new Set(), new Set(), 0, new Set(), {
+      x: 0, y: 0, scale: 1, width: 800, height: 600,
+    });
+
+    const attack: GameEvent = {
+      type: 'attack', attackerId: 'att', targetId: 'def',
+      attackerIndex: 0, targetIndex: 1,
+      attackerTile: { q: 0, r: 0 }, targetTile: { q: 1, r: 0 },
+      attackerDamage: 5, targetDamage: 5, missed: false,
+      attackerDied: false, targetDied: false,
+      attackerPre: { type: 'warrior', owner: 0, hp: 50 },
+      targetPre: { type: 'warrior', owner: 1, hp: 50 },
+    };
+    const p = h.gc.presentEvents([attack], h.gc.exploredKeysFor(0));
+
+    // Drive the combat animation to settle; hp-text containers may appear, but
+    // never a 10-circle smoke puff.
+    let settled = false;
+    const pEnd = p.finally(() => { settled = true; });
+    let sawSmoke = false;
+    const smokeEl = (): Container | undefined =>
+      h.mapRoot.children.find(
+        (c) => c instanceof Container && c.children.length === 10 && c.children.every((ch) => ch instanceof Graphics),
+      ) as Container | undefined;
+    for (let i = 0; i < 200 && !settled; i++) {
+      h.advanceTicks(20);
+      await new Promise((r) => setTimeout(r, 5));
+      if (smokeEl()) sawSmoke = true;
+    }
+    await pEnd;
+    expect(sawSmoke).toBe(false);
   });
 });

@@ -11,6 +11,7 @@ import { isExploredFor } from '../game/explore';
 import { axialKey, hexDistance, hexToPixel, type Axial } from '../game/hex';
 import { tileElevation } from '../render/elevation';
 import { MapView } from '../render/mapRenderer';
+import { spawnMuzzleSmoke } from '../render/smoke';
 import { spawnShipWake } from '../render/wake';
 import { TextureSet } from '../render/textureFactory';
 import { useGameStore } from '../store/gameStore';
@@ -365,6 +366,7 @@ export class EventPresenter {
       attackerTile !== undefined &&
       targetTile !== undefined
     ) {
+      this.spawnMuzzleSmokeAt(attackerTile);
       attackerShot = this.spawnCannonballFromTo(attackerTile, targetTile, false);
     }
     // Catapults lob a cannonball projectile on a higher arc at their ranged target.
@@ -546,8 +548,14 @@ export class EventPresenter {
       const targetPre = e.targetPre!;
       if (targetPre.type === 'archer' && targetPre.shipLevel === undefined) {
         await this.spawnArrowFromTo(targetTile, attackerTile);
-      } else if (targetPre.shipLevel !== undefined || targetPre.type === 'catapult' || targetPre.type === 'pirate') {
-        await this.spawnCannonballFromTo(targetTile, attackerTile, targetPre.type === 'catapult');
+      } else if (targetPre.shipLevel !== undefined) {
+        this.spawnMuzzleSmokeAt(targetTile);
+        await this.spawnCannonballFromTo(targetTile, attackerTile, false);
+      } else if (targetPre.type === 'catapult') {
+        await this.spawnCannonballFromTo(targetTile, attackerTile, true);
+      } else if (targetPre.type === 'pirate') {
+        this.spawnMuzzleSmokeAt(targetTile);
+        await this.spawnCannonballFromTo(targetTile, attackerTile, false);
       } else {
         await mapView.lungeUnit(targetKey, attackerKey, 10 / scale);
       }
@@ -1020,6 +1028,21 @@ export class EventPresenter {
     const texture = this.host.textures()?.cannonballTexture;
     if (!texture) return Promise.resolve();
     return this.spawnProjectile(fromTile, toTile, texture, 10, catapult ? 2.2 : 1);
+  }
+
+  private spawnMuzzleSmokeAt(tile: MapTile): void {
+    const app = this.host.app();
+    const mapRoot = this.host.mapRoot();
+    if (!app || !mapRoot) return;
+    const camera = this.host.camera();
+    const scale = camera.scale;
+    const world = hexToPixel(tile, HEX_SIZE);
+    spawnMuzzleSmoke(
+      app,
+      mapRoot,
+      camera.pan.x + world.x * scale,
+      camera.pan.y + (world.y - tileElevation(tile, HEX_SIZE)) * scale,
+    );
   }
 
   private spawnDeath(tile: MapTile): void {
