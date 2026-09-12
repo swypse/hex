@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { decodePng } from '../tools/packSkills.mjs';
+import { decodePng, finalizeAtlas } from '../tools/packSkills.mjs';
 import {
   generateAchievementAtlas,
   ACHIEVEMENT_ORDER,
@@ -54,10 +54,10 @@ describe('achievement atlas generation', () => {
     }
   });
 
-  it('keeps the committed atlas PNG in sync with the packer output', () => {
+  it('keeps the committed atlas PNG in sync with the packer output', async () => {
     const committed = readFileSync(fileURLToPath(ATLAS_URL));
-    const { png } = generateAchievementAtlas(SOURCE_DIR_URL, ACHIEVEMENT_COLS);
-    expect(Buffer.compare(committed, png)).toBe(0);
+    const final = await finalizeAtlas(generateAchievementAtlas(SOURCE_DIR_URL, ACHIEVEMENT_COLS).png);
+    expect(Buffer.compare(committed, final)).toBe(0);
   });
 
   it('references only real, valid 164x164 achievement icons', () => {

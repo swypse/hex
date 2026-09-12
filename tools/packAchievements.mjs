@@ -3,7 +3,7 @@
 // files are never modified. Run with: npm run pack:achievements
 import { readFileSync, writeFileSync, readdirSync } from 'node:fs';
 import { URL } from 'node:url';
-import { decodePng, encodePng } from './packSkills.mjs';
+import { decodePng, encodePng, finalizeAtlas } from './packSkills.mjs';
 
 export const SOURCE_DIR_URL = new URL('../src/assets/achivements/', import.meta.url);
 export const ATLAS_URL = new URL('../public/textures/achievements-atlas.png', import.meta.url);
@@ -72,15 +72,16 @@ ${entries}
   };
 }
 
-export function writeAchievementAtlas() {
+export async function writeAchievementAtlas() {
   const out = generateAchievementAtlas();
-  writeFileSync(ATLAS_URL, out.png);
+  const png = await finalizeAtlas(out.png);
+  writeFileSync(ATLAS_URL, png);
   writeFileSync(MANIFEST_URL, out.manifestTs);
-  return out;
+  return { ...out, png };
 }
 
 if (import.meta.main) {
-  const out = writeAchievementAtlas();
+  const out = await writeAchievementAtlas();
   console.log(`packed ${Object.keys(out.frames).length} achievement icons -> ${out.width}x${out.height} atlas (${out.png.length} bytes)`);
   console.log(`wrote ${ATLAS_URL.pathname}`);
   console.log(`wrote ${MANIFEST_URL.pathname}`);
