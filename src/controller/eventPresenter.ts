@@ -5,11 +5,13 @@ import { MapTile } from '../game/mapGen';
 import { Player } from '../game/players';
 import { TRIBES } from '../game/tribes';
 import { canAttack, canMove, HEAL_AMOUNT, PIRATE_OWNER, Unit, UNIT_TYPES } from '../game/units';
+import { isWaterType } from '../game/tileTypes';
 import { tileAt } from '../game/selection';
 import { isExploredFor } from '../game/explore';
-import { axialKey, hexDistance, hexToPixel } from '../game/hex';
+import { axialKey, hexDistance, hexToPixel, type Axial } from '../game/hex';
 import { tileElevation } from '../render/elevation';
 import { MapView } from '../render/mapRenderer';
+import { spawnShipWake } from '../render/wake';
 import { TextureSet } from '../render/textureFactory';
 import { useGameStore } from '../store/gameStore';
 import { EXPLORED_SCORE } from '../game/score';
@@ -696,11 +698,15 @@ export class EventPresenter {
     const fromTile = tileAt(map, e.from.q, e.from.r);
     sprite.position.set(startPos.x, startPos.y - (fromTile ? tileElevation(fromTile, HEX_SIZE) : 0));
     mapView.container.addChild(sprite);
+    const seaUnit = e.shipLevel !== undefined || unit.type === 'pirate';
+    let prev = e.from;
     for (const step of steps) {
       const to = hexToPixel(step, HEX_SIZE);
       const targetTile = tileAt(map, step.q, step.r);
       const y = targetTile ? to.y - tileElevation(targetTile, HEX_SIZE) : to.y;
       await this.tweenSpriteTo(sprite, { x: to.x, y }, 110);
+      if (seaUnit) this.spawnShipWakeSegment(prev, step);
+      prev = step;
       await new Promise((resolve) => setTimeout(resolve, 60));
     }
     this.host.hiddenUnitIds().delete(unit.id);
@@ -712,6 +718,22 @@ export class EventPresenter {
       const destVisible = unit.owner === local || isExploredFor(dest, local);
       if (destVisible) sfx.play('waterSquish');
     }
+  }
+
+  /** Scatters a short fading wake along the segment between two adjacent water
+   *  tiles the sea unit just sailed across. No-op for land steps (the landing
+   *  stop) and non-adjacent pairs (unexplored gaps in enemy paths). */
+  private spawnShipWakeSegment(from: Axial, to: Axial): void {
+    const app = this.host.app();
+    const mapView = this.host.mapView();
+    const sim = this.host.sim();
+    if (!app || !mapView || !sim) return;
+    const fromTile = tileAt(sim.map, from.q, from.r);
+    const toTile = tileAt(sim.map, to.q, to.r);
+    if (!fromTile || !toTile) return;
+    if (hexDistance(from, to) !== 1) return;
+    if (!isWaterType(fromTile.terrain) || !isWaterType(toTile.terrain)) return;
+    spawnShipWake(app, mapView.container, hexToPixel(from, HEX_SIZE), hexToPixel(to, HEX_SIZE));
   }
 
   private presentBonusClaimed(e: Extract<GameEvent, { type: 'bonusClaimed' }>): void {

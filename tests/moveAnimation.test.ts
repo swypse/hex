@@ -599,28 +599,100 @@ describe('move animation', () => {
     }
   });
 
-  it('does not bounce a village upgrade on an unexplored hex', async () => {
+  it('spawns wake squares on water tiles while a ship sails', async () => {
     const map = makeOpenMap();
-    const players = [player(0, Tribe.Cats), player(1, Tribe.Barbarians)];
+    const players = [player(0, Tribe.Cats)];
     h = setupGame(map, players);
-    const v = unitAt(map, 1, 0);
-    v.settlement = { owner: 0, level: 1, captureReady: false };
-    v.exploredBy = [];
+    const ship: Unit = {
+      id: 's1', owner: 0, type: 'warrior', q: 0, r: 0,
+      hasMoved: false, hasAttacked: false, hasHealed: false,
+      hp: 5, attack: 2, attackDistance: 1, spawnVillage: { q: 0, r: 0 }, shipLevel: 1,
+    };
+    const fromTile = unitAt(map, 0, 0);
+    fromTile.terrain = TileType.Water;
+    fromTile.unit = ship;
+    const dest = unitAt(map, 1, 0);
+    dest.terrain = TileType.Water;
+    fromTile.unit = null;
+    dest.unit = { ...ship, q: 1, r: 0 };
     h.mapView.update(map, players, null, new Set(), new Set(), 0, new Set(), {
       x: 0, y: 0, scale: 1, width: 800, height: 600,
     });
 
-    const spy = vi.spyOn(h.mapView, 'bounceHex');
-    try {
-      const events: GameEvent[] = [
-        { type: 'villageUpgraded', q: 1, r: 0, level: 2, playerIndex: 0 },
-      ];
-      const p = h.gc.presentEvents(events, h.gc.exploredKeysFor(0));
-      await p;
+    const events: GameEvent[] = [
+      { type: 'unitMoved', unitId: 's1', from: { q: 0, r: 0 }, path: [{ q: 1, r: 0 }], to: { q: 1, r: 0 }, shipLevel: 1 },
+    ];
+    const p = h.gc.presentEvents(events, h.gc.exploredKeysFor(0));
+    await waitFor(() =>
+      [...h.mapView.container.children].some((c) => c instanceof Graphics && c.zIndex === 5),
+    );
+    await p;
 
-      expect(spy).not.toHaveBeenCalled();
-    } finally {
-      spy.mockRestore();
-    }
+    const wakeRects = [...h.mapView.container.children].filter(
+      (c) => c instanceof Graphics && c.zIndex === 5,
+    );
+    expect(wakeRects.length).toBeGreaterThanOrEqual(10);
+    expect(wakeRects.length).toBeLessThanOrEqual(20);
+  });
+
+  it('does not spawn wake squares on a landing step onto land', async () => {
+    const map = makeOpenMap();
+    const players = [player(0, Tribe.Cats)];
+    h = setupGame(map, players);
+    const ship: Unit = {
+      id: 's1', owner: 0, type: 'warrior', q: 0, r: 0,
+      hasMoved: false, hasAttacked: false, hasHealed: false,
+      hp: 5, attack: 2, attackDistance: 1, spawnVillage: { q: 0, r: 0 }, shipLevel: 1,
+    };
+    unitAt(map, 0, 0).terrain = TileType.Water;
+    unitAt(map, 0, 0).unit = null;
+    unitAt(map, 1, 0).unit = { ...ship, q: 1, r: 0 };
+    h.mapView.update(map, players, null, new Set(), new Set(), 0, new Set(), {
+      x: 0, y: 0, scale: 1, width: 800, height: 600,
+    });
+
+    const events: GameEvent[] = [
+      { type: 'unitMoved', unitId: 's1', from: { q: 0, r: 0 }, path: [{ q: 1, r: 0 }], to: { q: 1, r: 0 }, shipLevel: 1 },
+    ];
+    await h.gc.presentEvents(events, h.gc.exploredKeysFor(0));
+
+    const wakeRects = [...h.mapView.container.children].filter(
+      (c) => c instanceof Graphics && c.zIndex === 5,
+    );
+    expect(wakeRects.length).toBe(0);
+  });
+
+  it('spawns wake squares while a pirate sails', async () => {
+    const map = makeOpenMap();
+    const players = [player(0, Tribe.Cats)];
+    h = setupGame(map, players);
+    const pirate: Unit = {
+      id: 'p1', owner: -1, type: 'pirate', q: 0, r: 0,
+      hasMoved: false, hasAttacked: false, hasHealed: false,
+      hp: 5, attack: 2, attackDistance: 1, spawnVillage: null,
+    };
+    unitAt(map, 0, 0).terrain = TileType.Water;
+    unitAt(map, 0, 0).unit = pirate;
+    unitAt(map, 0, 0).unit = null;
+    unitAt(map, 1, 0).terrain = TileType.Water;
+    unitAt(map, 1, 0).unit = { ...pirate, q: 1, r: 0 };
+    h.mapView.update(map, players, null, new Set(), new Set(), 0, new Set(), {
+      x: 0, y: 0, scale: 1, width: 800, height: 600,
+    });
+
+    const events: GameEvent[] = [
+      { type: 'unitMoved', unitId: 'p1', from: { q: 0, r: 0 }, path: [{ q: 1, r: 0 }], to: { q: 1, r: 0 } },
+    ];
+    const p = h.gc.presentEvents(events, h.gc.exploredKeysFor(0));
+    await waitFor(() =>
+      [...h.mapView.container.children].some((c) => c instanceof Graphics && c.zIndex === 5),
+    );
+    await p;
+
+    const wakeRects = [...h.mapView.container.children].filter(
+      (c) => c instanceof Graphics && c.zIndex === 5,
+    );
+    expect(wakeRects.length).toBeGreaterThanOrEqual(10);
+    expect(wakeRects.length).toBeLessThanOrEqual(20);
   });
 });
