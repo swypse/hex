@@ -357,9 +357,9 @@ export class EventPresenter {
     ) {
       this.spawnArrow(attackerTile, targetTile);
     }
-    // Ships fire a cannonball projectile along the same trajectory.
+    // Ships and pirates fire a cannonball projectile along the same trajectory.
     if (
-      e.attackerPre?.shipLevel !== undefined &&
+      (e.attackerPre?.shipLevel !== undefined || e.attackerPre?.type === 'pirate') &&
       attackerVisible &&
       attackerTile !== undefined &&
       targetTile !== undefined
