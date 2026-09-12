@@ -348,6 +348,7 @@ export class EventPresenter {
     const impact = audible ? plan.impact : undefined;
     if (audible && plan.launch) sfx.play(plan.launch);
 
+    let attackerShot: Promise<void> | null = null;
     // Land archers shoot a visible arrow projectile along an arc to the target.
     if (
       plan.launch === 'arcShot' &&
@@ -355,7 +356,7 @@ export class EventPresenter {
       attackerTile !== undefined &&
       targetTile !== undefined
     ) {
-      this.spawnArrow(attackerTile, targetTile);
+      attackerShot = this.spawnArrowFromTo(attackerTile, targetTile);
     }
     // Ships and pirates fire a cannonball projectile along the same trajectory.
     if (
@@ -364,7 +365,7 @@ export class EventPresenter {
       attackerTile !== undefined &&
       targetTile !== undefined
     ) {
-      this.spawnCannonball(attackerTile, targetTile);
+      attackerShot = this.spawnCannonballFromTo(attackerTile, targetTile, false);
     }
     // Catapults lob a cannonball projectile on a higher arc at their ranged target.
     if (
@@ -373,7 +374,7 @@ export class EventPresenter {
       attackerTile !== undefined &&
       targetTile !== undefined
     ) {
-      this.spawnCatapultBall(attackerTile, targetTile);
+      attackerShot = this.spawnCannonballFromTo(attackerTile, targetTile, true);
     }
 
     // In the final sim state a melee attacker that killed its target already
@@ -396,7 +397,7 @@ export class EventPresenter {
 
     if (mapView && !e.missed && attackerTile && targetTile && attackerVisible && e.attackerPre && e.targetPre) {
       try {
-        await this.presentStagedAttack(e, attackerTile, targetTile, targetVisible, attackerAdvanced, facing, impact, keep);
+        await this.presentStagedAttack(e, attackerTile, targetTile, targetVisible, attackerAdvanced, facing, impact, keep, attackerShot);
       } finally {
         mapView.setUnitOverrides(keep);
         this.host.render();
@@ -505,6 +506,7 @@ export class EventPresenter {
     facing: 'left' | 'right',
     impact?: 'swordHit' | 'hit',
     keep: Map<string, Unit> = new Map(),
+    attackerShot: Promise<void> | null = null,
   ): Promise<void> {
     const mapView = this.host.mapView();
     if (!mapView) return;
@@ -522,6 +524,9 @@ export class EventPresenter {
 
     const scale = this.host.camera().scale;
     await mapView.lungeUnit(attackerKey, targetKey, 10 / scale);
+    // Wait for the attacker's projectile to land before the hit lands/counter
+    // fires, so multi-tile shots and counter shots never overlap.
+    if (attackerShot) await attackerShot;
     if (impact) sfx.play(impact);
 
     // Attacker's blow lands on the target first.
@@ -1000,21 +1005,6 @@ export class EventPresenter {
       };
       ticker.add(fn);
     });
-  }
-
-  /** Archer shot: a 5px-tall arrow projectile (fire-and-forget). */
-  private spawnArrow(fromTile: MapTile, toTile: MapTile): void {
-    this.spawnArrowFromTo(fromTile, toTile).catch(() => {});
-  }
-
-  /** Ship shot: a cannonball projectile (fire-and-forget). */
-  private spawnCannonball(fromTile: MapTile, toTile: MapTile): void {
-    this.spawnCannonballFromTo(fromTile, toTile, false).catch(() => {});
-  }
-
-  /** Catapult shot: a cannonball lobbed on a loftier arc (fire-and-forget). */
-  private spawnCatapultBall(fromTile: MapTile, toTile: MapTile): void {
-    this.spawnCannonballFromTo(fromTile, toTile, true).catch(() => {});
   }
 
   /** Arrow projectile that resolves when the shot has landed. */
