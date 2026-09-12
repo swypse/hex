@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { wakeSquarePositions } from '../src/render/wake';
+import { Application, Container, Graphics } from 'pixi.js';
+import { spawnShipWake, wakeSquarePositions } from '../src/render/wake';
 
 function seqRng(seed: number): () => number {
   let s = seed;
@@ -32,6 +33,42 @@ describe('wakeSquarePositions', () => {
       expect(p.x).toBeLessThanOrEqual(68);
       expect(p.y).toBeGreaterThanOrEqual(-8);
       expect(p.y).toBeLessThanOrEqual(38);
+    }
+  });
+});
+
+describe('spawnShipWake', () => {
+  it('spawns 10-20 light-blue rects on the container that fade out and are removed after 200ms', () => {
+    const callbacks: Array<() => void> = [];
+    const app = {
+      screen: { width: 800, height: 600 },
+      ticker: { add: (fn: () => void) => callbacks.push(fn), remove: (): void => {} },
+    } as unknown as Application;
+    const container = new Container();
+    container.sortableChildren = true;
+
+    const realNow = (globalThis as { performance: Performance }).performance.now;
+    let now = 1000;
+    (globalThis as { performance: Performance }).performance.now = () => now;
+    try {
+      spawnShipWake(app, container, { x: 0, y: 0 }, { x: 100, y: 0 });
+
+      const rects = container.children.filter((c) => c instanceof Graphics);
+      expect(rects.length).toBeGreaterThanOrEqual(10);
+      expect(rects.length).toBeLessThanOrEqual(20);
+      expect(rects.every((g) => g.zIndex === 5)).toBe(true);
+      expect(callbacks).toHaveLength(1);
+
+      const fn = callbacks[0]!;
+      now = 1100;
+      fn();
+      expect(rects.every((g) => g.alpha > 0 && g.alpha < 1)).toBe(true);
+
+      now = 1300;
+      fn();
+      expect(container.children.length).toBe(0);
+    } finally {
+      (globalThis as { performance: Performance }).performance.now = realNow;
     }
   });
 });
