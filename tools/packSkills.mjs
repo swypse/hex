@@ -2,8 +2,10 @@
 // into a single compressed atlas PNG plus a generated manifest. The source
 // files are never modified. Run with: npm run pack:skills
 import { deflateSync, inflateSync, crc32 } from 'node:zlib';
-import { readFileSync, writeFileSync, readdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, readdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { execFile } from 'node:child_process';
 import { URL } from 'node:url';
+import pngquant from 'pngquant-bin';
 
 export const SOURCE_DIR_URL = new URL('../src/assets/skills/', import.meta.url);
 export const ATLAS_URL = new URL('../public/textures/skills-atlas.png', import.meta.url);
@@ -192,6 +194,34 @@ export function skillOrder() {
   return [...SKILL_ORDER];
 }
 
+/** Quantizes a PNG buffer with pngquant (8-bit palette, color type 3). Falls
+ *  back to the original buffer on any error (missing binary, pngquant failure,
+ *  no reduction). Never throws. */
+export async function compressPng(input) {
+  const tmp = mkdtempSync('/tmp/hex-atlas-');
+  const inPath = `${tmp}/in.png`;
+  const outPath = `${tmp}/out.png`;
+  try {
+    writeFileSync(inPath, input);
+    await new Promise((resolve, reject) => {
+      execFile(pngquant, ['--quality=20-50', '--force', inPath, '-o', outPath], (err) =>
+        err ? reject(err) : resolve(),
+      );
+    });
+    return readFileSync(outPath);
+  } catch {
+    return input;
+  } finally {
+    try { rmSync(tmp, { recursive: true, force: true }); } catch {}
+  }
+}
+
+/** Returns the smaller of a lossless PNG and its pngquant quantization. */
+export async function finalizeAtlas(png) {
+  const quantized = await compressPng(png);
+  return quantized.length < png.length ? quantized : png;
+}
+
 export function generateSkillAtlas(sourceDir = SOURCE_DIR_URL, cols = ATLAS_COLS) {
   const order = readdirSync(sourceDir)
     .filter((n) => n.endsWith('.png'))
@@ -245,15 +275,16 @@ ${entries}
   };
 }
 
-export function writeSkillAtlas() {
+export async function writeSkillAtlas() {
   const out = generateSkillAtlas();
-  writeFileSync(ATLAS_URL, out.png);
+  const png = await finalizeAtlas(out.png);
+  writeFileSync(ATLAS_URL, png);
   writeFileSync(MANIFEST_URL, out.manifestTs);
-  return out;
+  return { ...out, png };
 }
 
 if (import.meta.main) {
-  const out = writeSkillAtlas();
+  const out = await writeSkillAtlas();
   console.log(`packed ${Object.keys(out.frames).length} skill icons -> ${out.width}x${out.height} atlas (${out.png.length} bytes)`);
   console.log(`wrote ${ATLAS_URL.pathname}`);
   console.log(`wrote ${MANIFEST_URL.pathname}`);

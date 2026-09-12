@@ -5,6 +5,7 @@ import {
   encodePng,
   decodePng,
   generateSkillAtlas,
+  finalizeAtlas,
   skillOrder,
   ATLAS_COLS,
   ATLAS_CELL,
@@ -85,10 +86,10 @@ describe('skill atlas generation', () => {
     }
   });
 
-  it('keeps the committed atlas PNG in sync with the packer output', () => {
+  it('keeps the committed atlas PNG in sync with the packer output', async () => {
     const committed = readFileSync(fileURLToPath(ATLAS_URL));
-    const { png } = generateSkillAtlas(SOURCE_DIR, ATLAS_COLS);
-    expect(Buffer.compare(committed, png)).toBe(0);
+    const final = await finalizeAtlas(generateSkillAtlas(SOURCE_DIR, ATLAS_COLS).png);
+    expect(Buffer.compare(committed, final)).toBe(0);
   });
 
   it('references only real, valid skill icons', () => {
