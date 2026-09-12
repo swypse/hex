@@ -6,7 +6,7 @@ const TEXTURE_BASE = `${import.meta.env.BASE_URL}textures/`;
 /** Logical button key -> atlas frame key. Atlas frames live in ACTION_BUTTON_ATLAS_FRAMES. */
 export const ACTION_BUTTON_ICON_FILES: Record<string, string> = {
   upgrade: 'action-upgrade',
-  'upgrade-ship': 'action-upgrade',
+  'upgrade-ship': 'action-ship-upgrade',
   wall: 'action-build-wall',
   sawmill: 'action-build-sawmill',
   mine: 'action-build-mine',
