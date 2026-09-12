@@ -12,6 +12,7 @@
     "pack:skills": "node tools/packSkills.mjs",
     "pack:achievements": "node tools/packAchievements.mjs",
     "pack:action-buttons": "node tools/packActionButtons.mjs",
+    "pack:icons-16": "node tools/packIcons16.mjs",
     "relay": "node server/relay.mjs"
   },
   "dependencies": {
