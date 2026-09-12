@@ -13,13 +13,14 @@ import { buildingsInVillage, villageBuildingLimit } from './village';
 import { isMountainType } from './tileTypes';
 import { TRIBES } from './tribes';
 import { AI_PATTERNS, AiPatternContext, bestSpawnableUnitType, enemyCanAttackNext, enemyCanReach, isFrontierTile, landEnemyCanReach, nearestEnemyDistanceFrom, nearestFreeVillageDistanceFrom, nearestOwnUnitDistanceFrom, nearestVillageDistanceFrom } from './aiPatterns';
-import { AiAction, AiPlannerState } from './aiTypes';
+import { AiAction, AiDirectives, AiPlannerState } from './aiTypes';
 import { attackableTargets, chooseBestAttack, tradeIsFavorable } from './combat';
 import { isExploredFor } from './explore';
 import { GameMode } from './gameMode';
 import { AiSituation, analyzeSituation, coastExposedTile, isNavalEnemy } from './aiSituation';
 import { AiDifficultyProfile, profileFor } from './aiDifficulty';
 import { isShip } from './ship';
+import { updateStrategy, deriveDirectives } from './aiStrategy';
 
 const MAX_PLAN_STEPS = 200;
 
@@ -173,6 +174,19 @@ function bridgeLeadsSomewhere(map: GameMap, tile: MapTile, player: Player): bool
   return false;
 }
 
+/** Money kept before the AI spends on a spawn: the strategy reserve when a
+ *  plan is active, otherwise the difficulty profile's default. */
+function directivesReserve(directives: AiDirectives | undefined, difficulty: AiDifficultyProfile | undefined): number {
+  if (directives) return directives.moneyReserve;
+  return difficulty?.spawnReserve ?? UNIT_TYPES.warrior.price;
+}
+
+/** True while a strategy goal is mustering the army (units hold back from
+ *  suicidal solo trades until the massed strike is ready). */
+function mustering(directives: AiDirectives | undefined): boolean {
+  return directives?.muster !== undefined && directives?.muster !== null;
+}
+
 function bestAvailableAction(
   map: GameMap,
   player: Player,
@@ -180,10 +194,13 @@ function bestAvailableAction(
   state: AiPlannerState,
   situation: AiSituation | undefined,
   difficulty: AiDifficultyProfile | undefined,
+  directives: AiDirectives | undefined,
   source?: { kind: 'best' | 'random' },
 ): AiAction[] | null {
   const jitter = (): number => rng.next() * 60;
   const candidates: { score: number; action: AiAction | AiAction[] }[] = [];
+
+  const buildScale = directives?.pace === 'slow' ? 0.5 : directives?.pace === 'rushed' ? 0.6 : 1;
 
   for (const v of map.tiles) {
     if (!v.settlement || v.settlement.owner !== player.index) continue;
@@ -206,20 +223,25 @@ function bestAvailableAction(
           isExploredFor(t, player.index) &&
           !state.occupied.has(key(t.q, t.r)),
       );
+      const planFor = directives?.spawnPlan.find((p) => p.villageKey === k);
       const prefer =
-        urgent || situation?.stance === 'defend'
-          ? 'defense'
-          : situation?.navalThreat
-            ? 'naval'
-            : situation?.stance === 'settle' && freeVillageToGrab
-              ? 'scout'
-              : 'offense';
+        planFor
+          ? planFor.prefer
+          : urgent || situation?.stance === 'defend'
+            ? 'defense'
+            : situation?.navalThreat
+              ? 'naval'
+              : situation?.stance === 'settle' && freeVillageToGrab
+                ? 'scout'
+                : 'offense';
       const type = bestSpawnableUnitType(player, prefer);
       if (type) {
         const cost = { wood: UNIT_TYPES[type].priceWood, stone: 0, money: UNIT_TYPES[type].price, ore: UNIT_TYPES[type].priceOre };
         if (canAfford(player.resources, cost)) {
           const after = pay(player.resources, cost);
-          const reserveOk = urgent || after.money >= (difficulty?.spawnReserve ?? UNIT_TYPES.warrior.price);
+          // An economy goal keeps money in reserve for mines/skills, but a
+          // free-village grab is expansion income and always worth the spend.
+          const reserveOk = urgent || freeVillageToGrab || after.money >= directivesReserve(directives, difficulty);
           if (reserveOk) {
             candidates.push({ score: (urgent ? 500 : 250) + jitter(), action: { type: 'spawn', q: v.q, r: v.r, unitType: type } });
           }
@@ -237,7 +259,7 @@ function bestAvailableAction(
       continue;
     }
     const attackTile = chooseBestAttack(map, unit, unit.owner);
-    if (attackTile && (!difficulty || !difficulty.checkTrades || tradeIsFavorable(unit, attackTile))) {
+    if (attackTile && (!difficulty || !difficulty.checkTrades || !mustering(directives) || tradeIsFavorable(unit, attackTile))) {
       candidates.push({ score: 4000 + jitter(), action: { type: 'attack', unitId: unit.id, q: attackTile.q, r: attackTile.r } });
       continue;
     }
@@ -263,7 +285,7 @@ function bestAvailableAction(
       // unit off the village and forfeit the capture).
       const foreignVillage = c.settlement !== null && c.settlement.owner !== unit.owner;
       const a = chooseBestAttack(map, ghost, unit.owner);
-      if (a && !foreignVillage && (!difficulty || !difficulty.checkTrades || tradeIsFavorable(ghost, a))) {
+      if (a && !foreignVillage && (!difficulty || !difficulty.checkTrades || !mustering(directives) || tradeIsFavorable(ghost, a))) {
         const s = 3000 - hexDistance(t, c);
         if (s > bestMoveScore) {
           bestMoveScore = s;
@@ -288,6 +310,15 @@ function bestAvailableAction(
         s += 500 - df * 10;
         const ownDist = nearestOwnUnitDistanceFrom(map, player.index, c);
         if (Number.isFinite(ownDist)) s += Math.max(0, 30 - ownDist * 4);
+      }
+      if (directives?.frontTarget) {
+        const df = hexDistance(c, directives.frontTarget);
+        s += 300 - df * 8;
+        const ownDist = nearestOwnUnitDistanceFrom(map, player.index, c);
+        if (Number.isFinite(ownDist)) s += Math.max(0, 30 - ownDist * 4);
+      }
+      if (directives?.muster && hexDistance(c, directives.muster.target) > hexDistance(t, directives.muster.target)) {
+        s -= 150;
       }
       if (situation?.navalThreat && !isShip(unit) && unit.type !== 'catapult' && coastExposedTile(map, c, situation.navalEnemies)) {
         const canStrike = attackableTargets(map, ghost, unit.owner).some((a) => a.unit && isNavalEnemy(a.unit));
@@ -325,17 +356,17 @@ function bestAvailableAction(
     }
     if (canBuildPort(map, tile, player) && canAfford(player.resources, BUILDING_COSTS.port)) {
       if (!reserveLastSlotForMine(map, player, tile) || situation?.navalThreat) {
-        candidates.push({ score: 200 + jitter(), action: { type: 'build', q: tile.q, r: tile.r, kind: 'port' } });
+        candidates.push({ score: (200 * buildScale) + jitter(), action: { type: 'build', q: tile.q, r: tile.r, kind: 'port' } });
       }
     }
     if (canBuildTemple(map, tile, player) && canAfford(player.resources, BUILDING_COSTS.temple)) {
       if (!reserveLastSlotForMine(map, player, tile)) {
-        candidates.push({ score: 200 + jitter(), action: { type: 'build', q: tile.q, r: tile.r, kind: 'temple' } });
+        candidates.push({ score: (200 * buildScale) + jitter(), action: { type: 'build', q: tile.q, r: tile.r, kind: 'temple' } });
       }
     }
     if (canBuildForestTemple(map, tile, player) && canAfford(player.resources, BUILDING_COSTS.forestTemple)) {
       if (!reserveLastSlotForMine(map, player, tile)) {
-        candidates.push({ score: 200 + jitter(), action: { type: 'build', q: tile.q, r: tile.r, kind: 'forestTemple' } });
+        candidates.push({ score: (200 * buildScale) + jitter(), action: { type: 'build', q: tile.q, r: tile.r, kind: 'forestTemple' } });
       }
     }
   }
@@ -368,13 +399,20 @@ function bestAvailableAction(
     });
     if (!touchesOwnNetwork) continue;
     if (!bridgeLeadsSomewhere(map, tile, player)) continue;
-    candidates.push({ score: 250 + jitter(), action: { type: 'buildBridge', q: tile.q, r: tile.r } });
+    candidates.push({ score: (250 * buildScale) + jitter(), action: { type: 'buildBridge', q: tile.q, r: tile.r } });
   }
 
-  // While a naval threat is active the AI saves money for the naval skill
-  // chain (opened by the naval-open-skills pattern) instead of following the
-  // normal economy skill order.
-  if (!situation?.navalThreat) {
+  // A directive skill chain (economy/naval strategy) is opened before the
+  // generic economy skill order so the AI commits to its plan's tech path.
+  if (directives?.skillChain) {
+    for (const id of directives.skillChain) {
+      if (state.opened.has(id)) continue;
+      if (canOpenSkill(player, id)) {
+        candidates.push({ score: 300 + jitter(), action: { type: 'openSkill', skill: id } });
+        break;
+      }
+    }
+  } else if (!situation?.navalThreat) {
     for (const id of AI_SKILL_ORDER) {
       if (state.opened.has(id)) continue;
       if (canOpenSkill(player, id)) {
@@ -442,10 +480,14 @@ export function planAiActions(
   rng: SeededRandom,
   mode: GameMode = 'capture',
   markers?: AiActionMarker[],
+  turn: number = 0,
 ): AiAction[] {
   const difficulty = profileFor(player);
   const situation = analyzeSituation(map, player, mode, difficulty);
+  const strategy = updateStrategy(map, player, situation, mode, difficulty, turn, rng);
+  const directives = deriveDirectives(map, player, situation, difficulty, strategy);
   if (AI_DEBUG_LOGGING) aiLog(`  situation: ${situationSummary(situation)}`);
+  if (AI_DEBUG_LOGGING) aiLog(`  strategy: ${strategy.goals.map((g) => `${g.id}:${g.phase}`).join(',')} directives: {front=${directives.frontTarget ? key(directives.frontTarget.q, directives.frontTarget.r) : '-'}, reserve=${directives.moneyReserve}, pace=${directives.pace}}`);
   const state: AiPlannerState = {
     moved: new Set(),
     acted: new Set(),
@@ -458,7 +500,7 @@ export function planAiActions(
   const actions: AiAction[] = [];
   let stepNo = 0;
   for (let i = 0; i < MAX_PLAN_STEPS; i++) {
-    const ctx: AiPatternContext = { map, player, rng, state, situation, difficulty };
+    const ctx: AiPatternContext = { map, player, rng, state, situation, difficulty, directives };
     let next: AiAction[] | null = null;
     let label = 'fallback(best-score)';
     let note = '';
@@ -472,7 +514,7 @@ export function planAiActions(
     }
     if (!next) {
       const source: { kind: 'best' | 'random' } = { kind: 'best' };
-      next = bestAvailableAction(map, player, rng, state, situation, difficulty, source);
+      next = bestAvailableAction(map, player, rng, state, situation, difficulty, directives, source);
       if (next && source.kind === 'random') label = 'fallback(RANDOM mistake)';
     }
     if (!next) break;

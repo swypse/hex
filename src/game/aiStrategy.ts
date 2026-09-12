@@ -184,6 +184,10 @@ function nearestOwnVillageTo(map: GameMap, player: Player, target: { q: number; 
   return best;
 }
 
+/** Threat-oriented goals override peacetime goals (naval over army, army over
+ *  economy) so an economy plan cannot clobber the naval skill chain mid-threat. */
+const GOAL_PRIORITY: Record<AiGoalId, number> = { economy: 0, score: 0, army: 1, defense: 2, naval: 3 };
+
 export function deriveDirectives(
   map: GameMap,
   player: Player,
@@ -194,7 +198,7 @@ export function deriveDirectives(
   const personality = AI_PERSONALITIES[strategy.personalityId as 'aggressive' | 'balanced' | 'builder'] ?? AI_PERSONALITIES.balanced;
   const d: AiDirectives = { frontTarget: null, muster: null, spawnPlan: [], moneyReserve: 8, skillChain: null, pace: 'normal' };
 
-  for (const g of strategy.goals) {
+  for (const g of [...strategy.goals].sort((a, b) => GOAL_PRIORITY[a.id] - GOAL_PRIORITY[b.id])) {
     if (g.id === 'economy') {
       d.pace = 'slow';
       d.moneyReserve = Math.max(d.moneyReserve, 12);

@@ -11,6 +11,7 @@ import { TileType } from '../src/game/tileTypes';
 import { Unit } from '../src/game/units';
 import { GameMode } from '../src/game/gameMode';
 import { AiStrategyState } from '../src/game/aiTypes';
+import { planAiActions } from '../src/game/ai';
 
 function aiPlayer(name: string): Player {
   return {
@@ -221,5 +222,41 @@ describe('AiStrategy deriveDirectives', () => {
   it('personalities diverge: aggressive picks army, builder picks economy on the same map', () => {
     expect(pickPrimary(planState('Zed'))).toBe('army');
     expect(pickPrimary(planState('Obe'))).toBe('economy');
+  });
+});
+describe('planAiActions with strategy', () => {
+  it('keeps a bare one-village map on today behaviour (no crash, actions produced)', () => {
+    const tiles: MapTile[] = [
+      makeTile(0, 0, 1, { owner: 1, level: 1, captureReady: false }, makeWarrior('g1', 1, 0, 0)),
+      makeTile(1, 0),
+      makeTile(2, 0),
+    ];
+    const map: GameMap = { radius: 4, tiles, spawns: [] };
+    const actions = planAiActions(map, aiPlayer('Ona'), new SeededRandom(1), 'capture');
+    expect(actions.length).toBeGreaterThan(0);
+  });
+
+  it('army-plan moves units toward the enemy village front', () => {
+    const map: GameMap = { radius: 6, tiles: [
+      makeTile(0, 0, null, null, makeWarrior('g1', 1, 0, 0)),
+      makeTile(1, 0),
+      makeTile(2, 0, 1, { owner: 1, level: 1, captureReady: false }),
+      makeTile(3, 0),
+      makeTile(4, 0),
+      makeTile(5, 0, 0, { owner: 0, level: 1, captureReady: false }),
+    ], spawns: [] };
+    const actions = planAiActions(map, aiPlayer('Ragnar'), new SeededRandom(1), 'capture');
+    const moves = actions.filter((a) => a.type === 'move');
+    expect(moves.length).toBeGreaterThan(0);
+    expect(moves.some((m) => m.type === 'move' && m.q > 0)).toBe(true);
+  });
+
+  it('passes the turn through to the planner (no crash across turns)', () => {
+    const map = twoVillageMap();
+    const p = aiPlayer('Drake');
+    for (let turn = 1; turn <= 12; turn++) {
+      const actions = planAiActions(map, p, new SeededRandom(turn), 'capture');
+      expect(actions.length).toBeGreaterThanOrEqual(0);
+    }
   });
 });

@@ -777,7 +777,7 @@ export class Simulator {
     this.markCaptureReadyFor(playerIndex);
     this.emit({ type: 'aiTurn', playerIndex });
     const markers: AiActionMarker[] = [];
-    const actions = planAiActions(this.map, ai, this.aiRng(), this.mode, markers);
+    const actions = planAiActions(this.map, ai, this.aiRng(), this.mode, markers, this.turn);
     let actionNo = 0;
     for (const a of actions) {
       actionNo += 1;

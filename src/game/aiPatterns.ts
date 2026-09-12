@@ -11,7 +11,7 @@ import { attackableTargets, attackDamage, tradeIsFavorable } from './combat';
 import { canBuildPort, canBuildSawmill, canBuildMine, BUILDING_COSTS } from './buildings';
 import { unitsInVillage, villageCapacity } from './village';
 import { isExploredFor } from './explore';
-import { AiAction, AiPlannerState, SpawnPreference } from './aiTypes';
+import { AiAction, AiDirectives, AiPlannerState, SpawnPreference } from './aiTypes';
 import { AiDifficultyProfile } from './aiDifficulty';
 import { AiSituation, coastExposedTile, isMelee, isNavalEnemy } from './aiSituation';
 import { isShip, shipAttackDistance, canUpgradeShip } from './ship';
@@ -23,6 +23,7 @@ export interface AiPatternContext {
   state: AiPlannerState;
   situation?: AiSituation;
   difficulty?: AiDifficultyProfile;
+  directives?: AiDirectives;
 }
 
 export interface AiPattern {
