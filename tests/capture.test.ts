@@ -17,6 +17,10 @@ function makeUnit(id: string, owner: number, q: number, r: number): Unit {
   return { id, owner, type: 'warrior', q, r, hasMoved: true, hasAttacked: false, hasHealed: false, hp: 5, attack: 2, attackDistance: 1, spawnVillage: { q: 99, r: 99 } };
 }
 
+function makeRoadTile(q: number, r: number, owner: number): MapTile {
+  return { q, r, terrain: TileType.GrasslandLand, settlement: null, unit: null, ownedBy: owner, claimedByVillage: null, building: null, roadOwner: owner };
+}
+
 describe('setCaptureReady', () => {
   it('sets and clears the flag', () => {
     const tile = makeTile(0, 0, { owner: 1, level: 1, captureReady: false });
@@ -191,6 +195,53 @@ describe('villageIncome', () => {
     village.unit = null;
     expect(villageIncome(map, village)).toBe(5);
   });
+
+  it('gives +1 income to each village of a road-connected pair', () => {
+    const map: GameMap = { radius: 4, tiles: [], spawns: [] };
+    const a = makeTile(0, 0, { owner: 0, level: 1, captureReady: false }); // base 5
+    const b = makeTile(2, 0, { owner: 0, level: 1, captureReady: false }); // base 5
+    a.ownedBy = 0;
+    b.ownedBy = 0;
+    map.tiles.push(a, b, makeRoadTile(1, 0, 0));
+    expect(villageIncome(map, a)).toBe(5 + 1);
+    expect(villageIncome(map, b)).toBe(5 + 1);
+  });
+
+  it('gives +1 (not +2) to each village in a three-village road chain', () => {
+    const map: GameMap = { radius: 4, tiles: [], spawns: [] };
+    const a = makeTile(0, 0, { owner: 0, level: 1, captureReady: false }); // base 5
+    const b = makeTile(2, 0, { owner: 0, level: 1, captureReady: false });
+    const c = makeTile(4, 0, { owner: 0, level: 1, captureReady: false });
+    for (const t of [a, b, c]) t.ownedBy = 0;
+    map.tiles.push(a, b, c, makeRoadTile(1, 0, 0), makeRoadTile(3, 0, 0));
+    expect(villageIncome(map, a)).toBe(5 + 1);
+    expect(villageIncome(map, b)).toBe(5 + 1);
+    expect(villageIncome(map, c)).toBe(5 + 1);
+  });
+
+  it('counts two directly adjacent own villages as connected', () => {
+    const map: GameMap = { radius: 4, tiles: [], spawns: [] };
+    const a = makeTile(0, 0, { owner: 0, level: 1, captureReady: false }); // base 5
+    const b = makeTile(1, 0, { owner: 0, level: 1, captureReady: false });
+    a.ownedBy = 0;
+    b.ownedBy = 0;
+    map.tiles.push(a, b);
+    expect(villageIncome(map, a)).toBe(5 + 1);
+    expect(villageIncome(map, b)).toBe(5 + 1);
+  });
+
+  it('gives no bonus to a connected village while an enemy stands on it', () => {
+    const map: GameMap = { radius: 4, tiles: [], spawns: [] };
+    const a = makeTile(0, 0, { owner: 0, level: 3, captureReady: false }); // base 9
+    const b = makeTile(2, 0, { owner: 0, level: 1, captureReady: false });
+    a.ownedBy = 0;
+    b.ownedBy = 0;
+    map.tiles.push(a, b, makeRoadTile(1, 0, 0));
+    const enemy = makeUnit('e', 1, 0, 0);
+    enemy.spawnVillage = null;
+    a.unit = enemy;
+    expect(villageIncome(map, a)).toBe(0);
+  });
 });
 
 describe('villageIncomeTotal', () => {
@@ -201,6 +252,16 @@ describe('villageIncomeTotal', () => {
     const other = makeTile(2, 0, { owner: 1, level: 1, captureReady: false });
     map.tiles.push(v1, v2, other);
     expect(villageIncomeTotal(map, 0)).toBe(villageIncome(map, v1) + villageIncome(map, v2));
+  });
+
+  it('includes the connection bonus for a road-connected pair', () => {
+    const map: GameMap = { radius: 4, tiles: [], spawns: [] };
+    const a = makeTile(0, 0, { owner: 0, level: 1, captureReady: false }); // base 5
+    const b = makeTile(2, 0, { owner: 0, level: 2, captureReady: false }); // base 7
+    a.ownedBy = 0;
+    b.ownedBy = 0;
+    map.tiles.push(a, b, makeRoadTile(1, 0, 0));
+    expect(villageIncomeTotal(map, 0)).toBe((5 + 1) + (7 + 1));
   });
 });
 

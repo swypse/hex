@@ -1,12 +1,16 @@
 import { GameMap, MapTile } from './mapGen';
 import { Unit, unitMaintenance } from './units';
 import { villageCapacity, unitsInVillage, exploreVillageSight } from './village';
+import { isVillageRoadConnected } from './roads';
 
 export function setCaptureReady(villageTile: MapTile, ready: boolean): void {
   if (villageTile.settlement) {
     villageTile.settlement.captureReady = ready;
   }
 }
+
+/** Extra money income per turn for a village connected to another own village. */
+export const VILLAGE_CONNECTION_BONUS = 1;
 
 /** Money upkeep of all units this village raised (owner's units whose
  *  spawnVillage is this village), used against the village's income. */
@@ -39,7 +43,8 @@ export function villageIncome(map: GameMap, villageTile: MapTile): number {
   if (villageEnemyOccupied(villageTile)) return 0;
   const level = villageTile.settlement!.level;
   const base = 3 + level * 2;
-  return Math.max(0, base - villageMaintenance(map, villageTile));
+  const net = Math.max(0, base - villageMaintenance(map, villageTile));
+  return isVillageRoadConnected(map, villageTile) ? net + VILLAGE_CONNECTION_BONUS : net;
 }
 
 export function villageIncomeTotal(map: GameMap, playerIndex: number): number {
