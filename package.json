@@ -11,6 +11,7 @@
     "typecheck": "tsc --noEmit",
     "pack:skills": "node tools/packSkills.mjs",
     "pack:achievements": "node tools/packAchievements.mjs",
+    "pack:action-buttons": "node tools/packActionButtons.mjs",
     "relay": "node server/relay.mjs"
   },
   "dependencies": {
