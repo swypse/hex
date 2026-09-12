@@ -15,13 +15,12 @@ export interface MuzzleParticleParams {
 export function muzzleParticleParams(
   rng: () => number = Math.random,
 ): MuzzleParticleParams {
-  const minColor = 0x222222;
-  const span = 0xffffff - minColor;
+  const colors = [0x222222, 0x444444, 0xffffff];
   return {
-    color: minColor + Math.floor(rng() * (span + 1)),
-    opacity: 0.2 + rng() * 0.3,
-    start: 2 + rng() * 2,
-    end: 6 + rng() * 4,
+    color: colors[Math.floor(Math.random() * 3)] as number,
+    opacity: 0.2 + rng() * 0.5,
+    start: 6 + rng() * 2,
+    end: 12 + rng() * 4,
   };
 }
 
