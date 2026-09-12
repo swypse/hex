@@ -2,6 +2,7 @@ import { Container } from 'pixi.js';
 import { useGameStore } from '../../store/gameStore';
 import { type UIHost, type Widget } from '../host';
 import { IconButton } from '../kit/iconButton';
+import { ACTION_BUTTON_ICON_FILES, makeActionButtonIcon } from '../kit/actionButtonIcons';
 import { SKILLS_BUTTON_SIZE, achievementsButtonPosition } from '../layout';
 
 export class HudAchievements implements Widget {
@@ -13,9 +14,10 @@ export class HudAchievements implements Widget {
     this.host = host;
     const el = new Container();
     const btn = new IconButton({
-      icon: 'cup.png',
+      icon: ACTION_BUTTON_ICON_FILES['achievements']!,
       size: SKILLS_BUTTON_SIZE,
       onClick: () => useGameStore.getState().setOverlay({ kind: 'achievements' }),
+      iconFactory: makeActionButtonIcon,
     });
     btn.position.set(0, 0);
     el.addChild(btn);

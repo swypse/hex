@@ -2,6 +2,7 @@ import { Container, Graphics } from 'pixi.js';
 import { useGameStore } from '../../store/gameStore';
 import { type UIHost, type Widget } from '../host';
 import { IconButton } from '../kit/iconButton';
+import { ACTION_BUTTON_ICON_FILES, makeActionButtonIcon } from '../kit/actionButtonIcons';
 import { skillPulseStep } from '../../game/tutorial/tutorialSteps';
 import { SKILLS_BUTTON_SIZE, skillsButtonPosition } from '../layout';
 
@@ -17,10 +18,11 @@ export class HudSkills implements Widget {
     this.host = host;
     const el = new Container();
     const btn = new IconButton({
-      icon: 'skills.png',
+      icon: ACTION_BUTTON_ICON_FILES['skills']!,
       size: SKILLS_BUTTON_SIZE,
       color: 0x373748,
       onClick: () => useGameStore.getState().setOverlay({ kind: 'skill' }),
+      iconFactory: makeActionButtonIcon,
     });
     btn.position.set(0, 0);
     el.addChild(btn);

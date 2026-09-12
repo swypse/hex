@@ -6,6 +6,7 @@ import { useGameStore } from '../../store/gameStore';
 import { type UIHost, type Widget } from '../host';
 import { Button } from '../kit/button';
 import { IconButton } from '../kit/iconButton';
+import { ACTION_BUTTON_ICON_FILES, makeActionButtonIcon } from '../kit/actionButtonIcons';
 import { ActionTooltip } from '../kit/actionTooltip';
 import { tooltipsEnabled } from '../kit/tooltipGate';
 import { TOOLBAR_HEIGHT, isWideScreen, ACTION_TOOLBAR_MAX_WIDTH } from '../layout';
@@ -14,22 +15,22 @@ import { hasAnyAvailableAction } from '../../game/playerActions';
 import { STEP_CONFIG } from '../../game/tutorial/tutorialSteps';
 
 const ICON_ACTIONS: Record<string, string> = {
-  upgrade: 'upgrade.png',
-  wall: 'build-wall.png',
-  'upgrade-ship': 'upgrade.png',
-  heal: 'heal.png',
-  disband: 'disband.png',
-  capture: 'capture.png',
-  spawn: 'spawn.png',
-  sawmill: 'build-sawmill.png',
-  mine: 'build-mine.png',
-  port: 'build-port.png',
-  temple: 'water-temple.png',
-  forestTemple: 'forest-temple.png',
-  road: 'build-road.png',
-  bridge: 'build-bridge.png',
-  bonus: 'get-bonus.png',
-  bottle: 'get-bottle.png',
+  upgrade: 'upgrade',
+  wall: 'wall',
+  'upgrade-ship': 'upgrade-ship',
+  heal: 'heal',
+  disband: 'disband',
+  capture: 'capture',
+  spawn: 'spawn',
+  sawmill: 'sawmill',
+  mine: 'mine',
+  port: 'port',
+  temple: 'temple',
+  forestTemple: 'forestTemple',
+  road: 'road',
+  bridge: 'bridge',
+  bonus: 'bonus',
+  bottle: 'bottle',
 };
 
 const LAST_TURN_COLOR = 0x9cff55;
@@ -184,7 +185,7 @@ export class HudToolbar implements Widget {
       maybeHighlightAction(btn, key);
     };
     const addIcon = (icon: string, disabled: boolean, onClick: () => void, tooltipText: string, key: string): void => {
-      const btn = new IconButton({ icon, disabled, onClick, size: 48, ...ACTION_BTN });
+      const btn = new IconButton({ icon, disabled, onClick, size: 48, iconFactory: makeActionButtonIcon, ...ACTION_BTN });
       btn.position.set(x, 0);
       this.row!.addChild(btn);
       x += btn.width + GAP;
@@ -208,16 +209,17 @@ export class HudToolbar implements Widget {
     }
 
     const stats = new IconButton({
-      icon: 'stats.png',
+      icon: ACTION_BUTTON_ICON_FILES['stats']!,
       size: 48,
       onClick: () => useGameStore.getState().setOverlay({ kind: 'stats' }),
+      iconFactory: makeActionButtonIcon,
       ...ACTION_BTN,
     });
     this.statsRow.addChild(stats);
     if (tooltipsEnabled()) this.tooltips.push(new ActionTooltip(this.el!, stats, t('hud.stats')));
 
     const endTurn = new IconButton({
-      icon: 'end-turn.png',
+      icon: ACTION_BUTTON_ICON_FILES['end-turn']!,
       disabled: store.aiActive,
       onClick: () => gameController.endTurn(),
       size: 48,
