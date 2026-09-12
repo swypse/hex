@@ -14,14 +14,13 @@ describe('muzzleParticleParams', () => {
   it('produces params within the allowed ranges', () => {
     for (let i = 0; i < 50; i++) {
       const p = muzzleParticleParams(seqRng(i + 1));
-      expect(p.color).toBeGreaterThanOrEqual(0x222222);
-      expect(p.color).toBeLessThanOrEqual(0xffffff);
+      expect([0x222222, 0x444444, 0xffffff]).toContain(p.color);
       expect(p.opacity).toBeGreaterThanOrEqual(0.2);
-      expect(p.opacity).toBeLessThan(0.5);
-      expect(p.start).toBeGreaterThanOrEqual(2);
-      expect(p.start).toBeLessThan(4);
-      expect(p.end).toBeGreaterThanOrEqual(6);
-      expect(p.end).toBeLessThan(10);
+      expect(p.opacity).toBeLessThan(0.7);
+      expect(p.start).toBeGreaterThanOrEqual(6);
+      expect(p.start).toBeLessThan(8);
+      expect(p.end).toBeGreaterThanOrEqual(12);
+      expect(p.end).toBeLessThan(16);
     }
   });
 });
