@@ -2,6 +2,33 @@ import { BuildingKind } from './events';
 import { SkillId } from './skills';
 import { UnitType } from './units';
 
+export type SpawnPreference = 'offense' | 'defense' | 'scout' | 'naval';
+
+export type AiGoalId = 'economy' | 'army' | 'defense' | 'naval' | 'score';
+
+export interface AiGoalState {
+  id: AiGoalId;
+  phase: string;
+  target: { q: number; r: number } | null;
+  sinceTurn: number;
+  confidence: number;
+}
+
+export interface AiStrategyState {
+  personalityId: string;
+  nextPlanTurn: number;
+  goals: AiGoalState[];
+}
+
+export interface AiDirectives {
+  frontTarget: { q: number; r: number } | null;
+  muster: { tile: { q: number; r: number } | null; minUnits: number; target: { q: number; r: number } } | null;
+  spawnPlan: { villageKey: string; prefer: SpawnPreference }[];
+  moneyReserve: number;
+  skillChain: SkillId[] | null;
+  pace: 'rushed' | 'normal' | 'slow';
+}
+
 export type AiAction =
   | { type: 'upgrade'; q: number; r: number }
   | { type: 'move'; unitId: string; q: number; r: number }

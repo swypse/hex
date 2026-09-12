@@ -11,7 +11,7 @@ import { attackableTargets, attackDamage, tradeIsFavorable } from './combat';
 import { canBuildPort, canBuildSawmill, canBuildMine, BUILDING_COSTS } from './buildings';
 import { unitsInVillage, villageCapacity } from './village';
 import { isExploredFor } from './explore';
-import { AiAction, AiPlannerState } from './aiTypes';
+import { AiAction, AiPlannerState, SpawnPreference } from './aiTypes';
 import { AiDifficultyProfile } from './aiDifficulty';
 import { AiSituation, coastExposedTile, isMelee, isNavalEnemy } from './aiSituation';
 import { isShip, shipAttackDistance, canUpgradeShip } from './ship';
@@ -67,8 +67,6 @@ export function enemyCanAttackNext(map: GameMap, tile: MapTile, playerIndex: num
       hexDistance(tile, t) <= UNIT_MOVEMENT[t.unit.type] + UNIT_ATTACK_DISTANCE[t.unit.type],
   );
 }
-
-export type SpawnPreference = 'offense' | 'defense' | 'scout' | 'naval';
 
 const SPAWN_ORDER: Record<SpawnPreference, UnitType[]> = {
   offense: ['knight', 'swordsman', 'catapult', 'warrior', 'rider', 'archer', 'shield'],

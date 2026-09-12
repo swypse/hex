@@ -6,6 +6,7 @@ import { EMPTY_STATS, type PlayerStats } from './score';
 import type { AchievementId } from './achievements';
 import { Tribe, TRIBES } from './tribes';
 import { AiDifficulty, DEFAULT_AI_DIFFICULTY } from './aiDifficulty';
+import type { AiStrategyState } from './aiTypes';
 
 export interface Player {
   index: number;
@@ -21,6 +22,7 @@ export interface Player {
   stats?: PlayerStats;
   difficulty?: AiDifficulty;
   achievements?: AchievementId[];
+  strategy?: AiStrategyState;
 }
 
 function startingResourcesFor(tribe: Tribe): Resources {
