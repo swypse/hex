@@ -3,11 +3,13 @@ import { Player } from './players';
 import { GameMode } from './gameMode';
 import { AiDifficultyProfile } from './aiDifficulty';
 import { personalityFor } from './aiPersonality';
-import { AiGoalId, AiGoalState, AiStrategyState } from './aiTypes';
+import { AiGoalId, AiGoalState, AiStrategyState, AiDirectives } from './aiTypes';
 import { AiSituation } from './aiSituation';
 import { SeededRandom } from '../util/random';
 import { isExploredFor } from './explore';
 import { hexDistance } from './hex';
+import { AI_PERSONALITIES } from './aiPersonality';
+import { hasSkill, SkillId } from './skills';
 
 export function goalTargetKey(g: AiGoalState): string {
   return g.target ? `${g.target.q},${g.target.r}` : '';
@@ -146,4 +148,101 @@ export function updateStrategy(
   state.goals = next;
   state.nextPlanTurn = turn + difficulty.strategy.planIntervalTurns;
   return state;
+}
+function economySkillChain(player: Player): SkillId[] | null {
+  const chain: SkillId[] = ['forestry', 'climbing', 'smithery', 'geology', 'science'];
+  for (const s of chain) if (!hasSkill(player, s)) return chain.slice(chain.indexOf(s));
+  return null;
+}
+
+function navalSkillChain(player: Player): SkillId[] | null {
+  const chain: SkillId[] = ['water', 'navigation', 'science', 'catapult'];
+  for (const s of chain) if (!hasSkill(player, s)) return chain.slice(chain.indexOf(s));
+  return null;
+}
+
+function countOwnUnitsNear(map: GameMap, player: Player, target: { q: number; r: number }, radius: number): number {
+  let n = 0;
+  for (const t of map.tiles) {
+    if (!t.unit || t.unit.owner !== player.index) continue;
+    if (hexDistance(t, target) <= radius) n += 1;
+  }
+  return n;
+}
+
+function nearestOwnVillageTo(map: GameMap, player: Player, target: { q: number; r: number }): { q: number; r: number } | null {
+  let best: { q: number; r: number } | null = null;
+  let bestDist = Infinity;
+  for (const t of map.tiles) {
+    if (!t.settlement || t.settlement.owner !== player.index) continue;
+    const d = hexDistance(t, target);
+    if (d < bestDist) {
+      bestDist = d;
+      best = { q: t.q, r: t.r };
+    }
+  }
+  return best;
+}
+
+export function deriveDirectives(
+  map: GameMap,
+  player: Player,
+  situation: AiSituation,
+  difficulty: AiDifficultyProfile,
+  strategy: AiStrategyState,
+): AiDirectives {
+  const personality = AI_PERSONALITIES[strategy.personalityId as 'aggressive' | 'balanced' | 'builder'] ?? AI_PERSONALITIES.balanced;
+  const d: AiDirectives = { frontTarget: null, muster: null, spawnPlan: [], moneyReserve: 8, skillChain: null, pace: 'normal' };
+
+  for (const g of strategy.goals) {
+    if (g.id === 'economy') {
+      d.pace = 'slow';
+      d.moneyReserve = Math.max(d.moneyReserve, 12);
+      d.skillChain = economySkillChain(player);
+    }
+    if (g.id === 'army') {
+      const target = g.target;
+      if (!target) continue;
+      d.frontTarget = target;
+      d.pace = 'rushed';
+      if (d.moneyReserve > 4) d.moneyReserve = 4;
+      const mustered = countOwnUnitsNear(map, player, target, 5);
+      const minUnits = Math.round(personality.musterMinUnits * difficulty.strategy.musterFactor);
+      const assaultReady = situation.ownPower >= situation.enemyPower * difficulty.strategy.assaultRatio;
+      if (g.phase === 'muster' && mustered < minUnits && !assaultReady) {
+        d.muster = { tile: null, minUnits, target };
+      }
+      const village = nearestOwnVillageTo(map, player, target);
+      if (village) {
+        const freeTarget = situation.freeVillages.some((fv) => fv.village.q === target.q && fv.village.r === target.r);
+        d.spawnPlan.push({ villageKey: `${village.q},${village.r}`, prefer: freeTarget ? 'scout' : 'offense' });
+      }
+    }
+    if (g.id === 'defense') {
+      if (!g.target) continue;
+      d.frontTarget = g.target;
+      d.moneyReserve = 0;
+      d.pace = 'rushed';
+      d.muster = { tile: g.target, minUnits: 1, target: g.target };
+      const village = map.tiles.find((t) => t.settlement && t.settlement.owner === player.index && !t.unit);
+      if (village) d.spawnPlan.push({ villageKey: `${village.q},${village.r}`, prefer: 'defense' });
+    }
+    if (g.id === 'naval') {
+      d.skillChain = navalSkillChain(player);
+      d.pace = 'rushed';
+      if (d.moneyReserve <= 8) d.moneyReserve = 10;
+    }
+    if (g.id === 'score') {
+      d.pace = 'rushed';
+      d.moneyReserve = 0;
+      if (situation.freeVillages.length > 0) {
+        const fv = { q: situation.freeVillages[0]!.village.q, r: situation.freeVillages[0]!.village.r };
+        d.frontTarget = fv;
+        const village = nearestOwnVillageTo(map, player, fv);
+        if (village) d.spawnPlan.push({ villageKey: `${village.q},${village.r}`, prefer: 'scout' });
+      }
+    }
+  }
+  if (situation.endangered) d.moneyReserve = 0;
+  return d;
 }

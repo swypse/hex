@@ -3,13 +3,14 @@ import { AI_DIFFICULTY_PROFILES, profileFor } from '../src/game/aiDifficulty';
 import { AI_PERSONALITIES, personalityFor } from '../src/game/aiPersonality';
 import { SpawnPreference } from '../src/game/aiTypes';
 import { Player } from '../src/game/players';
-import { updateStrategy, goalTargetKey, productionBuildings } from '../src/game/aiStrategy';
+import { updateStrategy, goalTargetKey, productionBuildings, deriveDirectives, ensurePlayerStrategy } from '../src/game/aiStrategy';
 import { analyzeSituation } from '../src/game/aiSituation';
 import { SeededRandom } from '../src/util/random';
 import { GameMap, MapTile, Settlement } from '../src/game/mapGen';
 import { TileType } from '../src/game/tileTypes';
 import { Unit } from '../src/game/units';
 import { GameMode } from '../src/game/gameMode';
+import { AiStrategyState } from '../src/game/aiTypes';
 
 function aiPlayer(name: string): Player {
   return {
@@ -121,5 +122,104 @@ describe('AiStrategy lifecycle', () => {
     expect(productionBuildings(map, p)).toBe(1);
     const s = updateStrategy(map, p, analyzeSituation(map, p, mode, profileFor(p)), mode, profileFor(p), 1, new SeededRandom(1));
     if (s.goals[0]!.target) expect(goalTargetKey(s.goals[0]!)).toBe(`${s.goals[0]!.target!.q},${s.goals[0]!.target!.r}`);
+  });
+});
+
+describe('AiStrategy deriveDirectives', () => {
+  const mode: GameMode = 'capture';
+  const rng = new SeededRandom(1);
+
+  function pickPrimary(s: AiStrategyState): string {
+    return s.goals.find((g) => g.id === 'economy' || g.id === 'army')!.id;
+  }
+
+  function planState(name: string, turn = 1, m = mode): AiStrategyState {
+    const p = aiPlayer(name);
+    const profile = profileFor(p);
+    const map = twoVillageMap();
+    return updateStrategy(map, p, analyzeSituation(map, p, m, profile), m, profile, turn, rng);
+  }
+
+  it('emits a neutral directive set for a fresh player (no goals)', () => {
+    const p = aiPlayer('Adaro');
+    const map = twoVillageMap();
+    const profile = profileFor(p);
+    const situation = analyzeSituation(map, p, mode, profile);
+    const state = ensurePlayerStrategy(p, rng);
+    const d = deriveDirectives(map, p, situation, profile, state);
+    expect(d.frontTarget).toBeNull();
+    expect(d.muster).toBeNull();
+    expect(d.spawnPlan).toEqual([]);
+    expect(d.moneyReserve).toBe(8);
+    expect(d.skillChain).toBeNull();
+    expect(d.pace).toBe('normal');
+  });
+
+  it('economy goal sets a slow pace, reserve, and economy skill chain', () => {
+    const state = planState('Obe');
+    expect(pickPrimary(state)).toBe('economy');
+    const p = aiPlayer('Obe');
+    const map = twoVillageMap();
+    const profile = profileFor(p);
+    const situation = analyzeSituation(map, p, mode, profile);
+    const d = deriveDirectives(map, p, situation, profile, state);
+    expect(d.pace).toBe('slow');
+    expect(d.moneyReserve).toBeGreaterThanOrEqual(12);
+    expect(d.skillChain).not.toBeNull();
+  });
+
+  it('army goal emits a front target toward the enemy village and an offense spawn plan', () => {
+    const state = planState('Ragnar', 8);
+    expect(pickPrimary(state)).toBe('army');
+    const p = aiPlayer('Ragnar');
+    const map = twoVillageMap();
+    const profile = profileFor(p);
+    const situation = analyzeSituation(map, p, mode, profile);
+    const d = deriveDirectives(map, p, situation, profile, state);
+    expect(d.frontTarget).not.toBeNull();
+    expect(d.spawnPlan.some((s) => s.prefer === 'offense')).toBe(true);
+  });
+
+  it('defense goal reverts the money reserve to 0 and targets the endangered village', () => {
+    const p = aiPlayer('Sable');
+    const map = twoVillageMap();
+    map.tiles.push(makeTile(0, 2, 0, null, makeWarrior('e1', 0, 0, 2)));
+    const profile = profileFor(p);
+    const situation = analyzeSituation(map, p, mode, profile);
+    const state = updateStrategy(map, p, situation, mode, profile, 1, rng);
+    expect(state.goals.some((g) => g.id === 'defense')).toBe(true);
+    const d = deriveDirectives(map, p, situation, profile, state);
+    expect(d.moneyReserve).toBe(0);
+    expect(d.pace).toBe('rushed');
+    expect(d.frontTarget).not.toBeNull();
+  });
+
+  it('naval goal opens the naval skill chain first', () => {
+    const p = aiPlayer('Mara');
+    const map = twoVillageMap();
+    map.tiles.push(makeTile(0, -2, 0, null, { ...makeWarrior('e1', -1, 0, -2), shipLevel: 1 }));
+    const profile = profileFor(p);
+    const situation = analyzeSituation(map, p, mode, profile);
+    const state = updateStrategy(map, p, situation, mode, profile, 1, rng);
+    expect(state.goals.some((g) => g.id === 'naval')).toBe(true);
+    const d = deriveDirectives(map, p, situation, profile, state);
+    expect(d.skillChain).not.toBeNull();
+  });
+
+  it('score goal sets a rushed pace and zero reserve in 30-turn mode', () => {
+    const state = planState('Kade', 12, 'turns30');
+    expect(state.goals.some((g) => g.id === 'score')).toBe(true);
+    const p = aiPlayer('Kade');
+    const map = twoVillageMap();
+    const profile = profileFor(p);
+    const situation = analyzeSituation(map, p, 'turns30', profile);
+    const d = deriveDirectives(map, p, situation, profile, state);
+    expect(d.pace).toBe('rushed');
+    expect(d.moneyReserve).toBe(0);
+  });
+
+  it('personalities diverge: aggressive picks army, builder picks economy on the same map', () => {
+    expect(pickPrimary(planState('Zed'))).toBe('army');
+    expect(pickPrimary(planState('Obe'))).toBe('economy');
   });
 });
