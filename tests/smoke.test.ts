@@ -27,7 +27,7 @@ describe('muzzleParticleParams', () => {
 });
 
 describe('spawnMuzzleSmoke', () => {
-  it('adds a container with 10 circles that fade and are removed after ~750ms', () => {
+  it('adds a container with 10 squares that fade and are removed after ~1350ms', () => {
     const callbacks: Array<() => void> = [];
     const app = {
       screen: { width: 800, height: 600 },
@@ -47,19 +47,19 @@ describe('spawnMuzzleSmoke', () => {
       expect(el.children.every((c) => c instanceof Graphics)).toBe(true);
       expect(callbacks).toHaveLength(1);
 
-      const circles = el.children as Graphics[];
-      const w0 = circles.map((g) => g.getBounds().width);
+      const squares = el.children as Graphics[];
+      const w0 = squares.map((g) => g.getBounds().width);
       now = 1300;
       callbacks[0]!();
-      // 300ms in: past max stagger (150) and before the 600ms end, so every
-      // particle has a strictly larger radius.
-      const w1 = circles.map((g) => g.getBounds().width);
-      for (let i = 0; i < circles.length; i++) {
+      // 300ms in: past max stagger (150) and before the 1200ms end, so every
+      // particle has a strictly larger size.
+      const w1 = squares.map((g) => g.getBounds().width);
+      for (let i = 0; i < squares.length; i++) {
         expect(w1[i]!).toBeGreaterThan(w0[i]!);
       }
-      expect(circles.some((g) => g.alpha > 0)).toBe(true);
+      expect(squares.some((g) => g.alpha > 0)).toBe(true);
 
-      now = 1800;
+      now = 2600;
       callbacks[0]!();
       expect(mapRoot.children).toHaveLength(0);
     } finally {

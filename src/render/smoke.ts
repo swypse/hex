@@ -1,9 +1,9 @@
 import { Application, Container, Graphics } from 'pixi.js';
 
-export const MUZZLE_MS = 600;
+export const MUZZLE_MS = 1200;
 export const MUZZLE_STAGGER = 150;
 export const MUZZLE_COUNT = 10;
-const MUZZLE_RISE = 40;
+const MUZZLE_RISE = 80;
 
 export interface MuzzleParticleParams {
   color: number;
@@ -50,7 +50,7 @@ export function spawnMuzzleSmoke(
   for (let i = 0; i < MUZZLE_COUNT; i++) {
     const params = muzzleParticleParams();
     const g = new Graphics();
-    g.circle(0, 0, params.start).fill({ color: params.color, alpha: 1 });
+    g.rect(-params.start / 2, -params.start / 2, params.start, params.start).fill({ color: params.color, alpha: 1 });
     g.alpha = 0;
     el.addChild(g);
     particles.push({
@@ -77,7 +77,7 @@ export function spawnMuzzleSmoke(
       const t = Math.min(1, localAge / MUZZLE_MS);
       const radius = p.start + (p.end - p.start) * t;
       p.g.clear();
-      p.g.circle(0, 0, radius).fill({ color: p.color, alpha: 1 });
+      p.g.rect(-radius / 2, -radius / 2, radius, radius).fill({ color: p.color, alpha: 1 });
       p.g.alpha = p.opacity * (1 - t);
       p.g.position.set(
         p.x0 + Math.sin(t * Math.PI * 2 + p.phase) * p.swing,
