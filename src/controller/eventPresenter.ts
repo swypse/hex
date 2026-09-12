@@ -541,7 +541,7 @@ export class EventPresenter {
       const targetPre = e.targetPre!;
       if (targetPre.type === 'archer' && targetPre.shipLevel === undefined) {
         await this.spawnArrowFromTo(targetTile, attackerTile);
-      } else if (targetPre.shipLevel !== undefined || targetPre.type === 'catapult') {
+      } else if (targetPre.shipLevel !== undefined || targetPre.type === 'catapult' || targetPre.type === 'pirate') {
         await this.spawnCannonballFromTo(targetTile, attackerTile, targetPre.type === 'catapult');
       } else {
         await mapView.lungeUnit(targetKey, attackerKey, 10 / scale);
