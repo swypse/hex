@@ -15,6 +15,8 @@ export interface IconButtonOpts {
   disabledAlpha?: number;
   transparentDisabled?: boolean;
   onReady?: () => void;
+  /** Overrides how the icon sprite is built (default `makeIcon`). */
+  iconFactory?: (name: string, size: number, onReady?: () => void) => Sprite;
 }
 
 export class IconButton extends Container {
@@ -44,7 +46,8 @@ export class IconButton extends Container {
     this.bg = new Graphics();
     this.bg.circle(this.size / 2, this.size / 2, this.size / 2).fill(this.baseColor);
     const iconSize = this.size * 0.6;
-    this.sprite = makeIcon(opts.icon, iconSize, () => opts.onReady?.());
+    const buildIcon = opts.iconFactory ?? makeIcon;
+    this.sprite = buildIcon(opts.icon, iconSize, () => opts.onReady?.());
     this.sprite.position.set(this.size / 2, this.size / 2);
     this.addChild(this.bg, this.sprite);
     this.eventMode = 'static';
