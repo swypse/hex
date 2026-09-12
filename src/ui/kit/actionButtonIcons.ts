@@ -45,12 +45,13 @@ function sliceFrame(key: string, atlas: Texture): Texture | null {
 }
 
 export function makeActionButtonIcon(key: string, size: number, onReady?: () => void): Sprite {
+  const frameKey = ACTION_BUTTON_ICON_FILES[key] ?? key;
   const sprite = new Sprite();
   sprite.anchor.set(0.5);
   sprite.width = size;
   sprite.height = size;
   if (atlasTexture) {
-    const tex = sliceFrame(key, atlasTexture);
+    const tex = sliceFrame(frameKey, atlasTexture);
     if (tex) sprite.texture = tex;
     onReady?.();
     return sprite;
@@ -58,7 +59,7 @@ export function makeActionButtonIcon(key: string, size: number, onReady?: () => 
   const img = new Image();
   img.onload = () => {
     atlasTexture = Texture.from(img);
-    const tex = sliceFrame(key, atlasTexture);
+    const tex = sliceFrame(frameKey, atlasTexture);
     if (sprite.destroyed) return;
     if (tex) {
       sprite.texture = tex;

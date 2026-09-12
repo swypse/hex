@@ -39,6 +39,18 @@ describe('makeActionButtonIcon', () => {
     }
   });
 
+  it('resolves a logical toolbelt key to its atlas frame', () => {
+    // `upgrade-ship` is how HudToolbar passes the ship-upgrade action; the
+    // slicer must translate it through ACTION_BUTTON_ICON_FILES.
+    const sprite = icons.makeActionButtonIcon('upgrade-ship', 40);
+    const frame = ACTION_BUTTON_ATLAS_FRAMES['action-ship-upgrade']!;
+    FakeImage.instances[0]!.onload!.call(FakeImage.instances[0]!);
+    const tex = (sprite as { texture: Texture | null }).texture;
+    expect(tex).not.toBeNull();
+    expect(tex!.frame.x).toBe(frame.x);
+    expect(tex!.frame.y).toBe(frame.y);
+  });
+
   it('loads the single packed action-buttons atlas image', () => {
     const sprite = icons.makeActionButtonIcon('action-upgrade', 40);
     expect(FakeImage.instances).toHaveLength(1);
