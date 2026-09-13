@@ -11,10 +11,10 @@ import { ensureTerrainAtlas, terrainFrameTexture, TERRAIN_TILE_FILES, TERRAIN_FO
 import { buildingTileTexture, ensureBuildingsAtlas } from './buildingsAtlas';
 import { ensureTribeAtlas, tribeTileTexture } from './tribeAtlas';
 import { ensureActionButtonAtlas, actionButtonFrameTexture } from '../ui/kit/actionButtonIcons';
+import { ensureIcons32Atlas, icons32FrameTexture } from '../ui/kit/icons32';
 
 const TEXTURE_BASE = `${import.meta.env.BASE_URL}textures/`;
 
-const VILLAGE_CONNECTED_IMAGE_FILE = 'village-connected.png';
 const FOG_LEFT_WALL = 0xd5bbdc;
 const FOG_RIGHT_WALL = 0xc2a4ca;
 
@@ -451,7 +451,8 @@ export async function createTextures(
       makeUnitImageTexture(app, img, hexSize) ??
       { texture: makeBuildingTexture(app, 0x2e6b24, hexSize), anchorY: 0.5 };
   }
-  const villageConnectedTexture = await loadImageTexture(TEXTURE_BASE + VILLAGE_CONNECTED_IMAGE_FILE);
+  await ensureIcons32Atlas();
+  const villageConnectedTexture = icons32FrameTexture('village-connected-32');
   await ensureActionButtonAtlas();
   const captureTexture = actionButtonFrameTexture('action-capture-map');
   const arrowTexture = await loadImageTexture(TEXTURE_BASE + 'arrow.png');

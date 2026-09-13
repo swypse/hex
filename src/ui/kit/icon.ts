@@ -1,15 +1,24 @@
 import { Sprite, Texture } from 'pixi.js';
 import { TRIBE_ICONS_ATLAS_FRAMES } from '../../game/tribeIconsAtlasData.gen';
+import { ICONS32_ATLAS_FRAMES } from '../../game/icons32AtlasData.gen';
 import { makeTribeIcon } from './tribeIcons';
+import { makeIcon32 } from './icons32';
 
 const TEXTURE_BASE = `${import.meta.env.BASE_URL}textures/`;
 const cache = new Map<string, Texture>();
 
 export function makeIcon(name: string, size: number, onReady?: () => void): Sprite {
-  // Tribe icons live in the single packed tribe-icons atlas.
   const base = name.endsWith('.png') ? name.slice(0, -4) : name;
+  // Tribe icons live in the single packed tribe-icons atlas.
   if (TRIBE_ICONS_ATLAS_FRAMES[base]) {
     const sprite = makeTribeIcon(base, size);
+    if (onReady) onReady();
+    return sprite;
+  }
+  // 32px icons (buff badges, village-connected, ...) live in the 32px atlas;
+  // the asset files carry a '-32' suffix.
+  if (ICONS32_ATLAS_FRAMES[base] || ICONS32_ATLAS_FRAMES[`${base}-32`]) {
+    const sprite = makeIcon32(ICONS32_ATLAS_FRAMES[base] ? base : `${base}-32`, size);
     if (onReady) onReady();
     return sprite;
   }

@@ -17,6 +17,7 @@
     "pack:tribes": "node tools/packTribes.mjs",
     "pack:tribe-icons": "node tools/packTribeIcons.mjs",
     "pack:icons-16": "node tools/packIcons16.mjs",
+    "pack:icons-32": "node tools/packIcons32.mjs",
     "relay": "node server/relay.mjs"
   },
   "dependencies": {

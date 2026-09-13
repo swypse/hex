@@ -42,4 +42,14 @@ describe('makeIcon', () => {
     expect(FakeImage.instances).toHaveLength(1);
     expect(FakeImage.instances[0]!.src.endsWith('textures/bottle.png')).toBe(true);
   });
+
+  it('renders buff and village icons from the packed 32px atlas, never separate files', () => {
+    makeIcon('water-protection.png', 32);
+    makeIcon('forest-protection.png', 32);
+    makeIcon('village-connected.png', 32);
+    const srcs = FakeImage.instances.map((i) => i.src);
+    expect(srcs.some((s) => s.endsWith('water-protection.png'))).toBe(false);
+    expect(srcs.some((s) => s.endsWith('forest-protection.png'))).toBe(false);
+    expect(srcs.some((s) => s.endsWith('village-connected.png'))).toBe(false);
+  });
 });
