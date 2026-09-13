@@ -423,7 +423,7 @@ describe('HudSelected pirate deal info', () => {
     return out;
   };
 
-  const boot = (dealt: boolean): void => {
+  const boot = (paidBy: number[] | null): void => {
     Object.defineProperty(Text.prototype, 'width', { configurable: true, get: () => 60 });
     Object.defineProperty(Text.prototype, 'height', { configurable: true, get: () => 14 });
     (globalThis as { CanvasRenderingContext2D?: unknown }).CanvasRenderingContext2D = class {};
@@ -437,7 +437,7 @@ describe('HudSelected pirate deal info', () => {
       id: 'p1', owner: -1, type: 'pirate', q: 0, r: 0,
       hasMoved: false, hasAttacked: false, hasHealed: false,
       hp: 80, attack: 30, attackDistance: 3, defense: 5, spawnVillage: null,
-      ...(dealt ? { paidBy: [0] } : {}),
+      ...(paidBy ? { paidBy } : {}),
     };
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
     const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
@@ -460,15 +460,23 @@ describe('HudSelected pirate deal info', () => {
   });
 
   it('shows a deal line on a pirate without an active deal', () => {
-    boot(false);
+    boot(null);
     const all = texts().join('\n');
     expect(all).toContain('Pirate: no deal');
   });
 
-  it('shows an active-deal line on a pirate the player has paid', () => {
-    boot(true);
+  it('names the friend tribe on the active-deal line', () => {
+    boot([0]);
     const all = texts().join('\n');
     expect(all).toContain('Pirate: deal active');
+    expect(all).toContain('Villagers');
+  });
+
+  it('lists every friend tribe of the pirate', () => {
+    boot([0, 1]);
+    const all = texts().join('\n');
+    expect(all).toContain('Villagers');
+    expect(all).toContain('Cats');
     expect(all).not.toContain('Pirate: no deal');
   });
 });

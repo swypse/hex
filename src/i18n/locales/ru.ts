@@ -334,7 +334,7 @@ export default {
   'hud.selected.connectedBonus': 'Связано: +{bonus} к доходу',
   'hud.selected.buildings': 'Здания: {count}/{limit}',
   'hud.selected.pirateDeal': 'Пират: договора нет',
-  'hud.selected.pirateDealActive': 'Пират: договор активен',
+  'hud.selected.pirateDealActive': 'Пират: договор активен — {tribes}',
   'hud.pirateDealWith': 'Договор с племенем {tribe}',
   'hud.selected.full': 'Полно — улучшите до уровня {level}, чтобы получить новые слоты',
   'hud.selected.building': '{name} (уровень {level})',
