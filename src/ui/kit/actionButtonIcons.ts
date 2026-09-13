@@ -29,6 +29,7 @@ export const ACTION_BUTTON_ICON_FILES: Record<string, string> = {
 };
 
 let atlasTexture: Texture | null = null;
+let atlasPromise: Promise<void> | null = null;
 const frameCache = new Map<string, Texture>();
 
 function sliceFrame(key: string, atlas: Texture): Texture | null {
@@ -43,6 +44,36 @@ function sliceFrame(key: string, atlas: Texture): Texture | null {
   });
   frameCache.set(key, tex);
   return tex;
+}
+
+/** Loads the single packed action-buttons atlas image once and shares the same
+ *  load promise with every caller (sprites and direct frame slicing alike). */
+export function ensureActionButtonAtlas(): Promise<void> {
+  if (atlasPromise) return atlasPromise;
+  atlasPromise = new Promise<void>((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      try {
+        atlasTexture = Texture.from(img);
+      } catch {
+        console.error('[actionButtonIcons] Texture.from failed for', TEXTURE_BASE + ACTION_BUTTON_ATLAS_FILE);
+      }
+      resolve();
+    };
+    img.onerror = () => {
+      console.error('[actionButtonIcons] onerror for', TEXTURE_BASE + ACTION_BUTTON_ATLAS_FILE);
+      resolve();
+    };
+    img.src = TEXTURE_BASE + ACTION_BUTTON_ATLAS_FILE;
+  });
+  return atlasPromise;
+}
+
+/** Directly returns the atlas texture for a frame key (no sprite). Use after
+ *  `ensureActionButtonAtlas`; null when the atlas is unavailable. */
+export function actionButtonFrameTexture(key: string): Texture | null {
+  if (!atlasTexture) return null;
+  return sliceFrame(key, atlasTexture);
 }
 
 export function makeActionButtonIcon(key: string, size: number, onReady?: () => void): Sprite {

@@ -7,19 +7,13 @@ import { UNIT_TYPES, UNIT_TYPE_NAMES, type UnitType } from '../../game/units';
 import { useGameStore } from '../../store/gameStore';
 import { type UIHost } from '../host';
 import { Button } from '../kit/button';
+import { makeActionButtonIcon } from '../kit/actionButtonIcons';
 import { makeIcon } from '../kit/icon';
 import { makeLabel } from '../kit/label';
 import { Popup } from '../kit/popup';
 
-const SPAWN_ICONS: Record<Exclude<UnitType, 'pirate'>, string> = {
-  warrior: 'fist.png',
-  archer: 'arch.png',
-  rider: 'horse.png',
-  swordsman: 'sword.png',
-  shield: 'shield.png',
-  catapult: 'catapult.png',
-  knight: 'knight.png',
-};
+/** Old separate-image icon for the archer (no packed action icon exists for it). */
+const ARCHER_ICON = 'arch.png';
 
 const CELL_W = 92;
 const CELL_H = 112;
@@ -100,7 +94,9 @@ export class SpawnDialog {
       circle.circle(CELL_W / 2, 30, 30).fill(0x333333).stroke({ width: 2, color: 0x888888 });
       item.addChild(circle);
 
-      const icon = makeIcon(SPAWN_ICONS[type], 56);
+      const icon = type === 'archer'
+        ? makeIcon(ARCHER_ICON, 56)
+        : makeActionButtonIcon(`action-spawn-${type}`, 56);
       icon.position.set(CELL_W / 2, 30);
       item.addChild(icon);
 

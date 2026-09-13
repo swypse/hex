@@ -80,4 +80,27 @@ describe('SpawnDialog', () => {
     expect(useGameStore.getState().overlay).toBeNull();
     dialog.destroy();
   });
+
+  it('uses the packed action-buttons atlas for unit icons instead of separate images', () => {
+    class FakeImage {
+      src = '';
+      static instances: FakeImage[] = [];
+      constructor() {
+        FakeImage.instances.push(this);
+      }
+    }
+    FakeImage.instances = [];
+    (globalThis as { Image?: unknown }).Image = FakeImage;
+
+    const dialog = new SpawnDialog();
+    dialog.mount(host, root);
+
+    const urls = FakeImage.instances.map((i) => i.src);
+    // The per-unit spawn icons come from the single atlas, not separate files.
+    for (const old of ['fist.png', 'horse.png', 'sword.png', 'shield.png', 'catapult.png', 'knight.png']) {
+      expect(urls.some((u) => u.endsWith(old))).toBe(false);
+    }
+    expect(urls.some((u) => u.endsWith('action-buttons-atlas.png'))).toBe(true);
+    dialog.destroy();
+  });
 });

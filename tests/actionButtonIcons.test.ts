@@ -16,6 +16,8 @@ class FakeImage {
 interface ActionButtonIconsModule {
   ACTION_BUTTON_ICON_FILES: Record<string, string>;
   makeActionButtonIcon: (key: string, size: number, onReady?: () => void) => { width: number; height: number; destroy: () => void; texture: unknown };
+  ensureActionButtonAtlas: () => Promise<void>;
+  actionButtonFrameTexture: (key: string) => Texture | null;
 }
 
 describe('makeActionButtonIcon', () => {
@@ -37,6 +39,35 @@ describe('makeActionButtonIcon', () => {
     for (const key of Object.keys(ACTION_BUTTON_ICON_FILES)) {
       expect(ACTION_BUTTON_ATLAS_FRAMES[ACTION_BUTTON_ICON_FILES[key]!]).not.toBeUndefined();
     }
+  });
+
+  it('packs the per-unit spawn icons and the capture map marker', () => {
+    for (const key of [
+      'action-capture-map',
+      'action-spawn-warrior',
+      'action-spawn-shield',
+      'action-spawn-rider',
+      'action-spawn-swordsman',
+      'action-spawn-catapult',
+      'action-spawn-knight',
+    ]) {
+      expect(ACTION_BUTTON_ATLAS_FRAMES[key]).not.toBeUndefined();
+    }
+  });
+
+  it('slices a frame from the shared atlas via the frame API', async () => {
+    const loading = icons.ensureActionButtonAtlas();
+    expect(FakeImage.instances).toHaveLength(1);
+    expect(FakeImage.instances[0]!.src).toBe(`${import.meta.env.BASE_URL}textures/action-buttons-atlas.png`);
+    FakeImage.instances[0]!.onload!.call(FakeImage.instances[0]!);
+    await loading;
+    const frame = ACTION_BUTTON_ATLAS_FRAMES['action-capture-map']!;
+    const tex = icons.actionButtonFrameTexture('action-capture-map');
+    expect(tex).not.toBeNull();
+    expect(tex!.width).toBe(ACTION_BUTTON_ATLAS_CELL);
+    expect(tex!.height).toBe(ACTION_BUTTON_ATLAS_CELL);
+    expect(tex!.frame.x).toBe(frame.x);
+    expect(tex!.frame.y).toBe(frame.y);
   });
 
   it('resolves a logical toolbelt key to its atlas frame', () => {

@@ -11,11 +11,9 @@ export const MANIFEST_URL = new URL('../src/game/tribeAtlasData.gen.ts', import.
 
 export const TRIBE_COLS = 6;
 
-/** Sorted tribe codes that have an asset dir (src/assets/tribe-<code>/). */
-export const TRIBE_CODES = readdirSync(SOURCE_ROOT_URL)
-  .filter((n) => n.startsWith('tribe-'))
-  .map((n) => n.slice('tribe-'.length))
-  .sort();
+/** The playable tribe codes, matching TRIBES in src/game/tribes.ts. Other
+ *  `tribe-*` asset dirs (e.g. tribe-icons) are not tribes and are ignored. */
+export const TRIBE_CODES = ['aqua', 'barbarians', 'cats', 'forest', 'villagers', 'warriors'];
 
 export function tribeAssetDirURL(code) {
   return new URL(`tribe-${code}/`, SOURCE_ROOT_URL);

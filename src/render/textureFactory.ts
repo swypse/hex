@@ -10,6 +10,7 @@ import { tileElevation } from './elevation';
 import { ensureTerrainAtlas, terrainFrameTexture, TERRAIN_TILE_FILES, TERRAIN_FOG_FILE } from './terrainAtlas';
 import { buildingTileTexture, ensureBuildingsAtlas } from './buildingsAtlas';
 import { ensureTribeAtlas, tribeTileTexture } from './tribeAtlas';
+import { ensureActionButtonAtlas, actionButtonFrameTexture } from '../ui/kit/actionButtonIcons';
 
 const TEXTURE_BASE = `${import.meta.env.BASE_URL}textures/`;
 
@@ -46,7 +47,6 @@ const BRIDGE_TILE_FILES: Record<BridgeDir, string> = {
 const VILLAGE_IMAGE_FILE = 'village.png';
 const VILLAGE_LEVEL2_IMAGE_FILE = 'village-2.png';
 
-const CAPTURE_IMAGE_FILE = 'capture-map.png';
 const PIRATE_IMAGE_FILE = 'pirates-ship.png';
 
 const PORT_TILE_FILES: Record<PortDirection, string> = {
@@ -457,7 +457,8 @@ export async function createTextures(
       { texture: makeBuildingTexture(app, 0x2e6b24, hexSize), anchorY: 0.5 };
   }
   const villageConnectedTexture = await loadImageTexture(TEXTURE_BASE + VILLAGE_CONNECTED_IMAGE_FILE);
-  const captureTexture = await loadImageTexture(TEXTURE_BASE + CAPTURE_IMAGE_FILE);
+  await ensureActionButtonAtlas();
+  const captureTexture = actionButtonFrameTexture('action-capture-map');
   const arrowTexture = await loadImageTexture(TEXTURE_BASE + 'arrow.png');
   const cannonballTexture = await loadImageTexture(TEXTURE_BASE + 'cannonball.png');
   const wallImg = buildingTileTexture('wall');
