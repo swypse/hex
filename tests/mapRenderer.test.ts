@@ -5,7 +5,7 @@ import { GameMap, MapTile } from '../src/game/mapGen';
 import { TileType } from '../src/game/tileTypes';
 import { Player } from '../src/game/players';
 import { START_RESOURCES } from '../src/game/resources';
-import { Tribe } from '../src/game/tribes';
+import { Tribe, TRIBES } from '../src/game/tribes';
 import { Unit, UNIT_TYPES } from '../src/game/units';
 import { axialKey, hexToPixel } from '../src/game/hex';
 import { tileElevation } from '../src/render/elevation';
@@ -1509,3 +1509,91 @@ interface TileViewShape {
   buildingSprite: Sprite | null;
   unitSprite: Sprite | null;
 }
+
+describe('pirate deal circles', () => {
+  const viewport = { x: 400, y: 300, scale: 1, width: 800, height: 600 };
+
+  function makePirate(id: string, paidBy: number[] | undefined): Unit {
+    return {
+      id, owner: -1, type: 'pirate', q: 0, r: 0,
+      hasMoved: false, hasAttacked: false, hasHealed: false,
+      hp: 80, attack: 30, attackDistance: 3, defense: 5, spawnVillage: null,
+      ...(paidBy ? { paidBy } : {}),
+    };
+  }
+
+  function pirateMap(unit: Unit): GameMap {
+    const t00: MapTile = {
+      q: 0, r: 0, terrain: TileType.Water, height: 0.1, settlement: null,
+      building: null, roadOwner: null, unit, ownedBy: null, claimedByVillage: null, exploredBy: [0],
+    };
+    return { radius: 1, spawns: [], tiles: [t00] };
+  }
+
+  function twoTribes(): Player[] {
+    return [
+      { index: 0, tribe: Tribe.Cats, isHuman: true, name: 'Cats', resources: { ...START_RESOURCES }, score: 0, kills: 0, skills: [], isActive: true },
+      { index: 1, tribe: Tribe.Villagers, isHuman: false, name: 'Villagers', resources: { ...START_RESOURCES }, score: 0, kills: 0, skills: [], isActive: true },
+    ];
+  }
+
+  function circlesOf(v: MapView): Container | null {
+    const tvs = (v as unknown as { tileViews: Map<string, { dealCircles: Container | null }> }).tileViews;
+    return tvs.get('0,0')!.dealCircles;
+  }
+
+  function fillColor(g: Graphics): number | undefined {
+    const fill = g.context.instructions.find((i) => i.action === 'fill');
+    return (fill?.data as { style: { color: number } | undefined } | undefined)?.style?.color;
+  }
+
+  it('shows no circles before a deal and draws them after the pirate is paid', () => {
+    const pirate = makePirate('p1', undefined);
+    const textures = buildTextures(pirateMap(pirate));
+    const app = {
+      screen: { width: 800, height: 600 },
+      ticker: { add: (): void => {}, remove: (): void => {} },
+      stage: new Container(),
+    } as unknown as Application;
+    const v = new MapView(app, textures, HEX, SPRITE_SCALE, 2);
+    const players = twoTribes();
+    v.update(pirateMap(pirate), players, null, new Set(), new Set(), 0, new Set(), viewport);
+    expect(circlesOf(v)).toBeNull();
+
+    pirate.paidBy = [0];
+    v.update(pirateMap(pirate), players, null, new Set(), new Set(), 0, new Set(), viewport);
+    expect(circlesOf(v)).not.toBeNull();
+    expect(circlesOf(v)!.children).toHaveLength(1);
+    v.destroy();
+  });
+
+  it('draws one circle per deal in tribe colors, spaced 4px apart', () => {
+    const pirate = makePirate('p1', [0, 1]);
+    const textures = buildTextures(pirateMap(pirate));
+    const app = {
+      screen: { width: 800, height: 600 },
+      ticker: { add: (): void => {}, remove: (): void => {} },
+      stage: new Container(),
+    } as unknown as Application;
+    const v = new MapView(app, textures, HEX, SPRITE_SCALE, 2);
+    const players = twoTribes();
+    v.update(pirateMap(pirate), players, null, new Set(), new Set(), 0, new Set(), viewport);
+
+    const circles = circlesOf(v)!;
+    expect(circles.children).toHaveLength(2);
+    const c0 = circles.children[0] as Container;
+    const c1 = circles.children[1] as Container;
+    expect(c0.position.x).toBe(0);
+    expect(c1.position.x).toBe(12);
+
+    const catsColor = TRIBES.find((t) => t.id === Tribe.Cats)!.color;
+    const villagersColor = TRIBES.find((t) => t.id === Tribe.Villagers)!.color;
+    expect(fillColor(c0.children[0] as Graphics)).toBe(catsColor);
+    expect(fillColor(c1.children[0] as Graphics)).toBe(villagersColor);
+
+    const g0 = c0.children[0] as Graphics;
+    expect(g0.context.instructions.some((i) => i.action === 'fill')).toBe(true);
+    expect((c0.hitArea as { radius?: number }).radius).toBe(4);
+    v.destroy();
+  });
+});

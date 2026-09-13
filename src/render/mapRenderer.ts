@@ -1,5 +1,5 @@
 import {
-  Application, Container, Graphics, Sprite, Text, type TextStyleOptions, type Texture, type Ticker
+  Application, Circle, Container, Graphics, Sprite, Text, type TextStyleOptions, type Texture, type Ticker
 } from 'pixi.js';
 import { axialKey, compareTileY, hexCorners, hexEdge, hexEdgeNeighbor, hexToPixel, splitHexBorder } from '../game/hex';
 import { GameMap, MapTile } from '../game/mapGen';
@@ -20,6 +20,15 @@ import { tileElevation } from './elevation';
 import { type TextureSet, type TileTexture } from './textureFactory';
 import { villageTextureFor, villageOwnerTribe } from './villageTexture';
 import { tileSignature, tileInView, type Viewport } from './tileSignature';
+import { t } from '../i18n';
+import { Tooltip } from '../ui/kit/tooltip';
+
+/** Diameter of a pirate-deal dot drawn above the ship (world px). */
+export const PIRATE_DEAL_DOT = 8;
+/** Horizonial gap between pirate-deal dots (world px). */
+export const PIRATE_DEAL_GAP = 4;
+/** Lift of the deal-dot row above the pirate's sprite top (world px). */
+export const PIRATE_DEAL_LIFT = 14;
 
 export interface OverlayItem {
   el: Container;
@@ -129,6 +138,8 @@ interface TileView {
   unitSprite: Sprite | null;
   territory: Graphics;
   roadGraphics: Graphics | null;
+  /** Interactive row of 8px tribe-colored dots, one per active pirate deal. */
+  dealCircles: Container | null;
   signature: string;
 }
 
@@ -178,6 +189,7 @@ export class MapView {
   private shipBobRemove: (() => void) | null = null;
   private shipBusy = new Set<string>();
   private unitFacings = new Map<string, 'left' | 'right'>();
+  private dealTooltip: Tooltip | null = null;
   private lastLocalIndex = 0;
   /** Screen-space layer for edge capture markers. Kept out of `overlay` so a
    *  host can place it above every HUD element. */
@@ -210,6 +222,10 @@ export class MapView {
     this.stopShipBob();
     this.stopEdgePulse();
     this.unitFacings.clear();
+    if (this.dealTooltip) {
+      this.dealTooltip.destroy();
+      this.dealTooltip = null;
+    }
     if (this.exclamationAnimRemove) {
       this.exclamationAnimRemove();
       this.exclamationAnimRemove = null;
@@ -442,6 +458,7 @@ export class MapView {
         unitSprite: null,
         territory,
         roadGraphics: null,
+        dealCircles: null,
         signature: '',
       });
       this.container.addChild(el);
@@ -519,6 +536,64 @@ export class MapView {
         this.faceUnitSprite(tv.unitSprite, this.unitFacings.get(tile.unit.id) ?? 'right');
       }
     }
+
+    this.syncDealCircles(tv, tile, players, explored, hiddenUnitIds);
+  }
+
+  /** Draws a row of 8px dots above the pirate, one per active deal, colored in
+   *  the paid tribe's color. Each dot is interactive and shows a tooltip
+   *  naming the tribe the deal protects. */
+  private syncDealCircles(tv: TileView, tile: MapTile, players: Player[], explored: boolean, hiddenUnitIds: Set<string>): void {
+    const unit = tile.unit;
+    const paidBy = unit?.paidBy ?? [];
+    const shouldDraw = unit !== null && unit.type === 'pirate' && explored && !(hiddenUnitIds.has(unit.id)) && paidBy.length > 0;
+    if (!shouldDraw) {
+      if (tv.dealCircles) {
+        tv.el.removeChild(tv.dealCircles);
+        tv.dealCircles.destroy({ children: true });
+        tv.dealCircles = null;
+      }
+      return;
+    }
+    if (!this.dealTooltip) {
+      this.dealTooltip = new Tooltip(this.app);
+      this.app.stage.addChild(this.dealTooltip.el);
+    }
+    if (!tv.dealCircles) {
+      tv.dealCircles = new Container();
+      tv.dealCircles.eventMode = 'static';
+      tv.dealCircles.zIndex = 9;
+      tv.el.addChild(tv.dealCircles);
+    } else {
+      tv.dealCircles.removeChildren().forEach((c) => c.destroy({ children: true }));
+    }
+    const p = hexToPixel(tile, this.hexSize);
+    const y = p.y - tileElevation(tile, this.hexSize);
+    const top = this.unitTextureTop(unit, players);
+    tv.dealCircles.position.set(p.x, y - top - PIRATE_DEAL_LIFT);
+    let x = 0;
+    for (const ownerIndex of paidBy) {
+      const holder = new Container();
+      holder.eventMode = 'static';
+      holder.hitArea = new Circle(PIRATE_DEAL_DOT / 2, PIRATE_DEAL_DOT / 2, PIRATE_DEAL_DOT / 2);
+      holder.position.set(x, 0);
+      const tribe = players[ownerIndex] ? TRIBES.find((trib) => trib.id === players[ownerIndex]!.tribe) : undefined;
+      const g = new Graphics();
+      g.circle(PIRATE_DEAL_DOT / 2, PIRATE_DEAL_DOT / 2, PIRATE_DEAL_DOT / 2).fill(tribe?.color ?? PIRATE_COLOR);
+      holder.addChild(g);
+      const player = players[ownerIndex];
+      if (player && tribe) {
+        holder.on('pointerover', () => this.showDealTooltip(holder, tribe.name));
+        holder.on('pointerout', () => this.dealTooltip?.hide());
+      }
+      tv.dealCircles.addChild(holder);
+      x += PIRATE_DEAL_DOT + PIRATE_DEAL_GAP;
+    }
+  }
+
+  private showDealTooltip(target: Container, tribeName: string): void {
+    if (!this.dealTooltip) return;
+    this.dealTooltip.showFor(target, '', t('hud.pirateDealWith', { tribe: tribeName }));
   }
 
   /** Y for a bridge sprite: the deck rides at the height of the lower of the

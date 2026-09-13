@@ -335,6 +335,7 @@ export default {
   'hud.selected.buildings': 'Buildings: {count}/{limit}',
   'hud.selected.pirateDeal': 'Pirate: no deal',
   'hud.selected.pirateDealActive': 'Pirate: deal active',
+  'hud.pirateDealWith': 'Deal with {tribe}',
   'hud.selected.full': 'Full — upgrade to level {level} for more building slots',
   'hud.selected.building': '{name} (level {level})',
   'hud.selected.bridge': 'Bridge',

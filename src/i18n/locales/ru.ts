@@ -336,6 +336,7 @@ export default {
   'hud.selected.buildings': 'Здания: {count}/{limit}',
   'hud.selected.pirateDeal': 'Пират: договора нет',
   'hud.selected.pirateDealActive': 'Пират: договор активен',
+  'hud.pirateDealWith': 'Договор с племенем {tribe}',
   'hud.selected.full': 'Полно — улучшите до уровня {level}, чтобы получить новые слоты',
   'hud.selected.building': '{name} (уровень {level})',
   'hud.selected.bridge': 'Мост',
