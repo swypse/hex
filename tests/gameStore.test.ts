@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { useGameStore } from '../src/store/gameStore';
+import { useGameStore, initNavigation, confirmLeaveGame } from '../src/store/gameStore';
 
 describe('gameStore', () => {
   beforeEach(() => {
@@ -142,5 +142,64 @@ describe('gameStore', () => {
     store().setScreen('start');
     expect(store().centerMessage).toBeNull();
     expect(store().centerMessageQueue).toEqual([]);
+  });
+});
+
+describe('browser back from the game screen', () => {
+  function installFakeWindow(): { back: () => void } {
+    const stack: { screen: string }[] = [{ screen: 'start' }];
+    const listeners: Array<{ t: string; cb: (e: { state?: { screen?: string } }) => void }> = [];
+    (globalThis as { window?: unknown }).window = {
+      history: {
+        pushState: (s: { screen: string }, _u: string) => stack.push(s),
+        replaceState: (s: { screen: string }, _u: string) => {
+          stack[stack.length - 1] = s;
+        },
+      },
+      addEventListener: (t: string, cb: (e: unknown) => void) => {
+        listeners.push({ t, cb: cb as (e: { state?: { screen?: string } }) => void });
+      },
+      removeEventListener: () => {},
+    };
+    const back = (): void => {
+      if (stack.length <= 1) return;
+      stack.pop();
+      const event = { state: stack[stack.length - 1]! };
+      for (const l of listeners) {
+        if (l.t === 'popstate') l.cb(event);
+      }
+    };
+    return { back };
+  }
+
+  beforeEach(() => {
+    useGameStore.setState({
+      screen: 'start',
+      gameOver: false,
+      overlay: null,
+    });
+  });
+
+  it('entering the game replaces the launcher history entry, so Back leads to main', () => {
+    const { back } = installFakeWindow();
+    initNavigation();
+    const s = useGameStore.getState();
+    s.setScreen('setup');
+    s.setScreen('game');
+    s.setGameOver(true);
+    back();
+    expect(useGameStore.getState().screen).toBe('start');
+  });
+
+  it('still asks before leaving a live game, and Leave goes to main', () => {
+    const { back } = installFakeWindow();
+    initNavigation();
+    const s = useGameStore.getState();
+    s.setScreen('setup');
+    s.setScreen('game');
+    back();
+    expect(useGameStore.getState().overlay).toEqual({ kind: 'leave' });
+    confirmLeaveGame();
+    expect(useGameStore.getState().screen).toBe('start');
   });
 });

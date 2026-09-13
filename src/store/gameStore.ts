@@ -143,7 +143,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
   tutorialHighlightEndTurn: false,
 
   setScreen: (screen) => {
-    if (!suppressPush && get().screen !== screen) pushHistory(screen);
+    if (!suppressPush && get().screen !== screen) {
+      if (screen === 'game') replaceHistory(screen);
+      else pushHistory(screen);
+    }
     if (get().screen === 'game' && screen !== 'game') {
       set({
         centerMessage: null,
@@ -219,6 +222,18 @@ function pushHistory(screen: Screen): void {
     window.history.pushState({ screen }, '');
   } catch {
     // history API unavailable (e.g. sandboxed iframe); navigation still works
+  }
+}
+
+/** Replaces the current history entry instead of stacking a new one. Entering
+ *  the game replaces the launcher entry (setup/lobby) so that the browser Back
+ *  from the game returns to the main menu, never to the game-setup screen. */
+function replaceHistory(screen: Screen): void {
+  if (typeof window === 'undefined' || typeof window.history?.replaceState !== 'function') return;
+  try {
+    window.history.replaceState({ screen }, '');
+  } catch {
+    // history API unavailable; navigation still works
   }
 }
 
