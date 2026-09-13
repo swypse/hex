@@ -496,6 +496,8 @@ export const AI_PATTERNS: AiPattern[] = [
         const unit = t.unit;
         if (!unit || unit.owner !== player.index) continue;
         if (state.acted.has(unit.id) || state.moved.has(unit.id)) continue;
+        // Ships have their own naval-hunt pattern; don't retreat them here.
+        if (unit.shipLevel !== undefined) continue;
         // Don't retreat the last defender out of an endangered own village;
         // defend-hurt-unit decides whether it heals, retreats+spawns, or holds.
         if (t.settlement && t.settlement.owner === player.index && enemyCanReach(map, t, player.index)) continue;
