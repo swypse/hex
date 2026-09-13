@@ -9,6 +9,7 @@ import { shadeColor } from '../util/color';
 import { tileElevation } from './elevation';
 import { ensureTerrainAtlas, terrainFrameTexture, TERRAIN_TILE_FILES, TERRAIN_FOG_FILE } from './terrainAtlas';
 import { buildingTileTexture, ensureBuildingsAtlas } from './buildingsAtlas';
+import { ensureTribeAtlas, tribeTileTexture } from './tribeAtlas';
 
 const TEXTURE_BASE = `${import.meta.env.BASE_URL}textures/`;
 
@@ -45,11 +46,6 @@ const BRIDGE_TILE_FILES: Record<BridgeDir, string> = {
 const VILLAGE_IMAGE_FILE = 'village.png';
 const VILLAGE_LEVEL2_IMAGE_FILE = 'village-2.png';
 
-/** Tribe-specific owned-village texture files. Only tribes with bespoke files
- *  are listed; every other tribe uses the generic `village*.png` textures. */
-const VILLAGE_TRIBE_FILES: Partial<Record<Tribe, { level1: string; level2: string }>> = {
-  [Tribe.Cats]: { level1: 'village-cats.png', level2: 'village-cats-2.png' },
-};
 const CAPTURE_IMAGE_FILE = 'capture-map.png';
 const PIRATE_IMAGE_FILE = 'pirates-ship.png';
 
@@ -318,7 +314,13 @@ function makePirateTexture(app: Application, hexSize: number): TileTexture {
   return { texture, anchorY: 0.5 };
 }
 
-export async function createTextures(app: Application, map: GameMap, hexSize = 40): Promise<TextureSet> {
+export async function createTextures(
+  app: Application,
+  map: GameMap,
+  hexSize = 40,
+  /** Tribes present in this game. Only their atlases are loaded. */
+  activeTribes: ReadonlySet<Tribe> = new Set(TRIBES.map((t) => t.id)),
+): Promise<TextureSet> {
   const images = await loadTileImages();
   await ensureBuildingsAtlas();
   const tileTextures = new Map<string, TileTexture>();
@@ -380,34 +382,40 @@ export async function createTextures(app: Application, map: GameMap, hexSize = 4
     { texture: makeVillageTexture(app, 0x6a6a6a, hexSize), anchorY: 1 };
   const villageTextures = {} as Record<Tribe, { level1: TileTexture; level2: TileTexture }>;
   for (const tribe of TRIBES) {
-    const files = VILLAGE_TRIBE_FILES[tribe.id];
-    const lvl1 = files ? await loadImageTexture(TEXTURE_BASE + files.level1) : null;
-    const lvl2 = files ? await loadImageTexture(TEXTURE_BASE + files.level2) : null;
+    if (!activeTribes.has(tribe.id)) {
+      villageTextures[tribe.id] = { level1: genericVillage1, level2: genericVillage2 };
+      continue;
+    }
+    await ensureTribeAtlas(tribe.code);
+    const lvl1 = makeUnitImageTexture(app, tribeTileTexture(tribe.code, `${tribe.code}-village`), hexSize);
+    const lvl2 = makeUnitImageTexture(app, tribeTileTexture(tribe.code, `${tribe.code}-village-2`), hexSize);
     villageTextures[tribe.id] = {
-      level1: (lvl1 ? makeUnitImageTexture(app, lvl1, hexSize) : null) ?? genericVillage1,
-      level2: (lvl2 ? makeUnitImageTexture(app, lvl2, hexSize) : null) ?? genericVillage2,
+      level1: lvl1 ?? genericVillage1,
+      level2: lvl2 ?? genericVillage2,
     };
   }
   const unitTextures = {} as Record<Tribe, Record<UnitType, TileTexture>>;
   for (const tribe of TRIBES) {
+    if (!activeTribes.has(tribe.id)) continue;
+    await ensureTribeAtlas(tribe.code);
     const perTribe = {} as Record<UnitType, TileTexture>;
     for (const type of Object.keys(UNIT_TYPES) as UnitType[]) {
       if (type === 'pirate') continue;
-      const img = await loadImageTexture(TEXTURE_BASE + UNIT_IMAGE_FILES[tribe.id][type]);
-      const tex = makeUnitImageTexture(app, img, hexSize);
-      perTribe[type] = tex ?? makeUnitFallbackTexture(app, tribe.color, type, hexSize);
+      const frameKey = UNIT_IMAGE_FILES[tribe.id][type].replace(/\.png$/, '');
+      const img = tribeTileTexture(tribe.code, frameKey);
+      perTribe[type] = makeUnitImageTexture(app, img, hexSize) ?? makeUnitFallbackTexture(app, tribe.color, type, hexSize);
     }
     unitTextures[tribe.id] = perTribe;
   }
   const shipTextures = {} as Record<Tribe, Record<1 | 2 | 3, TileTexture>>;
   for (const tribe of TRIBES) {
-    const base = tribe.code;
-    const shipNames = [`${base}-ship.png`, `${base}-ship-2.png`, `${base}-ship-3.png`];
+    if (!activeTribes.has(tribe.id)) continue;
+    await ensureTribeAtlas(tribe.code);
     shipTextures[tribe.id] = {} as Record<1 | 2 | 3, TileTexture>;
     for (const level of [1, 2, 3] as const) {
-      const img = await loadImageTexture(TEXTURE_BASE + shipNames[level - 1]);
-      const tex = makeUnitImageTexture(app, img, hexSize);
-      shipTextures[tribe.id][level] = tex ?? {
+      const suffix = level === 1 ? 'ship' : `ship-${level}`;
+      const img = tribeTileTexture(tribe.code, `${tribe.code}-${suffix}`);
+      shipTextures[tribe.id][level] = makeUnitImageTexture(app, img, hexSize) ?? {
         texture: makeShipTexture(app, tribe.color, hexSize, level === 3),
         anchorY: 0.5,
       };

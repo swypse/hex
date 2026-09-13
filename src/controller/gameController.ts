@@ -85,7 +85,7 @@ class GameController {
     if (this.sim) {
       this.applyFitToScreen();
       useGameStore.getState().setTexturesLoading(true);
-      void createTextures(app, this.sim.map, HEX_SIZE * this.getCamera().qualityFactor).then((textures) => {
+      void createTextures(app, this.sim.map, HEX_SIZE * this.getCamera().qualityFactor, new Set(this.sim.players.map((p) => p.tribe))).then((textures) => {
         if (token === this.initToken) useGameStore.getState().setTexturesLoading(false);
         if (token !== this.initToken || !this.mapRoot) return;
         this.textures = textures;
@@ -284,7 +284,7 @@ class GameController {
     const token = this.initToken;
     try {
       const hexSize = HEX_SIZE * this.getCamera().qualityFactor;
-      const textures = await createTextures(this.app, this.sim.map, hexSize);
+      const textures = await createTextures(this.app, this.sim.map, hexSize, new Set(this.sim.players.map((p) => p.tribe)));
       if (token !== this.initToken || !this.app || !this.mapRoot) return;
       this.textures = textures;
       if (this.mapView) {
@@ -375,7 +375,7 @@ class GameController {
     store.setSelection({ kind: 'unit', q: start.q, r: start.r });
     if (this.app) {
       this.applyFitToScreen();
-      this.textures = await createTextures(this.app, map, HEX_SIZE * this.getCamera().qualityFactor);
+      this.textures = await createTextures(this.app, map, HEX_SIZE * this.getCamera().qualityFactor, new Set(this.sim!.players.map((p) => p.tribe)));
     }
     this.render();
     this.centerOnStartVillage();

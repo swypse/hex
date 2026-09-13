@@ -377,7 +377,7 @@ export class NetworkController {
     const app = this.host.app();
     if (app) {
       this.host.applyFitToScreen();
-      this.host.setTextures(await createTextures(app, map, 40 * this.host.cameraQualityFactor()));
+      this.host.setTextures(await createTextures(app, map, 40 * this.host.cameraQualityFactor(), new Set((this.host.sim()?.players ?? []).map((p) => p.tribe))));
     }
     this.host.render();
     this.host.centerOnStartVillage();
