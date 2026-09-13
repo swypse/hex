@@ -10,11 +10,17 @@ export function knownTribesFor(map: GameMap, players: Player[], playerIndex: num
   const local = players[playerIndex];
   if (local) known.add(local.tribe);
   for (const tile of map.tiles) {
-    const unit = tile.unit;
-    if (!unit || unit.owner < 0) continue;
     if (!isExploredFor(tile, playerIndex)) continue;
-    const owner = players[unit.owner];
-    if (owner) known.add(owner.tribe);
+    const unit = tile.unit;
+    if (unit && unit.owner >= 0) {
+      const owner = players[unit.owner];
+      if (owner) known.add(owner.tribe);
+    }
+    const village = tile.settlement;
+    if (village && village.owner !== null) {
+      const owner = players[village.owner];
+      if (owner) known.add(owner.tribe);
+    }
   }
   return known;
 }

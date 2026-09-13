@@ -53,6 +53,29 @@ describe('knownTribesFor', () => {
     expect(knownTribesFor(map, players, 0)).toEqual(new Set([Tribe.Villagers]));
     expect(knownTribesFor(map, players, 2)).toEqual(new Set([Tribe.Aqua]));
   });
+
+  it('discovers a tribe whose village tile is explored', () => {
+    const map = makeTestMap();
+    const players = [player(0, Tribe.Villagers), player(1, Tribe.Warriors)];
+    tileAt(map, 1, 0)!.settlement = { owner: 1, level: 1, captureReady: false };
+    expect(knownTribesFor(map, players, 0)).toEqual(new Set([Tribe.Villagers, Tribe.Warriors]));
+  });
+
+  it('does not discover a tribe from a village tile the local player has not explored', () => {
+    const map = makeTestMap();
+    const players = [player(0, Tribe.Villagers), player(1, Tribe.Warriors)];
+    const tile = tileAt(map, 1, 0)!;
+    tile.exploredBy = [1];
+    tile.settlement = { owner: 1, level: 1, captureReady: false };
+    expect(knownTribesFor(map, players, 0)).toEqual(new Set([Tribe.Villagers]));
+  });
+
+  it('does not discover a tribe from an unowned (free) village', () => {
+    const map = makeTestMap();
+    const players = [player(0, Tribe.Villagers), player(1, Tribe.Warriors)];
+    tileAt(map, 1, 0)!.settlement = { owner: null, level: 1, captureReady: false };
+    expect(knownTribesFor(map, players, 0)).toEqual(new Set([Tribe.Villagers]));
+  });
 });
 
 describe('territoryColor', () => {
@@ -98,6 +121,18 @@ describe('simulator discovery persistence', () => {
     const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
     sim.startGame();
     sim.applyCommand({ type: 'heal', unitId: 'does-not-exist' });
+    expect(players[0]!.knownTribes).toContain(players[1]!.tribe);
+  });
+
+  it('records a tribe whose village tile is explored', () => {
+    const map = makeTestMap();
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(42));
+    tileAt(map, 1, 0)!.settlement = { owner: 1, level: 1, captureReady: false };
+    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    sim.startGame();
+    const sync = (sim as unknown as { syncDiscoveries(): void }).syncDiscoveries.bind(sim);
+    expect(players[0]!.knownTribes).toEqual([Tribe.Villagers]);
+    sync();
     expect(players[0]!.knownTribes).toContain(players[1]!.tribe);
   });
 });

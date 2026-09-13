@@ -44,8 +44,6 @@ const BRIDGE_TILE_FILES: Record<BridgeDir, string> = {
   ne: 'bridge-ne',
   we: 'bridge-we',
 };
-const VILLAGE_IMAGE_FILE = 'village.png';
-const VILLAGE_LEVEL2_IMAGE_FILE = 'village-2.png';
 
 const PIRATE_IMAGE_FILE = 'pirates-ship.png';
 
@@ -374,24 +372,24 @@ export async function createTextures(
       ),
     );
   }
-  const genericVillage1 =
-    makeUnitImageTexture(app, await loadImageTexture(TEXTURE_BASE + VILLAGE_IMAGE_FILE), hexSize) ??
-    { texture: makeVillageTexture(app, 0x9a9a9a, hexSize), anchorY: 1 };
-  const genericVillage2 =
-    makeUnitImageTexture(app, await loadImageTexture(TEXTURE_BASE + VILLAGE_LEVEL2_IMAGE_FILE), hexSize) ??
-    { texture: makeVillageTexture(app, 0x6a6a6a, hexSize), anchorY: 1 };
   const villageTextures = {} as Record<Tribe, { level1: TileTexture; level2: TileTexture }>;
   for (const tribe of TRIBES) {
+    // Villages always use the tribe's own art from its atlas. Tribes outside
+    // the current game never own villages (their atlas stays unloaded per the
+    // active-tribes rule), so a tinted placeholder keeps the record total.
     if (!activeTribes.has(tribe.id)) {
-      villageTextures[tribe.id] = { level1: genericVillage1, level2: genericVillage2 };
+      villageTextures[tribe.id] = {
+        level1: { texture: makeVillageTexture(app, tribe.color, hexSize), anchorY: 1 },
+        level2: { texture: makeVillageTexture(app, shadeColor(tribe.color, 0.6), hexSize), anchorY: 1 },
+      };
       continue;
     }
     await ensureTribeAtlas(tribe.code);
-    const lvl1 = makeUnitImageTexture(app, tribeTileTexture(tribe.code, `${tribe.code}-village`), hexSize);
-    const lvl2 = makeUnitImageTexture(app, tribeTileTexture(tribe.code, `${tribe.code}-village-2`), hexSize);
     villageTextures[tribe.id] = {
-      level1: lvl1 ?? genericVillage1,
-      level2: lvl2 ?? genericVillage2,
+      level1: makeUnitImageTexture(app, tribeTileTexture(tribe.code, `${tribe.code}-village`), hexSize) ??
+        { texture: makeVillageTexture(app, tribe.color, hexSize), anchorY: 1 },
+      level2: makeUnitImageTexture(app, tribeTileTexture(tribe.code, `${tribe.code}-village-2`), hexSize) ??
+        { texture: makeVillageTexture(app, shadeColor(tribe.color, 0.6), hexSize), anchorY: 1 },
     };
   }
   const unitTextures = {} as Record<Tribe, Record<UnitType, TileTexture>>;
