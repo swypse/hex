@@ -17,7 +17,6 @@ const TEXTURE_BASE = `${import.meta.env.BASE_URL}textures/`;
 const VILLAGE_CONNECTED_IMAGE_FILE = 'village-connected.png';
 const FOG_LEFT_WALL = 0xd5bbdc;
 const FOG_RIGHT_WALL = 0xc2a4ca;
-const BOTTLE_IMAGE_FILE = 'bottle-on-water.png';
 
 /** Baked left/right vertical wall colours for each terrain group. */
 const TERRAIN_SIDE_COLORS: Partial<Record<TileType, { left: number; right: number }>> = {
@@ -44,8 +43,6 @@ const BRIDGE_TILE_FILES: Record<BridgeDir, string> = {
   ne: 'bridge-ne',
   we: 'bridge-we',
 };
-
-const PIRATE_IMAGE_FILE = 'pirates-ship.png';
 
 const PORT_TILE_FILES: Record<PortDirection, string> = {
   nw: 'port-nw',
@@ -472,14 +469,14 @@ export async function createTextures(
       makeUnitImageTexture(app, buildingTileTexture('village-empty'), hexSize) ??
       { texture: makeVillageTexture(app, 0x9a9a9a, hexSize), anchorY: 1 },
     bonusTexture:
-      makeUnitImageTexture(app, await loadImageTexture(TEXTURE_BASE + 'bonus.png'), hexSize) ??
+      makeUnitImageTexture(app, terrainFrameTexture('bonus'), hexSize) ??
       { texture: makeVillageTexture(app, 0xffd700, hexSize), anchorY: 1 },
     bottleTexture:
-      makeUnitImageTexture(app, await loadImageTexture(TEXTURE_BASE + BOTTLE_IMAGE_FILE), hexSize) ??
+      makeUnitImageTexture(app, terrainFrameTexture('bottle-on-water'), hexSize) ??
       { texture: makeBuildingTexture(app, 0x7fd8f5, hexSize), anchorY: 0.5 },
     unitTextures,
     pirateTexture:
-      makeUnitImageTexture(app, await loadImageTexture(TEXTURE_BASE + PIRATE_IMAGE_FILE), hexSize) ??
+      makeUnitImageTexture(app, terrainFrameTexture('pirates-ship'), hexSize) ??
       makePirateTexture(app, hexSize),
     sawmillTexture,
     mineTexture,

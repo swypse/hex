@@ -40,6 +40,12 @@ describe('terrain atlas loader', () => {
     expect(TERRAIN_ATLAS_FRAMES[TERRAIN_FOG_FILE]).not.toBeUndefined();
   });
 
+  it('packs the bonus, bottle and pirate-ship frames the factory consumes', () => {
+    for (const frame of ['bonus', 'bottle-on-water', 'pirates-ship']) {
+      expect(TERRAIN_ATLAS_FRAMES[frame]).not.toBeUndefined();
+    }
+  });
+
   it('loads the single packed terrain atlas image', async () => {
     const loading = atlas.ensureTerrainAtlas();
     expect(FakeImage.instances).toHaveLength(1);
