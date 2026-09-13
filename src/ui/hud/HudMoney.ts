@@ -64,10 +64,10 @@ export class HudMoney implements Widget {
     const fontSize = compact ? 11 : 13;
     const cy = compact ? 13 : 15;
     const rows = [
-      { key: 'money', icon: 'coin.png', value: `${r.money}`, income: r.moneyIncome > 0 ? ` (+${r.moneyIncome})` : '' },
-      { key: 'wood', icon: 'wood.png', value: `${r.wood}`, income: r.building.wood > 0 ? ` (+${r.building.wood})` : '' },
-      { key: 'stone', icon: 'stone.png', value: `${r.stone}`, income: r.building.stone > 0 ? ` (+${r.building.stone})` : '' },
-      { key: 'ore', icon: 'ore.png', value: `${r.ore}`, income: r.building.ore > 0 ? ` (+${r.building.ore})` : '' },
+      { key: 'money', icon: 'gold-32', value: `${r.money}`, income: r.moneyIncome > 0 ? ` (+${r.moneyIncome})` : '' },
+      { key: 'wood', icon: 'wood-32', value: `${r.wood}`, income: r.building.wood > 0 ? ` (+${r.building.wood})` : '' },
+      { key: 'stone', icon: 'stone-32', value: `${r.stone}`, income: r.building.stone > 0 ? ` (+${r.building.stone})` : '' },
+      { key: 'ore', icon: 'ore-32', value: `${r.ore}`, income: r.building.ore > 0 ? ` (+${r.building.ore})` : '' },
     ];
 
     let x = 0;

@@ -39,6 +39,12 @@ describe('icons-32 atlas loader', () => {
     }
   });
 
+  it('packs the resource icon frames the HUD consumes', () => {
+    for (const frame of ['gold-32', 'wood-32', 'stone-32', 'ore-32']) {
+      expect(ICONS32_ATLAS_FRAMES[frame]).not.toBeUndefined();
+    }
+  });
+
   it('loads the single packed icons-32 atlas image', async () => {
     const loading = icons.ensureIcons32Atlas();
     expect(FakeImage.instances).toHaveLength(1);

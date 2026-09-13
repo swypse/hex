@@ -47,4 +47,27 @@ describe('HudMoney placement', () => {
     expect(el.position.y).toBe(0);
     money.destroy();
   });
+
+  it('loads resource icons from the packed 32px atlas, not separate files', () => {
+    class FakeImage {
+      src = '';
+      static instances: FakeImage[] = [];
+
+      constructor() {
+        FakeImage.instances.push(this);
+      }
+    }
+    FakeImage.instances = [];
+    const originalImage = globalThis.Image;
+    (globalThis as { Image?: unknown }).Image = FakeImage;
+
+    const money = new HudMoney();
+    money.mount(host, root);
+
+    const srcs = FakeImage.instances.map((i) => i.src);
+    const bad = srcs.find((s) => !s.endsWith('icons-32-atlas.png'));
+    expect(bad).toBeUndefined();
+    (globalThis as { Image?: unknown }).Image = originalImage;
+    money.destroy();
+  });
 });
