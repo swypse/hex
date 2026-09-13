@@ -8,14 +8,13 @@ import { PortDirection } from '../game/buildings';
 import { shadeColor } from '../util/color';
 import { tileElevation } from './elevation';
 import { ensureTerrainAtlas, terrainFrameTexture, TERRAIN_TILE_FILES, TERRAIN_FOG_FILE } from './terrainAtlas';
+import { buildingTileTexture, ensureBuildingsAtlas } from './buildingsAtlas';
 
 const TEXTURE_BASE = `${import.meta.env.BASE_URL}textures/`;
 
 const VILLAGE_CONNECTED_IMAGE_FILE = 'village-connected.png';
 const FOG_LEFT_WALL = 0xd5bbdc;
 const FOG_RIGHT_WALL = 0xc2a4ca;
-const SAWMILL_IMAGE_FILE = 'sawmill.png';
-const MINE_IMAGE_FILE = 'mine.png';
 const BOTTLE_IMAGE_FILE = 'bottle-on-water.png';
 
 /** Baked left/right vertical wall colours for each terrain group. */
@@ -38,10 +37,10 @@ const TERRAIN_SIDE_COLORS: Partial<Record<TileType, { left: number; right: numbe
   [TileType.Water]: { left: 0x1f63a1, right: 0x174167 },
 };
 
-const BRIDGE_IMAGE_FILES: Record<BridgeDir, string> = {
-  nw: 'bridge-nw.png',
-  ne: 'bridge-ne.png',
-  we: 'bridge-we.png',
+const BRIDGE_TILE_FILES: Record<BridgeDir, string> = {
+  nw: 'bridge-nw',
+  ne: 'bridge-ne',
+  we: 'bridge-we',
 };
 const VILLAGE_IMAGE_FILE = 'village.png';
 const VILLAGE_LEVEL2_IMAGE_FILE = 'village-2.png';
@@ -54,27 +53,27 @@ const VILLAGE_TRIBE_FILES: Partial<Record<Tribe, { level1: string; level2: strin
 const CAPTURE_IMAGE_FILE = 'capture-map.png';
 const PIRATE_IMAGE_FILE = 'pirates-ship.png';
 
-const PORT_IMAGE_FILES: Record<PortDirection, string> = {
-  nw: 'port-nw.png',
-  ne: 'port-ne.png',
-  sw: 'port-sw.png',
-  se: 'port-se.png',
-  e: 'port-e.png',
-  w: 'port-w.png',
+const PORT_TILE_FILES: Record<PortDirection, string> = {
+  nw: 'port-nw',
+  ne: 'port-ne',
+  sw: 'port-sw',
+  se: 'port-se',
+  e: 'port-e',
+  w: 'port-w',
 };
 
-const TEMPLE_IMAGE_FILES: Record<1 | 2 | 3 | 4, string> = {
-  1: 'water-temple-1.png',
-  2: 'water-temple-2.png',
-  3: 'water-temple-3.png',
-  4: 'water-temple-4.png',
+const TEMPLE_TILE_FILES: Record<1 | 2 | 3 | 4, string> = {
+  1: 'water-temple-1',
+  2: 'water-temple-2',
+  3: 'water-temple-3',
+  4: 'water-temple-4',
 };
 
-const FOREST_TEMPLE_IMAGE_FILES: Record<1 | 2 | 3 | 4, string> = {
-  1: 'forest-temple-1.png',
-  2: 'forest-temple-2.png',
-  3: 'forest-temple-3.png',
-  4: 'forest-temple-4.png',
+const FOREST_TEMPLE_TILE_FILES: Record<1 | 2 | 3 | 4, string> = {
+  1: 'forest-temple-1',
+  2: 'forest-temple-2',
+  3: 'forest-temple-3',
+  4: 'forest-temple-4',
 };
 
 const IMAGE_HEX_W = 254;
@@ -321,6 +320,7 @@ function makePirateTexture(app: Application, hexSize: number): TileTexture {
 
 export async function createTextures(app: Application, map: GameMap, hexSize = 40): Promise<TextureSet> {
   const images = await loadTileImages();
+  await ensureBuildingsAtlas();
   const tileTextures = new Map<string, TileTexture>();
   const fogTextures = new Map<string, TileTexture>();
   const fogImage = images.get('fog') ?? null;
@@ -414,21 +414,21 @@ export async function createTextures(app: Application, map: GameMap, hexSize = 4
     }
   }
   const sawmillTexture =
-    makeUnitImageTexture(app, await loadImageTexture(TEXTURE_BASE + SAWMILL_IMAGE_FILE), hexSize) ??
+    makeUnitImageTexture(app, buildingTileTexture('sawmill'), hexSize) ??
     { texture: makeBuildingTexture(app, 0x9aa3b5, hexSize), anchorY: 0.5 };
   const mineTexture =
-    makeUnitImageTexture(app, await loadImageTexture(TEXTURE_BASE + MINE_IMAGE_FILE), hexSize) ??
+    makeUnitImageTexture(app, buildingTileTexture('mine'), hexSize) ??
     { texture: makeBuildingTexture(app, 0x7a5c3e, hexSize), anchorY: 0.5 };
   const bridgeTextures = {} as Record<BridgeDir, TileTexture>;
-  for (const dir of Object.keys(BRIDGE_IMAGE_FILES) as BridgeDir[]) {
-    const img = await loadImageTexture(TEXTURE_BASE + BRIDGE_IMAGE_FILES[dir]);
+  for (const dir of Object.keys(BRIDGE_TILE_FILES) as BridgeDir[]) {
+    const img = buildingTileTexture(BRIDGE_TILE_FILES[dir]);
     bridgeTextures[dir] =
       makeUnitImageTexture(app, img, hexSize) ??
       { texture: makeBuildingTexture(app, 0x4a3620, hexSize), anchorY: 0.5 };
   }
   const portTextures = {} as Record<PortDirection, TileTexture>;
-  for (const dir of Object.keys(PORT_IMAGE_FILES) as PortDirection[]) {
-    const img = await loadImageTexture(TEXTURE_BASE + PORT_IMAGE_FILES[dir]);
+  for (const dir of Object.keys(PORT_TILE_FILES) as PortDirection[]) {
+    const img = buildingTileTexture(PORT_TILE_FILES[dir]);
     portTextures[dir] =
       makeUnitImageTexture(app, img, hexSize) ??
       { texture: makePortTexture(app, 0x9a9a9a, hexSize), anchorY: 0.5 };
@@ -436,14 +436,14 @@ export async function createTextures(app: Application, map: GameMap, hexSize = 4
   const freePortTexture = makePortTexture(app, 0x9a9a9a, hexSize);
   const templeTextures = {} as Record<1 | 2 | 3 | 4, TileTexture>;
   for (const lvl of [1, 2, 3, 4] as const) {
-    const img = await loadImageTexture(TEXTURE_BASE + TEMPLE_IMAGE_FILES[lvl]);
+    const img = buildingTileTexture(TEMPLE_TILE_FILES[lvl]);
     templeTextures[lvl] =
       makeUnitImageTexture(app, img, hexSize) ??
       { texture: makeBuildingTexture(app, 0x3a6ea5, hexSize), anchorY: 0.5 };
   }
   const forestTempleTextures = {} as Record<1 | 2 | 3 | 4, TileTexture>;
   for (const lvl of [1, 2, 3, 4] as const) {
-    const img = await loadImageTexture(TEXTURE_BASE + FOREST_TEMPLE_IMAGE_FILES[lvl]);
+    const img = buildingTileTexture(FOREST_TEMPLE_TILE_FILES[lvl]);
     forestTempleTextures[lvl] =
       makeUnitImageTexture(app, img, hexSize) ??
       { texture: makeBuildingTexture(app, 0x2e6b24, hexSize), anchorY: 0.5 };
@@ -462,7 +462,7 @@ export async function createTextures(app: Application, map: GameMap, hexSize = 4
     fogTopTexture: getTileTexture('fog', TileType.Water, 0, fogImage, 0x7a7a7a, 'topface'),
     villageTextures,
     freeVillageTexture:
-      makeUnitImageTexture(app, await loadImageTexture(TEXTURE_BASE + 'village-empty.png'), hexSize) ??
+      makeUnitImageTexture(app, buildingTileTexture('village-empty'), hexSize) ??
       { texture: makeVillageTexture(app, 0x9a9a9a, hexSize), anchorY: 1 },
     bonusTexture:
       makeUnitImageTexture(app, await loadImageTexture(TEXTURE_BASE + 'bonus.png'), hexSize) ??
