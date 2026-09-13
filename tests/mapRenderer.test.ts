@@ -1596,4 +1596,63 @@ describe('pirate deal circles', () => {
     expect((c0.hitArea as { radius?: number }).radius).toBe(4);
     v.destroy();
   });
+
+  it('keeps the deal dots a fixed on-screen size regardless of zoom', () => {
+    const pirate = makePirate('p1', [0]);
+    const textures = buildTextures(pirateMap(pirate));
+    const app = {
+      screen: { width: 800, height: 600 },
+      ticker: { add: (): void => {}, remove: (): void => {} },
+      stage: new Container(),
+    } as unknown as Application;
+    const v = new MapView(app, textures, HEX, SPRITE_SCALE, 2);
+    const players = twoTribes();
+    v.update(pirateMap(pirate), players, null, new Set(), new Set(), 0, new Set(), viewport);
+    v.setViewport({ ...viewport, scale: 2 });
+    expect(circlesOf(v)!.scale.x).toBeCloseTo(0.5);
+    expect(circlesOf(v)!.scale.y).toBeCloseTo(0.5);
+    v.setViewport({ ...viewport, scale: 0.5 });
+    expect(circlesOf(v)!.scale.x).toBeCloseTo(2);
+    v.destroy();
+  });
+
+  it('centers the deal dots below the pirate hp bar', () => {
+    const pirate = makePirate('p1', [0, 1]);
+    const textures = buildTextures(pirateMap(pirate));
+    const app = {
+      screen: { width: 800, height: 600 },
+      ticker: { add: (): void => {}, remove: (): void => {} },
+      stage: new Container(),
+    } as unknown as Application;
+    const v = new MapView(app, textures, HEX, SPRITE_SCALE, 2);
+    const players = twoTribes();
+    v.update(pirateMap(pirate), players, null, new Set(), new Set(), 0, new Set(), viewport);
+    v.setViewport(viewport);
+    // The hp bar anchors at y - unitTextureTop + 40; with a 100px texture at
+    // anchorY 0.7 and spriteScale 0.5, the pirate top is 35px above the tile
+    // center (y = 0 for flat water), so the bar anchor is at y = 5. Two 8px
+    // dots with a 4px gap span 20px; centered that is -10; the row sits 4px
+    // below the bar anchor.
+    expect(circlesOf(v)!.position.x).toBeCloseTo(-10);
+    expect(circlesOf(v)!.position.y).toBeCloseTo(9);
+    v.destroy();
+  });
+
+  it('keeps a constant gap below the hp bar when zoomed', () => {
+    const pirate = makePirate('p1', [0]);
+    const textures = buildTextures(pirateMap(pirate));
+    const app = {
+      screen: { width: 800, height: 600 },
+      ticker: { add: (): void => {}, remove: (): void => {} },
+      stage: new Container(),
+    } as unknown as Application;
+    const v = new MapView(app, textures, HEX, SPRITE_SCALE, 2);
+    const players = twoTribes();
+    v.update(pirateMap(pirate), players, null, new Set(), new Set(), 0, new Set(), viewport);
+    v.setViewport({ ...viewport, scale: 2 });
+    // screen gap = position.y * scale - hpBarY * scale + inside offset
+    const vy = circlesOf(v)!.position.y * 2;
+    expect(vy - 5 * 2).toBeCloseTo(4);
+    v.destroy();
+  });
 });

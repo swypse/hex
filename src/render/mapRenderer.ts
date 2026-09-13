@@ -23,12 +23,14 @@ import { tileSignature, tileInView, type Viewport } from './tileSignature';
 import { t } from '../i18n';
 import { Tooltip } from '../ui/kit/tooltip';
 
-/** Diameter of a pirate-deal dot drawn above the ship (world px). */
+/** Diameter of a pirate-deal dot (screen px; the row does not scale with zoom). */
 export const PIRATE_DEAL_DOT = 8;
-/** Horizonial gap between pirate-deal dots (world px). */
+/** Horizontal gap between pirate-deal dots (screen px). */
 export const PIRATE_DEAL_GAP = 4;
-/** Lift of the deal-dot row above the pirate's sprite top (world px). */
-export const PIRATE_DEAL_LIFT = 14;
+/** Screen-px gap between the pirate's hp bar anchor and the deal-dot row. */
+export const PIRATE_DEAL_HPBAR_GAP = 4;
+/** World offset of the hp bar anchor above/relative to the tile's unit top. */
+const HP_BAR_ANCHOR_OFFSET = 40;
 
 export interface OverlayItem {
   el: Container;
@@ -190,6 +192,9 @@ export class MapView {
   private shipBusy = new Set<string>();
   private unitFacings = new Map<string, 'left' | 'right'>();
   private dealTooltip: Tooltip | null = null;
+  /** World anchor (hp bar point) + row width of each pirate-deal dot row. */
+  private dealAnchors = new Map<string, { x: number; y: number; rowW: number }>();
+  private viewport: Viewport | null = null;
   private lastLocalIndex = 0;
   /** Screen-space layer for edge capture markers. Kept out of `overlay` so a
    *  host can place it above every HUD element. */
@@ -263,6 +268,7 @@ export class MapView {
     this.graphicsPool = [];
     this.textPool = [];
     this.tileViews.clear();
+    this.dealAnchors.clear();
     this.overlayItems.length = 0;
     this.map = null;
   }
@@ -281,6 +287,7 @@ export class MapView {
   ): void {
     if (this.tileViews.size === 0) this.buildTiles(map);
     this.map = map;
+    this.viewport = viewport;
     this.lastLocalIndex = localPlayerIndex;
     if (this.unitOverrides.size > 0) {
       const tiles = map.tiles.map((t) => {
@@ -409,7 +416,9 @@ export class MapView {
   }
 
   setViewport(viewport: Viewport): void {
+    this.viewport = viewport;
     if (!this.map) return;
+    for (const key of this.dealAnchors.keys()) this.layoutDealCircles(key, viewport);
     for (const tile of this.map.tiles) {
       const tv = this.tileViews.get(axialKey(tile));
       if (tv) tv.el.visible = tileInView(tile, this.hexSize, viewport);
@@ -552,6 +561,7 @@ export class MapView {
         tv.el.removeChild(tv.dealCircles);
         tv.dealCircles.destroy({ children: true });
         tv.dealCircles = null;
+        this.dealAnchors.delete(axialKey(tile));
       }
       return;
     }
@@ -570,7 +580,6 @@ export class MapView {
     const p = hexToPixel(tile, this.hexSize);
     const y = p.y - tileElevation(tile, this.hexSize);
     const top = this.unitTextureTop(unit, players);
-    tv.dealCircles.position.set(p.x, y - top - PIRATE_DEAL_LIFT);
     let x = 0;
     for (const ownerIndex of paidBy) {
       const holder = new Container();
@@ -589,6 +598,23 @@ export class MapView {
       tv.dealCircles.addChild(holder);
       x += PIRATE_DEAL_DOT + PIRATE_DEAL_GAP;
     }
+    this.dealAnchors.set(axialKey(tile), {
+      x: p.x,
+      y: y - top + HP_BAR_ANCHOR_OFFSET,
+      rowW: x - PIRATE_DEAL_GAP,
+    });
+    if (this.viewport) this.layoutDealCircles(axialKey(tile), this.viewport);
+  }
+
+  /** Compensates the camera zoom so a pirate-deal dot row keeps a constant
+   *  on-screen size, centered directly below the unit's hp bar. */
+  private layoutDealCircles(key: string, viewport: Viewport): void {
+    const anchor = this.dealAnchors.get(key);
+    const tv = this.tileViews.get(key);
+    if (!anchor || !tv?.dealCircles) return;
+    const s = viewport.scale > 0 ? viewport.scale : 1;
+    tv.dealCircles.scale.set(1 / s, 1 / s);
+    tv.dealCircles.position.set(anchor.x - anchor.rowW / (2 * s), anchor.y + PIRATE_DEAL_HPBAR_GAP / s);
   }
 
   private showDealTooltip(target: Container, tribeName: string): void {
