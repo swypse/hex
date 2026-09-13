@@ -1656,3 +1656,89 @@ describe('pirate deal circles', () => {
     v.destroy();
   });
 });
+
+describe('MapView road-port connection', () => {
+  function mkTile(q: number, r: number, terrain: TileType, opts: { roadOwner?: number | null; port?: boolean; ownedBy?: number | null; exploredBy?: number[] } = {}): MapTile {
+    const o = opts.exploredBy ?? [0];
+    return {
+      q, r, terrain, height: 0.1,
+      settlement: opts.port ? null : opts.roadOwner === undefined ? { owner: 0, level: 1, captureReady: false } : null,
+      building: opts.port ? { kind: 'port', level: 1 } : null,
+      roadOwner: opts.roadOwner === undefined ? null : opts.roadOwner,
+      unit: null,
+      ownedBy: opts.port ? (opts.ownedBy ?? null) : null,
+      claimedByVillage: null,
+      exploredBy: o,
+    };
+  }
+
+  const viewport = { x: 400, y: 300, scale: 1, width: 800, height: 600 };
+  const players = [
+    { index: 0, tribe: Tribe.Cats, isHuman: true, name: 'Cats', resources: { ...START_RESOURCES }, score: 0, kills: 0, skills: [], isActive: true },
+  ];
+
+  function render(tiles: MapTile[]): { map: GameMap; view: MapView } {
+    const map: GameMap = { radius: 1, spawns: [], tiles };
+    const view = new MapView(makeApp(), buildTextures(map), HEX, SPRITE_SCALE, 2);
+    view.update(map, players, null, new Set(), new Set(), 0, new Set(), viewport);
+    return { map, view };
+  }
+
+  function strokePoints(view: MapView, key: string): { from: { x: number; y: number }; to: { x: number; y: number } }[] {
+    const tvs = (view as unknown as { tileViews: Map<string, { roadGraphics: Graphics | null }> }).tileViews;
+    const g = tvs.get(key)!.roadGraphics;
+    expect(g).not.toBeNull();
+    const ctx = g!.context as unknown as {
+      instructions: Array<{ action: string; data: { style: { color: number }; path: { instructions: Array<{ action: string; data: number[] }> } } }>;
+    };
+    return ctx.instructions
+      .filter((i) => i.action === 'stroke')
+      .map((i) => ({
+        from: { x: i.data.path.instructions.find((p) => p.action === 'moveTo')!.data[0]!, y: i.data.path.instructions.find((p) => p.action === 'moveTo')!.data[1]! },
+        to: { x: i.data.path.instructions.find((p) => p.action === 'lineTo')!.data[0]!, y: i.data.path.instructions.find((p) => p.action === 'lineTo')!.data[1]! },
+      }));
+  }
+
+  function makeApp(): Application {
+    return {
+      screen: { width: 800, height: 600 },
+      ticker: { add: (): void => {}, remove: (): void => {} },
+    } as unknown as Application;
+  }
+
+  it('draws a road stub on the port reaching the road hex edge, like an adjacent road', () => {
+    const tiles = [
+      mkTile(0, 0, TileType.Water, { port: true, ownedBy: 0 }),
+      mkTile(1, 0, TileType.GrasslandLand, { roadOwner: 0 }),
+    ];
+    const { view } = render(tiles);
+    const pts = strokePoints(view, '0,0');
+    // One stub from the port center toward the shared edge with the road at (1,0).
+    expect(pts).toHaveLength(1);
+    const edgeMidX = HEX * Math.cos(-Math.PI / 6);
+    expect(pts[0]!.from.x).toBeCloseTo(edgeMidX, 4);
+    expect(pts[0]!.from.y).toBeCloseTo(0, 4);
+    expect(pts[0]!.to.x).toBeCloseTo(0, 4);
+    expect(pts[0]!.to.y).toBeCloseTo(0, 4);
+    view.destroy();
+  });
+
+  it('draws no road stub on a port without an adjacent own road', () => {
+    const tiles = [mkTile(0, 0, TileType.Water, { port: true, ownedBy: 0 })];
+    const { view } = render(tiles);
+    const tvs = (view as unknown as { tileViews: Map<string, { roadGraphics: Graphics | null }> }).tileViews;
+    expect(tvs.get('0,0')!.roadGraphics).toBeNull();
+    view.destroy();
+  });
+
+  it('does not draw a road stub on a port adjacent to an enemy road', () => {
+    const tiles = [
+      mkTile(0, 0, TileType.Water, { port: true, ownedBy: 0 }),
+      mkTile(1, 0, TileType.GrasslandLand, { roadOwner: 1 }),
+    ];
+    const { view } = render(tiles);
+    const tvs = (view as unknown as { tileViews: Map<string, { roadGraphics: Graphics | null }> }).tileViews;
+    expect(tvs.get('0,0')!.roadGraphics).toBeNull();
+    view.destroy();
+  });
+});

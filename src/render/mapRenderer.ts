@@ -660,7 +660,10 @@ export class MapView {
   }
 
   private drawRoad(tv: TileView, tile: MapTile, explored: boolean): void {
-    const owner = tile.roadOwner;
+    const isPort = tile.building?.kind === 'port';
+    // A port is a road node just like a road hex: it connects to adjacent own
+    // roads up to the shared tile edge, the same way two adjacent roads meet.
+    const owner = isPort ? tile.ownedBy : tile.roadOwner;
     const isBridge = tile.bridge !== undefined && tile.bridge !== null;
     const p = hexToPixel(tile, this.hexSize);
     const edgeMidY = (seg: { ay: number; by: number }): number =>
@@ -670,10 +673,11 @@ export class MapView {
     if (owner !== undefined && owner !== null && !isBridge && explored) {
       for (let e = 0; e < 6; e++) {
         const n = this.tileIndex.get(axialKey(hexEdgeNeighbor(tile, e)));
-        const connected =
-          (n?.settlement && n.settlement.owner === owner) ||
-          n?.roadOwner === owner ||
-          (n?.building && n.building.kind === 'port' && n.ownedBy === owner);
+        const connected = isPort
+          ? n?.roadOwner === owner
+          : (n?.settlement && n.settlement.owner === owner) ||
+            n?.roadOwner === owner ||
+            (n?.building && n.building.kind === 'port' && n.ownedBy === owner);
         if (!connected) continue;
         const seg = hexEdge(tile, e, this.hexSize);
         orangeEdges.push({ x: (seg.ax + seg.bx) / 2, y: edgeMidY(seg) });
