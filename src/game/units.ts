@@ -8,7 +8,7 @@ export type UnitType = 'warrior' | 'rider' | 'archer' | 'swordsman' | 'shield' |
 export type PlayableUnitType = Exclude<UnitType, 'pirate'>;
 
 export const PIRATE_OWNER = -1;
-export const PIRATE_HP = 100;
+export const PIRATE_HP = 80;
 export const PIRATE_COLOR = 0x111111;
 
 export interface UnitTypeInfo {

@@ -192,7 +192,7 @@ describe('Pirates', () => {
     sim.applyCommand({ type: 'endTurn' });
     sim.drainEvents();
     expect(defender.hp).toBe(20);
-    expect(tileAt(map, 0, 0)!.unit!.hp).toBe(90);
+    expect(tileAt(map, 0, 0)!.unit!.hp).toBe(70);
   });
 
   it('does not step onto the land tile of a unit it kills', () => {
@@ -230,8 +230,8 @@ describe('Pirates', () => {
     const ok = sim.applyCommand({ type: 'attack', unitId: 'att', q: 0, r: 0 });
     expect(ok).toBe(true);
     sim.drainEvents();
-    expect(attacker.hp).toBe(24);
-    expect(tileAt(map, 0, 0)!.unit!.hp).toBe(85);
+    expect(attacker.hp).toBe(26);
+    expect(tileAt(map, 0, 0)!.unit!.hp).toBe(65);
   });
 
   it('moves toward the nearest player unit over sea when it is out of range', () => {

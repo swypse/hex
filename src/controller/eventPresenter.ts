@@ -179,7 +179,7 @@ export class EventPresenter {
       const fromTile = tileAt(sim.map, e.from.q, e.from.r);
       if (!fromTile || !isExploredFor(fromTile, local)) continue;
       if (this.moveGhosts.some((g) => g.unitId === unit.id)) continue;
-      const sprite = this.makeMoveGhostSprite(unit, fromTile);
+      const sprite = this.makeMoveGhostSprite(unit, e.shipLevel, fromTile);
       if (sprite) this.moveGhosts.push({ unitId: unit.id, sprite });
     }
     // Reveal units hidden up front whose move presentation was skipped (e.g.
@@ -622,7 +622,7 @@ export class EventPresenter {
     await this.animateMoveEvent(unit, e);
   }
 
-    private makeMoveGhostSprite(unit: Unit, tile: MapTile): Sprite | null {
+    private makeMoveGhostSprite(unit: Unit, shipLevel: 1 | 2 | 3 | undefined, tile: MapTile): Sprite | null {
     const mapView = this.host.mapView();
     const textures = this.host.textures();
     if (!mapView || !textures || !this.host.app()) return null;
@@ -631,8 +631,8 @@ export class EventPresenter {
     const unitTex =
       unit.type === 'pirate'
         ? textures.pirateTexture
-        : unit.shipLevel !== undefined && tribe !== undefined
-          ? textures.shipTextures[tribe]?.[unit.shipLevel]
+        : shipLevel !== undefined && tribe !== undefined
+          ? textures.shipTextures[tribe]?.[shipLevel]
           : tribe !== undefined
             ? textures.unitTextures[tribe]?.[unit.type]
             : undefined;
@@ -712,9 +712,16 @@ export class EventPresenter {
     sprite.position.set(startPos.x, startPos.y - (fromTile ? tileElevation(fromTile, HEX_SIZE) : 0));
     mapView.container.addChild(sprite);
     const seaUnit = e.shipLevel !== undefined || unit.type === 'pirate';
+    let facing: 'left' | 'right' = 'right';
     let prev = e.from;
     for (const step of steps) {
       const to = hexToPixel(step, HEX_SIZE);
+      const stepFacing: 'left' | 'right' = to.x < hexToPixel(prev, HEX_SIZE).x ? 'left' : 'right';
+      if (stepFacing !== facing) {
+        facing = stepFacing;
+        sprite.scale.x = -sprite.scale.x;
+        mapView.setUnitFacing(unit.id, facing);
+      }
       const targetTile = tileAt(map, step.q, step.r);
       const y = targetTile ? to.y - tileElevation(targetTile, HEX_SIZE) : to.y;
       await this.tweenSpriteTo(sprite, { x: to.x, y }, 110);

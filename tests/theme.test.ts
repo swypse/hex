@@ -15,8 +15,14 @@ describe('theme helpers', () => {
     expect(isLightColor(0x2f6fb3)).toBe(false);
   });
   it('buttonPressed is darker than buttonHover', () => {
-    expect(THEME.buttonPressed).toBe(0x2f3450);
+    expect(THEME.buttonPressed).toBe(0xe045cd);
     expect(THEME.buttonPressed).toBeLessThan(THEME.buttonHover);
+  });
+  it('buttonSelected is the active style color', () => {
+    expect(THEME.buttonSelected).toBe(0xf15edf);
+  });
+  it('idle and selected button colors differ', () => {
+    expect(THEME.button).not.toBe(THEME.buttonSelected);
   });
   it('uses the Roboto custom font', () => {
     expect(THEME.fontFamily).toBe('Roboto, system-ui, sans-serif');

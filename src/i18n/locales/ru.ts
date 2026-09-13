@@ -78,7 +78,6 @@ export default {
   // Settings
   'settings.title': 'Настройки',
   'settings.difficulty': 'Сложность ИИ',
-  'settings.disableTips': 'Отключить подсказки',
   'settings.language': 'Язык',
   'settings.sound': 'Звук',
   'settings.close': 'Закрыть',
@@ -331,6 +330,7 @@ export default {
   'hud.buff.waterProtection': '+{n} ЗАЩ — защита воды',
   'hud.selected.settlement': '{name} (ур. {level}): {units}/{cap}',
   'hud.selected.income': 'Доход: {income} монет',
+  'hud.selected.connectedBonus': 'Связано: +{bonus} к доходу',
   'hud.selected.buildings': 'Здания: {count}/{limit}',
   'hud.selected.full': 'Полно — улучшите до уровня {level}, чтобы получить новые слоты',
   'hud.selected.building': '{name} (уровень {level})',

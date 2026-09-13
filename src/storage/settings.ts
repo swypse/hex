@@ -7,14 +7,12 @@ export type Language = 'en' | 'ru';
 
 export interface GameSettings {
   aiDifficulty: AiDifficulty;
-  disableTips: boolean;
   lang: Language;
   soundOn: boolean;
 }
 
 const DEFAULTS: GameSettings = {
   aiDifficulty: DEFAULT_AI_DIFFICULTY,
-  disableTips: false,
   lang: 'en',
   soundOn: true,
 };
@@ -38,14 +36,6 @@ export function saveSettings(settings: GameSettings): void {
   } catch {
     // storage unavailable — ignore.
   }
-}
-
-export function tipsDisabled(): boolean {
-  return loadSettings().disableTips;
-}
-
-export function setTipsDisabled(disabled: boolean): void {
-  saveSettings({ ...loadSettings(), disableTips: disabled });
 }
 
 export function setAiDifficulty(level: AiDifficulty): void {

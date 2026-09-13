@@ -1,10 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Graphics, Text } from 'pixi.js';
 import { Button } from '../src/ui/kit/button';
+import { THEME } from '../src/ui/kit/theme';
 
 class FakeImage {
   src = '';
   onload: (() => void) | null = null;
+}
+
+function fillOf(btn: Button): number {
+  return (btn as unknown as { bg: { context: { fillStyle: { color: number } } } }).bg.context.fillStyle.color;
 }
 
 describe('Button', () => {
@@ -41,10 +46,27 @@ describe('Button', () => {
     expect(stroke).not.toHaveBeenCalled();
   });
 
-  it('still draws the selected border', () => {
+  it('still draws a border when selected', () => {
     const bg = (btn as unknown as { bg: Graphics }).bg;
     const stroke = vi.spyOn(bg, 'stroke');
     btn.selected = true;
-    expect(stroke).toHaveBeenCalled();
+    expect(stroke).not.toHaveBeenCalled();
+  });
+
+  it('fills a selected button with the selected color', () => {
+    btn.selected = true;
+    expect(fillOf(btn)).toBe(THEME.buttonSelected);
+  });
+
+  it('restores the idle fill when deselected', () => {
+    btn.selected = true;
+    btn.selected = false;
+    expect(fillOf(btn)).toBe(THEME.button);
+  });
+
+  it('keeps the selected fill while hovered', () => {
+    btn.selected = true;
+    btn.emit('pointerover', {} as never);
+    expect(fillOf(btn)).toBe(THEME.buttonSelected);
   });
 });

@@ -10,13 +10,13 @@ import { attackDamage } from '../../game/combat';
 import { activeBuffs, VILLAGE_DEFENSE } from '../../game/buffs';
 import { isShip } from '../../game/ship';
 import { villageCapacity, villageBuildingLimit, buildingsInVillage, unitsInVillage } from '../../game/village';
-import { villageIncome } from '../../game/capture';
+import { villageIncome, VILLAGE_CONNECTION_BONUS } from '../../game/capture';
 import { villageUpgradeCost } from '../../game/resources';
 import { buildingYield, BUILDING_NAMES } from '../../game/buildings';
 import { isExploredFor } from '../../game/explore';
 import { hexNeighbors } from '../../game/hex';
 import { canOpenSkill, hasSkill, skillCost, type SkillId } from '../../game/skills';
-import { canBuildRoadHere } from '../../game/roads';
+import { canBuildRoadHere, isVillageRoadConnected } from '../../game/roads';
 import { canBuildBridgeHere, hasBridge } from '../../game/bridges';
 import type { Player } from '../../game/players';
 import type { GameMap, MapTile } from '../../game/mapGen';
@@ -131,6 +131,10 @@ export class HudSelected implements Widget {
       bolds.push(true);
       if (settlement.owner !== null) {
         lines.push(t('hud.selected.income', { income: villageIncome(map, tile) }));
+        bolds.push(false);
+      }
+      if (settlement.owner === human.index && isVillageRoadConnected(map, tile)) {
+        lines.push(t('hud.selected.connectedBonus', { bonus: VILLAGE_CONNECTION_BONUS }));
         bolds.push(false);
       }
       if (settlement.owner === human.index) {

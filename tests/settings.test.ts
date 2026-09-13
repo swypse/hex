@@ -4,9 +4,7 @@ import {
   loadSettings,
   setAiDifficulty,
   setSoundEnabled,
-  setTipsDisabled,
   soundEnabled,
-  tipsDisabled,
 } from '../src/storage/settings';
 
 function fakeStorage(): Map<string, string> {
@@ -27,7 +25,6 @@ describe('settings storage', () => {
     fakeStorage();
     const s = loadSettings();
     expect(s.aiDifficulty).toBe('normal');
-    expect(s.disableTips).toBe(false);
     expect(s.lang).toBe('en');
     expect(s.soundOn).toBe(true);
   });
@@ -41,22 +38,6 @@ describe('AI difficulty setting', () => {
     expect(loadSettings().aiDifficulty).toBe('hard');
     setAiDifficulty('normal');
     expect(loadSettings().aiDifficulty).toBe('normal');
-  });
-});
-
-describe('Disable tips setting', () => {
-  it('defaults to tips enabled', () => {
-    fakeStorage();
-    expect(loadSettings().disableTips).toBe(false);
-    expect(tipsDisabled()).toBe(false);
-  });
-
-  it('round-trips a disabled-tips value', () => {
-    fakeStorage();
-    setTipsDisabled(true);
-    expect(tipsDisabled()).toBe(true);
-    setTipsDisabled(false);
-    expect(tipsDisabled()).toBe(false);
   });
 });
 

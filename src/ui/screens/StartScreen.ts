@@ -2,7 +2,7 @@ import { Application, Container, FillGradient, Graphics, Sprite, Text, Texture }
 import { gameController } from '../../controller/gameController';
 import { useGameStore } from '../../store/gameStore';
 import { saveRepository } from '../../storage/saveGame';
-import { loadSettings, setAiDifficulty, setSoundEnabled, setTipsDisabled } from '../../storage/settings';
+import { loadSettings, setAiDifficulty, setSoundEnabled } from '../../storage/settings';
 import { AiDifficulty } from '../../game/aiDifficulty';
 import { isTouchDevice } from '../touch';
 import { type ScreenController, type UIHost } from '../host';
@@ -10,7 +10,6 @@ import { ScreenScroll } from '../verticalScroll';
 import { t } from '../../i18n';
 import { Button } from '../kit/button';
 import { ButtonGroup } from '../kit/buttonGroup';
-import { makeCheckbox } from '../kit/checkbox';
 import { makeLabel } from '../kit/label';
 import { Modal } from '../kit/modal';
 import { Popup } from '../kit/popup';
@@ -59,8 +58,6 @@ class SettingsPanel {
     this.el = popup.el;
 
     const content = popup.content;
-    const cw = popup.contentWidth;
-    const rowH = 30;
     const blockGap = 10;
     let y = 0;
 
@@ -94,19 +91,6 @@ class SettingsPanel {
     difficultyGroup.position.set(0, y);
     content.addChild(difficultyGroup);
     y += difficultyGroup.buttonHeight + blockGap;
-
-    const tipsLabel = makeLabel(t('settings.disableTips'), { fontSize: 14, fill: 0xeeeeee });
-    const tipsCheckbox = makeCheckbox(loadSettings().disableTips, (v) => {
-      setTipsDisabled(v);
-      tipsCheckbox.setChecked(v);
-    });
-    tipsLabel.eventMode = 'static';
-    tipsLabel.cursor = 'pointer';
-    tipsLabel.on('pointertap', () => tipsCheckbox.tap());
-    tipsLabel.position.set(0, y + (rowH - tipsLabel.height) / 2);
-    tipsCheckbox.el.position.set(cw - 22, y + (rowH - 22) / 2);
-    content.addChild(tipsLabel, tipsCheckbox.el);
-    y += rowH + blockGap;
 
     const soundLabel = makeLabel(t('settings.sound'), { fontSize: 14, fill: 0xeeeeee });
     soundLabel.position.set(0, y);

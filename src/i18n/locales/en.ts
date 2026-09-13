@@ -78,7 +78,6 @@ export default {
   // Settings
   'settings.title': 'Settings',
   'settings.difficulty': 'AI difficulty',
-  'settings.disableTips': 'Disable tips',
   'settings.language': 'Language',
   'settings.sound': 'Sound',
   'settings.close': 'Close',
@@ -330,6 +329,7 @@ export default {
   'hud.buff.waterProtection': '+{n} DEF — water protection',
   'hud.selected.settlement': '{name} (lvl {level}): {units}/{cap}',
   'hud.selected.income': 'Income: {income} money',
+  'hud.selected.connectedBonus': 'Connected: +{bonus} income',
   'hud.selected.buildings': 'Buildings: {count}/{limit}',
   'hud.selected.full': 'Full — upgrade to level {level} for more building slots',
   'hud.selected.building': '{name} (level {level})',

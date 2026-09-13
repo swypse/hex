@@ -13,7 +13,6 @@ import { HudSelected } from '../hud/HudSelected';
 import { HudSkills } from '../hud/HudSkills';
 import { HudAchievements } from '../hud/HudAchievements';
 import { HudToolbar } from '../hud/HudToolbar';
-import { HudTips } from '../hud/HudTips';
 import { HudTribes } from '../hud/HudTribes';
 import { TOOLBAR_HEIGHT, isWideScreen } from '../layout';
 
@@ -80,7 +79,6 @@ export class GameScreen implements ScreenController {
       new HudSkills(),
       new HudAchievements(),
       new HudToolbar(),
-      new HudTips(),
     ];
     for (const w of gameWidgets) w.mount(host, content);
     const hudLoading = new HudLoading();

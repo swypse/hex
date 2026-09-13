@@ -100,9 +100,6 @@ export class Button extends Container {
         .roundRect(SHADOW_OFFSET_X, SHADOW_OFFSET_Y, this.w, this.h, r)
         .fill({ color: 0x000000, alpha: 0.3 });
       this.bg.roundRect(0, 0, this.w, this.h, r).fill(fill);
-      if (this._selected) {
-        this.bg.roundRect(1.5, 1.5, this.w - 3, this.h - 3, r).stroke({ width: 3, color: THEME.white });
-      }
       return;
     }
     if (this.shadow) {
@@ -111,27 +108,29 @@ export class Button extends Container {
     }
     traceRoundedRect(this.bg, 0, 0, this.w, this.h, this.corners);
     this.bg.fill(fill);
-    if (this._selected) {
-      const inset = (s: number, i: number): number => Math.max(0, this.corners[i]! - s);
-      traceRoundedRect(this.bg, 1.5, 1.5, this.w - 3, this.h - 3, [
-        inset(1.5, 0), inset(1.5, 1), inset(1.5, 2), inset(1.5, 3),
-      ] as ButtonCorners);
-      this.bg.stroke({ width: 3, color: THEME.white });
-    }
   }
 
   private redraw(): void {
-    this.render(THEME.button);
+    this.render(this.restingFill());
+  }
+
+  /** The resting fill for the current state, ignoring the transient pressed
+   *  shade: selected beats hover, which beats the idle color. */
+  private restingFill(): number {
+    if (this._disabled) return THEME.button;
+    if (this._selected) return THEME.buttonSelected;
+    if (this._hover) return THEME.buttonHover;
+    return THEME.button;
   }
 
   private onOver = (): void => {
     if (this._disabled) return;
     this._hover = true;
-    this.render(THEME.buttonHover);
+    this.render(this.restingFill());
   };
   private onOut = (): void => {
     this._hover = false;
-    this.render(THEME.button);
+    this.render(this.restingFill());
   };
   private onDown = (): void => {
     if (!this._disabled) this.render(THEME.buttonPressed);
@@ -140,7 +139,7 @@ export class Button extends Container {
     if (this._disabled) {
       this.render(THEME.button);
     } else {
-      this.render(this._hover ? THEME.buttonHover : THEME.button);
+      this.render(this.restingFill());
     }
   };
   private onTap = (): void => {

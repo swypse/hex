@@ -387,6 +387,187 @@ describe('move animation', () => {
     }
   });
 
+  it('keeps the walking sprite facing right while the unit moves right', async () => {
+    const map = makeOpenMap();
+    h = setupGame(map, [player(0, Tribe.Cats)]);
+    const from = unitAt(map, 0, 0);
+    const unit: Unit = {
+      id: 'u1', owner: 0, type: 'warrior', q: 0, r: 0,
+      hasMoved: true, hasAttacked: false, hasHealed: false,
+      hp: 5, attack: 2, attackDistance: 1, spawnVillage: { q: 0, r: 0 },
+    };
+    from.unit = unit;
+    const dest = unitAt(map, 2, 0);
+    from.unit = null;
+    const landed: Unit = { ...unit, q: 2, r: 0 };
+    dest.unit = landed;
+    h.mapView.update(map, [player(0, Tribe.Cats)], null, new Set(), new Set(), 0, new Set(), {
+      x: 0, y: 0, scale: 1, width: 800, height: 600,
+    });
+
+    const events: GameEvent[] = [
+      { type: 'unitMoved', unitId: 'u1', from: { q: 0, r: 0 }, path: [{ q: 1, r: 0 }, { q: 2, r: 0 }], to: { q: 2, r: 0 } },
+    ];
+    const p = h.gc.presentEvents(events, h.gc.exploredKeysFor(0));
+    await waitFor(() =>
+      [...h.mapView.container.children].some((c) => (c as { texture?: unknown }).texture !== undefined),
+    );
+    const walker = [...h.mapView.container.children]
+      .reverse()
+      .find((c) => (c as { texture?: unknown }).texture !== undefined) as unknown as { scale: { x: number } };
+    try {
+      expect(walker.scale.x).toBeGreaterThan(0);
+    } finally {
+      await p;
+    }
+  });
+
+  it('flips the walking sprite left before the unit moves left', async () => {
+    const map = makeOpenMap();
+    h = setupGame(map, [player(0, Tribe.Cats)]);
+    const from = unitAt(map, 0, 0);
+    const unit: Unit = {
+      id: 'u1', owner: 0, type: 'warrior', q: 0, r: 0,
+      hasMoved: true, hasAttacked: false, hasHealed: false,
+      hp: 5, attack: 2, attackDistance: 1, spawnVillage: { q: 0, r: 0 },
+    };
+    from.unit = unit;
+    const dest = unitAt(map, -1, 0);
+    from.unit = null;
+    const landed: Unit = { ...unit, q: -1, r: 0 };
+    dest.unit = landed;
+    h.mapView.update(map, [player(0, Tribe.Cats)], null, new Set(), new Set(), 0, new Set(), {
+      x: 0, y: 0, scale: 1, width: 800, height: 600,
+    });
+
+    const events: GameEvent[] = [
+      { type: 'unitMoved', unitId: 'u1', from: { q: 0, r: 0 }, path: [{ q: -1, r: 0 }], to: { q: -1, r: 0 } },
+    ];
+    const p = h.gc.presentEvents(events, h.gc.exploredKeysFor(0));
+    await waitFor(() =>
+      [...h.mapView.container.children].some((c) => (c as { texture?: unknown }).texture !== undefined),
+    );
+    const walker = [...h.mapView.container.children]
+      .reverse()
+      .find((c) => (c as { texture?: unknown }).texture !== undefined) as unknown as { scale: { x: number } };
+    try {
+      expect(walker.scale.x).toBeLessThan(0);
+    } finally {
+      await p;
+    }
+  });
+
+  it('flips the walking sprite when the move path changes horizontal direction', async () => {
+    const map = makeOpenMap();
+    h = setupGame(map, [player(0, Tribe.Cats)]);
+    const from = unitAt(map, 0, 0);
+    const unit: Unit = {
+      id: 'u1', owner: 0, type: 'warrior', q: 0, r: 0,
+      hasMoved: true, hasAttacked: false, hasHealed: false,
+      hp: 5, attack: 2, attackDistance: 1, spawnVillage: { q: 0, r: 0 },
+    };
+    from.unit = unit;
+    const dest = unitAt(map, 0, 1);
+    from.unit = null;
+    const landed: Unit = { ...unit, q: 0, r: 1 };
+    dest.unit = landed;
+    h.mapView.update(map, [player(0, Tribe.Cats)], null, new Set(), new Set(), 0, new Set(), {
+      x: 0, y: 0, scale: 1, width: 800, height: 600,
+    });
+
+    const events: GameEvent[] = [
+      {
+        type: 'unitMoved',
+        unitId: 'u1',
+        from: { q: 0, r: 0 },
+        path: [{ q: 1, r: 0 }, { q: 1, r: 1 }, { q: 0, r: 1 }],
+        to: { q: 0, r: 1 },
+      },
+    ];
+    const p = h.gc.presentEvents(events, h.gc.exploredKeysFor(0));
+    // The horizontal direction changes on the last step (right → left); the
+    // walk sprite must already be flipped while it is still walking.
+    await waitFor(() =>
+      [...h.mapView.container.children].some((c) => {
+        const s = c as { texture?: unknown; scale?: { x: number }; destroyed?: boolean };
+        return s.texture !== undefined && s.scale !== undefined && s.scale.x < 0 && !s.destroyed;
+      }),
+      3000,
+    );
+    const walker = [...h.mapView.container.children]
+      .reverse()
+      .find((c) => (c as { texture?: unknown }).texture !== undefined) as unknown as { scale: { x: number } };
+    try {
+      expect(walker.scale.x).toBeLessThan(0);
+    } finally {
+      await p;
+    }
+  });
+
+  it('keeps an AI unit that boards at a port looking like a land unit until it walks onto the port', async () => {
+    const map = makeOpenMap();
+    const players = [player(0, Tribe.Cats), player(1, Tribe.Barbarians)];
+    h = setupGame(map, players);
+    // The sim already holds the post-move state: the enemy unit has boarded and
+    // stands on the port cell as a ship.
+    const port = unitAt(map, 1, 0);
+    port.building = { kind: 'port', level: 1 };
+    const boarded: Unit = {
+      id: 'e1', owner: 1, type: 'warrior', q: 1, r: 0,
+      hasMoved: true, hasAttacked: true, hasHealed: false,
+      hp: 5, attack: 2, attackDistance: 1, spawnVillage: { q: 1, r: 0 }, shipLevel: 1,
+    };
+    port.unit = boarded;
+    h.mapView.update(map, players, null, new Set(), new Set(), 0, new Set(), {
+      x: 0, y: 0, scale: 1, width: 800, height: 600,
+    });
+
+    const events: GameEvent[] = [
+      { type: 'unitMoved', unitId: 'e1', from: { q: 0, r: 0 }, path: [{ q: 1, r: 0 }], to: { q: 1, r: 0 } },
+    ];
+    const p = h.gc.presentEvents(events, h.gc.exploredKeysFor(0));
+    // The ghost standing on the starting cell must still show the land unit.
+    const ghost = [...h.mapView.container.children]
+      .find((c) => (c as { texture?: unknown }).texture !== undefined) as unknown as { texture: Texture };
+    try {
+      expect(ghost.texture).toBe(h.gc.textures.unitTextures[Tribe.Barbarians].warrior.texture);
+    } finally {
+      await p;
+    }
+  });
+
+  it('keeps the AI ship texture while a ship that lands at a port is queued to move', async () => {
+    const map = makeOpenMap();
+    const players = [player(0, Tribe.Cats), player(1, Tribe.Barbarians)];
+    h = setupGame(map, players);
+    // The sim holds the post-move state: the ship has docked and stands on the
+    // port cell as a land unit.
+    const port = unitAt(map, 1, 0);
+    port.building = { kind: 'port', level: 1 };
+    const landed: Unit = {
+      id: 'e1', owner: 1, type: 'warrior', q: 1, r: 0,
+      hasMoved: true, hasAttacked: false, hasHealed: false,
+      hp: 5, attack: 2, attackDistance: 1, spawnVillage: { q: 1, r: 0 },
+    };
+    port.unit = landed;
+    h.mapView.update(map, players, null, new Set(), new Set(), 0, new Set(), {
+      x: 0, y: 0, scale: 1, width: 800, height: 600,
+    });
+
+    const events: GameEvent[] = [
+      { type: 'unitMoved', unitId: 'e1', from: { q: 0, r: 1 }, path: [{ q: 1, r: 0 }], to: { q: 1, r: 0 }, shipLevel: 1 },
+    ];
+    const p = h.gc.presentEvents(events, h.gc.exploredKeysFor(0));
+    // The ghost standing on the starting water cell must still show the ship.
+    const ghost = [...h.mapView.container.children]
+      .find((c) => (c as { texture?: unknown }).texture !== undefined) as unknown as { texture: Texture };
+    try {
+      expect(ghost.texture).toBe(h.gc.textures.shipTextures[Tribe.Barbarians][1].texture);
+    } finally {
+      await p;
+    }
+  });
+
   it('queues a tribe died notification after the last village is captured', async () => {
     const map = makeOpenMap();
     h = setupGame(map, [player(0, Tribe.Cats), player(1, Tribe.Barbarians)]);

@@ -49,11 +49,11 @@ describe('UNIT_TYPES', () => {
     expect(UNIT_TYPE_NAMES.knight).toBe('Knight');
   });
 
-  it('gives pirates 100 hp and 5 defense', () => {
-    expect(PIRATE_HP).toBe(100);
-    expect(UNIT_TYPES.pirate).toEqual({ movement: 5, attack: 30, attackDistance: 3, maxHp: 100, defense: 5, price: 0, priceWood: 0, priceOre: 0, shape: 'square' });
+  it('gives pirates 80 hp and 5 defense', () => {
+    expect(PIRATE_HP).toBe(80);
+    expect(UNIT_TYPES.pirate).toEqual({ movement: 5, attack: 30, attackDistance: 3, maxHp: 80, defense: 5, price: 0, priceWood: 0, priceOre: 0, shape: 'square' });
     const pirate = makeUnit(-1, 'pirate', 0, 0);
-    expect(pirate.hp).toBe(100);
+    expect(pirate.hp).toBe(80);
     expect(pirate.defense).toBe(5);
   });
 });
