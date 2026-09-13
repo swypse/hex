@@ -2,6 +2,7 @@ import { beforeEach, describe, it, expect, afterEach, vi } from 'vitest';
 import { Texture, type Container } from 'pixi.js';
 import { TRIBE_ATLAS_FRAMES, TRIBE_ATLAS_FILES, TRIBE_ATLAS_CELL_W, TRIBE_ATLAS_CELL_H } from '../src/game/tribeAtlasData.gen';
 import { ensureTribeAtlas, tribeTileTexture } from '../src/render/tribeAtlas';
+import { TRIBES } from '../src/game/tribes';
 
 class FakeImage {
   src = '';
@@ -37,6 +38,13 @@ describe('tribe atlas loader', () => {
     for (const code of Object.keys(TRIBE_ATLAS_FILES)) {
       expect(TRIBE_ATLAS_FILES[code]).toBe(`${code}-atlas.png`);
       expect(Object.keys(TRIBE_ATLAS_FRAMES[code]!).length).toBeGreaterThan(0);
+    }
+  });
+
+  it('packs a village texture pair for every playable tribe', () => {
+    for (const tribe of TRIBES) {
+      expect(TRIBE_ATLAS_FRAMES[tribe.code]?.[`${tribe.code}-village`]).toBeDefined();
+      expect(TRIBE_ATLAS_FRAMES[tribe.code]?.[`${tribe.code}-village-2`]).toBeDefined();
     }
   });
 
