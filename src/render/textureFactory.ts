@@ -7,33 +7,13 @@ import { UnitType, UNIT_IMAGE_FILES, UNIT_TYPES } from '../game/units';
 import { PortDirection } from '../game/buildings';
 import { shadeColor } from '../util/color';
 import { tileElevation } from './elevation';
+import { ensureTerrainAtlas, terrainFrameTexture, TERRAIN_TILE_FILES, TERRAIN_FOG_FILE } from './terrainAtlas';
 
 const TEXTURE_BASE = `${import.meta.env.BASE_URL}textures/`;
 
-const TILE_IMAGE_FILES: Record<TileType, string> = {
-  [TileType.GrasslandLand]: 'grassland-land.png',
-  [TileType.GrasslandForest]: 'grassland-forest.png',
-  [TileType.GrasslandMountain]: 'grassland-mountain.png',
-  [TileType.DesertLand]: 'desert-land.png',
-  [TileType.DesertForest]: 'desert-forest.png',
-  [TileType.DesertMountain]: 'desert-mountain.png',
-  [TileType.TundraLand]: 'tundra-land.png',
-  [TileType.TundraForest]: 'tundra-forest.png',
-  [TileType.TundraMountain]: 'tundra-mountain.png',
-  [TileType.TaigaLand]: 'taiga-land.png',
-  [TileType.TaigaForest]: 'taiga-forest.png',
-  [TileType.TaigaMountain]: 'taiga-mountain.png',
-  [TileType.RainforestLand]: 'rainforest-land.png',
-  [TileType.RainforestForest]: 'rainforest-forest.png',
-  [TileType.RainforestMountain]: 'rainforest-mountain.png',
-  [TileType.Water]: 'water.png',
-  [TileType.Settlement]: 'grassland-land.png',
-};
-
-const FOG_IMAGE_FILE = 'fog.png';
+const VILLAGE_CONNECTED_IMAGE_FILE = 'village-connected.png';
 const FOG_LEFT_WALL = 0xd5bbdc;
 const FOG_RIGHT_WALL = 0xc2a4ca;
-const VILLAGE_CONNECTED_IMAGE_FILE = 'village-connected.png';
 const SAWMILL_IMAGE_FILE = 'sawmill.png';
 const MINE_IMAGE_FILE = 'mine.png';
 const BOTTLE_IMAGE_FILE = 'bottle-on-water.png';
@@ -234,18 +214,14 @@ function loadImageTexture(url: string): Promise<Texture | null> {
 }
 
 async function loadTileImages(): Promise<Map<string, Texture>> {
+  await ensureTerrainAtlas();
   const map = new Map<string, Texture>();
-  const entries = Object.entries(TILE_IMAGE_FILES) as [string, string][];
-  const urls = entries.map(([key, file]) => ({ key, url: TEXTURE_BASE + file }));
-  const fogUrl = TEXTURE_BASE + FOG_IMAGE_FILE;
-  const textures = await Promise.all([
-    ...urls.map((u) => loadImageTexture(u.url)),
-    loadImageTexture(fogUrl),
-  ]);
-  urls.forEach((u, i) => {
-    if (textures[i]) map.set(u.key, textures[i]!);
-  });
-  if (textures[urls.length]) map.set('fog', textures[urls.length]!);
+  for (const [key, frameKey] of Object.entries(TERRAIN_TILE_FILES)) {
+    const tex = terrainFrameTexture(frameKey);
+    if (tex) map.set(key, tex);
+  }
+  const fog = terrainFrameTexture(TERRAIN_FOG_FILE);
+  if (fog) map.set('fog', fog);
   return map;
 }
 
