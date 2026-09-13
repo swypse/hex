@@ -21,6 +21,7 @@ export const ACTION_BUTTON_ICON_FILES: Record<string, string> = {
   forestTemple: 'action-forest-temple',
   bonus: 'action-get-bonus',
   bottle: 'action-get-bottle',
+  deal: 'action-deal-with-pirates',
   stats: 'action-stats',
   skills: 'action-skills',
   achievements: 'action-cup',

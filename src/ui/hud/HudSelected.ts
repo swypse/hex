@@ -3,7 +3,7 @@ import { Circle, Container, Graphics, Text } from 'pixi.js';
 import { gameController } from '../../controller/gameController';
 import { TRIBES } from '../../game/tribes';
 import { isForestType, isMountainType, isWaterType, TILE_TYPE_COLORS, TILE_TYPE_NAMES } from '../../game/tileTypes';
-import { UNIT_TYPE_NAMES, UNIT_TYPES, unitMaintenance, type Unit } from '../../game/units';
+import { UNIT_TYPE_NAMES, UNIT_TYPES, unitMaintenance, hasPirateDeal, type Unit } from '../../game/units';
 import { unitCanAct } from '../../game/unitActions';
 import { tileAt } from '../../game/selection';
 import { attackDamage } from '../../game/combat';
@@ -121,6 +121,14 @@ export class HudSelected implements Widget {
       for (const buff of unitDefenseBuffs(map, unit, tile)) {
         lines.push(t(buff.key, { n: buff.amount }));
         bolds.push(false);
+      }
+      if (unit.type === 'pirate') {
+        lines.push(
+          hasPirateDeal(unit, human.index)
+            ? t('hud.selected.pirateDealActive')
+            : t('hud.selected.pirateDeal'),
+        );
+        bolds.push(true);
       }
     }
 

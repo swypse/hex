@@ -4,7 +4,7 @@ import { useGameStore } from '../../store/gameStore';
 import { tileAt } from '../../game/selection';
 import { canAfford, villageUpgradeCost } from '../../game/resources';
 import { canBuildSawmill, canBuildForestTemple, canBuildMine, canBuildPort, canBuildTemple, BUILDING_COSTS } from '../../game/buildings';
-import { canHeal, canDisband, disbandCost, UNIT_TYPES, UNIT_TYPE_NAMES } from '../../game/units';
+import { canHeal, canDisband, disbandCost, hasPirateDeal, PIRATE_DEAL_COST, UNIT_TYPES, UNIT_TYPE_NAMES } from '../../game/units';
 import { SHIP_UPGRADE_COST, canUpgradeShip } from '../../game/ship';
 import { unitsInVillage, villageCapacity, canBuildWall, WALL_COST } from '../../game/village';
 import { canBuildRoad, ROAD_COST } from '../../game/roads';
@@ -18,6 +18,8 @@ export interface ToolbarSpec {
   label: string;
   disabled: boolean;
   onClick: () => void;
+  /** Render the button even when disabled (e.g. an already-active pirate deal). */
+  visibleWhenDisabled?: boolean;
 }
 
 export function toolbarSpecs(): ToolbarSpec[] {
@@ -115,6 +117,17 @@ export function toolbarSpecs(): ToolbarSpec[] {
         onClick: () => gameController.disbandSelectedUnit(),
       });
     }
+  }
+
+  if (unit && unit.type === 'pirate') {
+    const dealt = hasPirateDeal(unit, player.index);
+    out.push({
+      key: 'deal',
+      label: dealt ? t('action.pirateDealActive') : t('action.dealWithPirates', { money: PIRATE_DEAL_COST }),
+      disabled: dealt || !canAfford(player.resources, { wood: 0, stone: 0, money: PIRATE_DEAL_COST, ore: 0 }),
+      visibleWhenDisabled: true,
+      onClick: () => gameController.dealWithSelectedPirate(),
+    });
   }
 
   if (

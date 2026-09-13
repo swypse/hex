@@ -41,6 +41,8 @@ export type GameEvent =
   | { type: 'explorer'; q: number; r: number; path: Axial[]; playerIndex: number }
   | { type: 'pirateCapture'; q: number; r: number; playerIndex: number; success: boolean }
   | { type: 'pirateSpawned'; q: number; r: number }
+  | { type: 'pirateDeal'; unitId: string; q: number; r: number; playerIndex: number }
+  | { type: 'pirateDealCanceled'; unitId: string; q: number; r: number; playerIndex: number }
   | { type: 'achievementUnlocked'; playerIndex: number; achievement: AchievementId }
   | { type: 'turnStarted'; playerIndex: number; turn: number }
   | { type: 'aiTurn'; playerIndex: number }

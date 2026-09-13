@@ -398,6 +398,73 @@ describe('HudSelected connected village income bonus', () => {
   });
 });
 
+describe('HudSelected pirate deal info', () => {
+  let hud: HudSelected;
+  const originalSim = (gameController as unknown as { sim: unknown }).sim;
+
+  const texts = (): string[] => {
+    const el = (hud as unknown as { el: Container }).el!;
+    const out: string[] = [];
+    const walk = (c: Container): void => {
+      for (const ch of c.children) {
+        if (ch instanceof Text) out.push((ch as Text).text);
+        if (ch instanceof Container) walk(ch as Container);
+      }
+    };
+    walk(el);
+    return out;
+  };
+
+  const boot = (dealt: boolean): void => {
+    Object.defineProperty(Text.prototype, 'width', { configurable: true, get: () => 60 });
+    Object.defineProperty(Text.prototype, 'height', { configurable: true, get: () => 14 });
+    (globalThis as { CanvasRenderingContext2D?: unknown }).CanvasRenderingContext2D = class {};
+    (globalThis as { document?: unknown }).document = {
+      createElement: () => ({ getContext: () => fakeCanvasContext(), width: 0, height: 0 }),
+    };
+    const map = makeTestMap(2);
+    const tile = tileAt(map, 0, 0)!;
+    tile.terrain = TileType.Water;
+    tile.unit = {
+      id: 'p1', owner: -1, type: 'pirate', q: 0, r: 0,
+      hasMoved: false, hasAttacked: false, hasHealed: false,
+      hp: 80, attack: 30, attackDistance: 3, defense: 5, spawnVillage: null,
+      ...(dealt ? { paidBy: [0] } : {}),
+    };
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    (gameController as unknown as { sim: Simulator | null }).sim = sim;
+    useGameStore.setState({
+      screen: 'game',
+      players,
+      localPlayerIndex: 0,
+      selection: { kind: 'unit', q: 0, r: 0 },
+      tutorial: false,
+      tutorialStep: null,
+    });
+    hud = new HudSelected();
+    hud.mount(makeHost(), new Container());
+  };
+
+  afterEach(() => {
+    hud?.destroy();
+    (gameController as unknown as { sim: unknown }).sim = originalSim;
+  });
+
+  it('shows a deal line on a pirate without an active deal', () => {
+    boot(false);
+    const all = texts().join('\n');
+    expect(all).toContain('Pirate: no deal');
+  });
+
+  it('shows an active-deal line on a pirate the player has paid', () => {
+    boot(true);
+    const all = texts().join('\n');
+    expect(all).toContain('Pirate: deal active');
+    expect(all).not.toContain('Pirate: no deal');
+  });
+});
+
 function findText(root: Container, prefix: string): Text | undefined {
   for (const ch of root.children) {
     if (ch instanceof Text) {

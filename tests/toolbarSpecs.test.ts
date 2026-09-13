@@ -255,4 +255,66 @@ describe('toolbarSpecs', () => {
     expect(spy).toHaveBeenCalledWith('click');
     spy.mockRestore();
   });
+
+  it('offers an enabled deal action for an affordable pirate with no active deal', () => {
+    const tile = map.tiles.find((t) => t.unit === null)!;
+    tile.terrain = TileType.Water;
+    tile.ownedBy = null;
+    tile.unit = {
+      id: 'p', owner: -1, type: 'pirate', q: tile.q, r: tile.r,
+      hasMoved: false, hasAttacked: false, hasHealed: false,
+      hp: 80, attack: 30, attackDistance: 3, defense: 5, spawnVillage: null,
+    };
+    const store = useGameStore.getState();
+    store.setPlayers(store.players.map((p, i) => (i === 0 ? { ...p, resources: { ...p.resources, money: 100 } } : p)));
+    select(tile);
+    const spec = toolbarSpecs().find((a) => a.key === 'deal');
+    expect(spec).toBeDefined();
+    expect(spec!.disabled).toBe(false);
+    expect(spec!.label).toContain('50');
+  });
+
+  it('disables the deal action when the player cannot afford it', () => {
+    const tile = map.tiles.find((t) => t.unit === null)!;
+    tile.terrain = TileType.Water;
+    tile.ownedBy = null;
+    tile.unit = {
+      id: 'p', owner: -1, type: 'pirate', q: tile.q, r: tile.r,
+      hasMoved: false, hasAttacked: false, hasHealed: false,
+      hp: 80, attack: 30, attackDistance: 3, defense: 5, spawnVillage: null,
+    };
+    select(tile);
+    const spec = toolbarSpecs().find((a) => a.key === 'deal');
+    expect(spec).toBeDefined();
+    expect(spec!.disabled).toBe(true);
+  });
+
+  it('disables the deal action once the deal with the pirate is already active', () => {
+    const tile = map.tiles.find((t) => t.unit === null)!;
+    tile.terrain = TileType.Water;
+    tile.ownedBy = null;
+    tile.unit = {
+      id: 'p', owner: -1, type: 'pirate', q: tile.q, r: tile.r,
+      hasMoved: false, hasAttacked: false, hasHealed: false,
+      hp: 80, attack: 30, attackDistance: 3, defense: 5, spawnVillage: null, paidBy: [0],
+    };
+    const store = useGameStore.getState();
+    store.setPlayers(store.players.map((p, i) => (i === 0 ? { ...p, resources: { ...p.resources, money: 100 } } : p)));
+    select(tile);
+    const spec = toolbarSpecs().find((a) => a.key === 'deal');
+    expect(spec).toBeDefined();
+    expect(spec!.disabled).toBe(true);
+  });
+
+  it('does not offer a deal action for a selected non-pirate unit', () => {
+    const tile = map.tiles.find((t) => t.unit === null)!;
+    tile.ownedBy = 0;
+    tile.unit = {
+      id: 'w', owner: 0, type: 'warrior', q: tile.q, r: tile.r,
+      hasMoved: false, hasAttacked: false, hasHealed: false,
+      hp: UNIT_TYPES.warrior.maxHp, attack: 2, attackDistance: 1, spawnVillage: null,
+    };
+    select(tile);
+    expect(toolbarSpecs().some((a) => a.key === 'deal')).toBe(false);
+  });
 });

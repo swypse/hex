@@ -31,6 +31,7 @@ const ICON_ACTIONS: Record<string, string> = {
   bridge: 'bridge',
   bonus: 'bonus',
   bottle: 'bottle',
+  deal: 'deal',
 };
 
 const LAST_TURN_COLOR = 0x9cff55;
@@ -202,7 +203,7 @@ export class HudToolbar implements Widget {
     };
 
     for (const spec of actions) {
-      if (spec.disabled || store.aiActive || store.gameOver) continue;
+      if ((spec.disabled && !spec.visibleWhenDisabled) || store.aiActive || store.gameOver) continue;
       const iconFile = ICON_ACTIONS[spec.key];
       if (iconFile) addIcon(iconFile, spec.disabled, spec.onClick, spec.label, spec.key);
       else addText(spec.label, spec.disabled, spec.onClick, 16, spec.key);

@@ -734,6 +734,17 @@ class GameController {
     this.sendCommand({ type: 'upgradeShip', unitId: unit.id });
   }
 
+  dealWithSelectedPirate(): void {
+    const store = useGameStore.getState();
+    if (store.aiActive || store.gameOver) return;
+    const selection = store.selection;
+    if (!selection || selection.kind !== 'unit' || !this.sim) return;
+    const unit = tileAt(this.sim.map, selection.q, selection.r)?.unit;
+    if (!unit || unit.type !== 'pirate') return;
+    store.setSelection(null);
+    this.sendCommand({ type: 'deal', unitId: unit.id });
+  }
+
   /** Cheat (single-player only): grants the local player +100 of every
    *  resource. Returns true when granted. */
   cheatResources(): boolean {

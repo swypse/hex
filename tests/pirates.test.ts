@@ -302,4 +302,111 @@ describe('Pirates', () => {
     expect(players[0]!.score).toBe(30);
     expect(events.some((e) => e.type === 'scoreFly' && e.amount === 30)).toBe(true);
   });
+
+  it('accepts a deal for 50 money and the pirate stops attacking the player', () => {
+    const map = makeTestMap();
+    tileAt(map, 0, 0)!.terrain = TileType.Water;
+    const pirate = makePirate('pirate-1', 0, 0);
+    tileAt(map, 0, 0)!.unit = pirate;
+    const ship = makeShip('ship-1', 0, 0, 1);
+    tileAt(map, 0, 1)!.unit = ship;
+
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    players[0]!.resources.money = 100;
+    const sim = new Simulator(map, players, 'turns30', { rng: () => 0.5 });
+    sim.startGame();
+    sim.drainEvents();
+
+    expect(sim.applyCommand({ type: 'deal', unitId: 'pirate-1' })).toBe(true);
+    const events = sim.drainEvents();
+    expect(players[0]!.resources.money).toBe(50);
+    expect(pirate.paidBy).toContain(0);
+    expect(events.some((e) => e.type === 'pirateDeal' && e.playerIndex === 0)).toBe(true);
+
+    const shipHp = ship.hp;
+    sim.applyCommand({ type: 'endTurn' });
+    sim.drainEvents();
+    expect(ship.hp).toBe(shipHp);
+    expect(tileAt(map, 0, 1)!.unit).toBe(ship);
+    expect(players[0]!.resources.money).toBe(50);
+  });
+
+  it('does not charge twice for a deal with the same pirate', () => {
+    const map = makeTestMap();
+    tileAt(map, 0, 0)!.terrain = TileType.Water;
+    const pirate = makePirate('pirate-1', 0, 0);
+    tileAt(map, 0, 0)!.unit = pirate;
+
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    players[0]!.resources.money = 100;
+    const sim = new Simulator(map, players, 'turns30', { rng: () => 0.5 });
+    sim.startGame();
+    sim.drainEvents();
+
+    expect(sim.applyCommand({ type: 'deal', unitId: 'pirate-1' })).toBe(true);
+    sim.drainEvents();
+    expect(sim.applyCommand({ type: 'deal', unitId: 'pirate-1' })).toBe(false);
+    expect(players[0]!.resources.money).toBe(50);
+  });
+
+  it('rejects a deal the player cannot afford', () => {
+    const map = makeTestMap();
+    tileAt(map, 0, 0)!.terrain = TileType.Water;
+    const pirate = makePirate('pirate-1', 0, 0);
+    tileAt(map, 0, 0)!.unit = pirate;
+
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    const moneyBefore = players[0]!.resources.money;
+    const sim = new Simulator(map, players, 'turns30', { rng: () => 0.5 });
+    sim.startGame();
+    sim.drainEvents();
+
+    expect(sim.applyCommand({ type: 'deal', unitId: 'pirate-1' })).toBe(false);
+    expect(players[0]!.resources.money).toBe(moneyBefore);
+    expect(pirate.paidBy).toBeUndefined();
+  });
+
+  it('rejects a deal offer to a unit that is not a pirate', () => {
+    const map = makeTestMap();
+    const ship = makeShip('ship-1', 0, 0, 0);
+    tileAt(map, 0, 0)!.unit = ship;
+
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    players[0]!.resources.money = 100;
+    const sim = new Simulator(map, players, 'turns30', { rng: () => 0.5 });
+    sim.startGame();
+    sim.drainEvents();
+
+    expect(sim.applyCommand({ type: 'deal', unitId: 'ship-1' })).toBe(false);
+    expect(players[0]!.resources.money).toBe(100);
+  });
+
+  it('cancels the deal when the player attacks the pirate, which then attacks again', () => {
+    const map = makeTestMap();
+    tileAt(map, 0, 0)!.terrain = TileType.Water;
+    const pirate = makePirate('pirate-1', 0, 0);
+    tileAt(map, 0, 0)!.unit = pirate;
+    const ship = makeShip('ship-1', 0, 0, 1);
+    tileAt(map, 0, 1)!.unit = ship;
+
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    players[0]!.resources.money = 100;
+    const sim = new Simulator(map, players, 'turns30', { rng: () => 0.5 });
+    sim.startGame();
+    sim.drainEvents();
+
+    sim.applyCommand({ type: 'deal', unitId: 'pirate-1' });
+    sim.drainEvents();
+
+    expect(sim.applyCommand({ type: 'attack', unitId: 'ship-1', q: 0, r: 0 })).toBe(true);
+    const attackEvents = sim.drainEvents();
+    expect(pirate.paidBy).toBeUndefined();
+    expect(attackEvents.some((e) => e.type === 'pirateDealCanceled' && e.playerIndex === 0)).toBe(true);
+
+    const shipHpAfterFight = ship.hp;
+    sim.applyCommand({ type: 'endTurn' });
+    const turnEvents = sim.drainEvents();
+    expect(ship.hp).toBeLessThan(shipHpAfterFight);
+    expect(turnEvents.some((e) => e.type === 'pirateCapture')).toBe(true);
+  });
 });

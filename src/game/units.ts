@@ -11,6 +11,10 @@ export const PIRATE_OWNER = -1;
 export const PIRATE_HP = 80;
 export const PIRATE_COLOR = 0x111111;
 
+/** Money cost to strike a deal that stops one pirate ship from attacking the
+ *  paying player's tribe. */
+export const PIRATE_DEAL_COST = 50;
+
 export interface UnitTypeInfo {
   movement: number;
   attack: number;
@@ -63,6 +67,8 @@ export interface Unit {
   canExtraAttack?: boolean;
   /** Kills scored by this unit during its current turn (knight combos). */
   killsThisTurn?: number;
+  /** Player indices that paid this pirate; it will not attack their units. */
+  paidBy?: number[];
 }
 
 export const UNIT_MOVEMENT: Record<UnitType, number> = {
@@ -228,4 +234,10 @@ export function canHeal(unit: Unit): boolean {
 export function healUnit(unit: Unit): void {
   unit.hp = Math.min(UNIT_TYPES[unit.type].maxHp, unit.hp + HEAL_AMOUNT);
   unit.hasHealed = true;
+}
+
+/** Whether the pirate has an active deal with the given player: the player
+ *  paid it, so it will not attack their units until they attack it back. */
+export function hasPirateDeal(unit: Unit, playerIndex: number): boolean {
+  return unit.paidBy?.includes(playerIndex) ?? false;
 }

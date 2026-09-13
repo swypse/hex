@@ -138,4 +138,26 @@ describe('pirate capture messages', () => {
     );
     expect(useGameStore.getState().centerMessage).toBe('The attempt to capture your ship has failed');
   });
+
+  it('reports a pirate deal to the player who paid', async () => {
+    const owner = player(0, Tribe.Cats);
+    useGameStore.setState({ localPlayerIndex: 0, players: [owner] });
+    const presenter = new EventPresenter(makeHost([owner]));
+    await presenter.present(
+      [{ type: 'pirateDeal', unitId: 'pirate-1', q: 0, r: 0, playerIndex: 0 }],
+      new Set(),
+    );
+    expect(useGameStore.getState().centerMessage).toBe('Deal with the pirates — they will not attack your tribe anymore!');
+  });
+
+  it('reports when a pirate deal is broken by an attack', async () => {
+    const owner = player(0, Tribe.Cats);
+    useGameStore.setState({ localPlayerIndex: 0, players: [owner] });
+    const presenter = new EventPresenter(makeHost([owner]));
+    await presenter.present(
+      [{ type: 'pirateDealCanceled', unitId: 'pirate-1', q: 0, r: 0, playerIndex: 0 }],
+      new Set(),
+    );
+    expect(useGameStore.getState().centerMessage).toBe('The deal with the pirates is broken!');
+  });
 });

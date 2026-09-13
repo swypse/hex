@@ -33,6 +33,7 @@ describe('predictable command types', () => {
       'buildRoad',
       'buildWall',
       'capture',
+      'deal',
       'disband',
       'heal',
       'move',

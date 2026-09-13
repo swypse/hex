@@ -282,6 +282,18 @@ export class EventPresenter {
             }
             break;
           }
+          case 'pirateDeal': {
+            if (e.playerIndex === useGameStore.getState().localPlayerIndex) {
+              useGameStore.getState().setCenterMessage(t('msg.pirateDeal'));
+            }
+            break;
+          }
+          case 'pirateDealCanceled': {
+            if (e.playerIndex === useGameStore.getState().localPlayerIndex) {
+              useGameStore.getState().setCenterMessage(t('msg.pirateDealCanceled'));
+            }
+            break;
+          }
           case 'achievementUnlocked': {
             if (e.playerIndex === useGameStore.getState().localPlayerIndex) {
               useGameStore.getState().setCenterMessage(

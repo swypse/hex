@@ -16,7 +16,7 @@ import { awardScore, awardTempleScores, CAPTURE_SCORE, COMBO_SCORE, EMPTY_STATS,
 import { hasSkill, openSkill as applySkill, randomUnopenedSkill, SkillId } from './skills';
 import { evaluateAchievements, awardAchievementScores, currentlyMetIds, type AchievementId } from './achievements';
 import { gainShipAbility, revertShip, upgradeShip } from './ship';
-import { moveRange, canAttack, canDisband, canHeal, canMove, disbandCost, healUnit, makeUnit, unitMaintenance, PIRATE_OWNER, UNIT_TYPES, Unit, UnitType, UNIT_MOVEMENT } from './units';
+import { moveRange, canAttack, canDisband, canHeal, canMove, disbandCost, hasPirateDeal, healUnit, makeUnit, unitMaintenance, PIRATE_DEAL_COST, PIRATE_OWNER, UNIT_TYPES, Unit, UnitType, UNIT_MOVEMENT } from './units';
 import { reachableTargets, moveUnit, pathBetween, tileAt } from './selection';
 import { spawnUnit } from './spawn';
 import { exploreUnitPath } from './explore';
@@ -41,6 +41,7 @@ export type Command =
   | { type: 'openSkill'; skill: SkillId }
   | { type: 'heal'; unitId: string }
   | { type: 'disband'; unitId: string }
+  | { type: 'deal'; unitId: string }
   | { type: 'shipLanding'; unitId: string; q: number; r: number }
   | { type: 'claimBonus' }
   | { type: 'getBottle' }
@@ -63,6 +64,7 @@ export const PREDICTABLE_COMMAND_TYPES: ReadonlySet<Command['type']> = new Set([
   'openSkill',
   'heal',
   'disband',
+  'deal',
   'shipLanding',
 ]);
 
@@ -185,6 +187,9 @@ export class Simulator {
         break;
       case 'disband':
         ok = this.doDisband(cmd.unitId);
+        break;
+      case 'deal':
+        ok = this.doDeal(cmd.unitId);
         break;
       case 'shipLanding':
         ok = this.doShipLanding(cmd.unitId, cmd.q, cmd.r);
@@ -326,6 +331,14 @@ export class Simulator {
     const targetPlayer = target.unit.owner >= 0 ? this.players[target.unit.owner] : null;
     const targetId = target.unit.id;
     const targetWasPirate = target.unit.type === 'pirate';
+    // Attacking a pirate you had a deal with breaks the deal: it is free to
+    // hunt your tribe again (and may retaliate now or next turn).
+    if (targetWasPirate && hasPirateDeal(target.unit, attacker.owner)) {
+      const remaining = target.unit.paidBy!.filter((i) => i !== attacker.owner);
+      if (remaining.length === 0) delete target.unit.paidBy;
+      else target.unit.paidBy = remaining;
+      this.emit({ type: 'pirateDealCanceled', unitId: target.unit.id, q: target.q, r: target.r, playerIndex: attacker.owner });
+    }
     const attackerTilePos = { q: attacker.q, r: attacker.r };
     const targetTilePos = { q: target.q, r: target.r };
     const attackerPre = { type: attacker.type, owner: attacker.owner, shipLevel: attacker.shipLevel, hp: attacker.hp };
@@ -543,6 +556,19 @@ export class Simulator {
     const r = tile.r;
     tile.unit = null;
     this.emit({ type: 'unitDisbanded', unitId, q, r, playerIndex: unit.owner });
+    return true;
+  }
+
+  private doDeal(unitId: string): boolean {
+    const unit = this.findUnit(unitId);
+    if (!unit || unit.type !== 'pirate') return false;
+    const player = this.currentPlayer;
+    if (hasPirateDeal(unit, player.index)) return false;
+    const cost = { wood: 0, stone: 0, money: PIRATE_DEAL_COST, ore: 0 };
+    if (!canAfford(player.resources, cost)) return false;
+    player.resources = pay(player.resources, cost);
+    (unit.paidBy ??= []).push(player.index);
+    this.emit({ type: 'pirateDeal', unitId: unit.id, q: unit.q, r: unit.r, playerIndex: player.index });
     return true;
   }
 
@@ -951,6 +977,7 @@ export class Simulator {
     let bestDist = Infinity;
     for (const t of this.map.tiles) {
       if (!t.unit || t.unit.owner < 0) continue;
+      if (hasPirateDeal(unit, t.unit.owner)) continue;
       const d = hexDistance(unit, t);
       if (d < bestDist) {
         bestDist = d;
