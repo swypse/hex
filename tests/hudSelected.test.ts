@@ -8,6 +8,7 @@ import { makeTestMap, tileAt, makeUnit } from './helpers/testMap';
 import { buildPlayers } from '../src/game/players';
 import { Tribe } from '../src/game/tribes';
 import { SeededRandom } from '../src/util/random';
+import { type BonusKind } from '../src/game/bonus';
 import { Simulator } from '../src/game/simulator';
 import { TileType } from '../src/game/tileTypes';
 import { hexNeighbors } from '../src/game/hex';
@@ -478,6 +479,89 @@ describe('HudSelected pirate deal info', () => {
     expect(all).toContain('Villagers');
     expect(all).toContain('Cats');
     expect(all).not.toContain('Pirate: no deal');
+  });
+});
+
+describe('HudSelected bonus info', () => {
+  let hud: HudSelected;
+  const originalSim = (gameController as unknown as { sim: unknown }).sim;
+
+  const texts = (): string[] => {
+    const el = (hud as unknown as { el: Container }).el!;
+    const out: string[] = [];
+    const walk = (c: Container): void => {
+      for (const ch of c.children) {
+        if (ch instanceof Text) out.push((ch as Text).text);
+        if (ch instanceof Container) walk(ch as Container);
+      }
+    };
+    walk(el);
+    return out;
+  };
+
+  const boot = (kind: BonusKind): void => {
+    Object.defineProperty(Text.prototype, 'width', { configurable: true, get: () => 60 });
+    Object.defineProperty(Text.prototype, 'height', { configurable: true, get: () => 14 });
+    (globalThis as { CanvasRenderingContext2D?: unknown }).CanvasRenderingContext2D = class {};
+    (globalThis as { document?: unknown }).document = {
+      createElement: () => ({ getContext: () => fakeCanvasContext(), width: 0, height: 0 }),
+    };
+    const map = makeTestMap(2);
+    const tile = tileAt(map, 0, 0)!;
+    tile.bonus = { kind, claimer: null, arrivalTurn: 0 };
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    (gameController as unknown as { sim: Simulator | null }).sim = sim;
+    useGameStore.setState({
+      screen: 'game',
+      players,
+      localPlayerIndex: 0,
+      selection: { kind: 'terrain', q: 0, r: 0 },
+      tutorial: false,
+      tutorialStep: null,
+    });
+    hud = new HudSelected();
+    hud.mount(makeHost(), new Container());
+  };
+
+  afterEach(() => {
+    hud?.destroy();
+    (gameController as unknown as { sim: unknown }).sim = originalSim;
+  });
+
+  it('describes a money bonus', () => {
+    boot('money');
+    expect(texts().join('\n')).toContain('A stash of 15 money');
+  });
+
+  it('describes an explorer bonus', () => {
+    boot('explorer');
+    expect(texts().join('\n')).toContain('An explorer scouts and reveals new lands');
+  });
+
+  it('describes a skill bonus', () => {
+    boot('skill');
+    expect(texts().join('\n')).toContain('Reveals a random skill scroll');
+  });
+
+  it('does not describe a bonus on a plain tile', () => {
+    boot('money');
+    const map = makeTestMap(2);
+    tileAt(map, 0, 0)!.bonus = null;
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    (gameController as unknown as { sim: Simulator | null }).sim = sim;
+    useGameStore.setState({
+      screen: 'game',
+      players,
+      localPlayerIndex: 0,
+      selection: { kind: 'terrain', q: 0, r: 0 },
+      tutorial: false,
+      tutorialStep: null,
+    });
+    hud = new HudSelected();
+    hud.mount(makeHost(), new Container());
+    expect(texts().join('\n')).not.toContain('A stash of 15 money');
   });
 });
 

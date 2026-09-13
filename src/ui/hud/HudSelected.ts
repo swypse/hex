@@ -186,6 +186,11 @@ export class HudSelected implements Widget {
       }
     }
 
+    if (tile.bonus) {
+      lines.push(t(`hud.selected.bonus.${tile.bonus.kind}`));
+      bolds.push(false);
+    }
+
     const actions = this.suggestedSkillActions(tile, human);
 
     const highlightBuildingsLine = s.tutorial && s.tutorialStep === 'upgradeVillage3';
