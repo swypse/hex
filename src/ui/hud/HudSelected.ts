@@ -23,6 +23,7 @@ import type { GameMap, MapTile } from '../../game/mapGen';
 import { useGameStore } from '../../store/gameStore';
 import { type UIHost, type Widget } from '../host';
 import { makeLabel } from '../kit/label';
+import { makeIcon } from '../kit/icon';
 import { ICONS16_FILES, icons16FrameForIconPath, makeIcon16 } from '../kit/icons16';
 import { makeSkillMedallion } from '../kit/skillMedallion';
 import { makePanel } from '../kit/panel';
@@ -94,6 +95,7 @@ export class HudSelected implements Widget {
     let buildingLimitLineIndex = -1;
     let bridgeLineIndex = -1;
     let unitRow: { name: string; pairs: { icon: string; value: string }[] } | null = null;
+    let settlementRow: { name: string; pairs: { icon: string; value: string }[] } | null = null;
 
     if (hasBridge(tile)) {
       bridgeLineIndex = lines.length;
@@ -135,12 +137,16 @@ export class HudSelected implements Widget {
     if (tile.settlement) {
       const settlement = tile.settlement;
       settlementLineIndex = lines.length;
-      lines.push(t('hud.selected.settlement', { name: settlement.name ?? t('hud.selected.settlementDefault'), level: settlement.level, units: unitsInVillage(map, tile), cap: villageCapacity(settlement.level) }));
+      // The village line carries the income as an icon + value pair, like the
+      // unit characteristics row.
+      settlementRow = {
+        name: t('hud.selected.settlement', { name: settlement.name ?? t('hud.selected.settlementDefault'), level: settlement.level, units: unitsInVillage(map, tile), cap: villageCapacity(settlement.level) }),
+        pairs: settlement.owner !== null
+          ? [{ icon: 'gold-32', value: String(villageIncome(map, tile)) }]
+          : [],
+      };
+      lines.push('');
       bolds.push(true);
-      if (settlement.owner !== null) {
-        lines.push(t('hud.selected.income', { income: villageIncome(map, tile) }));
-        bolds.push(false);
-      }
       if (settlement.owner === human.index && isVillageRoadConnected(map, tile)) {
         lines.push(t('hud.selected.connectedBonus', { bonus: VILLAGE_CONNECTION_BONUS }));
         bolds.push(false);
@@ -183,23 +189,27 @@ export class HudSelected implements Widget {
     let y = 8;
     const lineWidths: number[] = [];
     for (let i = 0; i < lines.length; i++) {
-      if (i === unitLineIndex && unitRow) {
+      const iconRow = (i === unitLineIndex && unitRow) || (i === settlementLineIndex && settlementRow);
+      if (iconRow) {
+        const row = (i === unitLineIndex ? unitRow : settlementRow)!;
         const fill = darkText ? 0x111111 : 0xeeeeee;
-        const title = makeLabel(unitRow.name, { fontSize: 13, fill, fontWeight: '700' });
+        const title = makeLabel(row.name, { fontSize: 13, fill, fontWeight: '700' });
         title.position.set(10, y);
-        const row = new Container();
-        row.addChild(title);
+        const r = new Container();
+        r.addChild(title);
         let x = 10 + title.width + 7;
-        for (const pair of unitRow.pairs) {
-          const icon = makeIcon16(icons16FrameForIconPath(pair.icon), 16);
+        for (const pair of row.pairs) {
+          const icon = pair.icon.startsWith('16/')
+            ? makeIcon16(icons16FrameForIconPath(pair.icon), 16)
+            : makeIcon(pair.icon, 16);
           icon.anchor.set(0, 0);
           icon.position.set(x, y + (lineH - 16) / 2);
           const value = makeLabel(pair.value, { fontSize: 13, fill });
           value.position.set(x + 19, y);
-          row.addChild(icon, value);
+          r.addChild(icon, value);
           x += 19 + value.width + 7;
         }
-        this.el.addChild(row);
+        this.el.addChild(r);
         const contentW = x - 17;
         lineWidths[i] = contentW;
         maxW = Math.max(maxW, contentW);

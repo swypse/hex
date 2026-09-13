@@ -330,7 +330,6 @@ export default {
   'hud.buff.forestProtection': '+{n} DEF — forest protection',
   'hud.buff.waterProtection': '+{n} DEF — water protection',
   'hud.selected.settlement': '{name} (lvl {level}): {units}/{cap}',
-  'hud.selected.income': 'Income: {income} money',
   'hud.selected.connectedBonus': 'Connected: +{bonus} income',
   'hud.selected.buildings': 'Buildings: {count}/{limit}',
   'hud.selected.pirateDeal': 'Pirate: no deal',

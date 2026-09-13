@@ -173,12 +173,13 @@ describe('HudSelected village building constraints', () => {
     expect(all).not.toContain('UPKEEP');
   });
 
-  it('renders 4 stat icons inline on the selected unit line', () => {
+  it('renders 4 stat icons inline on the selected unit line plus the income icon', () => {
     mount(1, 1, 0, { unitOnVillage: true });
     const widths = findSprites((hud as unknown as { el: Container }).el!)
       .map((s) => s.width)
       .filter((w) => w === 16);
-    expect(widths).toEqual([16, 16, 16, 16]);
+    // 4 unit stats + the gold village income icon on the settlement line.
+    expect(widths).toEqual([16, 16, 16, 16, 16]);
   });
 
   it('draws a button-style drop shadow behind the info panel', () => {
@@ -383,17 +384,24 @@ describe('HudSelected connected village income bonus', () => {
     (gameController as unknown as { sim: unknown }).sim = originalSim;
   });
 
-  it('adds a +1 income bonus line when the village is connected to another own village', () => {
+  it('shows income as a gold icon + number on the village line when connected', () => {
     boot(true);
     const all = texts().join('\n');
-    expect(all).toContain('Income: 6 money');
+    // The income now lives on the village line as an icon + value pair.
+    expect(all).not.toContain('Income:');
+    expect(texts()).toContain('6');
     expect(all).toContain('Connected: +1 income');
+    const width16 = findSprites((hud as unknown as { el: Container }).el!)
+      .map((s) => s.width)
+      .filter((w) => w === 16);
+    expect(width16).not.toHaveLength(0);
   });
 
-  it('omits the bonus line when the village is not connected', () => {
+  it('omits the bonus line and shows base income on the village line when not connected', () => {
     boot(false);
     const all = texts().join('\n');
-    expect(all).toContain('Income: 5 money');
+    expect(all).not.toContain('Income:');
+    expect(texts()).toContain('5');
     expect(all).not.toContain('Connected');
   });
 });
