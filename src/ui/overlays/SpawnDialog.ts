@@ -8,12 +8,8 @@ import { useGameStore } from '../../store/gameStore';
 import { type UIHost } from '../host';
 import { Button } from '../kit/button';
 import { makeActionButtonIcon } from '../kit/actionButtonIcons';
-import { makeIcon } from '../kit/icon';
 import { makeLabel } from '../kit/label';
 import { Popup } from '../kit/popup';
-
-/** Old separate-image icon for the archer (no packed action icon exists for it). */
-const ARCHER_ICON = 'arch.png';
 
 const CELL_W = 92;
 const CELL_H = 112;
@@ -94,9 +90,7 @@ export class SpawnDialog {
       circle.circle(CELL_W / 2, 30, 30).fill(0x333333).stroke({ width: 2, color: 0x888888 });
       item.addChild(circle);
 
-      const icon = type === 'archer'
-        ? makeIcon(ARCHER_ICON, 56)
-        : makeActionButtonIcon(`action-spawn-${type}`, 56);
+      const icon = makeActionButtonIcon(`action-spawn-${type}`, 56);
       icon.position.set(CELL_W / 2, 30);
       item.addChild(icon);
 

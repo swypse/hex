@@ -96,8 +96,9 @@ describe('SpawnDialog', () => {
     dialog.mount(host, root);
 
     const urls = FakeImage.instances.map((i) => i.src);
-    // The per-unit spawn icons come from the single atlas, not separate files.
-    for (const old of ['fist.png', 'horse.png', 'sword.png', 'shield.png', 'catapult.png', 'knight.png']) {
+    // All unit spawn icons (archer included) come from the single atlas,
+    // never from separate files.
+    for (const old of ['fist.png', 'horse.png', 'sword.png', 'shield.png', 'catapult.png', 'knight.png', 'arch.png']) {
       expect(urls.some((u) => u.endsWith(old))).toBe(false);
     }
     expect(urls.some((u) => u.endsWith('action-buttons-atlas.png'))).toBe(true);
