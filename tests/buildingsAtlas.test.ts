@@ -2,6 +2,7 @@ import { beforeEach, describe, it, expect, afterEach, vi } from 'vitest';
 import { Texture, type Container } from 'pixi.js';
 import { BUILDINGS_ATLAS_FRAMES, BUILDINGS_ATLAS_CELL_W, BUILDINGS_ATLAS_CELL_H } from '../src/game/buildingsAtlasData.gen';
 import { BUILDING_TILE_FILES } from '../src/render/buildingsAtlas';
+import { BUILDINGS_ORDER } from '../tools/packBuildings.mjs';
 
 class FakeImage {
   src = '';
@@ -37,6 +38,10 @@ describe('buildings atlas loader', () => {
     for (const file of BUILDING_TILE_FILES) {
       expect(BUILDINGS_ATLAS_FRAMES[file]).not.toBeUndefined();
     }
+  });
+
+  it('BUILDING_TILE_FILES covers exactly the tiles in the buildings asset dir', () => {
+    expect([...BUILDING_TILE_FILES].sort()).toEqual([...BUILDINGS_ORDER].sort());
   });
 
   it('loads the single packed buildings atlas image', async () => {

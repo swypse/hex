@@ -452,7 +452,7 @@ export async function createTextures(app: Application, map: GameMap, hexSize = 4
   const captureTexture = await loadImageTexture(TEXTURE_BASE + CAPTURE_IMAGE_FILE);
   const arrowTexture = await loadImageTexture(TEXTURE_BASE + 'arrow.png');
   const cannonballTexture = await loadImageTexture(TEXTURE_BASE + 'cannonball.png');
-  const wallImg = await loadImageTexture(TEXTURE_BASE + 'wall.png');
+  const wallImg = buildingTileTexture('wall');
   // Bake the wall at the same hex image-scale as villages/units so its on-map
   // footprint always matches the tile, regardless of the camera quality factor.
   const wallTexture = wallImg ? makeUnitImageTexture(app, wallImg, hexSize) : null;

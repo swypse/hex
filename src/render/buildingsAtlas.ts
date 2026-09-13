@@ -26,6 +26,7 @@ export const BUILDING_TILE_FILES: string[] = [
   'forest-temple-3',
   'forest-temple-4',
   'village-empty',
+  'wall',
 ];
 
 let atlasTexture: Texture | null = null;

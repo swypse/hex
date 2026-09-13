@@ -22,8 +22,9 @@ export const BUILDINGS_ATLAS_FRAMES: Record<string, { x: number; y: number; w: n
   'port-w': { x: 256, y: 896, w: 256, h: 448 },
   'sawmill': { x: 512, y: 896, w: 256, h: 448 },
   'village-empty': { x: 768, y: 896, w: 256, h: 448 },
-  'water-temple-1': { x: 1024, y: 896, w: 256, h: 448 },
-  'water-temple-2': { x: 1280, y: 896, w: 256, h: 448 },
-  'water-temple-3': { x: 0, y: 1344, w: 256, h: 448 },
-  'water-temple-4': { x: 256, y: 1344, w: 256, h: 448 },
+  'wall': { x: 1024, y: 896, w: 256, h: 448 },
+  'water-temple-1': { x: 1280, y: 896, w: 256, h: 448 },
+  'water-temple-2': { x: 0, y: 1344, w: 256, h: 448 },
+  'water-temple-3': { x: 256, y: 1344, w: 256, h: 448 },
+  'water-temple-4': { x: 512, y: 1344, w: 256, h: 448 },
 };
