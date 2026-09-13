@@ -29,4 +29,17 @@ describe('makeIcon', () => {
     const load = FakeImage.instances[0]!.onload!;
     expect(() => load.call(FakeImage.instances[0]!)).not.toThrow();
   });
+
+  it('renders tribe icons from the packed atlas instead of separate files', () => {
+    const sprite = makeIcon('cats-icon.png', 32);
+    expect(FakeImage.instances).toHaveLength(1);
+    expect(FakeImage.instances[0]!.src.endsWith('textures/tribe-icons-atlas.png')).toBe(true);
+    expect(FakeImage.instances[0]!.src.endsWith('cats-icon.png')).toBe(false);
+  });
+
+  it('still loads non-tribe icons as individual files', () => {
+    const sprite = makeIcon('bottle.png', 32);
+    expect(FakeImage.instances).toHaveLength(1);
+    expect(FakeImage.instances[0]!.src.endsWith('textures/bottle.png')).toBe(true);
+  });
 });

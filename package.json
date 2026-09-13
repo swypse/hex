@@ -15,6 +15,7 @@
     "pack:terrain": "node tools/packTerrain.mjs",
     "pack:buildings": "node tools/packBuildings.mjs",
     "pack:tribes": "node tools/packTribes.mjs",
+    "pack:tribe-icons": "node tools/packTribeIcons.mjs",
     "pack:icons-16": "node tools/packIcons16.mjs",
     "relay": "node server/relay.mjs"
   },

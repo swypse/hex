@@ -333,11 +333,9 @@ describe('LobbyScreen host tribe icons use tribe codes', () => {
     (globalThis as { Image?: unknown }).Image = originalImage;
   });
 
-  it('requests the code-based icon files for all tribes', () => {
+  it('loads tribe icons from the packed atlas, never the old per-tribe files', () => {
     const srcs = FakeImage.instances.map((i) => i.src);
-    expect(srcs.some((s) => s.includes('cats-icon.png'))).toBe(true);
-    expect(srcs.some((s) => s.includes('forest-icon.png'))).toBe(true);
-    expect(srcs.some((s) => s.includes('aqua-icon.png'))).toBe(true);
+    expect(srcs.some((s) => s.endsWith('-icon.png'))).toBe(false);
   });
 });
 
