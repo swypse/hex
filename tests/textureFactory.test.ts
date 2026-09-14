@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { TileType } from '../src/game/tileTypes';
 import { MapTile } from '../src/game/mapGen';
 import { tileElevation } from '../src/render/elevation';
+import { coastWaterBrightness } from '../src/render/textureFactory';
 
 function tile(terrain: TileType, height: number): MapTile {
   return {
@@ -40,5 +41,29 @@ describe('tileElevation', () => {
 
   it('treats a missing height as 0', () => {
     expect(tileElevation(tile(TileType.GrasslandLand, 0), 40)).toBe(0);
+  });
+});
+
+describe('coastWaterBrightness', () => {
+  const water = { terrain: TileType.Water as TileType, q: 0, r: 0 };
+  const land = { terrain: TileType.GrasslandLand as TileType, q: 1, r: 0 };
+  const map = new Map([
+    ['0,0', water],
+    ['1,0', land],
+    ['0,1', water],
+  ]);
+  const find = (q: number, r: number): MapTile | undefined => map.get(`${q},${r}`) as MapTile | undefined;
+
+  it('brightens water adjacent to land', () => {
+    expect(coastWaterBrightness(water, find)).toBe(1.12);
+  });
+
+  it('keeps open water (no land neighbor) at factor 1', () => {
+    const open: typeof water = { terrain: TileType.Water, q: 0, r: 2 };
+    expect(coastWaterBrightness(open, find)).toBe(1);
+  });
+
+  it('keeps land tiles at factor 1', () => {
+    expect(coastWaterBrightness(land, find)).toBe(1);
   });
 });

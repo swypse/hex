@@ -1,6 +1,6 @@
-import { Application, Container, FillGradient, Graphics, Sprite, Texture } from 'pixi.js';
-import { axialKey, HEX_TILT } from '../game/hex';
-import { GameMap, type BridgeDir } from '../game/mapGen';
+import { Application, ColorMatrixFilter, Container, FillGradient, Graphics, Sprite, Texture } from 'pixi.js';
+import { axialKey, HEX_TILT, hexNeighbors } from '../game/hex';
+import { GameMap, type BridgeDir, type MapTile } from '../game/mapGen';
 import { isWaterType, TileType, TILE_TYPE_COLORS } from '../game/tileTypes';
 import { TRIBES, Tribe } from '../game/tribes';
 import { UnitType, UNIT_IMAGE_FILES, UNIT_TYPES } from '../game/units';
@@ -113,13 +113,31 @@ function hexagonPoints(size: number): number[] {
   return points;
 }
 
+/** Brightness factor for coast-adjacent water tiles (subtle shallow tint). */
+const COAST_WATER_BRIGHTNESS = 1.12;
+
+/** Brightness factor for a tile's baked texture: coast water is lighter, every
+ *  other tile keeps its natural colour (factor 1). `findNeighbor` resolves an
+ *  axial coordinate to its tile, or `undefined` for off-map coords. */
+export function coastWaterBrightness(
+  tile: { terrain: TileType; q: number; r: number },
+  findNeighbor: (q: number, r: number) => { terrain: TileType } | undefined,
+): number {
+  if (!isWaterType(tile.terrain)) return 1;
+  for (const n of hexNeighbors(tile)) {
+    const nbr = findNeighbor(n.q, n.r);
+    if (nbr && !isWaterType(nbr.terrain)) return COAST_WATER_BRIGHTNESS;
+  }
+  return 1;
+}
+
 function composeHexTexture(
   app: Application,
   hexSize: number,
   height: number,
   image: Texture | null,
   fill: number,
-  opts: { walls: boolean; anchor: 'base' | 'topface'; sideColors?: { left: number; right: number } },
+  opts: { walls: boolean; anchor: 'base' | 'topface'; sideColors?: { left: number; right: number }; brightness?: number },
 ): TileTexture {
   const container = new Container();
   const g = new Graphics();
@@ -163,6 +181,11 @@ function composeHexTexture(
     sprite.scale.set((Math.sqrt(3) * hexSize) / IMAGE_HEX_W);
     sprite.position.set(0, 0);
     container.addChild(sprite);
+  }
+  if (opts.brightness && opts.brightness !== 1) {
+    const filter = new ColorMatrixFilter();
+    filter.brightness(opts.brightness, false);
+    container.filters = [filter];
   }
   // Generate at resolution 1: the renderer resolution is the devicePixelRatio,
   // and qualityFactor already bakes the zoom/dpr supersampling into hexSize.
@@ -329,15 +352,20 @@ export async function createTextures(
     img: Texture | null,
     fill: number,
     anchor: 'base' | 'topface',
-    sideColors?: { left: number; right: number },
+    opts?: {
+      sideColors?: { left: number; right: number };
+      brightness?: number;
+    },
   ): TileTexture => {
-    const cacheKey = `${layer}|${terrain}|${heightPx}|${anchor}`;
+    const brightness = opts?.brightness ?? 1;
+    const cacheKey = `${layer}|${terrain}|${heightPx}|${anchor}|${brightness}`;
     const cached = textureCache.get(cacheKey);
     if (cached) return cached;
     const tex = composeHexTexture(app, hexSize, heightPx, img, fill, {
       walls: anchor === 'base',
       anchor,
-      sideColors,
+      sideColors: opts?.sideColors,
+      brightness,
     });
     textureCache.set(cacheKey, tex);
     return tex;
@@ -346,15 +374,21 @@ export async function createTextures(
   for (const tile of map.tiles) {
     maxHeightPx = Math.max(maxHeightPx, tileElevation(tile, hexSize));
   }
+  const tileByKey = new Map(map.tiles.map((t) => [axialKey(t), t]));
+  const findNeighbor = (q: number, r: number): MapTile | undefined => tileByKey.get(axialKey({ q, r }));
   for (const tile of map.tiles) {
     const fill = TILE_TYPE_COLORS[tile.terrain];
     const bottom = isWaterType(tile.terrain) ? shadeColor(fill, 0.7) : fill;
     const heightPx = tileElevation(tile, hexSize);
     const key = axialKey(tile);
     const img = images.get(String(tile.terrain)) ?? null;
+    const brightness = coastWaterBrightness(tile, findNeighbor);
     tileTextures.set(
       key,
-      getTileTexture('tile', tile.terrain, heightPx, img, bottom, 'base', TERRAIN_SIDE_COLORS[tile.terrain]),
+      getTileTexture('tile', tile.terrain, heightPx, img, bottom, 'base', {
+        sideColors: TERRAIN_SIDE_COLORS[tile.terrain],
+        brightness,
+      }),
     );
     fogTextures.set(
       key,
@@ -365,7 +399,7 @@ export async function createTextures(
         fogImage,
         0x7a7a7a,
         'base',
-        { left: FOG_LEFT_WALL, right: FOG_RIGHT_WALL },
+        { sideColors: { left: FOG_LEFT_WALL, right: FOG_RIGHT_WALL } },
       ),
     );
   }
