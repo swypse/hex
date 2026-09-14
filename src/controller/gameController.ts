@@ -13,7 +13,7 @@ import { hasSkill, SKILLS, SkillId } from '../game/skills';
 import { attackableTargets } from '../game/combat';
 import { moveRange, canMove, canAttack, canDisband, makeUnit, PIRATE_OWNER, type Unit, type UnitType } from '../game/units';
 import { cycleSelection, reachableTargets, tileAt } from '../game/selection';
-import { type GameMode } from '../game/gameMode';
+import { shouldPromptWatch, type GameMode } from '../game/gameMode';
 import { isExploredFor, initialExplorationFor } from '../game/explore';
 import { exploreVillageSights } from '../game/village';
 import { RESOURCE_CHEAT_AMOUNT } from '../game/cheats';
@@ -21,7 +21,7 @@ import { TRIBES, Tribe } from '../game/tribes';
 import { MapView, type OverlayItem } from '../render/mapRenderer';
 import { pickTileAt } from '../render/tilePick';
 import { createTextures } from '../render/textureFactory';
-import { useGameStore } from '../store/gameStore';
+import { useGameStore, confirmLeaveGame } from '../store/gameStore';
 import { TOOLBAR_HEIGHT, isWideScreen } from '../ui/layout';
 import { saveRepository } from '../storage/saveGame';
 import { sfx } from '../sound/sfx';
@@ -44,6 +44,7 @@ import {
 
 const HEX_SIZE = 40;
 const VILLAGE_START_OFFSET = 200;
+const SPECTATE_ROUND_DELAY_MS = 500;
 
 class GameController {
   private app: Application | null = null;
@@ -65,6 +66,7 @@ class GameController {
   private camera: CameraController | null = null;
   private events: EventPresenter | null = null;
   private tutorial: TutorialDirector | null = null;
+  private watchingLoopRunning = false;
 
   init(app: Application, root: Container, edgeLayerTarget: Container | null = null): void {
     if (this.mapRoot) return;
@@ -323,6 +325,17 @@ class GameController {
       if (store.netMode === 'host') this.getNetwork().broadcastBatch(events);
       await this.presentEvents(events, preExplored);
       this.syncStore();
+      const storeNow = useGameStore.getState();
+      if (this.sim && shouldPromptWatch({
+        netMode: storeNow.netMode,
+        mode: storeNow.mode,
+        gameOver: storeNow.gameOver,
+        watching: storeNow.watching,
+        localActive: this.sim.players[storeNow.localPlayerIndex]?.isActive ?? true,
+        overlayKind: storeNow.overlay?.kind ?? null,
+      })) {
+        storeNow.setOverlay({ kind: 'watchingPrompt' });
+      }
       this.render();
       if (useGameStore.getState().tutorial && this.tutorial) {
         const changed = this.tutorial.afterCommand(events);
@@ -784,8 +797,16 @@ class GameController {
     if (!this.sim) return false;
     const store = useGameStore.getState();
     if (store.screen !== 'game' || store.netMode !== 'single') return false;
+    this.revealMapForLocal();
+    return true;
+  }
+
+  /** Reveal the whole map and every tribe for the local player. */
+  private revealMapForLocal(): void {
+    if (!this.sim) return;
+    const store = useGameStore.getState();
     const local = this.sim.players[store.localPlayerIndex];
-    if (!local) return false;
+    if (!local) return;
     for (const tile of this.sim.map.tiles) {
       if (!(tile.exploredBy ?? []).includes(store.localPlayerIndex)) (tile.exploredBy ??= []).push(store.localPlayerIndex);
     }
@@ -794,7 +815,6 @@ class GameController {
     this.syncStore();
     this.saveGame();
     this.render();
-    return true;
   }
 
   /** Distance from `tile` to the AI's nearest own unit, settlement or port. */
@@ -900,6 +920,40 @@ class GameController {
     if (store.aiActive || store.gameOver || store.paused) return;
     store.setAiActive(true);
     this.sendCommand({ type: 'endTurn' });
+  }
+
+  watchGame(): void {
+    const store = useGameStore.getState();
+    if (store.overlay?.kind === 'watchingPrompt') store.setOverlay(null);
+    this.revealMapForLocal();
+    store.setWatching(true);
+    void this.runWatchLoop();
+  }
+
+  finishGameNow(): void {
+    const store = useGameStore.getState();
+    if (store.overlay?.kind === 'watchingPrompt') store.setOverlay(null);
+    if (!this.sim) return;
+    this.sim.endNow();
+    this.syncStore();
+  }
+
+  exitWatching(): void {
+    useGameStore.getState().setWatching(false);
+    confirmLeaveGame();
+  }
+
+  private async runWatchLoop(): Promise<void> {
+    if (this.watchingLoopRunning) return;
+    this.watchingLoopRunning = true;
+    try {
+      while (useGameStore.getState().watching && this.sim && !this.sim.gameOver) {
+        await this.runCommand({ type: 'endTurn' });
+        await new Promise((resolve) => setTimeout(resolve, SPECTATE_ROUND_DELAY_MS));
+      }
+    } finally {
+      this.watchingLoopRunning = false;
+    }
   }
 
   hostGame(opts: { mode: GameMode; totalPlayers: number; aiCount: number; name: string; tribe: Tribe; mapSize?: MapSize }): string {
