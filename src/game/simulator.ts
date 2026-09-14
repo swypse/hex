@@ -781,6 +781,8 @@ export class Simulator {
         this.resetUnitFlags();
         this.evaluateAchievementsForAll();
         if (this.checkEndConditions()) return;
+        const hasActiveHuman = this.players.some((p) => p.isActive && p.isHuman);
+        if (!hasActiveHuman) return;
       }
       this.currentPlayerIndex = next;
       if (!this.players[next]!.isActive) continue;
@@ -1136,6 +1138,15 @@ export class Simulator {
       }
     }
     return false;
+  }
+
+  /** End the game immediately with the current-board winner (used when an
+   *  eliminated player chooses "Finish" instead of watching). */
+  endNow(): void {
+    if (this.gameOver) return;
+    awardTempleScores(this.map, this.players);
+    awardAchievementScores(this.players);
+    this.endGame(computeWinner(this.players, this.map));
   }
 
   private endGame(winnerIndex: number): void {

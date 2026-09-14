@@ -151,6 +151,38 @@ describe('Simulator turn engine', () => {
   });
 });
 
+describe('spectate turn advance', () => {
+  it('endTurn advances exactly one round when no active human remains', () => {
+    const map = makeTestMap(3);
+    villageFor(map, 0, 0, 0);
+    villageFor(map, 0, 2, 1);
+    villageFor(map, 1, 0, 2);
+    const players = buildPlayers(Tribe.Villagers, 2, new SeededRandom(1));
+    players[0]!.isActive = false; // human eliminated
+    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5, aiRng: () => new SeededRandom(2) });
+    sim.startGame();
+    sim.drainEvents();
+    const startTurn = sim.turn;
+    sim.applyCommand({ type: 'endTurn' });
+    expect(sim.turn).toBe(startTurn + 1);
+    expect(sim.currentPlayerIndex).not.toBe(0);
+  });
+
+  it('endNow ends the game with a computed winner', () => {
+    const map = makeTestMap(3);
+    villageFor(map, 0, 0, 0);
+    villageFor(map, 0, 2, 1);
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    players[1]!.score = 50;
+    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    sim.startGame();
+    sim.drainEvents();
+    sim.endNow();
+    expect(sim.gameOver).toBe(true);
+    expect(sim.winnerIndex).toBe(1);
+  });
+});
+
 describe('capture readiness', () => {
   it('grants capture on the turn after entering and resets when the unit leaves', () => {
     const map = makeTestMap(6);
