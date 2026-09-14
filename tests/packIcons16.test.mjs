@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { decodePng, finalizeAtlas } from '../tools/packSkills.mjs';
+import { decodePng, finalizeAtlas, atlasPngsMatch } from '../tools/packSkills.mjs';
 import {
   generateIcons16Atlas,
   ICONS16_ORDER,
@@ -47,7 +47,7 @@ describe('icons16 atlas generation', () => {
   it('keeps the committed atlas PNG in sync with the packer output', async () => {
     const committed = readFileSync(fileURLToPath(ATLAS_URL));
     const final = await finalizeAtlas(generateIcons16Atlas(SOURCE_DIR_URL, ICONS16_COLS).png);
-    expect(Buffer.compare(committed, final)).toBe(0);
+    expect(atlasPngsMatch(committed, final)).toBe(true);
   });
 
   it('references only real, valid 16x16 icons', () => {

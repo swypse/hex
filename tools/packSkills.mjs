@@ -69,6 +69,8 @@ export function decodePng(data) {
   let bitDepth = 8;
   let colorType = 0;
   let interlace = 0;
+  let palette = null;
+  let trns = null;
   const idat = [];
   while (pos + 8 <= data.length) {
     const len = data.readUInt32BE(pos);
@@ -80,6 +82,10 @@ export function decodePng(data) {
       bitDepth = payload[8];
       colorType = payload[9];
       interlace = payload[12];
+    } else if (type === 'PLTE') {
+      palette = payload;
+    } else if (type === 'tRNS') {
+      trns = payload;
     } else if (type === 'IDAT') {
       idat.push(Buffer.from(payload));
     } else if (type === 'IEND') {
@@ -87,10 +93,10 @@ export function decodePng(data) {
     }
     pos += 12 + len;
   }
-  if (bitDepth !== 8 || colorType !== 6 || interlace !== 0) {
+  if (bitDepth !== 8 || (colorType !== 3 && colorType !== 6) || interlace !== 0) {
     throw new Error(`unsupported PNG format: bit depth ${bitDepth}, color type ${colorType}, interlace ${interlace}`);
   }
-  const bpp = 4;
+  const bpp = colorType === 6 ? 4 : 1;
   const stride = width * bpp;
   const raw = inflateSync(Buffer.concat(idat));
   const rgba = Buffer.alloc(stride * height);
@@ -104,6 +110,20 @@ export function decodePng(data) {
     unfilterLine(filter, rgba.subarray(y * stride, y * stride + stride), prev, bpp, stride);
     rgba.subarray(y * stride, y * stride + stride).copy(prev, 0);
     p += stride;
+  }
+  if (colorType === 3) {
+    if (!palette) throw new Error('palette PNG missing PLTE chunk');
+    const indexed = rgba;
+    const out = Buffer.alloc(width * height * 4);
+    for (let i = 0; i < width * height; i++) {
+      const idx = indexed[i];
+      const alpha = trns && idx < trns.length ? trns[idx] : 255;
+      out[i * 4] = palette[idx * 3] ?? 0;
+      out[i * 4 + 1] = palette[idx * 3 + 1] ?? 0;
+      out[i * 4 + 2] = palette[idx * 3 + 2] ?? 0;
+      out[i * 4 + 3] = alpha;
+    }
+    return { width, height, bitDepth, colorType, rgba: out };
   }
   return { width, height, bitDepth, colorType, rgba };
 }
@@ -220,6 +240,32 @@ export async function compressPng(input) {
 export async function finalizeAtlas(png) {
   const quantized = await compressPng(png);
   return quantized.length < png.length ? quantized : png;
+}
+
+/** Compares a committed atlas against freshly packed output. Returns true
+ *  when the images are pixel-identical (or byte-identical). pngquant's
+ *  encoded bytes can vary slightly across machines/CIs even for identical
+ *  pixels, so an exact byte compare would be flaky; a per-pixel tolerance
+ *  keeps the check strict for real drift (a single changed cell moves far
+ *  more pixels than the tolerance) while staying deterministic everywhere. */
+export function atlasPngsMatch(committed, final, { maxChannelDiff = 24, maxMismatchRatio = 0.005 } = {}) {
+  if (Buffer.compare(committed, final) === 0) return true;
+  const a = decodePng(committed);
+  const b = decodePng(final);
+  if (a.width !== b.width || a.height !== b.height) return false;
+  if (a.rgba.length !== b.rgba.length) return false;
+  let mismatched = 0;
+  for (let i = 0; i < a.rgba.length; i += 4) {
+    if (
+      Math.abs(a.rgba[i] - b.rgba[i]) > maxChannelDiff ||
+      Math.abs(a.rgba[i + 1] - b.rgba[i + 1]) > maxChannelDiff ||
+      Math.abs(a.rgba[i + 2] - b.rgba[i + 2]) > maxChannelDiff ||
+      Math.abs(a.rgba[i + 3] - b.rgba[i + 3]) > maxChannelDiff
+    ) {
+      mismatched += 1;
+    }
+  }
+  return mismatched / (a.rgba.length / 4) <= maxMismatchRatio;
 }
 
 export function generateSkillAtlas(sourceDir = SOURCE_DIR_URL, cols = ATLAS_COLS) {

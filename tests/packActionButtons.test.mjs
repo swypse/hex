@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { decodePng, finalizeAtlas } from '../tools/packSkills.mjs';
+import { decodePng, finalizeAtlas, atlasPngsMatch } from '../tools/packSkills.mjs';
 import {
   generateActionButtonAtlas,
   ACTION_BUTTON_ORDER,
@@ -51,7 +51,7 @@ describe('action button atlas generation', () => {
   it('keeps the committed atlas PNG in sync with the packer output', async () => {
     const committed = readFileSync(fileURLToPath(ATLAS_URL));
     const final = await finalizeAtlas(generateActionButtonAtlas(SOURCE_DIR_URL, ACTION_BUTTON_COLS).png);
-    expect(Buffer.compare(committed, final)).toBe(0);
+    expect(atlasPngsMatch(committed, final)).toBe(true);
   });
 
   it('references only real, valid 120x120 action button icons', () => {

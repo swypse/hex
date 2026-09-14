@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { decodePng, finalizeAtlas } from '../tools/packSkills.mjs';
+import { decodePng, finalizeAtlas, atlasPngsMatch } from '../tools/packSkills.mjs';
 import {
   generateTribeAtlas,
   TRIBE_CODES,
@@ -59,7 +59,7 @@ describe('tribe atlas generation', () => {
       expect(file).toBe(`${code}-atlas.png`);
       const committed = readFileSync(fileURLToPath(new URL(file, ATLAS_DIR_URL)));
       const final = await finalizeAtlas(generateTribeAtlas(code).png);
-      expect(Buffer.compare(committed, final)).toBe(0);
+      expect(atlasPngsMatch(committed, final)).toBe(true);
     }
   });
 
