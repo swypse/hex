@@ -60,3 +60,23 @@ export function rankPlayers(players: Player[], map: GameMap): Player[] {
     return a.name.localeCompare(b.name);
   });
 }
+
+export interface WatchPromptCheck {
+  netMode: string;
+  mode: GameMode;
+  gameOver: boolean;
+  watching: boolean;
+  localActive: boolean;
+  overlayKind: string | null;
+}
+
+export function shouldPromptWatch(c: WatchPromptCheck): boolean {
+  return (
+    c.netMode === 'single' &&
+    c.mode === 'capture' &&
+    !c.gameOver &&
+    !c.watching &&
+    !c.localActive &&
+    c.overlayKind !== 'watchingPrompt'
+  );
+}

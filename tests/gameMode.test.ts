@@ -12,6 +12,7 @@ import {
   expectedTurnsFor,
   GAME_MODE_NAMES,
   rankPlayers,
+  shouldPromptWatch,
 } from '../src/game/gameMode';
 
 function tile(
@@ -128,5 +129,26 @@ describe('gameMode', () => {
     const c = player(2, { score: 50 });
     const ranked = rankPlayers([a, b, c], map);
     expect(ranked.map((p) => p.index)).toEqual([0, 1, 2]);
+  });
+});
+
+describe('shouldPromptWatch', () => {
+  const base = { netMode: 'single', mode: 'capture' as const, gameOver: false, watching: false, localActive: false, overlayKind: null };
+  it('prompts when the local player is eliminated in single capture', () => {
+    expect(shouldPromptWatch(base)).toBe(true);
+  });
+  it('does not prompt on a live player', () => {
+    expect(shouldPromptWatch({ ...base, localActive: true })).toBe(false);
+  });
+  it('does not prompt when game is over', () => {
+    expect(shouldPromptWatch({ ...base, gameOver: true })).toBe(false);
+  });
+  it('does not prompt in multiplayer or non-capture mode', () => {
+    expect(shouldPromptWatch({ ...base, netMode: 'host' })).toBe(false);
+    expect(shouldPromptWatch({ ...base, mode: 'turns30' })).toBe(false);
+  });
+  it('does not prompt while already watching or already prompted', () => {
+    expect(shouldPromptWatch({ ...base, watching: true })).toBe(false);
+    expect(shouldPromptWatch({ ...base, overlayKind: 'watchingPrompt' })).toBe(false);
   });
 });
