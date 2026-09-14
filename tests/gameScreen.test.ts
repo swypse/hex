@@ -33,6 +33,10 @@ describe('GameScreen lifecycle', () => {
   beforeEach(() => {
     Object.defineProperty(Text.prototype, 'width', { configurable: true, get: () => 40 });
     Object.defineProperty(Text.prototype, 'height', { configurable: true, get: () => 14 });
+    (globalThis as { CanvasRenderingContext2D?: unknown }).CanvasRenderingContext2D = class {};
+    (globalThis as { document?: unknown }).document = {
+      createElement: () => ({ getContext: () => ({ measureText: (s: string) => ({ width: s.length * 8, actualBoundingBoxLeft: 0, actualBoundingBoxRight: s.length * 8, actualBoundingBoxAscent: 12, actualBoundingBoxDescent: 3 }), width: 0, height: 0 }) }),
+    };
     useGameStore.setState({ screen: 'start', texturesLoading: false });
     gameController.shutdown();
   });
