@@ -57,6 +57,15 @@ describe('gameStore', () => {
     expect(useGameStore.getState().localPlayerIndex).toBe(2);
   });
 
+  it('toggles the watching flag', () => {
+    const s = useGameStore.getState();
+    expect(s.watching).toBe(false);
+    s.setWatching(true);
+    expect(useGameStore.getState().watching).toBe(true);
+    useGameStore.getState().setWatching(false);
+    expect(useGameStore.getState().watching).toBe(false);
+  });
+
   it('setMyPeerId updates myPeerId', () => {
     useGameStore.getState().setMyPeerId('guest-abc');
     expect(useGameStore.getState().myPeerId).toBe('guest-abc');

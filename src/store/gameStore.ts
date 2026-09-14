@@ -32,7 +32,8 @@ export type OverlayState =
   | { kind: 'buildingLimitHelp' }
   | { kind: 'bridgeHelp' }
   | { kind: 'shipLanding'; target: { q: number; r: number } }
-  | { kind: 'disband'; unitId: string };
+  | { kind: 'disband'; unitId: string }
+  | { kind: 'watchingPrompt' };
 
 export interface LobbyState {
   role: 'host' | 'client';
@@ -54,6 +55,7 @@ interface GameStore {
   mode: GameMode;
   gameOver: boolean;
   winnerIndex: number | null;
+  watching: boolean;
   expectedTurns: number;
   bonusAwarded: boolean;
   centerMessage: string | null;
@@ -88,6 +90,7 @@ interface GameStore {
   setMode: (mode: GameMode) => void;
   setGameOver: (over: boolean) => void;
   setWinnerIndex: (index: number | null) => void;
+  setWatching: (v: boolean) => void;
   setExpectedTurns: (turns: number) => void;
   setBonusAwarded: (awarded: boolean) => void;
   setCenterMessage: (message: string | null, iconFile?: string | null, chipStyle?: IconChipStyle | null) => void;
@@ -118,6 +121,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   mode: 'capture',
   gameOver: false,
   winnerIndex: null,
+  watching: false,
   expectedTurns: 0,
   bonusAwarded: false,
   centerMessage: null,
@@ -170,6 +174,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   setMode: (mode) => set({ mode }),
   setGameOver: (over) => set({ gameOver: over }),
   setWinnerIndex: (index) => set({ winnerIndex: index }),
+  setWatching: (watching) => set({ watching }),
   setExpectedTurns: (turns) => set({ expectedTurns: turns }),
   setBonusAwarded: (awarded) => set({ bonusAwarded: awarded }),
   setCenterMessage: (message, iconFile = null, chipStyle = null) =>
