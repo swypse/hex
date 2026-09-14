@@ -138,6 +138,8 @@ interface TileView {
   bonusSprite: Sprite | null;
   bottleSprite: Sprite | null;
   unitSprite: Sprite | null;
+  /** White silhouette glow shown behind the unit sprite while it is selected. */
+  glowSprite: Sprite | null;
   territory: Graphics;
   roadGraphics: Graphics | null;
   /** Interactive row of 8px tribe-colored dots, one per active pirate deal. */
@@ -161,6 +163,8 @@ export class MapView {
   private waterRouteNeighbors = new Map<string, string[]>();
   /** Port keys reachable over own water (per cluster of two or more ports). */
   private waterJumps = new Map<string, Set<string>>();
+  /** Tile whose `glowSprite` is currently visible (selection highlight). */
+  private glowKey = '';
   private exclamationBobs: Container[] = [];
   private exclamationAnimRemove: (() => void) | null = null;
   private bonusBobs: { sprite: Sprite; baseY: number }[] = [];
@@ -270,6 +274,7 @@ export class MapView {
     this.tileViews.clear();
     this.dealAnchors.clear();
     this.overlayItems.length = 0;
+    this.glowKey = '';
     this.map = null;
   }
 
@@ -413,6 +418,7 @@ export class MapView {
     this.startFireAnimation();
     this.startBottleAnimation();
     this.updateSelectedBounce(selection);
+    this.updateSelectedGlow(selection, hiddenUnitIds, localPlayerIndex, players);
   }
 
   setViewport(viewport: Viewport): void {
@@ -465,6 +471,7 @@ export class MapView {
         bonusSprite: null,
         bottleSprite: null,
         unitSprite: null,
+        glowSprite: null,
         territory,
         roadGraphics: null,
         dealCircles: null,
@@ -649,35 +656,41 @@ export class MapView {
     const tile = this.map.tiles.find((t) => t.unit?.id === unitId);
     if (!tile) return;
     const sprite = this.tileViews.get(axialKey(tile))?.unitSprite;
-    if (sprite) this.faceUnitSprite(sprite, facing);
+    if (sprite) {
+      this.faceUnitSprite(sprite, facing);
+      this.syncGlowSprite(axialKey(tile));
+    }
   }
 
   /** Flips the sprite currently drawn on a tile without changing the stored
    * facing (used to keep staged combat sprites oriented while they animate). */
   faceUnitAtKey(key: string, facing: 'left' | 'right'): void {
     const sprite = this.tileViews.get(key)?.unitSprite;
-    if (sprite) this.faceUnitSprite(sprite, facing);
+    if (sprite) {
+      this.faceUnitSprite(sprite, facing);
+      this.syncGlowSprite(key);
+    }
   }
 
   private drawRoad(tv: TileView, tile: MapTile, explored: boolean): void {
     const isPort = tile.building?.kind === 'port';
-    // A port is a road node just like a road hex: it connects to adjacent own
-    // roads up to the shared tile edge, the same way two adjacent roads meet.
-    const owner = isPort ? tile.ownedBy : tile.roadOwner;
+    // Ports are road nodes in the game logic (roads connect up to their tile
+    // edge), but the port cell itself never shows a road: no road strokes are
+    // drawn from its centre.
+    const owner = tile.roadOwner;
     const isBridge = tile.bridge !== undefined && tile.bridge !== null;
     const p = hexToPixel(tile, this.hexSize);
     const edgeMidY = (seg: { ay: number; by: number }): number =>
       (seg.ay + seg.by) / 2 - tileElevation(tile, this.hexSize);
 
     const orangeEdges: { x: number; y: number }[] = [];
-    if (owner !== undefined && owner !== null && !isBridge && explored) {
+    if (owner !== undefined && owner !== null && !isBridge && !isPort && explored) {
       for (let e = 0; e < 6; e++) {
         const n = this.tileIndex.get(axialKey(hexEdgeNeighbor(tile, e)));
-        const connected = isPort
-          ? n?.roadOwner === owner
-          : (n?.settlement && n.settlement.owner === owner) ||
-            n?.roadOwner === owner ||
-            (n?.building && n.building.kind === 'port' && n.ownedBy === owner);
+        const connected =
+          (n?.settlement && n.settlement.owner === owner) ||
+          n?.roadOwner === owner ||
+          (n?.building && n.building.kind === 'port' && n.ownedBy === owner);
         if (!connected) continue;
         const seg = hexEdge(tile, e, this.hexSize);
         orangeEdges.push({ x: (seg.ax + seg.bx) / 2, y: edgeMidY(seg) });
@@ -1028,6 +1041,7 @@ export class MapView {
         const t = Math.min(1, (performance.now() - start) / 160);
         const k = Math.sin(t * Math.PI);
         sprite.position.set(baseX + ox * k, baseY + oy * k);
+        this.syncGlowSprite(fromKey);
         if (t >= 1) {
           this.app.ticker.remove(fn);
           done();
@@ -1071,6 +1085,7 @@ export class MapView {
         }
         const t = Math.min(1, (performance.now() - start) / ms);
         sprite.position.set(startX + (b.x - startX) * t, startY + (toY - startY) * t);
+        this.syncGlowSprite(fromKey);
         if (t >= 1) {
           this.app.ticker.remove(fn);
           done();
@@ -1091,6 +1106,7 @@ export class MapView {
     this.bounceBaseY = sprite.position.y;
     const amp = this.hexSize * 0.15;
     const start = performance.now();
+    const key = axialKey({ q, r });
     const fn = (): void => {
       if (!this.bounceSprite || this.bounceSprite.destroyed) {
         this.stopBounce();
@@ -1098,6 +1114,7 @@ export class MapView {
       }
       const t = Math.min(1, (performance.now() - start) / 300);
       this.bounceSprite.position.y = this.bounceBaseY - Math.sin(t * Math.PI) * amp;
+      this.syncGlowSprite(key);
       if (t >= 1) this.stopBounce();
     };
     this.app.ticker.add(fn);
@@ -1161,6 +1178,90 @@ export class MapView {
     const sprites = this.hexSurfaceSprites(tv);
     if (sprites.length === 0) return;
     this.runHexBounce(sprites.map((sprite) => ({ sprite, baseY: sprite.position.y, delay: 0 })));
+  }
+
+  /** The selection glow: a steady white Sprite hugging a selected unit's
+   *  silhouette, kept just behind the unit sprite and hidden otherwise. */
+  private updateSelectedGlow(
+    selection: Selection | null,
+    hiddenUnitIds: Set<string>,
+    localPlayerIndex: number,
+    players: Player[],
+  ): void {
+    const key = selection ? axialKey(selection) : '';
+    if (key !== this.glowKey) {
+      this.hideGlow();
+      this.glowKey = key;
+    }
+    const tile = this.tileIndex.get(key);
+    const tv = this.tileViews.get(key);
+    const unit = tile?.unit ?? null;
+    const shown =
+      tv !== undefined &&
+      tile !== undefined &&
+      selection !== null &&
+      selection.kind === 'unit' &&
+      unit !== null &&
+      selection.q === tile.q &&
+      selection.r === tile.r &&
+      isExploredFor(tile, localPlayerIndex) &&
+      !hiddenUnitIds.has(unit.id);
+    const unitTileTex = shown ? this.unitTextureFor(tile, players) : null;
+    const glowTex = unitTileTex ? this.textures.glowFor.get(unitTileTex.texture) : undefined;
+    if (!tv || !glowTex) {
+      this.hideGlow();
+      return;
+    }
+    let glow = tv.glowSprite;
+    if (!glow || glow.destroyed) {
+      glow = new Sprite(glowTex.texture);
+      glow.anchor.set(0.5, glowTex.anchorY);
+      glow.zIndex = 6;
+      tv.el.addChild(glow);
+      tv.glowSprite = glow;
+    } else if (glow.texture !== glowTex.texture) {
+      glow.texture = glowTex.texture;
+      glow.anchor.set(0.5, glowTex.anchorY);
+    }
+    glow.visible = tv.unitSprite?.visible ?? true;
+    this.syncGlowSprite(key);
+  }
+
+  private hideGlow(): void {
+    const tv = this.glowKey ? this.tileViews.get(this.glowKey) : undefined;
+    if (tv?.glowSprite) {
+      tv.el.removeChild(tv.glowSprite);
+      tv.glowSprite.destroy();
+      tv.glowSprite = null;
+    }
+    this.glowKey = '';
+  }
+
+  /** Keeps a selected unit's glow sprite glued to the unit sprite while it is
+   *  animated (facing flips, bounces, slides and lunges). */
+  private syncGlowSprite(key: string): void {
+    const tv = this.tileViews.get(key);
+    const unit = tv?.unitSprite;
+    const glow = tv?.glowSprite;
+    if (!unit || !glow || unit.destroyed || glow.destroyed) return;
+    glow.position.set(unit.position.x, unit.position.y);
+    glow.scale.set(unit.scale.x, unit.scale.y);
+  }
+
+  /** The TileTexture currently decorating `tile`'s unit sprite, mirroring the
+   *  lookup in `applyTile`. */
+  private unitTextureFor(tile: MapTile, players: Player[]): TileTexture | null {
+    const unit = tile.unit;
+    if (!unit) return null;
+    if (unit.type === 'pirate') return this.textures.pirateTexture;
+    const tribe = players[unit.owner]?.tribe;
+    if (unit.shipLevel !== undefined && tribe !== undefined) {
+      return this.textures.shipTextures[tribe]?.[unit.shipLevel] ?? null;
+    }
+    if (tribe !== undefined) {
+      return this.textures.unitTextures[tribe]?.[unit.type] ?? null;
+    }
+    return null;
   }
 
   private runHexBounce(entries: { sprite: Sprite; baseY: number; delay: number }[]): void {
@@ -1339,6 +1440,7 @@ export class MapView {
       for (const b of this.shipBobs) {
         if (this.shipBusy.has(b.key) || b.sprite.destroyed) continue;
         b.sprite.position.y = b.baseY + offset;
+        this.syncGlowSprite(b.key);
       }
     };
     ticker.add(fn);

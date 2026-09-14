@@ -30,18 +30,18 @@ describe('map generation', () => {
     const normal = generateMap(2, 42);
     const big = generateMap(2, 42, 'big');
     const huge = generateMap(2, 42, 'huge');
-    expect(normal.radius).toBe(8);
-    expect(big.radius).toBe(15);
-    expect(huge.radius).toBe(22);
+    expect(normal.radius).toBe(9);
+    expect(big.radius).toBe(16);
+    expect(huge.radius).toBe(23);
     expect(big.tiles.length).toBeGreaterThan(normal.tiles.length * 3);
     expect(huge.tiles.length).toBeGreaterThan(big.tiles.length * 1.8);
-    expect(big.tiles).toHaveLength(allTiles(15).length);
-    expect(huge.tiles).toHaveLength(allTiles(22).length);
+    expect(big.tiles).toHaveLength(allTiles(16).length);
+    expect(huge.tiles).toHaveLength(allTiles(23).length);
   });
 
   it('generates the expected number of tiles', () => {
     const map = generateMap(2, 42);
-    expect(map.tiles).toHaveLength(allTiles(8).length);
+    expect(map.tiles).toHaveLength(allTiles(9).length);
   });
 
   it('keeps starting villages at least 2 tiles from the map edge', () => {
@@ -89,7 +89,8 @@ describe('map generation', () => {
       for (const n of tilesInRange(s, 1)) nearVillage.add(axialKey(n));
     }
     const wild = map.tiles.filter(
-      (t) => !nearVillage.has(axialKey(t)) && hexDistance({ q: 0, r: 0 }, t) < radius,
+      // Exclude the two water-border rings (the map has a 2-ring water border).
+      (t) => !nearVillage.has(axialKey(t)) && hexDistance({ q: 0, r: 0 }, t) < radius - 1,
     );
     expect(wild.length).toBeGreaterThan(0);
     const water = wild.filter((t) => t.terrain === TileType.Water).length / wild.length;

@@ -2,7 +2,7 @@ import { t } from '../../i18n';
 import { Circle, Container, Graphics, Text } from 'pixi.js';
 import { gameController } from '../../controller/gameController';
 import { TRIBES } from '../../game/tribes';
-import { isForestType, isMountainType, isWaterType, TILE_TYPE_COLORS, TILE_TYPE_NAMES } from '../../game/tileTypes';
+import { isForestType, isMountainType, isWaterType, TILE_TYPE_NAMES } from '../../game/tileTypes';
 import { UNIT_TYPE_NAMES, UNIT_TYPES, unitMaintenance, type Unit } from '../../game/units';
 import { unitCanAct } from '../../game/unitActions';
 import { tileAt } from '../../game/selection';
@@ -27,7 +27,7 @@ import { makeIcon } from '../kit/icon';
 import { ICONS16_FILES, icons16FrameForIconPath, makeIcon16 } from '../kit/icons16';
 import { makeSkillMedallion } from '../kit/skillMedallion';
 import { makePanel } from '../kit/panel';
-import { isLightColor } from '../kit/theme';
+import { THEME } from '../kit/theme';
 import { TOOLBAR_HEIGHT, TURN_BAR_HEIGHT } from '../layout';
 
 function unitDefenseBuffs(map: GameMap, unit: Unit, tile: MapTile): { key: string; amount: number }[] {
@@ -85,8 +85,6 @@ export class HudSelected implements Widget {
 
     this.el.removeChildren().forEach((c) => c.destroy({ children: true }));
 
-    const terrainColor = TILE_TYPE_COLORS[tile.terrain];
-    const darkText = isLightColor(terrainColor);
     const lines: string[] = [TILE_TYPE_NAMES[tile.terrain]];
     const bolds: boolean[] = [false];
     let unitLineIndex = -1;
@@ -203,7 +201,7 @@ export class HudSelected implements Widget {
       const iconRow = (i === unitLineIndex && unitRow) || (i === settlementLineIndex && settlementRow);
       if (iconRow) {
         const row = (i === unitLineIndex ? unitRow : settlementRow)!;
-        const fill = darkText ? 0x111111 : 0xeeeeee;
+        const fill = 0xeeeeee;
         const title = makeLabel(row.name, { fontSize: 13, fill, fontWeight: '700' });
         title.position.set(10, y);
         const r = new Container();
@@ -230,7 +228,7 @@ export class HudSelected implements Widget {
       const highlight = highlightBuildingsLine && i === buildingLimitLineIndex;
       const t = makeLabel(lines[i]!, {
         fontSize: 13,
-        fill: highlight ? 0xffd700 : darkText ? 0x111111 : 0xeeeeee,
+        fill: highlight ? 0xffd700 : 0xeeeeee,
         fontWeight: highlight || bolds[i]! ? '700' : undefined
       });
       t.position.set(10, y);
@@ -296,7 +294,7 @@ export class HudSelected implements Widget {
       rightRadiusOnly: true,
     });
     shadow.position.set(SHADOW_OFFSET, SHADOW_OFFSET);
-    const bg = makePanel(bgW, this.measured, { fill: terrainColor, alpha: 1, rightRadiusOnly: true });
+    const bg = makePanel(bgW, this.measured, { fill: THEME.dialogBg, alpha: 1, rightRadiusOnly: true });
     bg.position.set(0, 0);
     this.el.addChildAt(shadow, 0);
     this.el.addChildAt(bg, 1);

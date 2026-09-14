@@ -10,10 +10,30 @@ export const TEMPLE_BUFF_THRESHOLD = 3;
 /** Defense a unit gets while standing in its own village. */
 export const VILLAGE_DEFENSE = 5;
 
-export const BUFF_INFO: Record<BuffId, { name: string; icon: string; tooltip: string }> = {
-  waterProtection: { name: 'Water Protection', icon: 'water-protection.png', tooltip: 'Water Protection: -10 dmg for ships' },
-  forestProtection: { name: 'Forest Protection', icon: 'forest-protection.png', tooltip: 'Forest Protection: -10 dmg for units in forest' },
+export const BUFF_INFO: Record<BuffId, { name: string; icon: string; tooltip: string; description: string }> = {
+  waterProtection: {
+    name: 'Water Protection',
+    icon: 'water-protection.png',
+    tooltip: 'Water Protection: -10 dmg for ships',
+    description: 'Ships you control take 10 less damage from enemy attacks. Unlocks with 3 water temples.',
+  },
+  forestProtection: {
+    name: 'Forest Protection',
+    icon: 'forest-protection.png',
+    tooltip: 'Forest Protection: -10 dmg for units in forest',
+    description: 'Your units in forest tiles take 10 less damage from enemy attacks. Unlocks with 3 forest temples.',
+  },
 };
+
+/** Number of owned temples of the kind that feeds `buff`. */
+export function templeCount(map: GameMap, playerIndex: number, buff: BuffId): number {
+  const kind = buff === 'waterProtection' ? 'temple' : 'forestTemple';
+  let n = 0;
+  for (const t of map.tiles) {
+    if (t.ownedBy === playerIndex && t.building?.kind === kind) n++;
+  }
+  return n;
+}
 
 export function activeBuffs(map: GameMap, playerIndex: number): BuffId[] {
   let water = 0;

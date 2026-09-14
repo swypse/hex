@@ -1,6 +1,7 @@
 import { Application, Container, Graphics, Text, type FederatedPointerEvent, type FederatedWheelEvent } from 'pixi.js';
 import { Button } from './button';
 import { makeLabel } from './label';
+import { THEME } from './theme';
 
 const PAD_H = 20;
 const PAD_TOP = 16;
@@ -11,7 +12,7 @@ const BUTTON_GAP = 12;
 const CARD_RADIUS = 10;
 const BACKDROP_COLOR = 0x000000;
 const BACKDROP_ALPHA = 0.6;
-const CARD_COLOR = 0x222222;
+const CARD_COLOR = THEME.dialogBg;
 const SHADOW_OFFSET_X = 10;
 const SHADOW_OFFSET_Y = 10;
 const SHADOW_ALPHA = 0.5;

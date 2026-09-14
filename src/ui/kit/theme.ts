@@ -6,6 +6,7 @@ export const THEME = {
   buttonSelected: 0xF15EDF,
   panelBg: 0x000000,
   panelAlpha: 0.6,
+  dialogBg: 0x222222,
   highlight: 0xffd700,
   radius: 4,
   fontFamily: 'Roboto, system-ui, sans-serif',

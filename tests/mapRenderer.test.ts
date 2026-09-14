@@ -70,6 +70,7 @@ function buildTextures(map: GameMap): TextureSet {
 
     wallTexture: null,
     arrowTexture: tex(67, 13),
+    glowFor: new Map([[unitTex.texture, tileTex(TEX_H + 8, TEX_H + 8)]]),
     cannonballTexture: tex(35, 15),
   };
 }
@@ -653,6 +654,32 @@ describe('MapView hp bar anchoring', () => {
     // cover the filled dot.
     for (const s of strokes) expect(s.data.style.alignment).toBe(0);
     v.destroy();
+  });
+
+  it('shows a steady glow behind a selected unit and hides it when deselected', () => {
+    const selection = { kind: 'unit', q: 0, r: 0 } as const;
+    view.update(map, players, selection, new Set(), new Set(), 0, new Set(), {
+      x: 400,
+      y: 300,
+      scale: 1,
+      width: 800,
+      height: 600,
+    });
+    const tv = (view as unknown as { tileViews: Map<string, { glowSprite: Sprite | null }> }).tileViews.get('0,0')!;
+    const glowTex = textures.glowFor.get(textures.unitTextures[Tribe.Cats]!.warrior!.texture)!;
+    expect(tv.glowSprite).not.toBeNull();
+    expect(tv.glowSprite!.texture).toBe(glowTex.texture);
+    // Just under the unit sprite (zIndex 7) so the halo peeks out behind it.
+    expect(tv.glowSprite!.zIndex).toBeLessThanOrEqual(6);
+
+    view.update(map, players, null, new Set(), new Set(), 0, new Set(), {
+      x: 400,
+      y: 300,
+      scale: 1,
+      width: 800,
+      height: 600,
+    });
+    expect(tv.glowSprite).toBeNull();
   });
 
   it('keeps the selected tile el above same-row neighbors so the top border stays visible', () => {
@@ -1684,21 +1711,6 @@ describe('MapView road-port connection', () => {
     return { map, view };
   }
 
-  function strokePoints(view: MapView, key: string): { from: { x: number; y: number }; to: { x: number; y: number } }[] {
-    const tvs = (view as unknown as { tileViews: Map<string, { roadGraphics: Graphics | null }> }).tileViews;
-    const g = tvs.get(key)!.roadGraphics;
-    expect(g).not.toBeNull();
-    const ctx = g!.context as unknown as {
-      instructions: Array<{ action: string; data: { style: { color: number }; path: { instructions: Array<{ action: string; data: number[] }> } } }>;
-    };
-    return ctx.instructions
-      .filter((i) => i.action === 'stroke')
-      .map((i) => ({
-        from: { x: i.data.path.instructions.find((p) => p.action === 'moveTo')!.data[0]!, y: i.data.path.instructions.find((p) => p.action === 'moveTo')!.data[1]! },
-        to: { x: i.data.path.instructions.find((p) => p.action === 'lineTo')!.data[0]!, y: i.data.path.instructions.find((p) => p.action === 'lineTo')!.data[1]! },
-      }));
-  }
-
   function makeApp(): Application {
     return {
       screen: { width: 800, height: 600 },
@@ -1706,20 +1718,16 @@ describe('MapView road-port connection', () => {
     } as unknown as Application;
   }
 
-  it('draws a road stub on the port reaching the road hex edge, like an adjacent road', () => {
+  it('draws no road on a port cell even with an adjacent own road', () => {
     const tiles = [
       mkTile(0, 0, TileType.Water, { port: true, ownedBy: 0 }),
       mkTile(1, 0, TileType.GrasslandLand, { roadOwner: 0 }),
     ];
     const { view } = render(tiles);
-    const pts = strokePoints(view, '0,0');
-    // One stub from the port center toward the shared edge with the road at (1,0).
-    expect(pts).toHaveLength(1);
-    const edgeMidX = HEX * Math.cos(-Math.PI / 6);
-    expect(pts[0]!.from.x).toBeCloseTo(edgeMidX, 4);
-    expect(pts[0]!.from.y).toBeCloseTo(0, 4);
-    expect(pts[0]!.to.x).toBeCloseTo(0, 4);
-    expect(pts[0]!.to.y).toBeCloseTo(0, 4);
+    const tvs = (view as unknown as { tileViews: Map<string, { roadGraphics: Graphics | null }> }).tileViews;
+    // Roads connect up to the port's tile edge, but the port cell itself
+    // never draws a road.
+    expect(tvs.get('0,0')!.roadGraphics).toBeNull();
     view.destroy();
   });
 

@@ -22,6 +22,7 @@ function makeHost(): UIHost {
 describe('HudScore buff icons', () => {
   let hud: HudScore;
   let root: Container;
+  let host: UIHost;
   const originalSim = (gameController as unknown as { sim: unknown }).sim;
 
   const mount = (waterTemples: number): Container => {
@@ -39,8 +40,9 @@ describe('HudScore buff icons', () => {
     Object.defineProperty(Text.prototype, 'height', { configurable: true, get: () => 14 });
     useGameStore.setState({ screen: 'game', players, localPlayerIndex: 0 });
     root = new Container();
+    host = makeHost();
     hud = new HudScore();
-    hud.mount(makeHost(), root);
+    hud.mount(host, root);
     return root;
   };
 
@@ -69,6 +71,66 @@ describe('HudScore buff icons', () => {
   it('shows no buff icon with only 2 water temples', () => {
     const r = mount(2);
     expect(allSprites(r).length).toBe(0);
+  });
+
+  it('shows the temple count as the sub score beside each buff icon', () => {
+    mount(3);
+    const buffRow = (hud as unknown as { buffRow: Container }).buffRow!;
+    expect(buffRow.children.length).toBe(1);
+    const texts = buffRow.children[0]!.children.filter((c) => c instanceof Text) as Text[];
+    expect(texts).toHaveLength(1);
+    expect(texts[0]!.text).toBe('3');
+  });
+
+  it('stacks buff items vertically under the score circle', () => {
+    const map = makeTestMap(3);
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(42));
+    for (const q of [1, 2, 3]) {
+      const tile = tileAt(map, q, 0)!;
+      tile.terrain = TileType.Water;
+      tile.ownedBy = 0;
+      if (q <= 3) tile.building = { kind: 'temple', level: 1 };
+    }
+    for (const r of [1, 2, 3]) {
+      const tile = tileAt(map, 0, r)!;
+      tile.terrain = TileType.GrasslandForest;
+      tile.ownedBy = 0;
+      tile.building = { kind: 'forestTemple', level: 1 };
+    }
+    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    (gameController as unknown as { sim: unknown }).sim = sim;
+    useGameStore.setState({ screen: 'game', players, localPlayerIndex: 0 });
+    root = new Container();
+    hud = new HudScore();
+    hud.mount(makeHost(), root);
+    const buffRow = (hud as unknown as { buffRow: Container }).buffRow!;
+    // Two items (water + forest protection) in a vertical column.
+    expect(buffRow.children.length).toBe(2);
+    const ys = buffRow.children.map((c) => c.position.y);
+    expect(ys[1]!).toBe(ys[0]! + 16 + 8);
+    expect(buffRow.children.every((c) => c.position.x === 0)).toBe(true);
+  });
+
+  it('opens a popup with the buff description on tap and closes it on destroy', () => {
+    mount(3);
+    const buffRow = (hud as unknown as { buffRow: Container }).buffRow!;
+    const item = buffRow.children[0] as Container;
+    const stage = host.app.stage as Container;
+    expect(stage.children.length).toBe(0);
+    (item.emit as (event: string) => void)('pointertap');
+    expect(stage.children.length).toBe(1);
+    const popupTexts: string[] = [];
+    const walk = (c: Container): void => {
+      for (const ch of c.children) {
+        if (ch instanceof Text) popupTexts.push((ch as Text).text);
+        if (ch instanceof Container) walk(ch as Container);
+      }
+    };
+    walk(stage);
+    expect(popupTexts.join('\n')).toContain('Water Protection');
+    expect(popupTexts.join('\n')).toContain('take 10 less damage');
+    hud.destroy();
+    expect(stage.children.length).toBe(0);
   });
 
   it('cancels the bounce animation when destroyed mid-bounce', () => {

@@ -1,4 +1,4 @@
-import { Application, ColorMatrixFilter, Container, FillGradient, Graphics, Sprite, Texture } from 'pixi.js';
+import { Application, BlurFilter, ColorMatrixFilter, Container, FillGradient, Graphics, Rectangle, Sprite, Texture } from 'pixi.js';
 import { axialKey, HEX_TILT, hexNeighbors } from '../game/hex';
 import { GameMap, type BridgeDir, type MapTile } from '../game/mapGen';
 import { isWaterType, TileType, TILE_TYPE_COLORS } from '../game/tileTypes';
@@ -95,6 +95,9 @@ export interface TextureSet {
   templeTextures: Record<1 | 2 | 3 | 4, TileTexture>;
   forestTempleTextures: Record<1 | 2 | 3 | 4, TileTexture>;
   shipTextures: Record<Tribe, Record<1 | 2 | 3, TileTexture>>;
+  /** White silhouette-following glow, keyed by the unit texture it decorates.
+   *  Used as a steady selection highlight behind the selected unit's sprite. */
+  glowFor: Map<Texture, TileTexture>;
   villageConnectedTexture: Texture | null;
   captureTexture: Texture | null;
   wallTexture: TileTexture | null;
@@ -114,7 +117,7 @@ function hexagonPoints(size: number): number[] {
 }
 
 /** Brightness factor for coast-adjacent water tiles (subtle shallow tint). */
-const COAST_WATER_BRIGHTNESS = 1.12;
+const COAST_WATER_BRIGHTNESS = 1.5;
 
 /** Brightness factor for a tile's baked texture: coast water is lighter, every
  *  other tile keeps its natural colour (factor 1). `findNeighbor` resolves an
@@ -252,6 +255,43 @@ function makeUnitImageTexture(
   const texture = app.renderer.generateTexture({ target: container, resolution: 1 });
   container.destroy({ children: true });
   return { texture, anchorY: IMAGE_HEX_CENTER_Y / IMAGE_H };
+}
+
+/** Baked-px padding around a glow texture so the blur (and its anchor math) is
+ *  never clipped at the texture frame edge. */
+const GLOW_PADDING = 4;
+/** Baked-px blur radius of the unit selection glow. */
+const GLOW_BLUR = 2;
+
+/** Bakes a white glow that hugs the non-empty pixels of a unit texture: the
+ *  art is flattened to pure white, blurred outward by `GLOW_BLUR`, and baked
+ *  with `GLOW_PADDING` spare room so nothing is clipped. The returned tile
+ *  shares the base texture's footprint, re-anchored so both sprites align when
+ *  placed at the unit's render position. */
+function makeUnitGlowTexture(app: Application, base: TileTexture): TileTexture {
+  const W = base.texture.width;
+  const H = base.texture.height;
+  const pad = GLOW_PADDING;
+  const container = new Container();
+  const sprite = new Sprite(base.texture);
+  sprite.anchor.set(0.5, base.anchorY);
+  const white = new ColorMatrixFilter();
+  white.matrix = [
+    0, 0, 0, 0, 1,
+    0, 0, 0, 0, 1,
+    0, 0, 0, 0, 1,
+    0, 0, 0, 1, 0,
+  ];
+  const blur = new BlurFilter({ strength: GLOW_BLUR });
+  sprite.filters = [white, blur];
+  container.addChild(sprite);
+  // The frame is the sprite's own bounds plus padding; generateTexture sizes
+  // its output from this instead of the (filter-unaware) local bounds.
+  const frame = new Rectangle(-W / 2 - pad, -base.anchorY * H - pad, W + pad * 2, H + pad * 2);
+  const texture = app.renderer.generateTexture({ target: container, frame, resolution: 1 });
+  container.destroy({ children: true });
+  const anchorY = (base.anchorY * H + pad) / (H + pad * 2);
+  return { texture, anchorY };
 }
 
 function makeUnitFallbackTexture(
@@ -424,6 +464,7 @@ export async function createTextures(
     };
   }
   const unitTextures = {} as Record<Tribe, Record<UnitType, TileTexture>>;
+  const glowFor = new Map<Texture, TileTexture>();
   for (const tribe of TRIBES) {
     if (!activeTribes.has(tribe.id)) continue;
     await ensureTribeAtlas(tribe.code);
@@ -433,6 +474,7 @@ export async function createTextures(
       const frameKey = UNIT_IMAGE_FILES[tribe.id][type].replace(/\.png$/, '');
       const img = tribeTileTexture(tribe.code, frameKey);
       perTribe[type] = makeUnitImageTexture(app, img, hexSize) ?? makeUnitFallbackTexture(app, tribe.color, type, hexSize);
+      glowFor.set(perTribe[type].texture, makeUnitGlowTexture(app, perTribe[type]));
     }
     unitTextures[tribe.id] = perTribe;
   }
@@ -448,6 +490,7 @@ export async function createTextures(
         texture: makeShipTexture(app, tribe.color, hexSize, level === 3),
         anchorY: 0.5,
       };
+      glowFor.set(shipTextures[tribe.id][level].texture, makeUnitGlowTexture(app, shipTextures[tribe.id][level]));
     }
   }
   const sawmillTexture =
@@ -495,6 +538,10 @@ export async function createTextures(
   // Bake the wall at the same hex image-scale as villages/units so its on-map
   // footprint always matches the tile, regardless of the camera quality factor.
   const wallTexture = wallImg ? makeUnitImageTexture(app, wallImg, hexSize) : null;
+  const pirateTexture =
+    makeUnitImageTexture(app, terrainFrameTexture('pirates-ship'), hexSize) ??
+    makePirateTexture(app, hexSize);
+  glowFor.set(pirateTexture.texture, makeUnitGlowTexture(app, pirateTexture));
   return {
     tileTextures,
     fogTextures,
@@ -510,9 +557,7 @@ export async function createTextures(
       makeUnitImageTexture(app, terrainFrameTexture('bottle-on-water'), hexSize) ??
       { texture: makeBuildingTexture(app, 0x7fd8f5, hexSize), anchorY: 0.5 },
     unitTextures,
-    pirateTexture:
-      makeUnitImageTexture(app, terrainFrameTexture('pirates-ship'), hexSize) ??
-      makePirateTexture(app, hexSize),
+    pirateTexture,
     sawmillTexture,
     mineTexture,
     bridgeTextures,
@@ -521,6 +566,7 @@ export async function createTextures(
     templeTextures,
     forestTempleTextures,
     shipTextures,
+    glowFor,
     villageConnectedTexture,
     captureTexture,
     wallTexture,

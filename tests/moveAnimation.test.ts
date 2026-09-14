@@ -76,6 +76,7 @@ function buildTextures(map: GameMap): TextureSet {
 
     wallTexture: null,
     arrowTexture: tex(67, 13),
+    glowFor: new Map(),
     cannonballTexture: tex(35, 15),
   };
 }
@@ -582,6 +583,7 @@ describe('move animation', () => {
     const s = useGameStore.getState();
     expect(s.centerMessage).toBe('Settlement is captured by Cats!');
     expect(s.centerMessageQueue).toContain('Barbarians died!');
+    expect(s.centerIconQueue).toContain('barbarians-icon.png');
   });
 
   it('spawns a 10-circle death animation on the dead unit hex and removes it after the rise', async () => {

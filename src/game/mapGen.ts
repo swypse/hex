@@ -7,7 +7,7 @@ import { makeUnit, type Unit } from './units';
 import { claimTileForVillage } from './claim';
 import { placeBonuses, type Bonus } from './bonus';
 
-const WATER_BORDER = 1;
+const WATER_BORDER = 2;
 const FREE_VILLAGE_MAX_DIST = 7;
 
 export interface Settlement {
@@ -226,7 +226,7 @@ export function generateMap(playerCount: number, seed: number, size: MapSize = '
   generateTerrain([...tileMap.values()], seed);
 
   for (const tile of tileMap.values()) {
-    if (hexDistance({ q: 0, r: 0 }, tile) === radius) {
+    if (hexDistance({ q: 0, r: 0 }, tile) >= radius - (WATER_BORDER - 1)) {
       tile.terrain = TileType.Water;
     }
   }

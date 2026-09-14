@@ -66,6 +66,7 @@ function buildTextures(map: GameMap): TextureSet {
 
     wallTexture: null,
     arrowTexture: tex(67, 13),
+    glowFor: new Map(),
     cannonballTexture: tex(35, 15),
   };
 }

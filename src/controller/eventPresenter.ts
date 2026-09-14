@@ -860,7 +860,7 @@ export class EventPresenter {
     if (e.ownerDied && e.oldOwner !== null) {
       const dead = sim.players[e.oldOwner]!;
       const tribe = TRIBES.find((t) => t.id === dead.tribe);
-      if (tribe) useGameStore.getState().setCenterMessage(t('msg.tribeDied', { tribe: tribe.name }));
+      if (tribe) useGameStore.getState().setCenterMessage(t('msg.tribeDied', { tribe: tribe.name }), `${tribe.code}-icon.png`);
     }
   }
 

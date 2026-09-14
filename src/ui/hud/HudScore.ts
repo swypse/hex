@@ -1,18 +1,19 @@
 import { Container, Graphics, Text } from 'pixi.js';
 import { gameController } from '../../controller/gameController';
 import { totalScore } from '../../game/score';
-import { activeBuffs, BUFF_INFO } from '../../game/buffs';
+import { activeBuffs, BUFF_INFO, templeCount, type BuffId } from '../../game/buffs';
 import { useGameStore } from '../../store/gameStore';
 import { type UIHost, type Widget } from '../host';
 import { makeIcon } from '../kit/icon';
 import { makeLabel } from '../kit/label';
-import { Tooltip } from '../kit/tooltip';
-import { tooltipsEnabled } from '../kit/tooltipGate';
+import { Popup, POPUP_BODY_SIZE } from '../kit/popup';
+import { t } from '../../i18n';
 
 const SIZE = 56;
 const PAD = 8;
 const ICON_SIZE = 16;
-const BUFF_GAP = 4;
+/** Vertical gap between buff items (icon + sub score) under the score circle. */
+const BUFF_GAP = 8;
 
 export class HudScore implements Widget {
   /** Optional tap handler (used by the skill-tree screen to open score details). */
@@ -23,7 +24,7 @@ export class HudScore implements Widget {
   private host: UIHost | null = null;
   private unsub: (() => void) | null = null;
   private lastScore = 0;
-  private tooltip: Tooltip | null = null;
+  private buffPopup: Popup | null = null;
   private bounceRemove: (() => void) | null = null;
 
   mount(host: UIHost, root: Container): void {
@@ -51,8 +52,6 @@ export class HudScore implements Widget {
     this.el = el;
     this.text = text;
     this.buffRow = buffRow;
-    this.tooltip = new Tooltip(host.app);
-    host.app.stage.addChild(this.tooltip.el);
     this.lastScore = this.readScore();
     this.layout();
     window.addEventListener('resize', this.layout);
@@ -69,9 +68,8 @@ export class HudScore implements Widget {
     const centerX = this.host.app.screen.width - PAD - SIZE / 2;
     const centerY = PAD + SIZE / 2 + 20;
     this.el.position.set(centerX, centerY);
-    const n = this.buffRow.children.length;
-    const totalW = n * ICON_SIZE + Math.max(0, n - 1) * BUFF_GAP;
-    this.buffRow.position.set(-totalW / 2, SIZE / 2 + 6);
+    // Buff items stack in a vertical column centred under the score circle.
+    this.buffRow.position.set(-ICON_SIZE / 2, SIZE / 2 + 6);
   };
 
   private readScore(): number {
@@ -93,26 +91,74 @@ export class HudScore implements Widget {
 
   private updateBuffs(): void {
     if (!this.buffRow || !this.host) return;
+    for (const child of this.buffRow.children) child.destroy({ children: true });
     this.buffRow.removeChildren();
     const s = useGameStore.getState();
     const map = gameController.getMap();
     if (!map) return;
     const buffs = activeBuffs(map, s.localPlayerIndex);
-    let x = 0;
+    let y = 0;
     for (const buff of buffs) {
       const info = BUFF_INFO[buff];
+      const count = templeCount(map, s.localPlayerIndex, buff);
+      const item = new Container();
       const icon = makeIcon(info.icon, ICON_SIZE);
-      icon.position.set(x, 0);
-      icon.eventMode = 'static';
-      if (tooltipsEnabled()) {
-        icon.on('pointerover', () => this.tooltip!.showForAfter(icon, info.tooltip, '', 500));
-        icon.on('pointerout', () => this.tooltip!.hideAfter(500));
-        icon.on('pointerdown', () => this.tooltip!.showFor(icon, info.tooltip, ''));
-      }
-      this.buffRow.addChild(icon);
-      x += ICON_SIZE + BUFF_GAP;
+      icon.position.set(0, 0);
+      const countLabel = makeLabel(String(count), { fontSize: 13, fill: 0xffffff, fontWeight: '700' });
+      countLabel.anchor.set(0, 0.5);
+      countLabel.position.set(ICON_SIZE + 4, ICON_SIZE / 2);
+      item.eventMode = 'static';
+      item.cursor = 'pointer';
+      item.on('pointertap', () => this.openBuffPopup(buff, count));
+      item.addChild(icon, countLabel);
+      item.position.set(0, y);
+      this.buffRow.addChild(item);
+      y += ICON_SIZE + BUFF_GAP;
     }
     this.layout();
+  }
+
+  /** Opens a small card describing the tapped protection buff. */
+  private openBuffPopup(buff: BuffId, count: number): void {
+    if (!this.host) return;
+    this.closeBuffPopup();
+    const info = BUFF_INFO[buff];
+    const labelLine = buff === 'waterProtection' ? t('ui.watertemples') : t('ui.foresttemples');
+    const onDone = (): void => {
+      this.closeBuffPopup();
+    };
+    const popup = new Popup({
+      app: this.host.app,
+      title: info.name,
+      modal: false,
+      width: 300,
+      onClose: onDone,
+      closeOnEscape: true,
+      onTap: onDone,
+    });
+    const desc = makeLabel(info.description, {
+      fontSize: POPUP_BODY_SIZE,
+      fill: 0xeeeeee,
+      wordWrap: true,
+      wordWrapWidth: popup.contentWidth,
+    });
+    desc.position.set(0, 0);
+    popup.content.addChild(desc);
+    const countLine = makeLabel(`${labelLine}: ${count}`, {
+      fontSize: POPUP_BODY_SIZE,
+      fill: 0xffffff,
+      fontWeight: '700',
+    });
+    countLine.position.set(0, desc.height + 10);
+    popup.content.addChild(countLine);
+    this.host.app.stage.addChild(popup.el);
+    popup.finish();
+    this.buffPopup = popup;
+  }
+
+  private closeBuffPopup(): void {
+    this.buffPopup?.destroy();
+    this.buffPopup = null;
   }
 
   private bounce(): void {
@@ -144,8 +190,7 @@ export class HudScore implements Widget {
     if (this.unsub) this.unsub();
     window.removeEventListener('resize', this.layout);
     this.stopBounce();
-    this.tooltip?.destroy();
-    this.tooltip = null;
+    this.closeBuffPopup();
     this.unsub = null;
     this.el?.destroy({ children: true });
     this.el = null;
