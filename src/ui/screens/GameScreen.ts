@@ -14,6 +14,7 @@ import { HudSkills } from '../hud/HudSkills';
 import { HudAchievements } from '../hud/HudAchievements';
 import { HudToolbar } from '../hud/HudToolbar';
 import { HudTribes } from '../hud/HudTribes';
+import { HudWatchExit } from '../hud/HudWatchExit';
 import { TOOLBAR_HEIGHT, isWideScreen } from '../layout';
 
 export class GameScreen implements ScreenController {
@@ -73,6 +74,7 @@ export class GameScreen implements ScreenController {
       new HudScore(),
       new HudPlayers(),
       new HudTurn(),
+      new HudWatchExit(),
       new HudMoney(),
       new HudTribes(),
       new HudSelected(),
