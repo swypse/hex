@@ -10,8 +10,6 @@ export interface AiGoalState {
   id: AiGoalId;
   phase: string;
   target: { q: number; r: number } | null;
-  sinceTurn: number;
-  confidence: number;
 }
 
 export interface AiStrategyState {

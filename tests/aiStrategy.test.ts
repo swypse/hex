@@ -92,7 +92,7 @@ describe('AiStrategy lifecycle', () => {
     const profile = profileFor(p);
     const s1 = updateStrategy(map, p, analyzeSituation(map, p, mode, profile), mode, profile, 1, new SeededRandom(1));
     const s2 = updateStrategy(map, p, analyzeSituation(map, p, mode, profile), mode, profile, 2, new SeededRandom(1));
-    expect(s2.goals[0]!.sinceTurn).toBe(1);
+    expect(s2.goals.map((g) => g.id)).toEqual(s1.goals.map((g) => g.id));
   });
 
   it('re-picks after the plan interval passes', () => {

@@ -94,7 +94,6 @@ export interface AiSituation {
   endangered: boolean;
   frontTarget: MapTile | null;
   freeVillages: FreeVillageTarget[];
-  huntTarget: MapTile | null;
   ownPower: number;
   enemyPower: number;
   navalThreat: boolean;
@@ -252,7 +251,6 @@ export function analyzeSituation(
     endangered,
     frontTarget: stance === 'war' ? enemyVillage : null,
     freeVillages: freeVillages(map, player.index),
-    huntTarget,
     ownPower: pow,
     enemyPower: epow,
     navalThreat,

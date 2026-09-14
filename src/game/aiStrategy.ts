@@ -36,8 +36,8 @@ function hasGoalTyped(goals: AiGoalState[], id: AiGoalId): boolean {
   return goals.some((g) => g.id === id);
 }
 
-function makeGoal(id: AiGoalId, phase: string, target: { q: number; r: number } | null, turn: number): AiGoalState {
-  return { id, phase, target, sinceTurn: turn, confidence: 1 };
+function makeGoal(id: AiGoalId, phase: string, target: { q: number; r: number } | null): AiGoalState {
+  return { id, phase, target };
 }
 
 function enemyVillageVisible(map: GameMap, player: Player): boolean {
@@ -128,13 +128,13 @@ export function updateStrategy(
 
   if (situation.endangered && !hasGoalTyped(next, 'defense')) {
     const danger = situation.dangers[0];
-    next.push(makeGoal('defense', 'muster', danger ? { q: danger.village.q, r: danger.village.r } : null, turn));
+    next.push(makeGoal('defense', 'muster', danger ? { q: danger.village.q, r: danger.village.r } : null));
   }
   if (situation.navalThreat && !hasGoalTyped(next, 'naval')) {
-    next.push(makeGoal('naval', 'research', null, turn));
+    next.push(makeGoal('naval', 'research', null));
   }
   if (mode === 'turns30' && !hasGoalTyped(next, 'score')) {
-    next.push(makeGoal('score', 'race', null, turn));
+    next.push(makeGoal('score', 'race', null));
   }
 
   const current = next.find((g) => g.id === 'economy' || g.id === 'army');
@@ -145,10 +145,10 @@ export function updateStrategy(
   });
   if (mode === 'turns30' && situation.ownPower < situation.enemyPower * 0.8) {
     next = next.filter((g) => g.id !== 'economy' && g.id !== 'army');
-    if (!hasGoalTyped(next, 'army')) next.push(makeGoal('army', 'choose', null, turn));
+    if (!hasGoalTyped(next, 'army')) next.push(makeGoal('army', 'choose', null));
   } else if (!current || current.id !== picked) {
     next = next.filter((g) => g.id !== 'economy' && g.id !== 'army');
-    next.push(makeGoal(picked, picked === 'army' ? 'choose' : 'build', picked === 'army' ? chooseArmyTarget(map, player) : null, turn));
+    next.push(makeGoal(picked, picked === 'army' ? 'choose' : 'build', picked === 'army' ? chooseArmyTarget(map, player) : null));
   }
 
   state.goals = next;
