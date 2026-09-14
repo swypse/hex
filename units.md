@@ -35,7 +35,7 @@ Archer (5 each) that the old whole-point scale could not represent.
 
 | Unit   | HP  | Atk | Def | Move      | Atk range | Cost           |
 |--------|-----|-----|-----|-----------|-----------|----------------|
-| Pirate | 80  | 30  | 5   | 5 (water) | 3         | — (AI-spawned) |
+| Pirate | 80  | 15  | 5   | 5 (water) | 3         | — (AI-spawned) |
 
 Pirates are not spawnable and sit outside the player balance graph. Their Def 5 matches the light armour of riders/archers,
 so their threat comes from HP and numbers rather than armour.
