@@ -34,7 +34,7 @@ export class SpawnDialog {
 
     const popup = new Popup({
       app: host.app,
-      title: 'Spawn a unit',
+      title: t('spawn.title'),
       onClose: () => useGameStore.getState().setOverlay(null),
     });
     root.addChild(popup.el);
@@ -54,14 +54,14 @@ export class SpawnDialog {
     const info = UNIT_TYPES[type];
     const out: string[] = [];
     if (!player) return out;
-    if (player.resources.money < info.price) out.push(`Not enough money — need ${info.price}, have ${player.resources.money}`);
-    if (info.priceWood > 0 && player.resources.wood < info.priceWood) out.push(`Not enough wood — need ${info.priceWood}, have ${player.resources.wood}`);
-    if (info.priceOre > 0 && player.resources.ore < info.priceOre) out.push(`Not enough ore — need ${info.priceOre}, have ${player.resources.ore}`);
-    if (type === 'rider' && !hasSkill(player, 'riding')) out.push('Requires the Riding skill');
-    if (type === 'knight' && !hasSkill(player, 'knights')) out.push('Requires the Knights skill');
-    if (type === 'swordsman' && !hasSkill(player, 'swordsman')) out.push('Requires the Swordsman skill');
-    if (type === 'shield' && !hasSkill(player, 'shields')) out.push('Requires the Shields skill');
-    if (type === 'catapult' && !hasSkill(player, 'catapult')) out.push('Requires the Catapult skill');
+    if (player.resources.money < info.price) out.push(t('spawn.reasonMoney', { need: info.price, have: player.resources.money }));
+    if (info.priceWood > 0 && player.resources.wood < info.priceWood) out.push(t('spawn.reasonWood', { need: info.priceWood, have: player.resources.wood }));
+    if (info.priceOre > 0 && player.resources.ore < info.priceOre) out.push(t('spawn.reasonOre', { need: info.priceOre, have: player.resources.ore }));
+    if (type === 'rider' && !hasSkill(player, 'riding')) out.push(t('spawn.reasonSkill', { skill: t('skill.riding.name') }));
+    if (type === 'knight' && !hasSkill(player, 'knights')) out.push(t('spawn.reasonSkill', { skill: t('skill.knights.name') }));
+    if (type === 'swordsman' && !hasSkill(player, 'swordsman')) out.push(t('spawn.reasonSkill', { skill: t('skill.swordsman.name') }));
+    if (type === 'shield' && !hasSkill(player, 'shields')) out.push(t('spawn.reasonSkill', { skill: t('skill.shields.name') }));
+    if (type === 'catapult' && !hasSkill(player, 'catapult')) out.push(t('spawn.reasonSkill', { skill: t('skill.catapult.name') }));
     return out;
   }
 
@@ -99,8 +99,8 @@ export class SpawnDialog {
       item.addChild(name);
 
       const info = UNIT_TYPES[type];
-      const woodText = info.priceWood > 0 ? ` + ${info.priceWood} wood` : '';
-      const oreText = info.priceOre > 0 ? ` + ${info.priceOre} ore` : '';
+      const woodText = info.priceWood > 0 ? ` + ${info.priceWood} ${t('res.wood')}` : '';
+      const oreText = info.priceOre > 0 ? ` + ${info.priceOre} ${t('res.ore')}` : '';
       const price = makeLabel(`${info.price}${woodText}${oreText}`, { fontSize: 12, fill: 0xeeeeee });
       price.position.set((CELL_W - price.width) / 2, 84);
       item.addChild(price);
@@ -126,7 +126,7 @@ export class SpawnDialog {
     this.clearContent();
     const content = this.popup.content;
     const lines = this.reasons(type);
-    const name = makeLabel(`${UNIT_TYPE_NAMES[type]} — cannot spawn`, { fontSize: 14, fill: 0xffffff, fontWeight: '700' });
+    const name = makeLabel(t('spawn.cannot', { unit: UNIT_TYPE_NAMES[type] }), { fontSize: 14, fill: 0xffffff, fontWeight: '700' });
     name.position.set(0, 0);
     content.addChild(name);
     let y = name.height + 8;

@@ -3,7 +3,7 @@ export const TURN_BAR_HEIGHT = 24;
 export const TURN_BAR_COLOR = 0x5198ff;
 export const TOOLBAR_SIDE_PADDING = 12;
 export const SKILLS_BUTTON_SIZE = 48;
-export const HUD_BUTTON_GAP = 6;
+const HUD_BUTTON_GAP = 6;
 export const TURN_BAR_GAP = 6;
 export const ACTION_TOOLBAR_MAX_WIDTH = 600;
 

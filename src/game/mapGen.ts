@@ -10,6 +10,11 @@ import { placeBonuses, type Bonus } from './bonus';
 const WATER_BORDER = 2;
 const FREE_VILLAGE_MAX_DIST = 7;
 
+/** Index a map's tiles by their axial key for O(1) neighbourhood lookups. */
+export function tileMapByKey(map: GameMap): Map<string, MapTile> {
+  return new Map(map.tiles.map((t) => [axialKey(t), t] as const));
+}
+
 export interface Settlement {
   owner: number | null;
   level: number;
@@ -34,7 +39,7 @@ export interface Building {
 
 /** A floating message-in-a-bottle on a water tile. `arrivalTurn` is set when
  *  a ship moves onto the tile; the bottle can then be collected next turn. */
-export interface Bottle {
+interface Bottle {
   bornTurn: number;
   arrivalTurn: number;
 }
@@ -74,7 +79,7 @@ export type MapSize = 'normal' | 'big' | 'huge';
 
 /** Linear map-size multiplier per option: big is ~2x the normal radius, huge
  *  ~3x. The map hex count therefore scales ~4x and ~9x. */
-export const MAP_RADIUS_FACTOR: Record<MapSize, number> = {
+const MAP_RADIUS_FACTOR: Record<MapSize, number> = {
   normal: 1,
   big: 2,
   huge: 3,

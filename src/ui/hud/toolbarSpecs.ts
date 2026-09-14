@@ -2,7 +2,7 @@ import { t } from '../../i18n';
 import { gameController } from '../../controller/gameController';
 import { useGameStore } from '../../store/gameStore';
 import { tileAt } from '../../game/selection';
-import { canAfford, villageUpgradeCost } from '../../game/resources';
+import { canAfford, moneyCost, villageUpgradeCost } from '../../game/resources';
 import { canBuildSawmill, canBuildForestTemple, canBuildMine, canBuildPort, canBuildTemple, BUILDING_COSTS } from '../../game/buildings';
 import { canHeal, canDisband, disbandCost, hasPirateDeal, PIRATE_DEAL_COST, UNIT_TYPES, UNIT_TYPE_NAMES } from '../../game/units';
 import { SHIP_UPGRADE_COST, canUpgradeShip } from '../../game/ship';
@@ -91,7 +91,7 @@ export function toolbarSpecs(): ToolbarSpec[] {
       out.push({ key: kind, label, disabled: !canAfford(player.resources, BUILDING_COSTS[kind]), onClick: () => gameController.buildSelectedBuilding(kind) });
     }
     if (canBuildRoad(map, tile, player)) {
-      out.push({ key: 'road', label: t('ui.buildaroad5w2s10m'), disabled: !canAfford(player.resources, ROAD_COST), onClick: () => gameController.buildSelectedRoad() });
+      out.push({ key: 'road', label: t('ui.buildroad5w2s10m'), disabled: !canAfford(player.resources, ROAD_COST), onClick: () => gameController.buildSelectedRoad() });
     }
     if (canBuildBridge(map, tile, player)) {
       out.push({ key: 'bridge', label: t('ui.buildbridge10w5s15m'), disabled: !canAfford(player.resources, BRIDGE_COST), onClick: () => gameController.buildSelectedBridge() });
@@ -113,7 +113,7 @@ export function toolbarSpecs(): ToolbarSpec[] {
       out.push({
         key: 'disband',
         label: t('action.disband', { name: UNIT_TYPE_NAMES[unit.type], cost: disbandCostMoney }),
-        disabled: !canAfford(player.resources, { wood: 0, stone: 0, money: disbandCostMoney, ore: 0 }),
+        disabled: !canAfford(player.resources, moneyCost(disbandCostMoney)),
         onClick: () => gameController.disbandSelectedUnit(),
       });
     }
@@ -124,7 +124,7 @@ export function toolbarSpecs(): ToolbarSpec[] {
     out.push({
       key: 'deal',
       label: dealt ? t('action.pirateDealActive') : t('action.dealWithPirates', { money: PIRATE_DEAL_COST }),
-      disabled: dealt || !canAfford(player.resources, { wood: 0, stone: 0, money: PIRATE_DEAL_COST, ore: 0 }),
+      disabled: dealt || !canAfford(player.resources, moneyCost(PIRATE_DEAL_COST)),
       visibleWhenDisabled: true,
       onClick: () => gameController.dealWithSelectedPirate(),
     });

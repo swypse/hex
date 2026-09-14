@@ -11,7 +11,7 @@ import { hexDistance, hexNeighbors } from './hex';
 import type { GameMap, MapTile } from './mapGen';
 import type { Player } from './players';
 import { PlayerStats } from './score';
-import { canAfford, pay, villageUpgradeCost } from './resources';
+import { canAfford, moneyCost, pay, villageUpgradeCost } from './resources';
 import { awardScore, awardTempleScores, CAPTURE_SCORE, COMBO_SCORE, EMPTY_STATS, KILL_SCORE, PIRATE_KILL_SCORE, SKILL_SCORE, UPGRADE_SCORE } from './score';
 import { hasSkill, openSkill as applySkill, randomUnopenedSkill, SkillId } from './skills';
 import { evaluateAchievements, awardAchievementScores, currentlyMetIds, type AchievementId } from './achievements';
@@ -550,10 +550,14 @@ export class Simulator {
     if (!canDisband(unit)) return false;
     const player = this.players[unit.owner]!;
     const cost = disbandCost(unit);
-    if (!canAfford(player.resources, { wood: 0, stone: 0, money: cost, ore: 0 })) return false;
-    player.resources = pay(player.resources, { wood: 0, stone: 0, money: cost, ore: 0 });
+    if (!canAfford(player.resources, moneyCost(cost))) return false;
+    player.resources = pay(player.resources, moneyCost(cost));
     const q = tile.q;
     const r = tile.r;
+    // A disbanded unit no longer stands on the village, so any capture
+    // readiness it had earned there is gone (fresh occupation restarts the
+    // full-turn wait at the next turn start).
+    this.clearAbandonedReady(tile, unit.owner);
     tile.unit = null;
     this.emit({ type: 'unitDisbanded', unitId, q, r, playerIndex: unit.owner });
     return true;
@@ -564,7 +568,7 @@ export class Simulator {
     if (!unit || unit.type !== 'pirate') return false;
     const player = this.currentPlayer;
     if (hasPirateDeal(unit, player.index)) return false;
-    const cost = { wood: 0, stone: 0, money: PIRATE_DEAL_COST, ore: 0 };
+    const cost = moneyCost(PIRATE_DEAL_COST);
     if (!canAfford(player.resources, cost)) return false;
     player.resources = pay(player.resources, cost);
     (unit.paidBy ??= []).push(player.index);
@@ -751,7 +755,14 @@ export class Simulator {
         t.settlement.owner = null;
         t.settlement.captureReady = false;
       }
-      if (t.unit && t.unit.owner === playerIndex) t.unit = null;
+      if (t.unit && t.unit.owner === playerIndex) {
+        // The unit stood on an enemy/free village: without it, any capture
+        // readiness that turn belong to no one and must not leak to the next
+        // unit that walks in.
+        if (t.settlement && t.settlement.owner !== playerIndex) t.settlement.captureReady = false;
+        t.unit = null;
+      }
+      if (t.bonus && t.bonus.claimer === playerIndex) t.bonus.claimer = null;
       if (t.ownedBy === playerIndex) {
         t.ownedBy = null;
         t.claimedByVillage = null;

@@ -1,6 +1,6 @@
 import { t } from '../i18n';
 import type { Player } from './players';
-import { canAfford, pay } from './resources';
+import { canAfford, moneyCost, pay } from './resources';
 
 export type SkillId =
   | 'climbing'
@@ -21,7 +21,7 @@ export type SkillId =
   | 'knights'
   | 'bridges';
 
-export interface SkillInfo {
+interface SkillInfo {
   id: SkillId;
   name: string;
   level: number;
@@ -163,12 +163,12 @@ export function canOpenSkill(player: Player, id: SkillId): boolean {
   if (hasSkill(player, id)) return false;
   const info = SKILLS[id];
   if (info.parent && !hasSkill(player, info.parent)) return false;
-  return canAfford(player.resources, { wood: 0, stone: 0, money: skillCost(id, player.skills.length), ore: 0 });
+  return canAfford(player.resources, moneyCost(skillCost(id, player.skills.length)));
 }
 
 export function openSkill(player: Player, id: SkillId): boolean {
   if (!canOpenSkill(player, id)) return false;
-  player.resources = pay(player.resources, { wood: 0, stone: 0, money: skillCost(id, player.skills.length), ore: 0 });
+  player.resources = pay(player.resources, moneyCost(skillCost(id, player.skills.length)));
   player.skills.push(id);
   return true;
 }

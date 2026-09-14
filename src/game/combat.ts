@@ -7,7 +7,7 @@ import type { Player } from './players';
 import { UNIT_TYPES, Unit } from './units';
 import { damageReduction } from './buffs';
 
-export interface AttackResult {
+interface AttackResult {
   attackerDamage: number;
   targetDamage: number;
   attackerDied: boolean;
@@ -16,7 +16,7 @@ export interface AttackResult {
 }
 
 export const MISS_CHANCE = 0.1;
-export const SCIENCE_MISS_CHANCE = 0.05;
+const SCIENCE_MISS_CHANCE = 0.05;
 export const MIN_DAMAGE = 10;
 
 export function missChanceFor(player: Player): number {
@@ -126,6 +126,12 @@ export function performAttack(
 
   if (targetDied) {
     target.unit = null;
+    // A capture-ready village loses readiness the moment its standing unit
+    // dies: a fresh melee killer advancing onto it must hold it for a full
+    // turn before it can be captured (same rule as a move-out).
+    if (target.settlement && target.settlement.owner !== attacker.owner && target.settlement.captureReady) {
+      target.settlement.captureReady = false;
+    }
     if (attackerTile && attacker.type !== 'archer' && attacker.type !== 'catapult' && attacker.type !== 'pirate' && targetUnit.type !== 'pirate' && !isShip(attacker) && !isShip(targetUnit)) {
       attackerTile.unit = null;
       attacker.q = target.q;
@@ -134,7 +140,15 @@ export function performAttack(
     }
   }
   if (attackerDied) {
-    if (attackerTile) attackerTile.unit = null;
+    if (attackerTile) {
+      // A defender who killed the unit that was standing on a capture-ready
+      // enemy/free village frees it up: readiness belongs to the standing
+      // unit's turn, not to the tile.
+      if (attackerTile.settlement && attackerTile.settlement.owner !== attacker.owner && attackerTile.settlement.captureReady) {
+        attackerTile.settlement.captureReady = false;
+      }
+      attackerTile.unit = null;
+    }
   }
 
   return { attackerDamage, targetDamage, attackerDied, targetDied, missed: false };

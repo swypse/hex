@@ -3,7 +3,7 @@ import { Simulator } from '../game/simulator';
 import { AttackUnitPre, GameEvent } from '../game/events';
 import { MapTile } from '../game/mapGen';
 import { Player } from '../game/players';
-import { TRIBES } from '../game/tribes';
+import { TRIBES, tribeById } from '../game/tribes';
 import { canAttack, canMove, HEAL_AMOUNT, PIRATE_OWNER, Unit, UNIT_TYPES } from '../game/units';
 import { isWaterType } from '../game/tileTypes';
 import { tileAt } from '../game/selection';
@@ -251,7 +251,7 @@ export class EventPresenter {
           }
           case 'knightCombo': {
             if (e.playerIndex === useGameStore.getState().localPlayerIndex) {
-              useGameStore.getState().setCenterMessage('Combo kill!');
+              useGameStore.getState().setCenterMessage(t('msg.comboKill'));
             }
             break;
           }
@@ -434,7 +434,7 @@ export class EventPresenter {
       }
       if (!e.missed && impact) sfx.play(impact);
       if (e.missed) {
-        if (targetTile && attackerVisible) this.spawnHpText(targetTile, 'Miss', 0xffa500);
+        if (targetTile && attackerVisible) this.spawnHpText(targetTile, t('msg.miss'), 0xffa500);
       } else {
         if (e.attackerDamage > 0 && targetTile && attackerVisible) this.spawnHpText(targetTile, `-${e.attackerDamage}`, 0xff4444);
         if (e.targetDamage > 0 && attackerTile && targetVisible) this.spawnHpText(attackerTile, `-${e.targetDamage}`, 0xff4444);
@@ -786,12 +786,12 @@ export class EventPresenter {
       return;
     }
     const messages: Record<Exclude<BonusKind, 'skill'>, string> = {
-      money: '+15 money',
-      resources: '+10 wood, +5 stone, +5 ore',
-      villageUpgrade: 'Village upgraded for free',
-      explorer: 'An explorer is scouting the land',
+      money: t('hud.selected.bonus.money'),
+      resources: t('hud.selected.bonus.resources'),
+      villageUpgrade: t('hud.selected.bonus.villageUpgrade'),
+      explorer: t('hud.selected.bonus.explorer'),
     };
-    store.setCenterMessage(`Bonus: ${messages[e.kind]}`);
+    store.setCenterMessage(t('msg.bonusPrefix', { text: messages[e.kind] }));
   }
 
   private presentBottleCollected(e: Extract<GameEvent, { type: 'bottleCollected' }>): void {
@@ -801,7 +801,7 @@ export class EventPresenter {
       skill: e.skill ? t('msg.bottleSkill', { skill: SKILLS[e.skill].name }) : t('msg.bottleMoney'),
       heal: t('msg.bottleHeal'),
     };
-    useGameStore.getState().setCenterMessage(messages[e.kind], 'bottle.png');
+    useGameStore.getState().setCenterMessage(messages[e.kind]);
   }
 
   private async presentExplorer(e: Extract<GameEvent, { type: 'explorer' }>): Promise<void> {
@@ -859,7 +859,7 @@ export class EventPresenter {
     }
     if (e.ownerDied && e.oldOwner !== null) {
       const dead = sim.players[e.oldOwner]!;
-      const tribe = TRIBES.find((t) => t.id === dead.tribe);
+      const tribe = tribeById(dead.tribe);
       if (tribe) useGameStore.getState().setCenterMessage(t('msg.tribeDied', { tribe: tribe.name }), `${tribe.code}-icon.png`);
     }
   }
@@ -872,7 +872,7 @@ export class EventPresenter {
       known.add(local.tribe);
       for (const t of local.knownTribes ?? []) known.add(t);
     }
-    const tribe = TRIBES.find((t) => t.id === capturer.tribe);
+    const tribe = tribeById(capturer.tribe);
     const name = tribe && known.has(capturer.tribe) ? tribe.name : t('ui.unknownTribe');
     const villageName = village.settlement!.name ?? t('tile.Settlement');
     store.setCenterMessage(t('msg.captured', { village: villageName, tribe: name }));

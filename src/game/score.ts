@@ -17,7 +17,7 @@ export const PIRATE_KILL_SCORE = 30;
 export const COMBO_SCORE = 30;
 export const SKILL_SCORE = 15;
 export const EXPLORED_SCORE = 3;
-export const TEMPLE_SCORES: Record<number, number> = { 1: 10, 2: 15, 3: 20, 4: 25 };
+const TEMPLE_SCORES: Record<number, number> = { 1: 10, 2: 15, 3: 20, 4: 25 };
 
 const UNIT_SCORE: Partial<Record<UnitType, number>> = {
   warrior: WARRIOR_SCORE,
@@ -79,7 +79,7 @@ export const EMPTY_STATS: PlayerStats = {
   tribesEliminated: 0,
 };
 
-export interface ScoreBreakdownItem {
+interface ScoreBreakdownItem {
   label: string;
   count: number;
   score: number;

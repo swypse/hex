@@ -1,9 +1,9 @@
 import type { Player } from './players';
 import type { AiGoalId } from './aiTypes';
 
-export type AiPersonalityId = 'aggressive' | 'balanced' | 'builder';
+type AiPersonalityId = 'aggressive' | 'balanced' | 'builder';
 
-export interface AiPersonality {
+interface AiPersonality {
   id: AiPersonalityId;
   goalWeights: Record<AiGoalId, number>;
   musterMinUnits: number;

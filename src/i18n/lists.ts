@@ -1,7 +1,7 @@
 import { currentLanguage, type Language } from '../storage/settings';
 
 /** Grammatical class of a village-noun: masculine, feminine, or plural-only. */
-export type NounKind = 'm' | 'f' | 'pl';
+type NounKind = 'm' | 'f' | 'pl';
 
 interface WordList {
   adjectives: string[];
@@ -73,6 +73,34 @@ export function villageNameAt(adjIdx: number, nounIdx: number): string {
 }
 
 type FoundWord = { idx: number; kind: 'adj' | 'noun' };
+
+/** Adjectives and animals used to generate AI player names per language. */
+const PLAYER_ADJECTIVES: Record<Language, string[]> = {
+  en: ['fury', 'glorious', 'tricky', 'silent', 'brave', 'cunning', 'savage', 'noble', 'ancient', 'wild'],
+  ru: ['Яростный', 'Славный', 'Хитрый', 'Молчаливый', 'Храбрый', 'Коварный', 'Свирепый', 'Благородный', 'Древний', 'Дикий'],
+};
+const PLAYER_ANIMALS: Record<Language, string[]> = {
+  en: ['fox', 'wolf', 'bear', 'hawk', 'lion', 'serpent', 'raven', 'tiger', 'boar', 'eagle'],
+  ru: ['Лис', 'Волк', 'Медведь', 'Ястреб', 'Лев', 'Змей', 'Ворон', 'Тигр', 'Кабан', 'Орёл'],
+};
+
+export function playerNameWords(): { adjectives: string[]; animals: string[] } {
+  const lang = currentLanguage();
+  return { adjectives: PLAYER_ADJECTIVES[lang] ?? PLAYER_ADJECTIVES.en, animals: PLAYER_ANIMALS[lang] ?? PLAYER_ANIMALS.en };
+}
+
+/** Ordinal-rank label ("3rd", "2-е место") following each language's grammar. */
+export function placeWord(rank: number): string {
+  if (currentLanguage() === 'ru') return `${rank}-е место`;
+  const mod10 = rank % 10;
+  const mod100 = rank % 100;
+  const suffix =
+    mod100 >= 11 && mod100 <= 13 ? 'th' :
+    mod10 === 1 ? 'st' :
+    mod10 === 2 ? 'nd' :
+    mod10 === 3 ? 'rd' : 'th';
+  return `${rank}${suffix}`;
+}
 
 /** Locate a word token in any language's vocabulary, recognizing inflected
  *  (feminine/plural) adjective forms as well as base forms. */

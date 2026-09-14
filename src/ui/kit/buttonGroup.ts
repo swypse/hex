@@ -2,12 +2,12 @@ import { Container } from 'pixi.js';
 import { Button, type ButtonCorners } from './button';
 import { THEME } from './theme';
 
-export interface ButtonGroupItem {
+interface ButtonGroupItem {
   label: string;
   onClick: () => void;
 }
 
-export interface ButtonGroupOpts {
+interface ButtonGroupOpts {
   items: ButtonGroupItem[];
   fontSize?: number;
   /** Fixed widths per item; when omitted each button sizes to its label. */

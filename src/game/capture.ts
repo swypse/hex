@@ -14,7 +14,7 @@ export const VILLAGE_CONNECTION_BONUS = 1;
 
 /** Money upkeep of all units this village raised (owner's units whose
  *  spawnVillage is this village), used against the village's income. */
-export function villageMaintenance(map: GameMap, villageTile: MapTile): number {
+function villageMaintenance(map: GameMap, villageTile: MapTile): number {
   const owner = villageTile.settlement?.owner;
   if (owner === null || owner === undefined) return 0;
   let upkeep = 0;

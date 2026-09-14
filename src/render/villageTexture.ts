@@ -4,7 +4,7 @@ import type { Settlement } from '../game/mapGen';
 import type { Player } from '../game/players';
 import type { TileTexture } from './textureFactory';
 
-export interface VillageTextureSet {
+interface VillageTextureSet {
   /** Per-tribe owned village textures; each entry falls back to the generic
    *  `village*.png` when that tribe has no own texture files. */
   villageTextures: Record<Tribe, { level1: TileTexture; level2: TileTexture }>;

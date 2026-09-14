@@ -1,5 +1,6 @@
 import { Application } from 'pixi.js';
 import { Simulator, Command } from '../game/simulator';
+import { t } from '../i18n';
 import { GameStateSnapshot, stripUndefinedValues } from '../game/state';
 import { GameEvent } from '../game/events';
 import { generateRoomCode, ClientMessage, HostMessage, LobbyPlayer } from '../net/peerSession';
@@ -15,7 +16,7 @@ import { SeededRandom } from '../util/random';
 import { GameMode } from '../game/gameMode';
 import { createTextures, TextureSet } from '../render/textureFactory';
 
-export interface HostPlayerEntry {
+interface HostPlayerEntry {
   peerId: string;
   name: string;
   tribeId: Tribe | null;
@@ -58,7 +59,12 @@ export class NetworkController {
   private pendingClientEvents: GameEvent[] = [];
   private pendingPreExplored: Set<string> | null = null;
   private predictedPending = 0;
-  private skipNextEvents = false;
+  /** Number of events batches to skip — one per optimistically predicted
+   *  command answered by the host. A count, not a boolean: with two commands
+   *  in flight (e.g. move then heal) two skip-requests are queued, and each
+   *  reply's `events` consumes exactly one. A state that consumed no pending
+   *  prediction resets the queue as stale. */
+  private eventsToSkip = 0;
 
   constructor(private readonly host: NetworkHost) {}
 
@@ -91,7 +97,7 @@ export class NetworkController {
         if (this.canceled) return;
         const s = useGameStore.getState();
         s.setConnection('error');
-        s.setConnectionMessage(err?.message ?? 'Could not set up the room.');
+        s.setConnectionMessage(err?.message ?? t('lobby.connectionError'));
       },
     });
     this.hostSession.open(code);
@@ -421,13 +427,13 @@ export class NetworkController {
       onClose: () => {
         if (this.canceled) return;
         store.setConnection('error');
-        store.setConnectionMessage('Disconnected from the host.');
+        store.setConnectionMessage(t('lobby.disconnected'));
         this.noteHostDisconnected();
       },
       onError: (err) => {
         if (this.canceled) return;
         store.setConnection('error');
-        store.setConnectionMessage(err?.message ?? 'Connection failed.');
+        store.setConnectionMessage(err?.message ?? t('lobby.errMsg'));
         this.noteHostDisconnected();
       },
     });
@@ -498,9 +504,11 @@ export class NetworkController {
       case 'state': {
         if (this.predictedPending > 0) {
           this.predictedPending--;
-          this.skipNextEvents = true;
+          this.eventsToSkip++;
         } else {
-          this.skipNextEvents = false;
+          // A state that did not consume a prediction is a plain sync batch:
+          // any earlier skip was stale, so the events it precedes must render.
+          this.eventsToSkip = 0;
         }
         this.markClientInGame();
         useGameStore.getState().setPaused(null);
@@ -527,8 +535,8 @@ export class NetworkController {
         break;
       }
       case 'events': {
-        if (this.skipNextEvents) {
-          this.skipNextEvents = false;
+        if (this.eventsToSkip > 0) {
+          this.eventsToSkip--;
           this.pendingPreExplored = null;
           break;
         }

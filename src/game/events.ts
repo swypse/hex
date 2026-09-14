@@ -7,8 +7,6 @@ import type { BottleEffect } from './bottles';
 
 export type BuildingKind = 'sawmill' | 'mine' | 'port' | 'temple' | 'forestTemple';
 
-export type { Axial };
-
 /** Pre-attack visual info for a combatant so presenters can keep showing a
  * unit (and its hp) after the sim has already applied the combat result. */
 export interface AttackUnitPre {

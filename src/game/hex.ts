@@ -99,7 +99,7 @@ export function pointInPolygon(
   return inside;
 }
 
-export interface EdgeSegment {
+interface EdgeSegment {
   ax: number;
   ay: number;
   bx: number;

@@ -2,26 +2,27 @@ import { GameMap, MapTile } from './mapGen';
 import { isShip } from './ship';
 import { isForestType } from './tileTypes';
 import { Unit } from './units';
+import { t } from '../i18n';
 
 export type BuffId = 'waterProtection' | 'forestProtection';
 
-export const TEMPLE_BUFF_THRESHOLD = 3;
+const TEMPLE_BUFF_THRESHOLD = 3;
 
 /** Defense a unit gets while standing in its own village. */
 export const VILLAGE_DEFENSE = 5;
 
 export const BUFF_INFO: Record<BuffId, { name: string; icon: string; tooltip: string; description: string }> = {
   waterProtection: {
-    name: 'Water Protection',
+    name: t('buff.waterProtection.name'),
     icon: 'water-protection.png',
-    tooltip: 'Water Protection: -10 dmg for ships',
-    description: 'Ships you control take 10 less damage from enemy attacks. Unlocks with 3 water temples.',
+    tooltip: t('buff.waterProtection.tooltip'),
+    description: t('buff.waterProtection.desc'),
   },
   forestProtection: {
-    name: 'Forest Protection',
+    name: t('buff.forestProtection.name'),
     icon: 'forest-protection.png',
-    tooltip: 'Forest Protection: -10 dmg for units in forest',
-    description: 'Your units in forest tiles take 10 less damage from enemy attacks. Unlocks with 3 forest temples.',
+    tooltip: t('buff.forestProtection.tooltip'),
+    description: t('buff.forestProtection.desc'),
   },
 };
 

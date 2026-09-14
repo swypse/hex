@@ -189,4 +189,16 @@ describe('spawnUnit', () => {
     expect(skilled.resources.money).toBe(10);
     expect(skilled.resources.ore).toBe(0);
   });
+
+  it('gives every spawned unit a unique id even with back-to-back spawns', () => {
+    const map = makeMap();
+    const player = makePlayer(0, 1000);
+    const a = map.tiles[0]!;
+    spawnUnit(map, a, 'warrior', player);
+    const idA = a.unit!.id;
+    a.unit = null;
+    spawnUnit(map, a, 'warrior', player);
+    const idB = a.unit!.id;
+    expect(idA).not.toBe(idB);
+  });
 });

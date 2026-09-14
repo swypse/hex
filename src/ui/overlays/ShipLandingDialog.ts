@@ -27,13 +27,13 @@ export class ShipLandingDialog {
     const cancel = new Button({ label: t('common.cancel'), onClick: () => gameController.cancelShipLanding() });
     const popup = new Popup({
       app: host.app,
-      title: `Become a ${UNIT_TYPE_NAMES[tile.unit.type]} again?`,
+      title: t('shipLanding.title', { unit: UNIT_TYPE_NAMES[tile.unit.type] }),
       buttons: [confirm, cancel],
       onClose: () => gameController.cancelShipLanding(),
       closeOnBackdrop: false,
     });
 
-    const text = makeLabel('Move your ship onto land to disembark.', {
+    const text = makeLabel(t('shipLanding.hint'), {
       fontSize: 14,
       fill: 0xcccccc,
       wordWrap: true,

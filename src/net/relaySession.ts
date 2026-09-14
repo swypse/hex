@@ -1,4 +1,5 @@
 import { ClientMessage, HostMessage } from './peerSession';
+import { t } from '../i18n';
 
 export interface WebSocketLike {
   send(data: string): void;
@@ -9,14 +10,14 @@ export interface WebSocketLike {
   onerror: (() => void) | null;
 }
 
-export interface RelaySessionOptions {
+interface RelaySessionOptions {
   /** Once in a game, keep retrying for ~5 min instead of the short lobby cap. */
   inGame?: boolean;
   /** Override the retry interval (tests use small values). */
   retryDelayMs?: number;
 }
 
-export interface RelayHostEvents {
+interface RelayHostEvents {
   onReady: () => void;
   onClientJoined: (clientId: string) => void;
   onData: (clientId: string, msg: ClientMessage) => void;
@@ -24,7 +25,7 @@ export interface RelayHostEvents {
   onError: (err: Error) => void;
 }
 
-export interface RelayClientEvents {
+interface RelayClientEvents {
   onRegistered: (selfId: string) => void;
   onJoined: () => void;
   onData: (msg: HostMessage) => void;
@@ -34,7 +35,7 @@ export interface RelayClientEvents {
 
 const DEFAULT_RELAY_URL = 'wss://swypse-hex.bonto.run/ws';
 
-export function relayUrl(): string {
+function relayUrl(): string {
   const explicit = import.meta.env.VITE_RELAY_URL;
   if (explicit) return explicit;
   if (typeof window !== 'undefined' && window.location && /^localhost(:\d+)?$/.test(window.location.hostname)) {
@@ -85,7 +86,7 @@ abstract class RelaySessionBase {
     try {
       socket = this.createSocket(this.url);
     } catch (err) {
-      this.fail(err instanceof Error ? err : new Error('Could not connect to the relay server.'));
+      this.fail(err instanceof Error ? err : new Error(t('net.relayConnect')));
       return;
     }
     this.socket = socket;
@@ -118,7 +119,7 @@ abstract class RelaySessionBase {
     const maxAttempts = this.inGame ? MAX_ATTEMPTS_IN_GAME : MAX_ATTEMPTS;
     if (this.attempts >= maxAttempts) {
       console.error(`[relay:${this.roleName}] giving up after ${this.attempts} attempts`);
-      this.fail(new Error('Could not reach the game server. Check your connection and try again.'));
+      this.fail(new Error(t('net.relayUnreachable')));
       return;
     }
     console.log(`[relay:${this.roleName}] retrying in ${RETRY_DELAY_MS}ms (attempt ${this.attempts + 1})`);
@@ -309,7 +310,7 @@ export class RelayClientSession extends RelaySessionBase {
           try {
             this.events.onData(msg.data as HostMessage);
           } catch (err) {
-            this.events.onError(err instanceof Error ? err : new Error('Failed to process a message from the host.'));
+            this.events.onError(err instanceof Error ? err : new Error(t('net.hostMessage')));
           }
         }
         break;

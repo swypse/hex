@@ -1,11 +1,11 @@
 import { Application, Container, Graphics } from 'pixi.js';
 
-export interface WakePoint {
+interface WakePoint {
   x: number;
   y: number;
 }
 
-export const WAKE_JITTER_PX = 9;
+const WAKE_JITTER_PX = 9;
 
 export function wakeSquarePositions(
   from: WakePoint,

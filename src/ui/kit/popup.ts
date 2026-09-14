@@ -23,7 +23,7 @@ const MIN_CARD_HEIGHT = 80;
 /** Standard body text size used across popups. */
 export const POPUP_BODY_SIZE = 14;
 
-export interface PopupOpts {
+interface PopupOpts {
   app: Application;
   /** Centered header text. Optional. */
   title?: string;

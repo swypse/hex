@@ -5,7 +5,7 @@ const SETTINGS_KEY = 'hex-settings-v1';
 
 export type Language = 'en' | 'ru';
 
-export interface GameSettings {
+interface GameSettings {
   aiDifficulty: AiDifficulty;
   lang: Language;
   soundOn: boolean;
@@ -30,7 +30,7 @@ export function loadSettings(): GameSettings {
   return { ...DEFAULTS };
 }
 
-export function saveSettings(settings: GameSettings): void {
+function saveSettings(settings: GameSettings): void {
   try {
     storageService.setItem(SETTINGS_KEY, JSON.stringify(settings));
   } catch {

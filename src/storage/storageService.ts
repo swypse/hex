@@ -4,7 +4,7 @@ export interface StorageService {
   removeItem(key: string): void;
 }
 
-export class LocalStorageService implements StorageService {
+class LocalStorageService implements StorageService {
   getItem(key: string): string | null {
     return window.localStorage.getItem(key);
   }

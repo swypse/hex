@@ -1,8 +1,8 @@
 import { axialKey, hexNeighbors } from './hex';
-import { GameMap, MapTile } from './mapGen';
+import { tileMapByKey, type GameMap, type MapTile } from './mapGen';
 import { isWaterType } from './tileTypes';
 
-export interface WaterComponent {
+interface WaterComponent {
   owner: number;
   ports: MapTile[];
   tiles: Set<string>;
@@ -11,8 +11,8 @@ export interface WaterComponent {
 /** Flood-filled components over a player's own water cells (terrain water
  *  tiles it owns, bridges and ports included) that contain at least two of
  *  the player's own ports. */
-export function findWaterPortComponents(map: GameMap): WaterComponent[] {
-  const byKey = new Map(map.tiles.map((t) => [axialKey(t), t] as const));
+function findWaterPortComponents(map: GameMap): WaterComponent[] {
+  const byKey = tileMapByKey(map);
   const owners = new Set<number>();
   for (const t of map.tiles) {
     if (t.building?.kind === 'port' && t.ownedBy !== null && t.ownedBy !== undefined) {

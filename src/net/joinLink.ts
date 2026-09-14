@@ -1,6 +1,6 @@
 import { isRoomCode } from './peerSession';
 
-export const JOIN_QUERY_PARAM = 'join';
+const JOIN_QUERY_PARAM = 'join';
 
 let pendingJoin: string | null = null;
 

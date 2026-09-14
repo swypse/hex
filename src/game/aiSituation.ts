@@ -9,25 +9,25 @@ import { UNIT_ATTACK_DISTANCE, UNIT_MOVEMENT, Unit, UnitType } from './units';
 import { isWaterType } from './tileTypes';
 import { attackDamage } from './combat';
 
-export type AiStance = 'settle' | 'defend' | 'war';
+type AiStance = 'settle' | 'defend' | 'war';
 
-export interface EnemyUnit {
+interface EnemyUnit {
   tile: MapTile;
   unit: Unit;
 }
 
-export interface VillageDanger {
+interface VillageDanger {
   village: MapTile;
   /** Smallest number of enemy turns before an enemy can occupy the village. */
   enemyTurns: number;
 }
 
-export interface FreeVillageTarget {
+interface FreeVillageTarget {
   village: MapTile;
   distance: number;
 }
 
-export interface NavalEnemy {
+interface NavalEnemy {
   tile: MapTile;
   unit: Unit;
   distance: number;
@@ -46,7 +46,7 @@ function navalStrikeRange(unit: Unit): number {
 /** True when a tile lies within the attack range of any listed naval enemy
  *  (terrain-ignoring). Used to keep fresh spawns and land units out of a
  *  pirate's reach. */
-export function navalCanStrikeTile(tile: MapTile, navalEnemies: NavalEnemy[]): boolean {
+function navalCanStrikeTile(tile: MapTile, navalEnemies: NavalEnemy[]): boolean {
   return navalEnemies.some((e) => hexDistance(tile, e.tile) <= navalStrikeRange(e.unit));
 }
 
@@ -108,7 +108,7 @@ export function isMelee(unit: Unit): boolean {
   return MELEE_TYPES.has(unit.type);
 }
 
-export function movementOf(unit: Unit): number {
+function movementOf(unit: Unit): number {
   return unit.shipLevel !== undefined ? shipMovement(unit) : UNIT_MOVEMENT[unit.type];
 }
 

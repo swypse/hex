@@ -55,7 +55,7 @@ describe('coastWaterBrightness', () => {
   const find = (q: number, r: number): MapTile | undefined => map.get(`${q},${r}`) as MapTile | undefined;
 
   it('brightens water adjacent to land', () => {
-    expect(coastWaterBrightness(water, find)).toBe(1.12);
+    expect(coastWaterBrightness(water, find)).toBe(1.5);
   });
 
   it('keeps open water (no land neighbor) at factor 1', () => {

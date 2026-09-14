@@ -13,12 +13,12 @@ export type Screen = 'start' | 'setup' | 'lobby' | 'game';
 export type { LobbyPlayer };
 
 /** Optional styling for the icon chip shown above a center message. */
-export interface IconChipStyle {
+interface IconChipStyle {
   size: number;
   bgColor: number;
 }
 
-export type OverlayState =
+type OverlayState =
   | null
   | { kind: 'spawn' }
   | { kind: 'skill' }
@@ -35,7 +35,7 @@ export type OverlayState =
   | { kind: 'disband'; unitId: string }
   | { kind: 'watchingPrompt' };
 
-export interface LobbyState {
+interface LobbyState {
   role: 'host' | 'client';
   code: string;
   mode: GameMode;

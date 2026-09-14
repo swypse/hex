@@ -1,7 +1,7 @@
 import { Container, Graphics, Text } from 'pixi.js';
 import { gameController } from '../../controller/gameController';
 import { useGameStore } from '../../store/gameStore';
-import { TRIBES, type Tribe } from '../../game/tribes';
+import { TRIBES, type Tribe, tribeById } from '../../game/tribes';
 import { type GameMode } from '../../game/gameMode';
 import { type AiDifficulty } from '../../game/aiDifficulty';
 import { type MapSize } from '../../game/mapGen';
@@ -64,15 +64,15 @@ export class SetupScreen implements ScreenController {
     host.screenLayer.addChild(this.root);
     this.scroll = new ScreenScroll(host.app, this.root);
 
-    this.tribeTitle = makeLabel(t('setup.chooseTribe'), { fontSize: 24, fill: 0xffffff });
+    this.tribeTitle = makeLabel(t('common.chooseTribe'), { fontSize: 24, fill: 0xffffff });
     this.tribeTitle.anchor.set(0.5, 0.5);
     this.enemiesTitle = makeLabel(t('setup.enemies'), { fontSize: 24, fill: 0xffffff });
     this.enemiesTitle.anchor.set(0.5, 0.5);
-    this.modeTitle = makeLabel(t('setup.mode'), { fontSize: 24, fill: 0xffffff });
+    this.modeTitle = makeLabel(t('common.mode'), { fontSize: 24, fill: 0xffffff });
     this.modeTitle.anchor.set(0.5, 0.5);
     this.difficultyTitle = makeLabel(t('setup.difficulty'), { fontSize: 24, fill: 0xffffff });
     this.difficultyTitle.anchor.set(0.5, 0.5);
-    this.mapSizeTitle = makeLabel(t('setup.mapSize'), { fontSize: 24, fill: 0xffffff });
+    this.mapSizeTitle = makeLabel(t('common.mapSize'), { fontSize: 24, fill: 0xffffff });
     this.mapSizeTitle.anchor.set(0.5, 0.5);
 
     for (const t of TRIBES) {
@@ -161,7 +161,7 @@ export class SetupScreen implements ScreenController {
     this.hint.anchor.set(0.5, 0.5);
 
     this.backBtn = new Button({
-      label: t('setup.back'),
+      label: t('common.back'),
       width: 96,
       fontSize: 14,
       onClick: () => useGameStore.getState().setScreen('start')
@@ -259,7 +259,7 @@ export class SetupScreen implements ScreenController {
       probe.destroy();
     }
     this.tribeDescH = maxH;
-    const info = TRIBES.find((t) => t.id === this.tribe);
+    const info = tribeById(this.tribe);
     if (!info) return;
     const desc = makeLabel(t(`tribe.desc.${info.code}`), opts);
     desc.anchor.set(0.5, 0);

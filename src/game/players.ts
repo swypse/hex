@@ -4,7 +4,7 @@ import { Resources, START_RESOURCES } from './resources';
 import type { SkillId } from './skills';
 import { EMPTY_STATS, type PlayerStats } from './score';
 import type { AchievementId } from './achievements';
-import { Tribe, TRIBES } from './tribes';
+import { Tribe, TRIBES, tribeById } from './tribes';
 import { AiDifficulty, DEFAULT_AI_DIFFICULTY } from './aiDifficulty';
 import type { AiStrategyState } from './aiTypes';
 
@@ -26,12 +26,12 @@ export interface Player {
 }
 
 function startingResourcesFor(tribe: Tribe): Resources {
-  const info = TRIBES.find((t) => t.id === tribe)!;
+  const info = tribeById(tribe)!;
   return { ...START_RESOURCES, money: START_RESOURCES.money + (info.startMoneyBonus ?? 0) };
 }
 
 function startingSkillsFor(tribe: Tribe): SkillId[] {
-  const info = TRIBES.find((t) => t.id === tribe)!;
+  const info = tribeById(tribe)!;
   return info.startSkill ? [info.startSkill] : [];
 }
 

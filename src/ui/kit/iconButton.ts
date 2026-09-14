@@ -3,7 +3,7 @@ import { makeIcon } from './icon';
 import { THEME } from './theme';
 import { sfx } from '../../sound/sfx';
 
-export interface IconButtonOpts {
+interface IconButtonOpts {
   icon: string;
   onClick: () => void;
   size?: number;

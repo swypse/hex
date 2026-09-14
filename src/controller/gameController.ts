@@ -1,6 +1,7 @@
 import { Application, Container } from 'pixi.js';
 import { Simulator, type Command } from '../game/simulator';
 import { localizeVillageName } from '../i18n/lists';
+import { t } from '../i18n';
 import { GameStateSnapshot } from '../game/state';
 import { GameEvent, BuildingKind } from '../game/events';
 import type { HostMessage } from '../net/peerSession';
@@ -17,7 +18,7 @@ import { shouldPromptWatch, type GameMode } from '../game/gameMode';
 import { isExploredFor, initialExplorationFor } from '../game/explore';
 import { exploreVillageSights } from '../game/village';
 import { RESOURCE_CHEAT_AMOUNT } from '../game/cheats';
-import { TRIBES, Tribe } from '../game/tribes';
+import { TRIBES, Tribe, tribeById } from '../game/tribes';
 import { MapView, type OverlayItem } from '../render/mapRenderer';
 import { pickTileAt } from '../render/tilePick';
 import { createTextures } from '../render/textureFactory';
@@ -218,9 +219,9 @@ class GameController {
     if (notify && !firstSync) {
       const newly = [...current].filter((id) => !this.knownTribeIds.has(id));
       newly.forEach((tribeId, i) => {
-        const tribe = TRIBES.find((t) => t.id === tribeId);
+        const tribe = tribeById(tribeId);
         if (!tribe) return;
-        setTimeout(() => useGameStore.getState().setCenterMessage(`You meet ${tribe.name}!`, `${tribe.code}-icon.png`), i * 1100);
+        setTimeout(() => useGameStore.getState().setCenterMessage(t('msg.meetTribe', { tribe: tribe.name }), `${tribe.code}-icon.png`), i * 1100);
       });
     }
     this.knownTribeIds = new Set<number>([...this.knownTribeIds, ...current]);

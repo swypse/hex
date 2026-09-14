@@ -3,7 +3,7 @@ import { storageService, type StorageService } from './storageService';
 
 const SAVE_KEY = 'hex-save-v1';
 
-export interface SaveRepository {
+interface SaveRepository {
   save(snapshot: GameStateSnapshot): void;
   load(): GameStateSnapshot | null;
   hasSave(): boolean;

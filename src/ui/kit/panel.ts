@@ -39,7 +39,7 @@ export function makePanel(
   return g;
 }
 
-export function makeCircle(
+function makeCircle(
   radius: number,
   fill: number,
   stroke?: { width: number; color: number },

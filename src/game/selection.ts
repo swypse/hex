@@ -6,7 +6,7 @@ import { isShip } from './ship';
 import { isExploredFor } from './explore';
 import { Unit, moveRange } from './units';
 
-export type SelectionKind = 'unit' | 'village' | 'terrain';
+type SelectionKind = 'unit' | 'village' | 'terrain';
 
 export interface Selection {
   kind: SelectionKind;

@@ -4,7 +4,7 @@ import { makeLabel } from './label';
 import { makeSkillIcon, SKILL_ICON_FILES } from './skillIcons';
 import { THEME } from './theme';
 
-export interface SkillMedallionOpts {
+interface SkillMedallionOpts {
   skill: SkillId;
   opened: boolean;
   /** Text in the top-right badge: the money price, or a checkmark when opened. */

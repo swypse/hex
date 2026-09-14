@@ -4,7 +4,7 @@ import { canAfford, villageUpgradeCost } from './resources';
 import { isWaterType } from './tileTypes';
 import { canOpenSkill, hasSkill, SkillId } from './skills';
 import { reachableTargets, tileAt } from './selection';
-import { UNIT_ATTACK_DISTANCE, UNIT_MOVEMENT, UNIT_TYPES, canHeal, HEAL_AMOUNT, Unit, UnitType } from './units';
+import { UNIT_MOVEMENT, UNIT_TYPES, UNIT_ATTACK_DISTANCE, canHeal, HEAL_AMOUNT, Unit, UnitType } from './units';
 import { SeededRandom } from '../util/random';
 import { hexDistance, hexNeighbors } from './hex';
 import { attackableTargets, attackDamage, tradeIsFavorable } from './combat';
@@ -14,7 +14,7 @@ import { isExploredFor } from './explore';
 import { AiAction, AiDirectives, AiPlannerState, SpawnPreference } from './aiTypes';
 import { AiDifficultyProfile } from './aiDifficulty';
 import { AiSituation, coastExposedTile, isMelee, isNavalEnemy } from './aiSituation';
-import { isShip, shipAttackDistance, canUpgradeShip } from './ship';
+import { isShip, shipAttackDistance, shipMovement, canUpgradeShip } from './ship';
 
 export interface AiPatternContext {
   map: GameMap;
@@ -26,7 +26,7 @@ export interface AiPatternContext {
   directives?: AiDirectives;
 }
 
-export interface AiPattern {
+interface AiPattern {
   id: string;
   priority: number;
   evaluate(ctx: AiPatternContext): AiAction[] | null;
@@ -36,13 +36,21 @@ function key(q: number, r: number): string {
   return `${q},${r}`;
 }
 
+/** Movement and attack reach of a unit in hexes, honoring ship stat tables.
+ *  Ships keep their land-unit `.type`, so the raw UNIT_MOVEMENT/ATTACK_DISTANCE
+ *  tables drastically underestimate a levelled enemy ship's strike zone. */
+function enemyReach(unit: Unit): { move: number; attack: number } {
+  if (isShip(unit)) return { move: shipMovement(unit), attack: shipAttackDistance(unit) };
+  return { move: UNIT_MOVEMENT[unit.type], attack: UNIT_ATTACK_DISTANCE[unit.type] };
+}
+
 export function enemyCanReach(map: GameMap, tile: MapTile, playerIndex: number): boolean {
   return map.tiles.some(
     (t) =>
       t.unit &&
       t.unit.owner !== playerIndex &&
       isExploredFor(t, playerIndex) &&
-      hexDistance(tile, t) <= UNIT_MOVEMENT[t.unit.type],
+      hexDistance(tile, t) <= enemyReach(t.unit).move,
   );
 }
 
@@ -55,18 +63,16 @@ export function landEnemyCanReach(map: GameMap, tile: MapTile, playerIndex: numb
       t.unit.owner >= 0 &&
       t.unit.owner !== playerIndex &&
       isExploredFor(t, playerIndex) &&
-      hexDistance(tile, t) <= UNIT_MOVEMENT[t.unit.type],
+      hexDistance(tile, t) <= enemyReach(t.unit).move,
   );
 }
 
 export function enemyCanAttackNext(map: GameMap, tile: MapTile, playerIndex: number): boolean {
-  return map.tiles.some(
-    (t) =>
-      t.unit &&
-      t.unit.owner !== playerIndex &&
-      isExploredFor(t, playerIndex) &&
-      hexDistance(tile, t) <= UNIT_MOVEMENT[t.unit.type] + UNIT_ATTACK_DISTANCE[t.unit.type],
-  );
+  return map.tiles.some((t) => {
+    if (!t.unit || t.unit.owner === playerIndex || !isExploredFor(t, playerIndex)) return false;
+    const reach = enemyReach(t.unit);
+    return hexDistance(tile, t) <= reach.move + reach.attack;
+  });
 }
 
 const SPAWN_ORDER: Record<SpawnPreference, UnitType[]> = {
@@ -141,7 +147,7 @@ export function isFrontierTile(map: GameMap, tile: MapTile, playerIndex: number)
   });
 }
 
-export function attackersForTile(
+function attackersForTile(
   map: GameMap,
   player: Player,
   targetTile: MapTile,

@@ -18,7 +18,7 @@ export function t(key: string, params?: Record<string, string | number>): string
   return text;
 }
 
-export function availableLanguages(): { code: Language; label: string }[] {
+function availableLanguages(): { code: Language; label: string }[] {
   return [
     { code: 'en', label: dicts.en['lang.en'] ?? 'English' },
     { code: 'ru', label: dicts.ru['lang.ru'] ?? 'Русский' },

@@ -2,12 +2,12 @@ import {
   Application, Circle, Container, Graphics, Sprite, Text, type TextStyleOptions, type Texture, type Ticker
 } from 'pixi.js';
 import { axialKey, compareTileY, hexCorners, hexEdge, hexEdgeNeighbor, hexToPixel, splitHexBorder } from '../game/hex';
-import { GameMap, MapTile } from '../game/mapGen';
+import { tileMapByKey, type GameMap, type MapTile } from '../game/mapGen';
 import { bridgeCoastOffsets } from '../game/bridges';
 import { portDirection } from '../game/buildings';
 import { Player } from '../game/players';
 import { Selection } from '../game/selection';
-import { TRIBES } from '../game/tribes';
+import { TRIBES, tribeById } from '../game/tribes';
 import { UNIT_TYPES, PIRATE_COLOR, Unit } from '../game/units';
 import { unitCanAct } from '../game/unitActions';
 import { isExploredFor } from '../game/explore';
@@ -24,11 +24,11 @@ import { t } from '../i18n';
 import { Tooltip } from '../ui/kit/tooltip';
 
 /** Diameter of a pirate-deal dot (screen px; the row does not scale with zoom). */
-export const PIRATE_DEAL_DOT = 8;
+const PIRATE_DEAL_DOT = 8;
 /** Horizontal gap between pirate-deal dots (screen px). */
-export const PIRATE_DEAL_GAP = 4;
+const PIRATE_DEAL_GAP = 4;
 /** Screen-px gap between the pirate's hp bar anchor and the deal-dot row. */
-export const PIRATE_DEAL_HPBAR_GAP = 4;
+const PIRATE_DEAL_HPBAR_GAP = 4;
 /** World offset of the hp bar anchor above/relative to the tile's unit top. */
 const HP_BAR_ANCHOR_OFFSET = 40;
 
@@ -62,7 +62,7 @@ const CAPTURE_EDGE_PULSE_MS = 600;
  *  the ground plane like the hexes. */
 const MARKER_Y_SCALE = 0.75;
 
-export type CaptureMarkerSide = 'l' | 'r' | 't' | 'b';
+type CaptureMarkerSide = 'l' | 'r' | 't' | 'b';
 
 /** The 6 polygon points of the off-screen capture marker triangle.
  *
@@ -303,13 +303,13 @@ export class MapView {
       });
       map = { ...map, tiles };
     }
-    this.tileIndex = new Map(map.tiles.map((t) => [axialKey(t), t]));
+    this.tileIndex = tileMapByKey(map);
     this.waterRouteNeighbors = waterRouteEdges(map);
     this.waterJumps = portWaterClusterJumps(map);
     const local = players[localPlayerIndex];
     const known = new Set<number>(local ? [local.tribe, ...(local.knownTribes ?? [])] : []);
     this.knownOwners = new Set(players.filter((p) => known.has(p.tribe)).map((p) => p.index));
-    const reachableColor = local ? (TRIBES.find((t) => t.id === local.tribe)?.color ?? SELECTION_COLOR) : SELECTION_COLOR;
+    const reachableColor = local ? (tribeById(local.tribe)?.color ?? SELECTION_COLOR) : SELECTION_COLOR;
     this.clearFireEffects();
     this.releaseOverlay();
     this.clearHighlights();
@@ -344,7 +344,7 @@ export class MapView {
         const unit = tile.unit;
         const color = unit.type === 'pirate'
           ? PIRATE_COLOR
-          : TRIBES.find((t) => t.id === players[unit.owner]!.tribe)!.color;
+          : tribeById(players[unit.owner]!.tribe)!.color;
         const center = this.unitTextureTop(unit, players);
         hpBars.push({
           unit,
@@ -768,7 +768,7 @@ export class MapView {
     g.clear();
     if (!explored || tile.ownedBy === null) return;
     const owner = tile.ownedBy;
-    const tribe = TRIBES.find((t) => t.id === players[owner]!.tribe)!;
+    const tribe = tribeById(players[owner]!.tribe)!;
     const p = hexToPixel(tile, this.hexSize);
     const elev = tileElevation(tile, this.hexSize);
     const cx = p.x;
@@ -1774,7 +1774,7 @@ export class MapView {
     const map = this.map!;
     const capacity = villageCapacity(tile.settlement!.level);
     const count = unitsInVillage(map, tile);
-    const tribe = TRIBES.find((t) => t.id === players[owner]!.tribe)!;
+    const tribe = tribeById(players[owner]!.tribe)!;
     const connected = this.textures.villageConnectedTexture !== null && isVillageRoadConnected(map, tile, this.waterJumps);
     const icon = connected ? new Sprite(this.textures.villageConnectedTexture!) : null;
     const iconSize = 16;

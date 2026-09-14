@@ -1,5 +1,5 @@
 import { Container, Graphics } from 'pixi.js';
-import { TRIBES } from '../../game/tribes';
+import { TRIBES, tribeById } from '../../game/tribes';
 import { useGameStore } from '../../store/gameStore';
 import { type UIHost, type Widget } from '../host';
 import { makeIcon } from '../kit/icon';
@@ -54,7 +54,7 @@ export class HudPlayers implements Widget {
   }
 
   private makeChip(name: string, tribeId: number, online: boolean): Container {
-    const tribe = TRIBES.find((t) => t.id === tribeId)!;
+    const tribe = tribeById(tribeId)!;
     const chip = new Container();
     const cx = SLOT_WIDTH / 2;
     const cy = RADIUS + 4;

@@ -1,11 +1,11 @@
 import type { Container } from 'pixi.js';
 
-export const TRIBE_DIAM = 56;
+const TRIBE_DIAM = 56;
 export const TRIBE_GAP = 16;
-export const TRIBE_STEP = TRIBE_DIAM + TRIBE_GAP;
+const TRIBE_STEP = TRIBE_DIAM + TRIBE_GAP;
 export const TRIBE_ROW_STEP = 88;
 
-export interface TribeSlot {
+interface TribeSlot {
   x: number;
   y: number;
 }

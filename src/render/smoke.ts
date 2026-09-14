@@ -1,11 +1,11 @@
 import { Application, Container, Graphics } from 'pixi.js';
 
-export const MUZZLE_MS = 1200;
-export const MUZZLE_STAGGER = 150;
+const MUZZLE_MS = 1200;
+const MUZZLE_STAGGER = 150;
 export const MUZZLE_COUNT = 10;
 const MUZZLE_RISE = 80;
 
-export interface MuzzleParticleParams {
+interface MuzzleParticleParams {
   color: number;
   opacity: number;
   start: number;

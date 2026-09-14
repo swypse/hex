@@ -1,5 +1,6 @@
 import type { Simulator } from '../game/simulator';
 import type { GameEvent } from '../game/events';
+import { t } from '../i18n';
 import { hexDistance, hexNeighbors } from '../game/hex';
 import { tileAt } from '../game/selection';
 import type { MapTile } from '../game/mapGen';
@@ -335,7 +336,7 @@ export class TutorialDirector {
       .filter(freeNeutral)
       .sort((a, b) => hexDistance(a, anchor) - hexDistance(b, anchor))[0];
     if (!target) return;
-    target.settlement = { owner: null, level: 1, captureReady: false, name: 'Empty Village' };
+    target.settlement = { owner: null, level: 1, captureReady: false, name: t('tutorial.emptyVillage') };
     this.freeVillageQ = target.q;
     this.freeVillageR = target.r;
     this.freeVillageSet = true;

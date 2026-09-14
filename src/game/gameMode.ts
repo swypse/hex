@@ -31,6 +31,11 @@ export function captureWinnerIndex(map: GameMap): number | null {
 
 export function computeWinner(players: Player[], map: GameMap): number {
   const active = players.filter((p) => p.isActive);
+  // Every player can be ruled out at once (simultaneous forfeits, capture mode
+  // where the last villages become ownerless): fall back to the first player so
+  // the end-game flow still has a concrete winner instead of Math.max(-Infinity)
+  // crashing on an empty array.
+  if (active.length === 0) return players[0]?.index ?? 0;
   let best = active.slice();
   const maxScore = Math.max(...best.map((p) => totalScore(map, p)));
   best = best.filter((p) => totalScore(map, p) === maxScore);
@@ -61,7 +66,7 @@ export function rankPlayers(players: Player[], map: GameMap): Player[] {
   });
 }
 
-export interface WatchPromptCheck {
+interface WatchPromptCheck {
   netMode: string;
   mode: GameMode;
   gameOver: boolean;

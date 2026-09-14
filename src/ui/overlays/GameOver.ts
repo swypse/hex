@@ -1,7 +1,7 @@
 import { t } from '../../i18n';
 import { Container, Graphics } from 'pixi.js';
 import { gameController } from '../../controller/gameController';
-import { TRIBES } from '../../game/tribes';
+import { TRIBES, tribeById } from '../../game/tribes';
 import { Player } from '../../game/players';
 import { scoreBreakdown, totalScore } from '../../game/score';
 import { bonusScoreFor, rankPlayers } from '../../game/gameMode';
@@ -44,13 +44,13 @@ export class GameOver {
     if (!map) return;
     const winner = s.players[s.winnerIndex];
     if (!winner) return;
-    const tribe = TRIBES.find((t) => t.id === winner.tribe)!;
+    const tribe = tribeById(winner.tribe)!;
 
     const again = new Button({ label: t('ui.playagain'), width: 180, onClick: () => useGameStore.getState().setScreen('setup') });
     const menu = new Button({ label: t('ui.mainmenu'), width: 180, onClick: () => useGameStore.getState().setScreen('start') });
     const popup = new Popup({
       app: host.app,
-      title: 'Game over',
+      title: t('gameover.title'),
       buttons: [again, menu],
       closeOnBackdrop: false,
       closeOnEscape: false,
@@ -63,7 +63,7 @@ export class GameOver {
     this.selectedIndex = s.localPlayerIndex;
 
     let y = 0;
-    const banner = makeLabel(`${winner.name} (${tribe.name}) wins!`, {
+    const banner = makeLabel(t('gameover.wins', { name: winner.name, tribe: tribe.name }), {
       fontSize: 24,
       fill: tribe.color,
       fontWeight: '800',
@@ -124,7 +124,7 @@ export class GameOver {
     circle.circle(0, 0, CIRCLE_R).fill(0xffffff);
     const clip = new Graphics();
     clip.circle(0, 0, CIRCLE_R).fill(0xffffff);
-    const tribe = TRIBES.find((t) => t.id === p.tribe)!;
+    const tribe = tribeById(p.tribe)!;
     const icon = makeIcon(`${tribe.code}-icon.png`, CIRCLE_R * 2);
     icon.mask = clip;
     const badge = new Graphics();
@@ -150,7 +150,7 @@ export class GameOver {
     const map = gameController.getMap();
     if (!map) return;
     const player = s.players[this.selectedIndex]!;
-    const tribe = TRIBES.find((t) => t.id === player.tribe)!;
+    const tribe = tribeById(player.tribe)!;
     const fastBonus = s.bonusAwarded && s.winnerIndex === player.index ? bonusScoreFor(s.players.length) : 0;
     const cw = this.popup.contentWidth;
 
@@ -170,7 +170,7 @@ export class GameOver {
         ? `${item.label}: ${item.count}`
         : item.count === 0
           ? `${item.label}: ${item.score}`
-          : `${item.label}: ${item.count}, Scores: ${item.score}`;
+          : `${item.label}: ${item.count}, ${t('gameover.scores', { score: item.score })}`;
       const label = makeLabel(line, { fontSize: 14, fill: 0xeeeeee, wordWrap: true, wordWrapWidth: cw });
       label.anchor.set(0.5, 0);
       label.position.set(cw / 2, y);
@@ -203,7 +203,7 @@ export class GameOver {
         y += line.height + 8;
       }
     }
-    const total = makeLabel(`Total: ${totalScore(map, player)}`, {
+    const total = makeLabel(`${t('gameover.total')} ${totalScore(map, player)}`, {
       fontSize: 16,
       fill: 0xffffff,
       fontWeight: '700',

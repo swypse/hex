@@ -14,10 +14,10 @@ export interface Bonus {
   arrivalTurn: number;
 }
 
-export const EXPLORER_MOVES = 25;
+const EXPLORER_MOVES = 25;
 
-export const BONUS_MIN_DIST = 4;
-export const START_AREA_DIST = 3;
+const BONUS_MIN_DIST = 4;
+const START_AREA_DIST = 3;
 
 export function randomBonusKind(rng: () => number): BonusKind {
   const kinds: BonusKind[] = ['money', 'resources', 'villageUpgrade', 'explorer', 'skill'];

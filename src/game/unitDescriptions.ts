@@ -37,7 +37,7 @@ export function unitHelpDescription(unit: Unit): string {
   return t(DESC_KEYS[unit.type]);
 }
 
-export interface UnitHelpStat {
+interface UnitHelpStat {
   /** 16px icon file, e.g. '16/move-16.png'. */
   icon: string;
   /** Localized stat text, e.g. '1 movement'. */

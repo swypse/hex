@@ -5,7 +5,7 @@ import { Tribe } from './tribes';
 import type { GameMap, MapTile } from './mapGen';
 
 export type UnitType = 'warrior' | 'rider' | 'archer' | 'swordsman' | 'shield' | 'catapult' | 'knight' | 'pirate';
-export type PlayableUnitType = Exclude<UnitType, 'pirate'>;
+type PlayableUnitType = Exclude<UnitType, 'pirate'>;
 
 export const PIRATE_OWNER = -1;
 export const PIRATE_HP = 80;
@@ -15,7 +15,7 @@ export const PIRATE_COLOR = 0x111111;
  *  paying player's tribe. */
 export const PIRATE_DEAL_COST = 50;
 
-export interface UnitTypeInfo {
+interface UnitTypeInfo {
   movement: number;
   attack: number;
   attackDistance: number;
@@ -107,7 +107,7 @@ export const UNIT_ATTACK_DISTANCE: Record<UnitType, number> = {
 export const MAX_HP = UNIT_TYPES.warrior.maxHp;
 
 /** Money upkeep a land unit of this type costs its home village each turn. */
-export const UNIT_MAINTENANCE: Record<UnitType, number> = {
+const UNIT_MAINTENANCE: Record<UnitType, number> = {
   warrior: 1,
   archer: 2,
   swordsman: 3,
@@ -119,7 +119,7 @@ export const UNIT_MAINTENANCE: Record<UnitType, number> = {
 };
 
 /** Money upkeep a ship costs its home village each turn, by ship level. */
-export const SHIP_MAINTENANCE: Record<1 | 2 | 3, number> = {
+const SHIP_MAINTENANCE: Record<1 | 2 | 3, number> = {
   1: 2,
   2: 3,
   3: 4,
@@ -156,7 +156,7 @@ export const UNIT_TYPE_NAMES: Record<UnitType, string> = {
 
 export const HEAL_AMOUNT = 15;
 
-export interface UnitOptions {
+interface UnitOptions {
   id?: string;
   hasMoved?: boolean;
   hasAttacked?: boolean;

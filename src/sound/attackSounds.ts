@@ -1,6 +1,6 @@
 import type { UnitType } from '../game/units';
 
-export interface AttackSoundPlan {
+interface AttackSoundPlan {
   launch?: 'arcShot';
   impact?: 'swordHit' | 'hit';
 }

@@ -1,10 +1,9 @@
-import { axialKey, hexNeighbors } from './hex';
 import { isExploredFor } from './explore';
-import type { GameMap, MapTile } from './mapGen';
+import { tileMapByKey, type GameMap, type MapTile } from './mapGen';
 import type { Player } from './players';
 import { awardScore, EMPTY_STATS, type PlayerStats } from './score';
 import { SKILLS } from './skills';
-import { portWaterClusterJumps } from './waterRoads';
+import { roadNetworkComponents } from './roads';
 
 export type AchievementId =
   | 'greatConnector'
@@ -47,44 +46,16 @@ function ownedVillages(map: GameMap, player: Player): MapTile[] {
   return map.tiles.filter((t) => t.settlement !== null && t.settlement.owner === player.index);
 }
 
-function isNetworkNode(tile: MapTile, player: Player): boolean {
-  if (tile.settlement !== null && tile.settlement.owner === player.index) return true;
-  if (tile.roadOwner === player.index) return true;
-  return tile.building?.kind === 'port' && tile.ownedBy === player.index;
-}
-
 /** Largest number of the player's villages reachable over its own roads,
  *  bridges and ports. */
 function largestVillageCluster(map: GameMap, player: Player): number {
-  const byKey = new Map(map.tiles.map((t) => [axialKey(t), t] as const));
-  const waterJumps = portWaterClusterJumps(map);
-  const visited = new Set<string>();
+  const byKey = tileMapByKey(map);
   let best = 0;
-  for (const start of map.tiles) {
-    if (visited.has(axialKey(start)) || !isNetworkNode(start, player)) continue;
+  for (const comp of roadNetworkComponents(map, player.index)) {
     let villages = 0;
-    const queue = [start];
-    visited.add(axialKey(start));
-    while (queue.length > 0) {
-      const cur = queue.shift()!;
-      // Ports in the same own-water cluster are effectively adjacent, so a
-      // village reached through a port's water route joins this cluster.
-      const siblings = waterJumps.get(axialKey(cur));
-      if (siblings) {
-        for (const sk of siblings) {
-          if (visited.has(sk)) continue;
-          visited.add(sk);
-          const t = byKey.get(sk);
-          if (t) queue.push(t);
-        }
-      }
-      if (cur.settlement !== null && cur.settlement.owner === player.index) villages += 1;
-      for (const n of hexNeighbors(cur)) {
-        const tile = byKey.get(axialKey(n));
-        if (!tile || visited.has(axialKey(tile)) || !isNetworkNode(tile, player)) continue;
-        visited.add(axialKey(tile));
-        queue.push(tile);
-      }
+    for (const k of comp) {
+      const t = byKey.get(k);
+      if (t && t.settlement !== null && t.settlement.owner === player.index) villages += 1;
     }
     if (villages > best) best = villages;
   }
@@ -194,7 +165,7 @@ export function unlockedAchievements(player: Player): AchievementId[] {
   return player.achievements ?? [];
 }
 
-export function hasAchievement(player: Player, id: AchievementId): boolean {
+function hasAchievement(player: Player, id: AchievementId): boolean {
   return (player.achievements ?? []).includes(id);
 }
 

@@ -2,7 +2,7 @@ import { Container } from 'pixi.js';
 import { gameController } from '../../controller/gameController';
 import { useGameStore } from '../../store/gameStore';
 import { t } from '../../i18n';
-import { TRIBES, type Tribe } from '../../game/tribes';
+import { TRIBES, type Tribe, tribeById } from '../../game/tribes';
 import { type GameMode } from '../../game/gameMode';
 import { type MapSize } from '../../game/mapGen';
 import { buildJoinLink, consumePendingJoin } from '../../net/joinLink';
@@ -106,7 +106,7 @@ export class LobbyScreen implements ScreenController {
     const cx = this.host!.app.screen.width / 2;
     const hostBtn = new Button({ label: t('lobby.hostGame'), width: 240, onClick: () => { this.view = 'host'; this.render(); } });
     const joinBtn = new Button({ label: t('lobby.joinGame'), width: 240, onClick: () => { this.view = 'join'; this.render(); } });
-    const back = new Button({ label: t('lobby.back'), width: 240, onClick: () => useGameStore.getState().setScreen('start') });
+    const back = new Button({ label: t('common.back'), width: 240, onClick: () => useGameStore.getState().setScreen('start') });
     hostBtn.position.set(cx - 120, 160);
     joinBtn.position.set(cx - 120, 230);
     back.position.set(cx - 120, 300);
@@ -227,7 +227,7 @@ export class LobbyScreen implements ScreenController {
 
   private renderHost(): void {
     const cx = this.host!.app.screen.width / 2;
-    this.title(t('lobby.hostTitle'));
+    this.title(t('lobby.hostGame'));
     let y = 110;
 
     const nameInput = new TextInputOverlay({
@@ -281,7 +281,7 @@ export class LobbyScreen implements ScreenController {
     total.position.set(cx, y + 276 + rowDelta);
     this.viewContent.addChild(total);
 
-    const modeLabel = this.groupLabel(t('lobby.mode'), 3);
+    const modeLabel = this.groupLabel(t('common.mode'), 3);
     modeLabel.position.set(cx, y + 326 + rowDelta);
     this.viewContent.addChild(modeLabel);
     (['capture', 'turns30'] as GameMode[]).forEach((m, i) => {
@@ -290,7 +290,7 @@ export class LobbyScreen implements ScreenController {
       this.viewContent.addChild(b);
     });
 
-    const mapLabel = this.groupLabel(t('lobby.mapSize'), 4);
+    const mapLabel = this.groupLabel(t('common.mapSize'), 4);
     mapLabel.position.set(cx, y + 436 + rowDelta);
     this.viewContent.addChild(mapLabel);
     MAP_SIZE_OPTIONS.forEach((s, i) => {
@@ -300,7 +300,7 @@ export class LobbyScreen implements ScreenController {
     });
 
     this.createBtn = new Button({ label: t('lobby.createRoom'), width: 240, selected: this.focus === CREATE_ROOM_FOCUS, onClick: () => this.createRoom() });
-    const back = new Button({ label: t('lobby.back'), width: 96, fontSize: 14, selected: this.focus === HOST_NAV_ITEMS - 1, onClick: () => { this.view = 'menu'; this.render(); } });
+    const back = new Button({ label: t('common.back'), width: 96, fontSize: 14, selected: this.focus === HOST_NAV_ITEMS - 1, onClick: () => { this.view = 'menu'; this.render(); } });
     this.createBtn.position.set(cx - 120, y + 556 + rowDelta);
     back.position.set(cx - 48, y + 616 + rowDelta);
     this.viewContent.addChild(this.createBtn, back);
@@ -322,7 +322,7 @@ export class LobbyScreen implements ScreenController {
   private renderJoin(): void {
     const cx = this.host!.app.screen.width / 2;
     const s = useGameStore.getState();
-    this.title(t('lobby.joinTitle'));
+    this.title(t('lobby.joinGame'));
     let y = 130;
 
     const codeInput = new TextInputOverlay({
@@ -362,7 +362,7 @@ export class LobbyScreen implements ScreenController {
       y += 30;
     }
 
-    const back = new Button({ label: t('lobby.back'), width: 200, onClick: () => { this.view = 'menu'; this.render(); } });
+    const back = new Button({ label: t('common.back'), width: 200, onClick: () => { this.view = 'menu'; this.render(); } });
     back.position.set(cx - 100, y);
     this.viewContent.addChild(back);
   }
@@ -379,7 +379,7 @@ export class LobbyScreen implements ScreenController {
     const myPeerId = isHost ? (joined.find((p) => p.isHost)?.peerId ?? '') : s.myPeerId;
 
     this.title(isHost ? t('lobby.yourRoom') : t('lobby.room'));
-    const code = makeLabel(`Code: ${lobby.code}`, { fontSize: 18, fill: 0xffffff });
+    const code = makeLabel(t('lobby.code', { code: lobby.code }), { fontSize: 18, fill: 0xffffff });
     code.anchor.set(0.5, 0.5);
     let copyBtn: Button | null = null;
     copyBtn = new Button({
@@ -417,7 +417,7 @@ export class LobbyScreen implements ScreenController {
 
     let y = isHost ? 190 : 150;
     for (const p of joined) {
-      const tribeName = p.tribeId !== null ? (TRIBES.find((t) => t.id === p.tribeId)?.name ?? '') : '';
+      const tribeName = p.tribeId !== null ? (tribeById(p.tribeId)?.name ?? '') : '';
       const row = makeLabel(
         `${p.name || '...'}${tribeName ? ` - ${tribeName}` : ''}${p.isHost ? ' ' + t('lobby.hostMarker') : ''}${p.ready ? ' ' + t('lobby.readyMarker') : ''}`,
         { fontSize: 16, fill: 0xeeeeee },
@@ -429,7 +429,7 @@ export class LobbyScreen implements ScreenController {
     }
     y += 20;
 
-    const tribeLabel = makeLabel(t('lobby.chooseTribe'), { fontSize: 24, fill: 0xffffff });
+    const tribeLabel = makeLabel(t('common.chooseTribe'), { fontSize: 24, fill: 0xffffff });
     tribeLabel.anchor.set(0.5, 0.5);
     tribeLabel.position.set(cx, y);
     this.viewContent.addChild(tribeLabel);
@@ -465,7 +465,7 @@ export class LobbyScreen implements ScreenController {
         errMsg.anchor.set(0.5, 0.5);
         errMsg.position.set(cx, y);
         this.viewContent.addChild(errMsg);
-        const back = new Button({ label: t('lobby.back'), width: 150, onClick: () => { gameController.cancelLobby(); this.view = 'menu'; this.render(); } });
+        const back = new Button({ label: t('common.back'), width: 150, onClick: () => { gameController.cancelLobby(); this.view = 'menu'; this.render(); } });
         back.position.set(cx - 75, y + 34);
         this.viewContent.addChild(back);
         return;
@@ -498,7 +498,7 @@ export class LobbyScreen implements ScreenController {
         const retry = new Button({ label: t('lobby.tryAgain'), width: 150, onClick: () => gameController.joinGame(lobby.code, retryName) });
         retry.position.set(cx - 165, y);
         this.viewContent.addChild(retry);
-        const back = new Button({ label: t('lobby.back'), width: 150, onClick: () => { gameController.cancelLobby(); this.view = 'join'; this.render(); } });
+        const back = new Button({ label: t('common.back'), width: 150, onClick: () => { gameController.cancelLobby(); this.view = 'join'; this.render(); } });
         back.position.set(cx + 15, y);
         this.viewContent.addChild(back);
         return;
@@ -527,7 +527,7 @@ export class LobbyScreen implements ScreenController {
         connecting.position.set(cx, y);
         this.viewContent.addChild(connecting);
         y += 30;
-        const cancel = new Button({ label: t('lobby.cancel'), width: 150, onClick: () => { gameController.cancelLobby(); this.view = 'join'; this.render(); } });
+        const cancel = new Button({ label: t('common.cancel'), width: 150, onClick: () => { gameController.cancelLobby(); this.view = 'join'; this.render(); } });
         cancel.position.set(cx - 75, y);
         this.viewContent.addChild(cancel);
       }

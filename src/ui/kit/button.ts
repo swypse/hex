@@ -9,7 +9,7 @@ const SHADOW_OFFSET_Y = 4;
 /** Corner radii in order top-left, top-right, bottom-right, bottom-left. */
 export type ButtonCorners = readonly [number, number, number, number];
 
-export interface ButtonOpts {
+interface ButtonOpts {
   label: string;
   onClick: () => void;
   disabled?: boolean;

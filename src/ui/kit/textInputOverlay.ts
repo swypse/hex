@@ -2,7 +2,7 @@ import { Container, Text } from 'pixi.js';
 import { makeLabel } from './label';
 import { makePanel } from './panel';
 
-export interface TextInputOpts {
+interface TextInputOpts {
   x: number;
   y: number;
   width: number;

@@ -1,5 +1,5 @@
 import { axialKey, hexNeighbors } from './hex';
-import { GameMap, MapTile } from './mapGen';
+import { GameMap, MapTile, tileMapByKey } from './mapGen';
 import { Player } from './players';
 import { canAfford, pay, Resources } from './resources';
 import { tileAt } from './selection';
@@ -12,6 +12,54 @@ export const ROAD_COST: Resources = { wood: 5, stone: 2, money: 10, ore: 0 };
 function isRoadNode(t: MapTile, owner: number): boolean {
   if (t.roadOwner === owner) return true;
   return t.building?.kind === 'port' && t.ownedBy === owner;
+}
+
+/** Connected components of a player's road/port/bridge network: own villages,
+ *  own roads and own ports, where ports in the same own-water cluster are
+ *  treated as adjacent. Each component is a set of tile keys. */
+export function roadNetworkComponents(
+  map: GameMap,
+  owner: number,
+  waterJumps: Map<string, Set<string>> = portWaterClusterJumps(map),
+): Set<string>[] {
+  const byKey = tileMapByKey(map);
+  const isNode = (t: MapTile): boolean =>
+    (t.settlement !== null && t.settlement.owner === owner) ||
+    t.roadOwner === owner ||
+    (t.building?.kind === 'port' && t.ownedBy === owner);
+  const visited = new Set<string>();
+  const components: Set<string>[] = [];
+  for (const start of map.tiles) {
+    const startKey = axialKey(start);
+    if (visited.has(startKey) || !isNode(start)) continue;
+    const comp = new Set<string>([startKey]);
+    const queue: MapTile[] = [start];
+    visited.add(startKey);
+    while (queue.length > 0) {
+      const cur = queue.shift()!;
+      // Ports in the same own-water cluster are effectively adjacent: a
+      // village reached through a port's water route joins this component.
+      const siblings = waterJumps.get(axialKey(cur));
+      if (siblings) {
+        for (const sk of siblings) {
+          if (visited.has(sk)) continue;
+          visited.add(sk);
+          comp.add(sk);
+          const t = byKey.get(sk);
+          if (t) queue.push(t);
+        }
+      }
+      for (const n of hexNeighbors(cur)) {
+        const t = byKey.get(axialKey(n));
+        if (!t || visited.has(axialKey(t)) || !isNode(t)) continue;
+        visited.add(axialKey(t));
+        comp.add(axialKey(t));
+        queue.push(t);
+      }
+    }
+    components.push(comp);
+  }
+  return components;
 }
 
 export function canBuildRoad(map: GameMap, tile: MapTile, player: Player): boolean {
@@ -54,37 +102,18 @@ export function isVillageRoadConnected(
 ): boolean {
   const owner = villageTile.settlement?.owner;
   if (owner === null || owner === undefined) return false;
-  const byKey = new Map(map.tiles.map((t) => [axialKey(t), t] as const));
-  const isNode = (t: MapTile): boolean => {
-    if (axialKey(t) === axialKey(villageTile)) return true;
-    if (t.settlement !== null && t.settlement.owner === owner) return true;
-    if (t.roadOwner === owner) return true;
-    return t.building?.kind === 'port' && t.ownedBy === owner;
-  };
-  const visited = new Set<string>([axialKey(villageTile)]);
-  const queue: MapTile[] = [villageTile];
-  while (queue.length > 0) {
-    const cur = queue.shift()!;
-    // Ports in the same own-water cluster are effectively adjacent: a village
-    // reached through a port's water route counts as connected.
-    const siblings = waterJumps.get(axialKey(cur));
-    if (siblings) {
-      for (const sk of siblings) {
-        if (visited.has(sk)) continue;
-        visited.add(sk);
-        const t = byKey.get(sk);
-        if (t) queue.push(t);
-      }
-    }
-    for (const n of hexNeighbors(cur)) {
-      const t = byKey.get(axialKey(n));
-      if (!t || visited.has(axialKey(t)) || !isNode(t)) continue;
-      if (t.settlement !== null && t.settlement.owner === owner && !(t.q === villageTile.q && t.r === villageTile.r)) {
+  const byKey = tileMapByKey(map);
+  const home = axialKey(villageTile);
+  for (const comp of roadNetworkComponents(map, owner, waterJumps)) {
+    if (!comp.has(home)) continue;
+    // Connected when another own village shares this component.
+    for (const k of comp) {
+      const t = byKey.get(k);
+      if (t && t.settlement !== null && t.settlement.owner === owner && k !== home) {
         return true;
       }
-      visited.add(axialKey(t));
-      queue.push(t);
     }
+    return false;
   }
   return false;
 }

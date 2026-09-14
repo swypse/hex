@@ -1,6 +1,6 @@
 import { Application, Container, Graphics, type FederatedPointerEvent, type FederatedWheelEvent } from 'pixi.js';
 
-export interface ScreenScrollOptions {
+interface ScreenScrollOptions {
   bottomPad?: number;
   onScroll?: (offset: number) => void;
 }

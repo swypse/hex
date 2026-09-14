@@ -1,6 +1,6 @@
 export type AiDifficulty = 'easy' | 'normal' | 'hard';
 
-export interface AiStrategyProfile {
+interface AiStrategyProfile {
   planIntervalTurns: number;
   musterFactor: number;
   assaultRatio: number;

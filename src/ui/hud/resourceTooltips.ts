@@ -1,6 +1,6 @@
 import { t } from '../../i18n';
 
-export interface ResourceTooltipInfo {
+interface ResourceTooltipInfo {
   name: string;
   requiredFor: string;
 }

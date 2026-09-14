@@ -5,6 +5,8 @@ import { hasSkill } from './skills';
 import { makeUnit, UNIT_TYPES, UnitType } from './units';
 import { unitsInVillage, villageCapacity } from './village';
 
+let spawnSeq = 0;
+
 export function spawnUnit(
   map: GameMap,
   villageTile: MapTile,
@@ -25,7 +27,9 @@ export function spawnUnit(
 
   player.resources = pay(player.resources, cost);
   villageTile.unit = makeUnit(player.index, type, villageTile.q, villageTile.r, {
-    id: `spawn-${Date.now()}`,
+    // Date.now() alone collides when several villages spawn in the same
+    // millisecond (e.g. one AI turn); the per-game sequence keeps ids unique.
+    id: `spawn-${Date.now()}-${spawnSeq++}`,
     hasMoved: true,
     hasAttacked: true,
     hasHealed: true,

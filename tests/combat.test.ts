@@ -356,6 +356,43 @@ describe('science miss chance', () => {
     expect(result.attackerDamage).toBe(20);
     expect(target.unit!.hp).toBe(30);
   });
+
+  it('clears capture-ready on a village when its standing unit dies and the killer advances', () => {
+    const map: GameMap = { radius: 4, tiles: [], spawns: [] };
+    const attacker = makeWarrior('a', 0, 0, 0, 50);
+    const village = makeTile(1, 0, TileType.GrasslandLand, makeWarrior('b', 1, 1, 0, 1));
+    village.settlement = { owner: 2, level: 1, captureReady: true };
+    map.tiles.push(makeTile(0, 0, TileType.GrasslandLand, attacker), village);
+    const result = performAttack(map, attacker, village, noMiss);
+    expect(result.targetDied).toBe(true);
+    // The new occupant must hold the village for a full turn before capturing.
+    expect(village.settlement!.captureReady).toBe(false);
+    expect(village.unit).toBe(attacker);
+  });
+
+  it('keeps a village capture-ready when its own captain holds despite winning a fight', () => {
+    const map: GameMap = { radius: 4, tiles: [], spawns: [] };
+    const holder = makeWarrior('a', 0, 0, 0, 50);
+    const village = makeTile(0, 0, TileType.GrasslandLand, holder);
+    village.settlement = { owner: 2, level: 1, captureReady: true };
+    const intruder = makeTile(1, 0, TileType.GrasslandLand, makeWarrior('b', 1, 1, 0, 1));
+    map.tiles.push(village, intruder);
+    performAttack(map, holder, intruder, noMiss);
+    expect(village.settlement!.captureReady).toBe(true);
+  });
+
+  it('clears capture-ready when the unit that earned it dies on the village', () => {
+    const map: GameMap = { radius: 4, tiles: [], spawns: [] };
+    const doomed = makeWarrior('a', 0, 0, 0, 1);
+    const village = makeTile(0, 0, TileType.GrasslandLand, doomed);
+    village.settlement = { owner: 2, level: 1, captureReady: true };
+    const killer = makeTile(1, 0, TileType.GrasslandLand, makeWarrior('b', 1, 1, 0, 50));
+    map.tiles.push(village, killer);
+    const result = performAttack(map, doomed, killer, noMiss);
+    expect(result.attackerDied).toBe(true);
+    expect(village.unit).toBeNull();
+    expect(village.settlement!.captureReady).toBe(false);
+  });
 });
 
 describe('temple protection', () => {

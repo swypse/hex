@@ -24,7 +24,7 @@ export interface LobbyPlayer {
   ready: boolean;
 }
 
-export const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
 export function generateRoomCode(): string {
   let code = '';

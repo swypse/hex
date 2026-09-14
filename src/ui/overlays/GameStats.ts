@@ -1,8 +1,8 @@
 import { t } from '../../i18n';
 import { Container, Graphics, Text } from 'pixi.js';
-import { currentLanguage } from '../../storage/settings';
+import { placeWord } from '../../i18n/lists';
 import { gameController } from '../../controller/gameController';
-import { TRIBES } from '../../game/tribes';
+import { TRIBES, tribeById } from '../../game/tribes';
 import { UNKNOWN_TRIBE_COLOR } from '../../game/discovery';
 import { EMPTY_STATS, totalScore } from '../../game/score';
 import { achievementNameKey } from '../../game/achievements';
@@ -12,14 +12,6 @@ import { Button } from '../kit/button';
 import { makeIconChip } from '../kit/tribeChip';
 import { makeLabel } from '../kit/label';
 import { Popup } from '../kit/popup';
-
-function placeText(rank: number): string {
-  if (currentLanguage() === 'ru') return `${rank}-е место`;
-  const mod10 = rank % 10;
-  const mod100 = rank % 100;
-  const suffix = mod100 >= 11 && mod100 <= 13 ? 'th' : mod10 === 1 ? 'st' : mod10 === 2 ? 'nd' : mod10 === 3 ? 'rd' : 'th';
-  return `${rank}${suffix}`;
-}
 
 const CHIP_SIZE = 32;
 const HEADER_LINE = 40;
@@ -79,7 +71,7 @@ export class GameStats {
     };
 
     ranked.forEach(({ p, score }, rank) => {
-      const tribe = TRIBES.find((t) => t.id === p.tribe);
+      const tribe = tribeById(p.tribe);
       const knownTribe = tribe !== undefined && known.has(p.tribe);
       const tribeColor = knownTribe ? tribe!.color : UNKNOWN_TRIBE_COLOR;
       const tribeName = knownTribe ? tribe!.name : t('ui.unknownTribe');
@@ -117,7 +109,7 @@ export class GameStats {
       scoreLabel.anchor.set(1, 0.5);
       scoreLabel.position.set(cw, headerCentre);
       popup.content.addChild(scoreLabel);
-      const place = makeLabel(placeText(rank + 1), { fontSize: 13, fill: 0xcccccc, fontWeight: '600' });
+      const place = makeLabel(placeWord(rank + 1), { fontSize: 13, fill: 0xcccccc, fontWeight: '600' });
       place.anchor.set(1, 0.5);
       place.position.set(cw - scoreLabel.width - 8, headerCentre);
       popup.content.addChild(place);

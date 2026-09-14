@@ -1,6 +1,6 @@
 import { Application, BlurFilter, ColorMatrixFilter, Container, FillGradient, Graphics, Rectangle, Sprite, Texture } from 'pixi.js';
 import { axialKey, HEX_TILT, hexNeighbors } from '../game/hex';
-import { GameMap, type BridgeDir, type MapTile } from '../game/mapGen';
+import { tileMapByKey, type BridgeDir, type GameMap, type MapTile } from '../game/mapGen';
 import { isWaterType, TileType, TILE_TYPE_COLORS } from '../game/tileTypes';
 import { TRIBES, Tribe } from '../game/tribes';
 import { UnitType, UNIT_IMAGE_FILES, UNIT_TYPES } from '../game/units';
@@ -414,7 +414,7 @@ export async function createTextures(
   for (const tile of map.tiles) {
     maxHeightPx = Math.max(maxHeightPx, tileElevation(tile, hexSize));
   }
-  const tileByKey = new Map(map.tiles.map((t) => [axialKey(t), t]));
+  const tileByKey = tileMapByKey(map);
   const findNeighbor = (q: number, r: number): MapTile | undefined => tileByKey.get(axialKey({ q, r }));
   for (const tile of map.tiles) {
     const fill = TILE_TYPE_COLORS[tile.terrain];

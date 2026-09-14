@@ -1,6 +1,7 @@
-import { Container, Graphics, Rectangle, Sprite, Texture } from 'pixi.js';
+import { Container, Rectangle, Sprite, Texture } from 'pixi.js';
 import type { AchievementId } from '../../game/achievements';
 import { ACHIEVEMENT_ATLAS_FILE, ACHIEVEMENT_ATLAS_CELL, ACHIEVEMENT_ATLAS_FRAMES } from '../../game/achievementAtlasData.gen';
+import { makeCircleChip } from './tribeChip';
 
 const TEXTURE_BASE = `${import.meta.env.BASE_URL}textures/`;
 
@@ -65,18 +66,7 @@ export function makeAchievementIcon(key: string, size: number, onReady?: () => v
   return sprite;
 }
 
-/** A round chip with the given achievement atlas icon clipped inside it.
- *  Mirrors makeIconChip so both look identical in the achievements dialog. */
+/** A round chip with the given achievement atlas icon clipped inside it. */
 export function makeAchievementChip(key: string, size: number, opts: { bgColor?: number; border?: { width: number; color: number } } = {}): Container {
-  const chip = new Container();
-  const radius = size / 2;
-  const bg = new Graphics();
-  bg.circle(0, 0, radius).fill(opts.bgColor ?? 0xffffff);
-  if (opts.border && opts.border.width > 0) bg.stroke({ width: opts.border.width, color: opts.border.color });
-  const clip = new Graphics();
-  clip.circle(0, 0, radius).fill(0xffffff);
-  const icon = makeAchievementIcon(key, size);
-  icon.mask = clip;
-  chip.addChild(bg, clip, icon);
-  return chip;
+  return makeCircleChip(makeAchievementIcon(key, size), size, opts);
 }

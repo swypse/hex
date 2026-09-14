@@ -1,13 +1,13 @@
-export const MIN_ZOOM = 0.5;
-export const MAX_ZOOM = 3;
+const MIN_ZOOM = 0.5;
+const MAX_ZOOM = 3;
 
-export const INERTIA_DECAY = 0.01;
+const INERTIA_DECAY = 0.01;
 export const INERTIA_START_SPEED = 100;
 export const INERTIA_STOP_SPEED = 30;
 
 export const PAN_PADDING = 0.5; // fraction of the screen, on each side
 
-export const QUALITY_CAP = 4;
+const QUALITY_CAP = 4;
 
 export function maxZoomFor(aspectRatio: number): number {
   return MAX_ZOOM + Math.min(2, Math.max(0, (aspectRatio - 1) * 2));

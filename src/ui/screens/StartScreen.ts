@@ -47,7 +47,7 @@ class SettingsPanel {
   private popup: Popup | null = null;
 
   constructor(app: Application, onClose: () => void) {
-    const close = new Button({ label: t('settings.close'), width: 140, onClick: onClose });
+    const close = new Button({ label: t('common.close'), width: 140, onClick: onClose });
     const popup = new Popup({
       app,
       title: t('settings.title'),

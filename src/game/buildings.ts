@@ -1,12 +1,13 @@
 import { axialKey, hexNeighbors } from './hex';
 import { GameMap, MapTile } from './mapGen';
 import { Player } from './players';
-import { canAfford, pay, Resources } from './resources';
+import { canAfford, moneyCost, pay, Resources } from './resources';
 import { hasSkill } from './skills';
 import { isForestType, isLandType, isMountainType, isWaterType } from './tileTypes';
 import { buildingsInVillage, villageBuildingLimit } from './village';
 import { villageEnemyOccupied } from './capture';
 import type { BuildingKind } from './events';
+import { t } from '../i18n';
 
 export const SAWMILL_COST = 10;
 export const MINE_COST = 15;
@@ -30,16 +31,16 @@ function villageHasBuildingSlot(map: GameMap, tile: MapTile, player: Player): bo
 }
 
 export const BUILDING_NAMES: Record<BuildingKind, string> = {
-  sawmill: 'Sawmill',
-  mine: 'Mine',
-  port: 'Port',
-  temple: 'Water temple',
-  forestTemple: 'Forest temple',
+  sawmill: t('building.sawmill'),
+  mine: t('building.mine'),
+  port: t('building.port'),
+  temple: t('building.temple'),
+  forestTemple: t('building.forestTemple'),
 };
 
 export const BUILDING_COSTS: Record<BuildingKind, Resources> = {
-  sawmill: { wood: 0, stone: 0, money: SAWMILL_COST, ore: 0 },
-  mine: { wood: 0, stone: 0, money: MINE_COST, ore: 0 },
+  sawmill: moneyCost(SAWMILL_COST),
+  mine: moneyCost(MINE_COST),
   port: { wood: 10, stone: 0, money: 30, ore: 2 },
   temple: { wood: 0, stone: 10, money: 30, ore: 0 },
   forestTemple: { wood: 0, stone: 10, money: 30, ore: 0 },

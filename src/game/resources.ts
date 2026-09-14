@@ -14,6 +14,11 @@ export function villageUpgradeCost(level: number): Resources {
   return { wood: 2 * level, stone: level, money: 2 * level, ore: 0 };
 }
 
+/** Money-only cost, the common case for maintaining reserve checks. */
+export function moneyCost(money: number): Resources {
+  return { wood: 0, stone: 0, money, ore: 0 };
+}
+
 export function canAfford(have: Resources, cost: Resources): boolean {
   return (
     have.wood >= cost.wood &&

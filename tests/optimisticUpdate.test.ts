@@ -171,4 +171,22 @@ describe('client optimistic reconciliation', () => {
     await Promise.resolve();
     expect(present).toHaveBeenCalledTimes(1);
   });
+
+  it('skips one events batch per pending prediction (two rapid commands)', async () => {
+    const { host, adopt, present } = makeFakeHost();
+    const net = new NetworkController(host);
+
+    net.noteClientPrediction();
+    net.noteClientPrediction();
+    net.onHostMessage(stateMsg());
+    await Promise.resolve();
+    net.onHostMessage(stateMsg());
+    await Promise.resolve();
+    net.onHostMessage(eventsMsg());
+    await Promise.resolve();
+    net.onHostMessage(eventsMsg());
+    await Promise.resolve();
+    expect(adopt).toHaveBeenCalledTimes(2);
+    expect(present).not.toHaveBeenCalled();
+  });
 });

@@ -6,7 +6,7 @@ import { canMove, canAttack } from './units';
 
 export const BOTTLE_SPAWN_TURNS = 2;
 export const BOTTLE_SPAWN_PROBABILITY = 0.2;
-export const BOTTLE_LIFETIME_TURNS = 5;
+const BOTTLE_LIFETIME_TURNS = 5;
 export const BOTTLE_MONEY = 50;
 export const BOTTLE_HEAL = 20;
 

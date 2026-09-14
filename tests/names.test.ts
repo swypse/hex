@@ -1,18 +1,15 @@
 import { describe, it, expect } from 'vitest';
 import {
-  ADJECTIVES,
-  ANIMALS,
-  VILLAGE_ADJECTIVES,
-  VILLAGE_NOUNS,
   generatePlayerNames,
   generateVillageNames,
 } from '../src/game/names';
+import { playerNameWords, villageNameWords } from '../src/i18n/lists';
 import { SeededRandom } from '../src/util/random';
 
 describe('names', () => {
-  it('has 10 adjectives and 10 animals', () => {
-    expect(ADJECTIVES).toHaveLength(10);
-    expect(ANIMALS).toHaveLength(10);
+  it('has 10 adjectives and 10 animals per language', () => {
+    expect(playerNameWords().adjectives).toHaveLength(10);
+    expect(playerNameWords().animals).toHaveLength(10);
   });
 
   it('generates the requested count of names, all unique and capitalized', () => {
@@ -37,7 +34,7 @@ describe('names', () => {
     for (const name of names) {
       expect(name).toMatch(/^[A-Z][a-z]+ [A-Z][a-z]+$/);
     }
-    expect(VILLAGE_ADJECTIVES).toHaveLength(10);
-    expect(VILLAGE_NOUNS).toHaveLength(10);
+    expect(villageNameWords().adjectives).toHaveLength(10);
+    expect(villageNameWords().nouns).toHaveLength(10);
   });
 });

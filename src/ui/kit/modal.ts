@@ -4,7 +4,7 @@ import { Button } from './button';
 import { makeLabel } from './label';
 import { Popup } from './popup';
 
-export interface ModalOpts {
+interface ModalOpts {
   app: Application;
   title: string;
   lines: string[];

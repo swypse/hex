@@ -1,6 +1,6 @@
 import { Container, Graphics } from 'pixi.js';
 import { UNKNOWN_TRIBE_COLOR } from '../../game/discovery';
-import { TRIBES } from '../../game/tribes';
+import { TRIBES, tribeById } from '../../game/tribes';
 import { useGameStore } from '../../store/gameStore';
 import { type UIHost, type Widget } from '../host';
 import { makeLabel } from '../kit/label';
@@ -59,7 +59,7 @@ export class HudTribes implements Widget {
 
   private makeChip(tribeId: number, explored: boolean, active: boolean): Container {
     if (explored) {
-      const tribe = TRIBES.find((t) => t.id === tribeId);
+      const tribe = tribeById(tribeId);
       if (!tribe) return new Container();
       const chip = makeIconChip(`${tribe.code}-icon.png`, CIRCLE_SIZE);
       chip.alpha = active ? 1 : ELIMINATED_ALPHA;

@@ -2,7 +2,7 @@ import { Container, Graphics } from 'pixi.js';
 import { makeIcon } from './icon';
 import { makeLabel } from './label';
 
-export interface TribeOption {
+interface TribeOption {
   el: Container;
   setSelected(selected: boolean): void;
 }

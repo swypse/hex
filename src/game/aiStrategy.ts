@@ -97,7 +97,13 @@ function weightedPrimaryScore(
   const production = productionBuildings(map, player);
   let economyScore = (70 - production * 20 + situation.freeVillages.length * 5) * weights.economy + rng.next() * 20;
   let armyScore = (25 + (enemyVillageVisible(map, player) ? 90 : 0) + situation.freeVillages.length * 8 + (situation.ownPower >= situation.enemyPower ? 25 : 0)) * weights.army + rng.next() * 20;
-  if (mode === 'turns30') armyScore *= 0.5;
+  if (mode === 'turns30') {
+    armyScore *= 0.5;
+    // The personality's score appetite pushes the primary plan toward the
+    // aggressive score race (villages/temples/kills win 30-turn games fast):
+    // high score weight -> expansion push, low -> it is fine to crawl.
+    armyScore += 20 * weights.score;
+  }
   if (production >= difficulty.strategy.economyCap) economyScore -= 40;
   if (economyScore >= armyScore) return 'economy';
   return 'army';

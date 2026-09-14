@@ -1,6 +1,6 @@
 import { Container, Graphics, Text } from 'pixi.js';
 
-import { TRIBES } from '../../game/tribes';
+import { TRIBES, tribeById } from '../../game/tribes';
 import { useGameStore } from '../../store/gameStore';
 import { type UIHost, type Widget } from '../host';
 import { makeLabel } from '../kit/label';
@@ -49,7 +49,7 @@ export class HudTurn implements Widget {
     let label = base;
     const current = s.players[s.currentPlayerIndex];
     if (s.aiActive && current) {
-      const tribe = TRIBES.find((t) => t.id === current.tribe);
+      const tribe = tribeById(current.tribe);
       if (tribe) {
         const local = s.players[s.localPlayerIndex];
         const known = new Set<number>();

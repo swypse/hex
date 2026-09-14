@@ -28,3 +28,7 @@ export const TRIBES: TribeInfo[] = [
   { id: Tribe.Forest, name: t('tribe.forest'), code: 'forest', color: TRIBE_COLORS.Forest, startSkill: 'forestry' },
   { id: Tribe.Aqua, name: t('tribe.aqua'), code: 'aqua', color: TRIBE_COLORS.Aqua, startSkill: 'navigation' },
 ];
+
+export function tribeById(id: number): TribeInfo | undefined {
+  return TRIBES.find((t) => t.id === id);
+}

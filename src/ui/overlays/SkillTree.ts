@@ -4,7 +4,7 @@ import { gameController } from '../../controller/gameController';
 import { SKILLS, hasSkill, canOpenSkill, skillCost, type SkillId } from '../../game/skills';
 import { scoreBreakdown, totalScore } from '../../game/score';
 import { type Player } from '../../game/players';
-import { TRIBES } from '../../game/tribes';
+import { TRIBES, tribeById } from '../../game/tribes';
 import { clampZoom, zoomAroundCursor, decayVelocity, INERTIA_START_SPEED, INERTIA_STOP_SPEED } from '../../game/zoom';
 import { useGameStore } from '../../store/gameStore';
 import { type UIHost } from '../host';
@@ -20,7 +20,7 @@ const RING_SPACING = 110;
 const CX = 400;
 const CY = 340;
 
-export interface SkillNodeLayout {
+interface SkillNodeLayout {
   x: number;
   y: number;
   depth: number;
@@ -349,7 +349,7 @@ export class SkillTree {
       return;
     }
     this.el.visible = true;
-    const tribe = TRIBES.find((t) => t.id === human.tribe)!;
+    const tribe = tribeById(human.tribe)!;
     const highlight = new Set(useGameStore.getState().tutorialHighlightSkills);
 
     const title = makeLabel(t('skillTree.title'), { fontSize: 24, fill: 0xffffff, fontWeight: '700' });
@@ -441,7 +441,7 @@ export class SkillTree {
         },
       }));
     }
-    buttons.push(new Button({ label: opened ? 'OK' : 'Close', onClick: () => this.closeDetail() }));
+    buttons.push(new Button({ label: opened ? t('common.ok') : t('common.close'), onClick: () => this.closeDetail() }));
 
     const popup = new Popup({
       app: host.app,
@@ -506,14 +506,14 @@ export class SkillTree {
       y += label.height + (opts?.bold ? 10 : 6);
       popup.content.addChild(label);
     };
-    const tribe = TRIBES.find((t) => t.id === player.tribe);
+    const tribe = tribeById(player.tribe);
     addLine(`${player.name}${tribe ? ` (${tribe.name})` : ''}`, { bold: true });
     for (const item of scoreBreakdown(map, player, 0)) {
       const line = item.score === 0
         ? `${item.label}: ${item.count}`
         : item.count === 0
           ? `${item.label}: ${item.score}`
-          : `${item.label}: ${item.count}, Scores: ${item.score}`;
+          : `${item.label}: ${item.count}, ${t('gameover.scores', { score: item.score })}`;
       addLine(line);
     }
     addLine(`${t('gameover.total')} ${totalScore(map, player)}`, { bold: true });

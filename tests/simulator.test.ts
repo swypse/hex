@@ -72,6 +72,27 @@ describe('Simulator commands', () => {
     expect(sim.applyCommand({ type: 'forfeit', playerIndex: 1 })).toBe(false);
   });
 
+  it('forfeit releases a touched bonus claimer and the capture-ready of occupied enemy villages', () => {
+    const map = makeTestMap();
+    tileAt(map, 0, 0)!.settlement = { owner: 0, level: 1, captureReady: false };
+    tileAt(map, 0, 1)!.settlement = { owner: 1, level: 1, captureReady: false };
+    tileAt(map, 0, 0)!.unit = makeUnit('u1', 0, 'warrior', 0, 0);
+    // Player 1 stands on an enemy village that was marked capture-ready by their
+    // turn start, and has claimed a bonus that has not been collected yet.
+    tileAt(map, 0, 1)!.settlement!.captureReady = true;
+    tileAt(map, 0, 1)!.unit = makeUnit('u2', 1, 'warrior', 0, 1);
+    tileAt(map, 1, 0)!.bonus = { kind: 'money', claimer: 1, arrivalTurn: 0 };
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    players[1]!.isHuman = true;
+    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    sim.startGame();
+    sim.drainEvents();
+
+    expect(sim.applyCommand({ type: 'forfeit', playerIndex: 1 })).toBe(true);
+    expect(tileAt(map, 0, 1)!.settlement!.captureReady).toBe(false);
+    expect(tileAt(map, 1, 0)!.bonus!.claimer).toBeNull();
+  });
+
   it('rejects a move to an unreachable tile', () => {
     const map = makeTestMap();
     tileAt(map, 0, 0)!.unit = makeUnit('u1', 0, 'warrior', 0, 0);
