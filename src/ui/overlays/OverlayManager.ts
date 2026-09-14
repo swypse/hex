@@ -14,6 +14,7 @@ import { AchievementsDialog } from './AchievementsDialog';
 import { WelcomeDialog } from './WelcomeDialog';
 import { TutorialOverlay } from './TutorialOverlay';
 import { DisconnectDialog } from './DisconnectDialog';
+import { WatchPromptDialog } from './WatchPromptDialog';
 
 interface Overlay {
   mount(host: UIHost, root: Container): void;
@@ -49,6 +50,7 @@ export class OverlayManager {
     welcome: { make: () => new WelcomeDialog(), mounted: null, hiding: false },
     tutorial: { make: () => new TutorialOverlay(), mounted: null, hiding: false },
     disconnect: { make: () => new DisconnectDialog(), mounted: null, hiding: false },
+    watchingprompt: { make: () => new WatchPromptDialog(), mounted: null, hiding: false },
   };
   private unsub: (() => void) | null = null;
   private refreshing = false;
@@ -109,6 +111,9 @@ export class OverlayManager {
           break;
         case 'bridgeHelp':
           active.add('bridgehelp');
+          break;
+        case 'watchingPrompt':
+          active.add('watchingprompt');
           break;
       }
     }
