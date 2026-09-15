@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { Container, Text } from 'pixi.js';
+import { Container, BitmapText } from 'pixi.js';
 import { GameStats } from '../src/ui/overlays/GameStats';
 import { useGameStore } from '../src/store/gameStore';
 import { gameController } from '../src/controller/gameController';
@@ -45,8 +45,6 @@ describe('GameStats unknown tribes', () => {
     const enemyName = TRIBES.find((t) => t.id === players[1]!.tribe)!.name;
     const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
     (gameController as unknown as { sim: unknown }).sim = sim;
-    Object.defineProperty(Text.prototype, 'width', { configurable: true, get: () => 60 });
-    Object.defineProperty(Text.prototype, 'height', { configurable: true, get: () => 14 });
     (globalThis as { CanvasRenderingContext2D?: unknown }).CanvasRenderingContext2D = class {};
     (globalThis as { document?: unknown }).document = {
       createElement: () => ({ getContext: () => fakeCanvasContext(), width: 0, height: 0 }),
@@ -64,8 +62,6 @@ describe('GameStats unknown tribes', () => {
     players[0]!.knownTribes = [Tribe.Villagers, players[1]!.tribe];
     const sim = new Simulator(makeTestMap(), players, 'capture', { rng: () => 0.5 });
     (gameController as unknown as { sim: unknown }).sim = sim;
-    Object.defineProperty(Text.prototype, 'width', { configurable: true, get: () => 60 });
-    Object.defineProperty(Text.prototype, 'height', { configurable: true, get: () => 14 });
     (globalThis as { CanvasRenderingContext2D?: unknown }).CanvasRenderingContext2D = class {};
     (globalThis as { document?: unknown }).document = {
       createElement: () => ({ getContext: () => fakeCanvasContext(), width: 0, height: 0 }),
@@ -81,7 +77,7 @@ describe('GameStats unknown tribes', () => {
     const out: string[] = [];
     const walk = (c: Container): void => {
       for (const ch of c.children) {
-        if (ch instanceof Text) out.push(String((ch as Text).text));
+        if (ch instanceof BitmapText) out.push(String((ch as BitmapText).text));
         if (ch instanceof Container) walk(ch as Container);
       }
     };

@@ -1,4 +1,4 @@
-import { Application, Container, Graphics, Text } from 'pixi.js';
+import { Application, Container, Graphics, BitmapText } from 'pixi.js';
 import { makeLabel } from './label';
 
 const TRIANGLE_H = 8;
@@ -19,8 +19,8 @@ function isInside(node: Container | null, root: Container): boolean {
 export class Tooltip {
   readonly el: Container;
   private readonly bg: Graphics;
-  private readonly title: Text;
-  private readonly text: Text;
+  private readonly title: BitmapText;
+  private readonly text: BitmapText;
   private readonly app: Application;
   private readonly stage: Container;
   private showTimer: ReturnType<typeof setTimeout> | null = null;

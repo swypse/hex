@@ -1,4 +1,4 @@
-import { Container, Graphics, Text } from 'pixi.js';
+import { Container, Graphics, BitmapText } from 'pixi.js';
 import { gameController } from '../../controller/gameController';
 import { useGameStore } from '../../store/gameStore';
 import { TRIBES, type Tribe, tribeById } from '../../game/tribes';
@@ -40,15 +40,15 @@ export class SetupScreen implements ScreenController {
   private enemies = 3;
   private difficulty: AiDifficulty = loadSettings().aiDifficulty;
   private mapSize: MapSize = 'normal';
-  private tribeTitle: Text | null = null;
-  private enemiesTitle: Text | null = null;
-  private modeTitle: Text | null = null;
-  private difficultyTitle: Text | null = null;
-  private mapSizeTitle: Text | null = null;
+  private tribeTitle: BitmapText | null = null;
+  private enemiesTitle: BitmapText | null = null;
+  private modeTitle: BitmapText | null = null;
+  private difficultyTitle: BitmapText | null = null;
+  private mapSizeTitle: BitmapText | null = null;
   private tribeItems: Container[] = [];
   private tribeCircles: Graphics[] = [];
-  private tribeItemLabels: Text[] = [];
-  private tribeDesc: Text | null = null;
+  private tribeItemLabels: BitmapText[] = [];
+  private tribeDesc: BitmapText | null = null;
   private tribeDescH = 0;
   private enemyGroup: ButtonGroup | null = null;
   private modeGroup: ButtonGroup | null = null;
@@ -56,7 +56,7 @@ export class SetupScreen implements ScreenController {
   private mapSizeGroup: ButtonGroup | null = null;
   private startBtn: Button | null = null;
   private backBtn: Button | null = null;
-  private hint: Text | null = null;
+  private hint: BitmapText | null = null;
 
   mount(host: UIHost): void {
     this.host = host;

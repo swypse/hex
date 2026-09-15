@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { Container, Text } from 'pixi.js';
+import { Container, BitmapText } from 'pixi.js';
 import { gameController } from '../src/controller/gameController';
 import { useGameStore } from '../src/store/gameStore';
 import { makeTestMap } from './helpers/testMap';
@@ -40,8 +40,6 @@ describe('WatchPromptDialog', () => {
     const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
     (gameController as unknown as { sim: unknown }).sim = sim;
     useGameStore.setState({ screen: 'game', players, localPlayerIndex: 0, mode: 'capture' });
-    Object.defineProperty(Text.prototype, 'width', { configurable: true, get: () => 60 });
-    Object.defineProperty(Text.prototype, 'height', { configurable: true, get: () => 14 });
     (globalThis as { CanvasRenderingContext2D?: unknown }).CanvasRenderingContext2D = class {};
     (globalThis as { document?: unknown }).document = {
       createElement: () => ({ getContext: () => ({ measureText: (s: string) => ({ width: s.length * 8, actualBoundingBoxLeft: 0, actualBoundingBoxRight: s.length * 8, actualBoundingBoxAscent: 12, actualBoundingBoxDescent: 3 }), width: 0, height: 0 }) }),
@@ -53,7 +51,7 @@ describe('WatchPromptDialog', () => {
     const texts: string[] = [];
     const walk = (c: Container): void => {
       for (const ch of c.children) {
-        if (ch instanceof Text) texts.push(String((ch as Text).text));
+        if (ch instanceof BitmapText) texts.push(String((ch as BitmapText).text));
         if (ch instanceof Container) walk(ch as Container);
       }
     };

@@ -1,4 +1,4 @@
-import { Application, Container, FillGradient, Graphics, Sprite, Text, Texture } from 'pixi.js';
+import { Application, Container, FillGradient, Graphics, Sprite, BitmapText, Texture } from 'pixi.js';
 import { gameController } from '../../controller/gameController';
 import { useGameStore } from '../../store/gameStore';
 import { saveRepository } from '../../storage/saveGame';
@@ -176,7 +176,7 @@ export class StartScreen implements ScreenController {
   private host: UIHost | null = null;
   private scroll: ScreenScroll | null = null;
   private title: Sprite | null = null;
-  private hint: Text | null = null;
+  private hint: BitmapText | null = null;
   private buttons: Button[] = [];
   private index = 0;
   private aboutBtn: Button | null = null;

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { Container, Graphics, Sprite, Text } from 'pixi.js';
+import { Container, Graphics, Sprite, BitmapText } from 'pixi.js';
 import { HudTribes } from '../src/ui/hud/HudTribes';
 import { useGameStore } from '../src/store/gameStore';
 import { UNKNOWN_TRIBE_COLOR } from '../src/game/discovery';
@@ -48,8 +48,6 @@ describe('HudTribes', () => {
   let widget: HudTribes | null = null;
 
   beforeEach(() => {
-    Object.defineProperty(Text.prototype, 'width', { configurable: true, get: () => 60 });
-    Object.defineProperty(Text.prototype, 'height', { configurable: true, get: () => 14 });
     (globalThis as { CanvasRenderingContext2D?: unknown }).CanvasRenderingContext2D = class {};
     (globalThis as { document?: unknown }).document = {
       createElement: () => ({ getContext: () => fakeCanvasContext(), width: 0, height: 0 }),
@@ -75,7 +73,7 @@ describe('HudTribes', () => {
     chip.children.filter((c) => c instanceof Sprite).length;
 
   const textOf = (chip: Container): string[] =>
-    chip.children.filter((c): c is Text => c instanceof Text).map((c) => String(c.text));
+    chip.children.filter((c): c is BitmapText => c instanceof BitmapText).map((c) => String(c.text));
 
   const hasFill = (chip: Container, color: number): boolean =>
     (chip.children.filter((c) => c instanceof Graphics) as Graphics[]).some((g) =>
@@ -127,7 +125,7 @@ describe('HudTribes', () => {
     expect(spritesIn(chip)).toBe(0);
     expect(textOf(chip)).toEqual(['?']);
     expect(hasFill(chip, UNKNOWN_TRIBE_COLOR)).toBe(true);
-    const q = chip.children.find((c): c is Text => c instanceof Text)!;
+    const q = chip.children.find((c): c is BitmapText => c instanceof BitmapText)!;
     expect((q.style as { fill?: string | number }).fill).toBe(0xffffff);
   });
 

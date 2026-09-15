@@ -1,4 +1,4 @@
-import { Container, Graphics, Text } from 'pixi.js';
+import { Container, Graphics, BitmapText } from 'pixi.js';
 
 import { TRIBES, tribeById } from '../../game/tribes';
 import { useGameStore } from '../../store/gameStore';
@@ -9,7 +9,7 @@ import { TOOLBAR_HEIGHT, TURN_BAR_HEIGHT, TURN_BAR_COLOR, isWideScreen, ACTION_T
 
 export class HudTurn implements Widget {
   private el: Container | null = null;
-  private text: Text | null = null;
+  private text: BitmapText | null = null;
   private panel: Graphics | null = null;
   private host: UIHost | null = null;
   private unsub: (() => void) | null = null;

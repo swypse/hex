@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { Container, Graphics, Sprite, Text } from 'pixi.js';
+import { Container, Graphics, Sprite, BitmapText } from 'pixi.js';
 import { LobbyScreen } from '../src/ui/screens/LobbyScreen';
 import { gameController } from '../src/controller/gameController';
 import { TRIBES, Tribe } from '../src/game/tribes';
@@ -50,11 +50,11 @@ function uiNodes(screen: LobbyScreen): Container[] {
 }
 
 function hasDirectText(c: Container, text: string): boolean {
-  return c.children.some((ch) => ch instanceof Text && String((ch as Text).text).toUpperCase() === text.toUpperCase());
+  return c.children.some((ch) => ch instanceof BitmapText && String((ch as BitmapText).text).toUpperCase() === text.toUpperCase());
 }
 
 function textsOf(c: Container): string[] {
-  return c.children.filter((ch) => ch instanceof Text).map((ch) => String((ch as Text).text));
+  return c.children.filter((ch) => ch instanceof BitmapText).map((ch) => String((ch as BitmapText).text));
 }
 
 type KeyboardEventLike = { key: string; preventDefault: () => void };
@@ -65,8 +65,6 @@ describe('LobbyScreen host keyboard navigation', () => {
   let keyHandler: ((e: KeyboardEventLike) => void) | null;
 
   beforeEach(() => {
-    Object.defineProperty(Text.prototype, 'width', { configurable: true, get: () => 60 });
-    Object.defineProperty(Text.prototype, 'height', { configurable: true, get: () => 14 });
     installCanvasDom();
     keyHandler = null;
     const win = (globalThis as { window: { addEventListener: (t: string, cb: unknown) => void; removeEventListener: (t: string, cb: unknown) => void } }).window;
@@ -243,8 +241,6 @@ describe('LobbyScreen menu keyboard navigation', () => {
   let keyHandler: ((e: KeyboardEventLike) => void) | null;
 
   beforeEach(() => {
-    Object.defineProperty(Text.prototype, 'width', { configurable: true, get: () => 60 });
-    Object.defineProperty(Text.prototype, 'height', { configurable: true, get: () => 14 });
     installCanvasDom();
     keyHandler = null;
     const win = (globalThis as { window: { addEventListener: (t: string, cb: unknown) => void; removeEventListener: (t: string, cb: unknown) => void } }).window;
@@ -310,8 +306,6 @@ describe('LobbyScreen host tribe icons use tribe codes', () => {
   const originalImage = globalThis.Image;
 
   beforeEach(() => {
-    Object.defineProperty(Text.prototype, 'width', { configurable: true, get: () => 60 });
-    Object.defineProperty(Text.prototype, 'height', { configurable: true, get: () => 14 });
     FakeImage.instances = [];
     (globalThis as { Image?: unknown }).Image = FakeImage;
     installCanvasDom();
@@ -344,8 +338,6 @@ describe('LobbyScreen client room tribe selection', () => {
   let host: ReturnType<typeof makeHost>;
 
   beforeEach(() => {
-    Object.defineProperty(Text.prototype, 'width', { configurable: true, get: () => 60 });
-    Object.defineProperty(Text.prototype, 'height', { configurable: true, get: () => 14 });
     installCanvasDom();
     host = makeHost();
     screen = new LobbyScreen();
@@ -400,7 +392,7 @@ describe('LobbyScreen client room tribe selection', () => {
   });
 
   const hasText = (text: string): boolean =>
-    uiNodes(screen).some((c) => c instanceof Text && String((c as Text).text) === text);
+    uiNodes(screen).some((c) => c instanceof BitmapText && String((c as BitmapText).text) === text);
 
   it('shows "Waiting for game start..." once the joining player is ready', () => {
     setClientRoom();

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { Application, Container, Text } from 'pixi.js';
+import { Application, Container, BitmapText } from 'pixi.js';
 import { GameScreen } from '../src/ui/screens/GameScreen';
 import { gameController } from '../src/controller/gameController';
 import { useGameStore } from '../src/store/gameStore';
@@ -20,7 +20,7 @@ function makeHost(): UIHost {
 
 function findTextOwner(c: Container, text: string): Container | null {
   for (const ch of c.children) {
-    if (ch instanceof Text && (ch as Text).text === text) return c;
+    if (ch instanceof BitmapText && (ch as BitmapText).text === text) return c;
     if (ch instanceof Container) {
       const found = findTextOwner(ch as Container, text);
       if (found) return found;
@@ -31,8 +31,6 @@ function findTextOwner(c: Container, text: string): Container | null {
 
 describe('GameScreen lifecycle', () => {
   beforeEach(() => {
-    Object.defineProperty(Text.prototype, 'width', { configurable: true, get: () => 40 });
-    Object.defineProperty(Text.prototype, 'height', { configurable: true, get: () => 14 });
     (globalThis as { CanvasRenderingContext2D?: unknown }).CanvasRenderingContext2D = class {};
     (globalThis as { document?: unknown }).document = {
       createElement: () => ({ getContext: () => ({ measureText: (s: string) => ({ width: s.length * 8, actualBoundingBoxLeft: 0, actualBoundingBoxRight: s.length * 8, actualBoundingBoxAscent: 12, actualBoundingBoxDescent: 3 }), width: 0, height: 0 }) }),

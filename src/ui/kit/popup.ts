@@ -1,4 +1,4 @@
-import { Application, Container, Graphics, Text, type FederatedPointerEvent, type FederatedWheelEvent } from 'pixi.js';
+import { Application, Container, Graphics, BitmapText, type FederatedPointerEvent, type FederatedWheelEvent } from 'pixi.js';
 import { Button } from './button';
 import { makeLabel } from './label';
 import { THEME } from './theme';
@@ -94,7 +94,7 @@ export class Popup {
   private readonly viewport: Container;
   private readonly clip: Graphics;
   private readonly scrollPad: Graphics;
-  private readonly titleText: Text | null;
+  private readonly titleText: BitmapText | null;
   private readonly modal: boolean;
   private buttons: Button[] = [];
   private scrollable: boolean;

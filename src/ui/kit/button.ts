@@ -1,4 +1,4 @@
-import { Container, Graphics, Text } from 'pixi.js';
+import { Container, Graphics, BitmapText } from 'pixi.js';
 import { makeLabel } from './label';
 import { TEXT_BUTTON, THEME } from './theme';
 import { sfx } from '../../sound/sfx';
@@ -55,7 +55,7 @@ function traceRoundedRect(
 
 export class Button extends Container {
   private readonly bg: Graphics;
-  private readonly text: Text;
+  private readonly text: BitmapText;
   private readonly w: number;
   private readonly h: number;
   private readonly onClick: () => void;

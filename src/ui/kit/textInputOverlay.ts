@@ -1,4 +1,4 @@
-import { Container, Text } from 'pixi.js';
+import { Container, BitmapText } from 'pixi.js';
 import { makeLabel } from './label';
 import { makePanel } from './panel';
 
@@ -14,7 +14,7 @@ interface TextInputOpts {
 
 export class TextInputOverlay {
   private readonly field: Container;
-  private readonly label: Text;
+  private readonly label: BitmapText;
   private readonly opts: TextInputOpts;
   private input: HTMLInputElement | null = null;
   private disposed = false;

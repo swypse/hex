@@ -1,4 +1,4 @@
-import { Container, Graphics, Text } from 'pixi.js';
+import { Container, Graphics, BitmapText } from 'pixi.js';
 import { gameController } from '../../controller/gameController';
 import { totalScore } from '../../game/score';
 import { activeBuffs, BUFF_INFO, type BuffId } from '../../game/buffs';
@@ -18,7 +18,7 @@ export class HudScore implements Widget {
   /** Optional tap handler (used by the skill-tree screen to open score details). */
   onTap: (() => void) | null = null;
   private el: Container | null = null;
-  private text: Text | null = null;
+  private text: BitmapText | null = null;
   private buffRow: Container | null = null;
   private host: UIHost | null = null;
   private unsub: (() => void) | null = null;
@@ -37,7 +37,6 @@ export class HudScore implements Widget {
       fontSize: 20,
       fill: 0xffffff,
       fontWeight: '800',
-      dropShadow: { alpha: 0.1, blur: 0, color: 0x000000, distance: 1 },
     });
     text.anchor.set(0.5, 0.5);
     const buffRow = new Container();

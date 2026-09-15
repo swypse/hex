@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { Container, Sprite, Text } from 'pixi.js';
+import { Container, Sprite, BitmapText } from 'pixi.js';
 import { UnitHelpDialog } from '../src/ui/overlays/UnitHelpDialog';
 import { gameController } from '../src/controller/gameController';
 import { useGameStore } from '../src/store/gameStore';
@@ -44,7 +44,7 @@ describe('UnitHelpDialog', () => {
     const out: string[] = [];
     const walk = (n: Container): void => {
       for (const ch of n.children) {
-        if (ch instanceof Text) out.push(String((ch as Text).text));
+        if (ch instanceof BitmapText) out.push(String((ch as BitmapText).text));
         if (ch instanceof Container) walk(ch as Container);
       }
     };
@@ -65,8 +65,6 @@ describe('UnitHelpDialog', () => {
   }
 
   beforeEach(() => {
-    Object.defineProperty(Text.prototype, 'width', { configurable: true, get: () => 40 });
-    Object.defineProperty(Text.prototype, 'height', { configurable: true, get: () => 14 });
     (globalThis as { CanvasRenderingContext2D?: unknown }).CanvasRenderingContext2D = class {};
     (globalThis as { document?: unknown }).document = {
       createElement: () => ({ getContext: () => fakeCanvasContext(), width: 0, height: 0 }),

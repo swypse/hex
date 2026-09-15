@@ -1,5 +1,5 @@
 import { describe, expect, it, afterEach, vi } from 'vitest';
-import { Container, Sprite, Text } from 'pixi.js';
+import { Container, Sprite, BitmapText } from 'pixi.js';
 import { CenterMessage } from '../src/ui/overlays/CenterMessage';
 import { useGameStore } from '../src/store/gameStore';
 import { t } from '../src/i18n';
@@ -22,11 +22,11 @@ function installCanvas(): void {
   };
 }
 
-function allTexts(c: Container): Text[] {
-  const out: Text[] = [];
+function allTexts(c: Container): BitmapText[] {
+  const out: BitmapText[] = [];
   const walk = (n: Container): void => {
     for (const ch of n.children) {
-      if (ch instanceof Text) out.push(ch as Text);
+      if (ch instanceof BitmapText) out.push(ch as BitmapText);
       if (ch instanceof Container) walk(ch);
     }
   };
@@ -50,8 +50,6 @@ describe('CenterMessage', () => {
   });
 
   it('renders a smaller, wrapped notification that stays within 90% of the screen width', () => {
-    Object.defineProperty(Text.prototype, 'width', { configurable: true, get: () => 500 });
-    Object.defineProperty(Text.prototype, 'height', { configurable: true, get: () => 14 });
     installCanvas();
 
     useGameStore.setState({ centerMessage: 'A very long notification about something that happened on the map.' });
@@ -82,8 +80,6 @@ describe('CenterMessage', () => {
   });
 
   it('shows the tribe icon above the text for a meet-tribe message', () => {
-    Object.defineProperty(Text.prototype, 'width', { configurable: true, get: () => 120 });
-    Object.defineProperty(Text.prototype, 'height', { configurable: true, get: () => 14 });
     installCanvas();
     useGameStore.setState({ centerMessage: 'You meet Cats!', centerIconFile: 'cats-icon.png' });
     const host = makeHost();
@@ -98,8 +94,6 @@ describe('CenterMessage', () => {
   });
 
   it('renders the achievement icon chip at 64px when a chip style is set', () => {
-    Object.defineProperty(Text.prototype, 'width', { configurable: true, get: () => 120 });
-    Object.defineProperty(Text.prototype, 'height', { configurable: true, get: () => 14 });
     installCanvas();
     useGameStore.setState({
       centerMessage: 'Achievement unlocked!',
@@ -139,8 +133,6 @@ describe('CenterMessage', () => {
   });
 
   it('closes immediately when the card is clicked', () => {
-    Object.defineProperty(Text.prototype, 'width', { configurable: true, get: () => 120 });
-    Object.defineProperty(Text.prototype, 'height', { configurable: true, get: () => 14 });
     installCanvas();
     useGameStore.setState({ centerMessage: 'Hello' });
     const root = new Container();

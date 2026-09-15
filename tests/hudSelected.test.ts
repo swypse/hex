@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { Circle, Container, Graphics, Sprite, Text } from 'pixi.js';
+import { Circle, Container, Graphics, Sprite, BitmapText } from 'pixi.js';
 import { HudSelected } from '../src/ui/hud/HudSelected';
 import { useGameStore } from '../src/store/gameStore';
 import { gameController } from '../src/controller/gameController';
@@ -43,7 +43,7 @@ describe('HudSelected village building constraints', () => {
     const out: string[] = [];
     const walk = (c: Container): void => {
       for (const ch of c.children) {
-        if (ch instanceof Text) out.push((ch as Text).text);
+        if (ch instanceof BitmapText) out.push((ch as BitmapText).text);
         if (ch instanceof Container) walk(ch as Container);
       }
     };
@@ -52,8 +52,6 @@ describe('HudSelected village building constraints', () => {
   };
 
   const mount = (level: number, buildingCount: number, owner: number | null, opts: { unitOnVillage?: boolean; wall?: boolean } = {}): void => {
-    Object.defineProperty(Text.prototype, 'width', { configurable: true, get: () => 60 });
-    Object.defineProperty(Text.prototype, 'height', { configurable: true, get: () => 14 });
     (globalThis as { CanvasRenderingContext2D?: unknown }).CanvasRenderingContext2D = class {};
     (globalThis as { document?: unknown }).document = {
       createElement: () => ({ getContext: () => fakeCanvasContext(), width: 0, height: 0 }),
@@ -240,7 +238,7 @@ describe('HudSelected building produce and bridge info lines', () => {
     const out: string[] = [];
     const walk = (c: Container): void => {
       for (const ch of c.children) {
-        if (ch instanceof Text) out.push((ch as Text).text);
+        if (ch instanceof BitmapText) out.push((ch as BitmapText).text);
         if (ch instanceof Container) walk(ch as Container);
       }
     };
@@ -262,8 +260,6 @@ describe('HudSelected building produce and bridge info lines', () => {
   };
 
   const boot = (setup: (map: GameMap) => MapTile): void => {
-    Object.defineProperty(Text.prototype, 'width', { configurable: true, get: () => 60 });
-    Object.defineProperty(Text.prototype, 'height', { configurable: true, get: () => 14 });
     (globalThis as { CanvasRenderingContext2D?: unknown }).CanvasRenderingContext2D = class {};
     (globalThis as { document?: unknown }).document = {
       createElement: () => ({ getContext: () => fakeCanvasContext(), width: 0, height: 0 }),
@@ -343,7 +339,7 @@ describe('HudSelected connected village income bonus', () => {
     const out: string[] = [];
     const walk = (c: Container): void => {
       for (const ch of c.children) {
-        if (ch instanceof Text) out.push((ch as Text).text);
+        if (ch instanceof BitmapText) out.push((ch as BitmapText).text);
         if (ch instanceof Container) walk(ch as Container);
       }
     };
@@ -352,8 +348,6 @@ describe('HudSelected connected village income bonus', () => {
   };
 
   const boot = (setupConnected: boolean): void => {
-    Object.defineProperty(Text.prototype, 'width', { configurable: true, get: () => 60 });
-    Object.defineProperty(Text.prototype, 'height', { configurable: true, get: () => 14 });
     (globalThis as { CanvasRenderingContext2D?: unknown }).CanvasRenderingContext2D = class {};
     (globalThis as { document?: unknown }).document = {
       createElement: () => ({ getContext: () => fakeCanvasContext(), width: 0, height: 0 }),
@@ -416,7 +410,7 @@ describe('HudSelected pirate deal info', () => {
     const out: string[] = [];
     const walk = (c: Container): void => {
       for (const ch of c.children) {
-        if (ch instanceof Text) out.push((ch as Text).text);
+        if (ch instanceof BitmapText) out.push((ch as BitmapText).text);
         if (ch instanceof Container) walk(ch as Container);
       }
     };
@@ -425,8 +419,6 @@ describe('HudSelected pirate deal info', () => {
   };
 
   const boot = (paidBy: number[] | null): void => {
-    Object.defineProperty(Text.prototype, 'width', { configurable: true, get: () => 60 });
-    Object.defineProperty(Text.prototype, 'height', { configurable: true, get: () => 14 });
     (globalThis as { CanvasRenderingContext2D?: unknown }).CanvasRenderingContext2D = class {};
     (globalThis as { document?: unknown }).document = {
       createElement: () => ({ getContext: () => fakeCanvasContext(), width: 0, height: 0 }),
@@ -491,7 +483,7 @@ describe('HudSelected bonus info', () => {
     const out: string[] = [];
     const walk = (c: Container): void => {
       for (const ch of c.children) {
-        if (ch instanceof Text) out.push((ch as Text).text);
+        if (ch instanceof BitmapText) out.push((ch as BitmapText).text);
         if (ch instanceof Container) walk(ch as Container);
       }
     };
@@ -500,8 +492,6 @@ describe('HudSelected bonus info', () => {
   };
 
   const boot = (kind: BonusKind): void => {
-    Object.defineProperty(Text.prototype, 'width', { configurable: true, get: () => 60 });
-    Object.defineProperty(Text.prototype, 'height', { configurable: true, get: () => 14 });
     (globalThis as { CanvasRenderingContext2D?: unknown }).CanvasRenderingContext2D = class {};
     (globalThis as { document?: unknown }).document = {
       createElement: () => ({ getContext: () => fakeCanvasContext(), width: 0, height: 0 }),
@@ -565,10 +555,10 @@ describe('HudSelected bonus info', () => {
   });
 });
 
-function findText(root: Container, prefix: string): Text | undefined {
+function findText(root: Container, prefix: string): BitmapText | undefined {
   for (const ch of root.children) {
-    if (ch instanceof Text) {
-      if ((ch as Text).text.startsWith(prefix)) return ch as Text;
+    if (ch instanceof BitmapText) {
+      if ((ch as BitmapText).text.startsWith(prefix)) return ch as BitmapText;
     } else if (ch instanceof Container) {
       const found = findText(ch as Container, prefix);
       if (found) return found;

@@ -1,5 +1,5 @@
 import { t } from '../../i18n';
-import { Container, Graphics, Text } from 'pixi.js';
+import { Container, Graphics, BitmapText } from 'pixi.js';
 import { placeWord } from '../../i18n/lists';
 import { gameController } from '../../controller/gameController';
 import { TRIBES, tribeById } from '../../game/tribes';
@@ -64,7 +64,7 @@ export class GameStats {
     const local = s.players[s.localPlayerIndex];
     const known = new Set<number>(local ? [local.tribe, ...(local.knownTribes ?? [])] : []);
     let y = 0;
-    const top = (label: Text, x: number, ty: number): void => {
+    const top = (label: BitmapText, x: number, ty: number): void => {
       label.anchor.set(0, 0);
       label.position.set(x, ty);
       popup.content.addChild(label);

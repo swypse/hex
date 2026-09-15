@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { Container, Sprite, Text } from 'pixi.js';
+import { Container, Sprite, BitmapText } from 'pixi.js';
 import { HudScore } from '../src/ui/hud/HudScore';
 import { useGameStore } from '../src/store/gameStore';
 import { gameController } from '../src/controller/gameController';
@@ -36,8 +36,7 @@ describe('HudScore buff icons', () => {
     }
     const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
     (gameController as unknown as { sim: unknown }).sim = sim;
-    Object.defineProperty(Text.prototype, 'width', { configurable: true, get: () => 60 });
-    Object.defineProperty(Text.prototype, 'height', { configurable: true, get: () => 14 });
+    
     useGameStore.setState({ screen: 'game', players, localPlayerIndex: 0 });
     root = new Container();
     host = makeHost();
@@ -78,7 +77,7 @@ describe('HudScore buff icons', () => {
     const buffRow = (hud as unknown as { buffRow: Container }).buffRow!;
     expect(buffRow.children.length).toBe(1);
     const item = buffRow.children[0]!;
-    const texts = item.children.filter((c) => c instanceof Text) as Text[];
+    const texts = item.children.filter((c) => c instanceof BitmapText) as BitmapText[];
     expect(texts).toHaveLength(0);
     const sprites = item.children.filter((c) => c instanceof Sprite) as Sprite[];
     expect(sprites).toHaveLength(1);
@@ -124,7 +123,7 @@ describe('HudScore buff icons', () => {
     const popupTexts: string[] = [];
     const walk = (c: Container): void => {
       for (const ch of c.children) {
-        if (ch instanceof Text) popupTexts.push((ch as Text).text);
+        if (ch instanceof BitmapText) popupTexts.push((ch as BitmapText).text);
         if (ch instanceof Container) walk(ch as Container);
       }
     };
@@ -138,8 +137,7 @@ describe('HudScore buff icons', () => {
   it('cancels the bounce animation when destroyed mid-bounce', () => {
     const map = makeTestMap(3);
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(42));
-    Object.defineProperty(Text.prototype, 'width', { configurable: true, get: () => 60 });
-    Object.defineProperty(Text.prototype, 'height', { configurable: true, get: () => 14 });
+    
     useGameStore.setState({ screen: 'game', players, localPlayerIndex: 0 });
 
     const registered: Array<(t: { deltaMS: number }) => void> = [];

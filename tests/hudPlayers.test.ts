@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, afterEach } from 'vitest';
-import { Container, Graphics, Text } from 'pixi.js';
+import { Container, Graphics, BitmapText } from 'pixi.js';
 import { HudPlayers, PLAYER_ONLINE_COLOR, PLAYER_OFFLINE_COLOR } from '../src/ui/hud/HudPlayers';
 import { useGameStore } from '../src/store/gameStore';
 import { Tribe } from '../src/game/tribes';
@@ -31,8 +31,6 @@ describe('HudPlayers', () => {
   let root: Container;
 
   beforeEach(() => {
-    Object.defineProperty(Text.prototype, 'width', { configurable: true, get: () => 60 });
-    Object.defineProperty(Text.prototype, 'height', { configurable: true, get: () => 14 });
     (globalThis as { CanvasRenderingContext2D?: unknown }).CanvasRenderingContext2D = class {};
     (globalThis as { document?: unknown }).document = {
       createElement: () => ({ getContext: () => fakeCanvasContext(), width: 0, height: 0 }),
@@ -60,7 +58,7 @@ describe('HudPlayers', () => {
     const out: string[] = [];
     const walk = (cc: Container): void => {
       for (const ch of cc.children) {
-        if (ch instanceof Text) out.push(String((ch as Text).text));
+        if (ch instanceof BitmapText) out.push(String((ch as BitmapText).text));
         if (ch instanceof Container) walk(ch as Container);
       }
     };
@@ -71,7 +69,7 @@ describe('HudPlayers', () => {
   const chipFor = (c: Container, name: string): Container | null => {
     for (const ch of c.children) {
       if (!(ch instanceof Container)) continue;
-      if (ch.children.some((x) => x instanceof Text && String((x as Text).text) === name)) return ch as Container;
+      if (ch.children.some((x) => x instanceof BitmapText && String((x as BitmapText).text) === name)) return ch as Container;
     }
     return null;
   };

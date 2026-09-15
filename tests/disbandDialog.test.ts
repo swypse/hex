@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach, afterEach } from 'vitest';
-import { Container, Text } from 'pixi.js';
+import { Container, BitmapText } from 'pixi.js';
 import { Simulator } from '../src/game/simulator';
 import { generateMap } from '../src/game/mapGen';
 import { buildPlayers } from '../src/game/players';
@@ -25,7 +25,7 @@ function allTexts(c: Container): string[] {
   const out: string[] = [];
   const walk = (n: Container): void => {
     for (const ch of n.children) {
-      if (ch instanceof Text) out.push(String((ch as Text).text));
+      if (ch instanceof BitmapText) out.push(String((ch as BitmapText).text));
       if (ch instanceof Container) walk(ch);
     }
   };
@@ -38,8 +38,6 @@ describe('DisbandDialog', () => {
   let root: Container;
 
   beforeEach(() => {
-    Object.defineProperty(Text.prototype, 'width', { configurable: true, get: () => 40 });
-    Object.defineProperty(Text.prototype, 'height', { configurable: true, get: () => 14 });
     (globalThis as { CanvasRenderingContext2D?: unknown }).CanvasRenderingContext2D = class {};
     (globalThis as { document?: unknown }).document = {
       createElement: () => ({ getContext: () => fakeCanvasContext(), width: 0, height: 0 }),
