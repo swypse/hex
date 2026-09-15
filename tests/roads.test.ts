@@ -128,15 +128,17 @@ describe('roads', () => {
     expect(canBuildRoad(map, map.tiles[1]!, player(100, 10, 10, 0, ['forestry', 'roads']))).toBe(false);
   });
 
-  it('builds a road adjacent to an owned port', () => {
+  it('builds a road adjacent to an owned port connected to an own village', () => {
     const map = mapWith([
-      tile(0, 0, TileType.Water, { building: { kind: 'port', level: 1 } }),
-      tile(1, 0, TileType.GrasslandLand),
+      villageTile(0, 0, 0),
+      tile(1, 0, TileType.GrasslandLand, { roadOwner: 0 }),
+      tile(2, 0, TileType.Water, { building: { kind: 'port', level: 1 } }),
+      tile(3, 0, TileType.GrasslandLand),
     ]);
-    map.tiles[0]!.ownedBy = 0;
+    map.tiles[2]!.ownedBy = 0;
     const p = player(100, 10, 10, 0, ['forestry', 'roads']);
-    expect(canBuildRoad(map, map.tiles[1]!, p)).toBe(true);
-    expect(buildRoad(map, map.tiles[1]!, p)).toBe(true);
+    expect(canBuildRoad(map, map.tiles[3]!, p)).toBe(true);
+    expect(buildRoad(map, map.tiles[3]!, p)).toBe(true);
   });
 
   it('does not build a road adjacent to another player port', () => {
@@ -146,6 +148,49 @@ describe('roads', () => {
     ]);
     map.tiles[0]!.ownedBy = 1;
     expect(canBuildRoad(map, map.tiles[1]!, player(100, 10, 10, 0, ['forestry', 'roads']))).toBe(false);
+  });
+
+  it('does not build a road off an orphaned bridge not connected to a village', () => {
+    const map = mapWith([
+      villageTile(0, 0, 0),
+      (() => {
+        const bridge = tile(3, 0, TileType.Water, { roadOwner: 0 });
+        bridge.bridge = { owner: 0, dir: 'we' };
+        return bridge;
+      })(),
+      tile(4, 0, TileType.GrasslandLand),
+    ]);
+    expect(canBuildRoad(map, map.tiles[2]!, player(100, 10, 10, 0, ['forestry', 'roads']))).toBe(false);
+  });
+
+  it('does not build a road off an orphaned road stub after its village is captured', () => {
+    const map = mapWith([
+      tile(0, 0, TileType.GrasslandLand, { settlement: { owner: 1, level: 1, captureReady: false }, ownedBy: 1 }),
+      tile(1, 0, TileType.GrasslandLand, { roadOwner: 0 }),
+      tile(2, 0, TileType.GrasslandLand),
+    ]);
+    expect(canBuildRoad(map, map.tiles[2]!, player(100, 10, 10, 0, ['forestry', 'roads']))).toBe(false);
+  });
+
+  it('does not build a road when the player owns no villages', () => {
+    const map = mapWith([
+      tile(1, 0, TileType.GrasslandLand, { roadOwner: 0 }),
+      tile(2, 0, TileType.GrasslandLand),
+    ]);
+    expect(canBuildRoad(map, map.tiles[1]!, player(100, 10, 10, 0, ['forestry', 'roads']))).toBe(false);
+  });
+
+  it('builds a road off a bridge that is connected to an own village', () => {
+    const map = mapWith([
+      villageTile(0, 0, 0),
+      (() => {
+        const bridge = tile(1, 0, TileType.Water, { roadOwner: 0 });
+        bridge.bridge = { owner: 0, dir: 'we' };
+        return bridge;
+      })(),
+      tile(2, 0, TileType.GrasslandLand),
+    ]);
+    expect(canBuildRoad(map, map.tiles[2]!, player(100, 10, 10, 0, ['forestry', 'roads']))).toBe(true);
   });
 
   it('does not pay when the build is rejected', () => {

@@ -1,7 +1,7 @@
 import { canBuildSawmill, canBuildForestTemple, canBuildMine, canBuildPort, canBuildTemple, BUILDING_COSTS } from './buildings';
 import { hexDistance, hexNeighbors } from './hex';
 import { canBuildBridge, bridgeCoastOffsets, bridgeDirFor, BRIDGE_COST } from './bridges';
-import { canBuildRoad } from './roads';
+import { canBuildRoad, villageConnectedNodes } from './roads';
 import { GameMap, MapTile } from './mapGen';
 import { Player } from './players';
 import { canAfford, pay, villageUpgradeCost } from './resources';
@@ -371,9 +371,10 @@ function bestAvailableAction(
     }
   }
 
+  const roadConnected = villageConnectedNodes(map, player.index);
   for (const tile of map.tiles) {
     if (state.built.has(key(tile.q, tile.r))) continue;
-    if (!canBuildRoad(map, tile, player)) continue;
+    if (!canBuildRoad(map, tile, player, roadConnected)) continue;
     if (tile.unit && tile.unit.owner !== player.index) continue;
     // Only extend the road network where it pushes toward unexplored ground or
     // a foreign village (roads grant +1 movement, speeding up expansion).

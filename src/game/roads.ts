@@ -62,15 +62,47 @@ export function roadNetworkComponents(
   return components;
 }
 
-export function canBuildRoad(map: GameMap, tile: MapTile, player: Player): boolean {
+/** Tile keys of the player's road/port/bridge nodes that share a component
+ *  with at least one of the player's own villages. Only these nodes may be
+ *  extended by new roads — an orphaned bridge or a road stub left behind by a
+ *  captured village cannot grow further. */
+export function villageConnectedNodes(
+  map: GameMap,
+  owner: number,
+  waterJumps: Map<string, Set<string>> = portWaterClusterJumps(map),
+): Set<string> {
+  const byKey = tileMapByKey(map);
+  const out = new Set<string>();
+  for (const comp of roadNetworkComponents(map, owner, waterJumps)) {
+    const hasVillage = [...comp].some(
+      (k) => byKey.get(k)?.settlement?.owner === owner,
+    );
+    if (hasVillage) {
+      for (const k of comp) out.add(k);
+    }
+  }
+  return out;
+}
+
+export function canBuildRoad(
+  map: GameMap,
+  tile: MapTile,
+  player: Player,
+  connectedNodes: Set<string> = villageConnectedNodes(map, player.index),
+): boolean {
   if (!hasSkill(player, 'roads')) return false;
-  if (!canBuildRoadHere(map, tile, player)) return false;
+  if (!canBuildRoadHere(map, tile, player, connectedNodes)) return false;
   return canAfford(player.resources, ROAD_COST);
 }
 
 /** Terrain/ownership preconditions for a road on this tile, without requiring
  *  the Roads skill or the money to pay for it (used by the open-Roads hint). */
-export function canBuildRoadHere(map: GameMap, tile: MapTile, player: Player): boolean {
+export function canBuildRoadHere(
+  map: GameMap,
+  tile: MapTile,
+  player: Player,
+  connectedNodes: Set<string> = villageConnectedNodes(map, player.index),
+): boolean {
   if (tile.roadOwner !== null && tile.roadOwner !== undefined) return false;
   // Roads may only cross the player's own or unclaimed territory, never an
   // enemy's.
@@ -83,7 +115,7 @@ export function canBuildRoadHere(map: GameMap, tile: MapTile, player: Player): b
     const t = tileAt(map, n.q, n.r);
     if (!t) return false;
     if (t.settlement && t.settlement.owner === player.index) return true;
-    return isRoadNode(t, player.index);
+    return isRoadNode(t, player.index) && connectedNodes.has(axialKey(t));
   });
   return connected;
 }

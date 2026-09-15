@@ -191,7 +191,7 @@ interface Harness {
     taskQueue: Promise<void>;
   };
   mapView: MapView;
-  tileViews: () => Map<string, { unitSprite: { visible: boolean } | null }>;
+  tileViews: () => Map<string, { unitSprite: { visible: boolean; scale: { x: number } } | null }>;
 }
 
 let realRaf: typeof requestAnimationFrame | undefined;
@@ -241,7 +241,7 @@ function setupGame(map: GameMap, players: Player[]): Harness {
     gc,
     mapView,
     tileViews: () =>
-      (mapView as unknown as { tileViews: Map<string, { unitSprite: { visible: boolean } | null }> }).tileViews,
+      (mapView as unknown as { tileViews: Map<string, { unitSprite: { visible: boolean; scale: { x: number } } | null }> }).tileViews,
   };
 }
 
@@ -421,6 +421,41 @@ describe('move animation', () => {
     } finally {
       await p;
     }
+  });
+
+  it('keeps the unit facing right after a rightward move even if it was flipped left before', async () => {
+    const map = makeOpenMap();
+    h = setupGame(map, [player(0, Tribe.Cats)]);
+    const from = unitAt(map, 0, 0);
+    const unit: Unit = {
+      id: 'u1', owner: 0, type: 'warrior', q: 0, r: 0,
+      hasMoved: true, hasAttacked: false, hasHealed: false,
+      hp: 5, attack: 2, attackDistance: 1, spawnVillage: { q: 0, r: 0 },
+    };
+    from.unit = unit;
+    const dest = unitAt(map, 2, 0);
+    from.unit = null;
+    const landed: Unit = { ...unit, q: 2, r: 0 };
+    dest.unit = landed;
+    h.mapView.update(map, [player(0, Tribe.Cats)], null, new Set(), new Set(), 0, new Set(), {
+      x: 0, y: 0, scale: 1, width: 800, height: 600,
+    });
+    // A prior attack flipped the unit to face left; the upcoming rightward
+    // move should override that and leave it facing right once it settles.
+    h.mapView.setUnitFacing('u1', 'left');
+
+    const events: GameEvent[] = [
+      { type: 'unitMoved', unitId: 'u1', from: { q: 0, r: 0 }, path: [{ q: 1, r: 0 }, { q: 2, r: 0 }], to: { q: 2, r: 0 } },
+    ];
+    const p = h.gc.presentEvents(events, h.gc.exploredKeysFor(0));
+    // Wait until the walk is over and the unit is revealed on the destination.
+    await waitFor(() => {
+      const v = h.tileViews().get(axialKey({ q: 2, r: 0 }));
+      return v?.unitSprite?.visible === true;
+    });
+    await p;
+    const settled = h.tileViews().get(axialKey({ q: 2, r: 0 }))!.unitSprite!;
+    expect(settled.scale.x).toBeGreaterThan(0);
   });
 
   it('flips the walking sprite left before the unit moves left', async () => {

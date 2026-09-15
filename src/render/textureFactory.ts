@@ -1,4 +1,6 @@
-import { Application, BlurFilter, ColorMatrixFilter, Container, FillGradient, Graphics, Rectangle, Sprite, Texture } from 'pixi.js';
+import {
+  Application, BlurFilter, ColorMatrixFilter, Container, FillGradient, Graphics, Rectangle, Sprite, Texture
+} from 'pixi.js';
 import { axialKey, HEX_TILT, hexNeighbors } from '../game/hex';
 import { tileMapByKey, type BridgeDir, type GameMap, type MapTile } from '../game/mapGen';
 import { isWaterType, TileType, TILE_TYPE_COLORS } from '../game/tileTypes';
@@ -140,7 +142,12 @@ function composeHexTexture(
   height: number,
   image: Texture | null,
   fill: number,
-  opts: { walls: boolean; anchor: 'base' | 'topface'; sideColors?: { left: number; right: number }; brightness?: number },
+  opts: {
+    walls: boolean;
+    anchor: 'base' | 'topface';
+    sideColors?: { left: number; right: number };
+    brightness?: number
+  },
 ): TileTexture {
   const container = new Container();
   const g = new Graphics();
@@ -261,10 +268,10 @@ function makeUnitImageTexture(
  *  never clipped at the texture frame edge. */
 const GLOW_PADDING = 4;
 /** Baked-px blur radius of the unit selection glow. */
-const GLOW_BLUR = 2;
+const GLOW_BLUR = 8;
 
-/** Bakes a white glow that hugs the non-empty pixels of a unit texture: the
- *  art is flattened to pure white, blurred outward by `GLOW_BLUR`, and baked
+/** Bakes a glow that hugs the non-empty pixels of a unit texture: the
+ *  art is flattened to pure color, blurred outward by `GLOW_BLUR`, and baked
  *  with `GLOW_PADDING` spare room so nothing is clipped. The returned tile
  *  shares the base texture's footprint, re-anchored so both sprites align when
  *  placed at the unit's render position. */
@@ -275,15 +282,15 @@ function makeUnitGlowTexture(app: Application, base: TileTexture): TileTexture {
   const container = new Container();
   const sprite = new Sprite(base.texture);
   sprite.anchor.set(0.5, base.anchorY);
-  const white = new ColorMatrixFilter();
-  white.matrix = [
+  const blurColor = new ColorMatrixFilter();
+  blurColor.matrix = [
     0, 0, 0, 0, 1,
-    0, 0, 0, 0, 1,
-    0, 0, 0, 0, 1,
+    0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0,
     0, 0, 0, 1, 0,
   ];
   const blur = new BlurFilter({ strength: GLOW_BLUR });
-  sprite.filters = [white, blur];
+  sprite.filters = [blurColor, blur];
   container.addChild(sprite);
   // The frame is the sprite's own bounds plus padding; generateTexture sizes
   // its output from this instead of the (filter-unaware) local bounds.

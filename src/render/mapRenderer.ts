@@ -1781,7 +1781,7 @@ export class MapView {
     const iconSize = 16;
     const gap = 4;
     const label = this.takeText(`${tile.settlement!.name ?? ''} ${count}/${capacity}`.trim(), {
-      fontSize: 13,
+      fontSize: 14,
       fill: 0xffffff,
       fontFamily: FONT_REGULAR
     });

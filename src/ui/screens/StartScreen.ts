@@ -17,23 +17,8 @@ import { setLanguage, type Language } from '../../storage/settings';
 
 const IMAGE_BASE = `${import.meta.env.BASE_URL}images/`;
 
-// Single uniform scale applied to both background images relative to their
-// original pixel size, so they always render at the same relative size.
-const BACKGROUND_SCALE = 1;
-
-const MAIN_TOP = {
-  file: 'main-top.png',
-  width: 510,
-  height: 396,
-  anchor: { x: 1, y: 0 },
-  offset: { x: 0.1, y: -0.5 },
-} as const;
-const MAIN_BOTTOM = {
-  file: 'main-bottom.png',
-  width: 589,
-  height: 599,
-  anchor: { x: 0, y: 1 },
-  offset: { x: -0.05, y: 0.1 },
+const MAIN_BG = {
+  file: 'main-bg.png',
 } as const;
 
 /** Popup-backed dialog the start screen can show (settings / about). */
@@ -182,8 +167,7 @@ export class StartScreen implements ScreenController {
   private aboutBtn: Button | null = null;
   private settingsBtn: Button | null = null;
   private modal: ModalView | null = null;
-  private topImg: Sprite | null = null;
-  private bottomImg: Sprite | null = null;
+  private bgImg: Sprite | null = null;
   private bg: Graphics | null = null;
 
   mount(host: UIHost): void {
@@ -192,7 +176,7 @@ export class StartScreen implements ScreenController {
     host.screenLayer.addChild(this.root);
 
     this.addGradientBackground();
-    this.addBackgroundImages();
+    this.addBackgroundImage();
     this.scroll = new ScreenScroll(host.app, this.root);
 
     this.title = new Sprite();
@@ -275,24 +259,20 @@ export class StartScreen implements ScreenController {
     this.bg.clear().rect(0, 0, w, h).fill(gradient);
   }
 
-  private addBackgroundImages(): void {
-    this.topImg = this.loadBackground(MAIN_TOP);
-    this.bottomImg = this.loadBackground(MAIN_BOTTOM);
-  }
-
-  private loadBackground(def: { file: string; anchor: { x: number; y: number } }): Sprite {
+  private addBackgroundImage(): void {
     const sprite = new Sprite();
-    sprite.anchor.set(def.anchor.x, def.anchor.y);
+    // Centre the image on its bottom edge so it hangs below the screen.
+    sprite.anchor.set(0.5, 1);
     sprite.eventMode = 'none';
     this.root!.addChild(sprite);
+    this.bgImg = sprite;
     const img = new Image();
     img.onload = () => {
       if (sprite.destroyed) return;
       sprite.texture = Texture.from(img);
       this.layout();
     };
-    img.src = IMAGE_BASE + def.file;
-    return sprite;
+    img.src = IMAGE_BASE + MAIN_BG.file;
   }
 
   private onKeyDown = (e: KeyboardEvent): void => {
@@ -338,31 +318,19 @@ export class StartScreen implements ScreenController {
     if (this.aboutBtn) this.aboutBtn.position.set(12, h - this.aboutBtn.height - 12);
     if (this.settingsBtn) this.settingsBtn.position.set(w - this.settingsBtn.width - 12, h - this.settingsBtn.height - 12);
     this.paintGradient();
-    this.placeBackground(this.topImg, MAIN_TOP);
-    this.placeBackground(this.bottomImg, MAIN_BOTTOM);
+    this.placeBackgroundImage();
     this.scroll?.resize();
     this.scroll?.refresh();
   }
 
-  private placeBackground(
-    sprite: Sprite | null,
-    def: { width: number; height: number; anchor: { x: number; y: number }; offset: { x: number; y: number } },
-  ): void {
+  private placeBackgroundImage(): void {
+    const sprite = this.bgImg;
     if (!sprite || sprite.texture === Texture.EMPTY || !this.host) return;
-    // Keep the intended on-screen width, but derive the height from the
-    // texture's own aspect ratio so a differently-sized image is never
-    // distorted.
     const texture = sprite.texture;
-    const scale = (def.width * BACKGROUND_SCALE) / texture.width;
-    sprite.width = texture.width * scale;
-    sprite.height = texture.height * scale;
-    // Start with the image's matching corner on the screen corner, then apply
-    // the offset, which is a fraction of the image's own width/height.
+    sprite.width = texture.width;
+    sprite.height = texture.height;
     const screen = this.host.app.screen;
-    sprite.position.set(
-      def.anchor.x * screen.width + def.offset.x * def.width,
-      def.anchor.y * screen.height + def.offset.y * def.height,
-    );
+    sprite.position.set(screen.width / 2, screen.height + 100);
   }
 
   private move(dir: number): void {
@@ -412,8 +380,7 @@ export class StartScreen implements ScreenController {
     this.buttons = [];
     this.aboutBtn = null;
     this.settingsBtn = null;
-    this.topImg = null;
-    this.bottomImg = null;
+    this.bgImg = null;
     this.bg = null;
     this.host = null;
   }

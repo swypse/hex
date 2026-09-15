@@ -10,7 +10,7 @@ const CIRCLE_SIZE = 36;
 const RADIUS = CIRCLE_SIZE / 2;
 const GAP = 8;
 /** Vertical centre of the chip row, just below the top-centre resource panel. */
-const ROW_Y = 52;
+const ROW_Y = 62;
 const ELIMINATED_ALPHA = 0.3;
 
 export class HudTribes implements Widget {

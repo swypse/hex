@@ -14,7 +14,7 @@ import {
   canBuildForestTemple,
   BUILDING_COSTS,
 } from './buildings';
-import { canBuildRoad, ROAD_COST } from './roads';
+import { canBuildRoad, ROAD_COST, villageConnectedNodes } from './roads';
 import { canBuildBridge, BRIDGE_COST } from './bridges';
 import { bonusEligibleFor } from './bonus';
 import { bottleCollectableFor } from './bottles';
@@ -75,13 +75,14 @@ export function hasAnyAvailableAction(map: GameMap, player: Player, turn: number
 
   if (bottleCollectableFor(map, player.index, turn).length > 0) return true;
 
+  const roadConnected = villageConnectedNodes(map, player.index);
   for (const tile of map.tiles) {
     if (canBuildSawmill(map, tile, player) && canAfford(player.resources, BUILDING_COSTS.sawmill)) return true;
     if (canBuildMine(map, tile, player) && canAfford(player.resources, BUILDING_COSTS.mine)) return true;
     if (canBuildPort(map, tile, player) && canAfford(player.resources, BUILDING_COSTS.port)) return true;
     if (canBuildTemple(map, tile, player) && canAfford(player.resources, BUILDING_COSTS.temple)) return true;
     if (canBuildForestTemple(map, tile, player) && canAfford(player.resources, BUILDING_COSTS.forestTemple)) return true;
-    if (canBuildRoad(map, tile, player)) return true;
+    if (canBuildRoad(map, tile, player, roadConnected)) return true;
     if (canBuildBridge(map, tile, player) && canAfford(player.resources, BRIDGE_COST)) return true;
   }
 

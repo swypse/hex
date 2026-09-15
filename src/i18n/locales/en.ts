@@ -427,6 +427,7 @@ export default {
   'help.catapult.base': 'Siege unit: 1 movement, attack range 4, 30 HP.',
   'help.catapult.damage': 'Deals 40–60 random damage per attack.',
   'help.catapult.noAdvance': 'Never moves onto the tile of a unit it kills.',
+  'help.catapult.noCounter': 'Never counter-attacks when attacked (as a ship it still does).',
   'help.catapult.skill': 'Requires the Catapult skill (30 money + 20 wood + 5 ore).',
   'help.knight.desc': 'Elite cavalry that strikes again after a kill.',
   'help.knight.base': 'Elite cavalry: 3 movement, 50 attack, 50 HP.',

@@ -28,6 +28,8 @@ import { ICONS16_FILES, icons16FrameForIconPath, makeIcon16 } from '../kit/icons
 import { makeSkillMedallion } from '../kit/skillMedallion';
 import { makePanel } from '../kit/panel';
 import { THEME } from '../kit/theme';
+import { makeActionButtonIcon } from '../kit/actionButtonIcons';
+import { selectedInfoClosed, setSelectedInfoClosed } from '../../storage/settings';
 import { TOOLBAR_HEIGHT, TURN_BAR_HEIGHT } from '../layout';
 
 function unitDefenseBuffs(map: GameMap, unit: Unit, tile: MapTile): { key: string; amount: number }[] {
@@ -47,12 +49,14 @@ export class HudSelected implements Widget {
   private unsub: (() => void) | null = null;
   private onResize: (() => void) | null = null;
   private measured = 0;
+  private closed = false;
 
   mount(host: UIHost, root: Container): void {
     this.host = host;
     const el = new Container();
     root.addChild(el);
     this.el = el;
+    this.closed = selectedInfoClosed();
     this.layout();
     this.update();
     this.unsub = useGameStore.subscribe(() => this.update());
@@ -84,6 +88,12 @@ export class HudSelected implements Widget {
     this.el.visible = true;
 
     this.el.removeChildren().forEach((c) => c.destroy({ children: true }));
+
+    if (this.closed) {
+      this.renderCollapsed();
+      this.layout();
+      return;
+    }
 
     const lines: string[] = [TILE_TYPE_NAMES[tile.terrain]];
     const bolds: boolean[] = [false];
@@ -285,7 +295,10 @@ export class HudSelected implements Widget {
     for (const row of helpRows) {
       contentW = Math.max(contentW, lineWidths[row.index]! + 6 + HELP_SIZE);
     }
-    const bgW = contentW + 20;
+    // Reserve the panel's top-right corner for the close button.
+    const CLOSE_SIZE = 16;
+    const CLOSE_GAP = 6;
+    const bgW = contentW + 10 + CLOSE_GAP + CLOSE_SIZE + 8;
     // Button-style drop shadow under the info panel.
     const SHADOW_OFFSET = 4;
     const shadow = makePanel(bgW, this.measured, {
@@ -316,7 +329,47 @@ export class HudSelected implements Widget {
       this.el.addChild(btn);
     }
 
+    const close = new Container();
+    const closeCircle = new Graphics();
+    closeCircle
+      .circle(CLOSE_SIZE / 2, CLOSE_SIZE / 2, CLOSE_SIZE / 2)
+      .fill({ color: 0x000000, alpha: 0.7 });
+    const mark = new Graphics();
+    const markPad = 4;
+    mark.moveTo(markPad, markPad).lineTo(CLOSE_SIZE - markPad, CLOSE_SIZE - markPad).stroke({ width: 2, color: 0xeeeeee });
+    mark.moveTo(CLOSE_SIZE - markPad, markPad).lineTo(markPad, CLOSE_SIZE - markPad).stroke({ width: 2, color: 0xeeeeee });
+    close.addChild(closeCircle, mark);
+    close.eventMode = 'static';
+    close.cursor = 'pointer';
+    close.hitArea = new Circle(CLOSE_SIZE / 2, CLOSE_SIZE / 2, CLOSE_SIZE / 2);
+    close.on('pointertap', () => {
+      setSelectedInfoClosed(true);
+      this.closed = true;
+      this.update();
+    });
+    close.position.set(bgW - 8 - CLOSE_SIZE, 8);
+    this.el.addChild(close);
+
     this.layout();
+  }
+
+  private renderCollapsed(): void {
+    if (!this.el || !this.host) return;
+    const ICON_SIZE = 32;
+    this.measured = ICON_SIZE;
+    const holder = new Container();
+    const icon = makeActionButtonIcon('action-info', ICON_SIZE);
+    icon.position.set(ICON_SIZE / 2, ICON_SIZE / 2);
+    holder.addChild(icon);
+    holder.eventMode = 'static';
+    holder.cursor = 'pointer';
+    holder.hitArea = new Circle(ICON_SIZE / 2, ICON_SIZE / 2, ICON_SIZE / 2);
+    holder.on('pointertap', () => {
+      setSelectedInfoClosed(false);
+      this.closed = false;
+      this.update();
+    });
+    this.el.addChild(holder);
   }
 
   private suggestedSkillActions(tile: MapTile, human: Player): { id: SkillId; label: string }[] {

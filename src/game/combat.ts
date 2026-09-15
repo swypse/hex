@@ -37,6 +37,12 @@ export function counterAttackDamage(unit: Unit): number {
   return Math.round((base * unit.hp) / UNIT_TYPES[unit.type].maxHp);
 }
 
+/** Whether a unit retaliates when it survives an attack. Land catapults never
+ *  counter-attack; aboard a ship the crew fights back with the ship's cannon. */
+export function canCounterAttack(unit: Unit): boolean {
+  return !(unit.type === 'catapult' && !isShip(unit));
+}
+
 export function attackableTargets(map: GameMap, unit: Unit, playerIndex = 0): MapTile[] {
   return map.tiles.filter((t) => {
     if (!t.unit) return false;
@@ -62,7 +68,7 @@ export function chooseBestAttack(map: GameMap, unit: Unit, playerIndex = 0): Map
     if (target.shipLevel !== undefined) s += 90;
     if (t.settlement && t.settlement.owner !== unit.owner) s += 150;
     const dist = hexDistance({ q: unit.q, r: unit.r }, { q: t.q, r: t.r });
-    if (dist > target.attackDistance) s += 40;
+    if (dist > target.attackDistance || !canCounterAttack(target)) s += 40;
     if (s > bestScore) {
       bestScore = s;
       best = t;
@@ -77,6 +83,7 @@ export function tradeIsFavorable(attacker: Unit, targetTile: MapTile): boolean {
   if (attackDamage(attacker) >= target.hp) return true;
   const dist = hexDistance({ q: attacker.q, r: attacker.r }, { q: target.q, r: target.r });
   if (dist > shipAttackDistance(target)) return true; // no counter available
+  if (!canCounterAttack(target)) return true;
   return attackDamage(attacker) >= counterAttackDamage(target);
 }
 
@@ -117,7 +124,7 @@ export function performAttack(
     { q: attacker.q, r: attacker.r },
     { q: target.q, r: target.r },
   );
-  if (!targetDied && distance <= targetUnit.attackDistance) {
+  if (!targetDied && distance <= targetUnit.attackDistance && canCounterAttack(targetUnit)) {
     const counterReduction = attackerTile ? damageReduction(map, attacker, attackerTile) : 0;
     targetDamage = Math.max(MIN_DAMAGE, counterAttackDamage(targetUnit) - (attacker.defense ?? 0) - counterReduction);
     attackerDied = attacker.hp - targetDamage <= 0;

@@ -152,7 +152,7 @@ describe('HudTribes', () => {
     widget = new HudTribes();
     widget.mount(host, root);
     expect(el().position.x).toBe(640);
-    expect(el().position.y).toBe(52);
+    expect(el().position.y).toBe(62);
     // A single chip sits at its own centre.
     expect(chips()[0]!.position.x).toBe(0);
   });

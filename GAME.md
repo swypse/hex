@@ -55,7 +55,8 @@ freshly spawned unit must wait until the next turn.
 - **Swordsman** additionally requires the *Swordsman* skill.
 - **Shield** additionally requires the *Shields* skill.
 - **Catapult** additionally requires the *Catapult* skill. It deals 5–10 random damage per attack, cannot attack in a
-  turn in which it has already moved, and never moves onto a killed enemy's tile.
+  turn in which it has already moved, and never moves onto a killed enemy's tile. A land catapult never counter-attacks
+  when attacked (aboard a ship the crew still fights back with the ship's cannon).
 - **Ships:** when a unit moves onto its own port it becomes a ship, but can't move or attack again until the next turn.
   Ships move 2/3/4 (levels 1/2/3) and traverse water; they can land only on coast tiles as the final step. A ship may
   always attack in the same turn it has moved (the shield/catapult "cannot attack after moving" limit does not apply
@@ -86,7 +87,8 @@ freshly spawned unit must wait until the next turn.
   are not available (a unit next to an enemy can always move at least 1 cell).
 - **Attack** — attack an enemy within attack range, once per turn. Damage = `round(attack × current hp / max hp)`. Each
   attack has a 10% chance to miss (5% if the attacker's owner has opened Science), dealing no damage (the attack still
-  counts as used). If the target survives and is in range, it counter-attacks. A defending shield counters with
+  counts as used). If the target survives and is in range, it counter-attacks, except a land catapult never
+  counter-attacks. A defending shield counters with
   `round(7 × current hp / max hp)`. A shield cannot attack in a turn in which it has already moved (as a ship this limit
   does not apply). On a kill, the attacker moves onto the target's tile (unless the attacker is an archer or a pirate,
   is a ship, or the target was a pirate or a ship).
@@ -95,7 +97,9 @@ freshly spawned unit must wait until the next turn.
 - **Upgrade village** — costs 2 wood + 1 stone + 2 money at level 1, scaling by level (×2 wood, ×1 stone, ×2 money per
   level). Raises the village level, its claim radius, income and unit capacity.
 - **Build road** — costs 5 wood + 2 stone + 10 money, requires the *Roads* skill. Connects a tile to an adjacent owned
-  road, port, or village, increasing trade income.
+  road, port, or village, increasing trade income. A road may only be placed on a tile that links, through the
+  road/port/bridge network, back to one of the player's own villages: orphaned roads, ports, and bridges that are no
+  longer connected to a village cannot be extended.
 - **Build bridge** — costs 10 wood + 15 money + 5 stone, requires the *Bridges* skill. Built on a water tile between two
   land hexes: the tile becomes walkable land-with-road for units, still lets ships sail under it, and connects to
   neighbouring roads. Can't be built on a port, water temple, or occupied tile, and ports/water temples can't be built

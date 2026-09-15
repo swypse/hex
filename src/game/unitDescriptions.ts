@@ -9,7 +9,7 @@ const LAND_KEYS: Record<UnitType, string[]> = {
   archer: ['help.archer.base', 'help.archer.noAdvance'],
   swordsman: ['help.swordsman.base', 'help.swordsman.skill', 'help.warrior.advance'],
   shield: ['help.shield.base', 'help.shield.counter', 'help.shield.moveLock', 'help.shield.skill'],
-  catapult: ['help.catapult.base', 'help.catapult.damage', 'help.shield.moveLock', 'help.catapult.noAdvance', 'help.catapult.skill'],
+  catapult: ['help.catapult.base', 'help.catapult.damage', 'help.shield.moveLock', 'help.catapult.noAdvance', 'help.catapult.noCounter', 'help.catapult.skill'],
   knight: ['help.knight.base', 'help.knight.rekill', 'help.knight.combo', 'help.warrior.advance', 'help.knight.skill'],
   pirate: ['help.pirate.base', 'help.pirate.spawn', 'help.pirate.act', 'help.pirate.capture', 'help.pirate.steal', 'help.pirate.reward'],
 };

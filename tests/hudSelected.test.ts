@@ -94,7 +94,10 @@ describe('HudSelected village building constraints', () => {
     let n = 0;
     const walk = (c: Container): void => {
       for (const ch of c.children) {
-        if (ch instanceof Container && ch.hitArea instanceof Circle) n++;
+        if (ch instanceof Container && ch.hitArea instanceof Circle) {
+          const hasSprite = (ch as Container).children.some((x) => x instanceof Sprite);
+          if (hasSprite) n++;
+        }
         if (ch instanceof Container) walk(ch as Container);
       }
     };
@@ -251,7 +254,10 @@ describe('HudSelected building produce and bridge info lines', () => {
     let n = 0;
     const walk = (c: Container): void => {
       for (const ch of c.children) {
-        if (ch instanceof Container && ch.hitArea instanceof Circle) n++;
+        if (ch instanceof Container && ch.hitArea instanceof Circle) {
+          const hasSprite = (ch as Container).children.some((x) => x instanceof Sprite);
+          if (hasSprite) n++;
+        }
         if (ch instanceof Container) walk(ch as Container);
       }
     };
@@ -552,6 +558,117 @@ describe('HudSelected bonus info', () => {
     hud = new HudSelected();
     hud.mount(makeHost(), new Container());
     expect(texts().join('\n')).not.toContain('A stash of 15 money');
+  });
+});
+
+describe('HudSelected close button and collapsed state', () => {
+  let hud: HudSelected;
+  const originalSim = (gameController as unknown as { sim: unknown }).sim;
+
+  const texts = (): string[] => {
+    const el = (hud as unknown as { el: Container }).el!;
+    const out: string[] = [];
+    const walk = (c: Container): void => {
+      for (const ch of c.children) {
+        if (ch instanceof BitmapText) out.push((ch as BitmapText).text);
+        if (ch instanceof Container) walk(ch as Container);
+      }
+    };
+    walk(el);
+    return out;
+  };
+
+  const closeButton = (): Container | undefined => {
+    const el = (hud as unknown as { el: Container }).el!;
+    const walk = (c: Container): Container | undefined => {
+      for (const ch of c.children) {
+        if (
+          ch instanceof Container &&
+          ch.hitArea instanceof Circle &&
+          ch.children.length === 2 &&
+          ch.children[0] instanceof Graphics &&
+          ch.children[1] instanceof Graphics
+        ) {
+          return ch as Container;
+        }
+        if (ch instanceof Container) {
+          const found = walk(ch as Container);
+          if (found) return found;
+        }
+      }
+      return undefined;
+    };
+    return walk(el);
+  };
+
+  const collapsedIcon = (): Container | undefined => {
+    const el = (hud as unknown as { el: Container }).el!;
+    const walk = (c: Container): Container | undefined => {
+      for (const ch of c.children) {
+        if (ch instanceof Container && ch.hitArea instanceof Circle && ch.children.length === 1 && ch.children[0] instanceof Sprite) {
+          return ch as Container;
+        }
+        if (ch instanceof Container) {
+          const found = walk(ch as Container);
+          if (found) return found;
+        }
+      }
+      return undefined;
+    };
+    return walk(el);
+  };
+
+  const boot = (): void => {
+    (globalThis as { CanvasRenderingContext2D?: unknown }).CanvasRenderingContext2D = class {};
+    (globalThis as { document?: unknown }).document = {
+      createElement: () => ({ getContext: () => fakeCanvasContext(), width: 0, height: 0 }),
+    };
+    const map = makeTestMap(2);
+    const village = tileAt(map, 0, 0)!;
+    village.unit = makeUnit('u1', 0, 'warrior', 0, 0);
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    (gameController as unknown as { sim: Simulator | null }).sim = sim;
+    useGameStore.setState({
+      screen: 'game',
+      players,
+      localPlayerIndex: 0,
+      selection: { kind: 'unit', q: 0, r: 0 },
+      tutorial: false,
+      tutorialStep: null,
+    });
+    hud = new HudSelected();
+    hud.mount(makeHost(), new Container());
+  };
+
+  afterEach(() => {
+    hud?.destroy();
+    (gameController as unknown as { sim: unknown }).sim = originalSim;
+  });
+
+  it('draws a close button in the open popup', () => {
+    boot();
+    expect(texts().join('\n')).toContain('Warrior');
+    expect(closeButton()).toBeDefined();
+  });
+
+  it('collapses to the action-info icon when closed', () => {
+    boot();
+    (closeButton()! as unknown as { emit: (e: string) => void }).emit('pointertap');
+    expect(texts()).toHaveLength(0);
+    const icon = collapsedIcon();
+    expect(icon).toBeDefined();
+    const sprites = findSprites((hud as unknown as { el: Container }).el!);
+    expect(sprites).toHaveLength(1);
+    expect(sprites[0]!.width).toBe(32);
+  });
+
+  it('re-opens the full popup when the collapsed icon is tapped', () => {
+    boot();
+    (closeButton()! as unknown as { emit: (e: string) => void }).emit('pointertap');
+    (collapsedIcon()! as unknown as { emit: (e: string) => void }).emit('pointertap');
+    expect(texts().join('\n')).toContain('Warrior');
+    expect(closeButton()).toBeDefined();
   });
 });
 

@@ -63,6 +63,9 @@ export class HudMoney implements Widget {
     const iconSize = compact ? 17 : 21;
     const fontSize = compact ? 11 : 13;
     const cy = compact ? 13 : 15;
+    const padTop = 4;
+    const padSide = 12;
+    const padBottom = 4;
     const rows = [
       { key: 'money', icon: 'gold-32', value: `${r.money}`, income: r.moneyIncome > 0 ? ` (+${r.moneyIncome})` : '' },
       { key: 'wood', icon: 'wood-32', value: `${r.wood}`, income: r.building.wood > 0 ? ` (+${r.building.wood})` : '' },
@@ -70,19 +73,19 @@ export class HudMoney implements Widget {
       { key: 'ore', icon: 'ore-32', value: `${r.ore}`, income: r.building.ore > 0 ? ` (+${r.building.ore})` : '' },
     ];
 
-    let x = 0;
+    let x = padSide;
     let maxH = compact ? 26 : 30;
     for (const row of rows) {
       const icon = makeIcon(row.icon, iconSize);
       icon.eventMode = 'static';
       icon.cursor = 'pointer';
-      icon.position.set(x + iconSize / 2 + 6, cy);
+      icon.position.set(x + iconSize / 2 + 6, cy + padTop);
       const open = (): void => this.openResourcePopup(row.key as 'money' | 'wood' | 'stone' | 'ore');
       icon.on('pointertap', open);
       const value = makeLabel(row.value, { fontSize });
       value.eventMode = 'static';
       value.cursor = 'pointer';
-      value.position.set(x + iconSize + 11, cy - value.height / 2);
+      value.position.set(x + iconSize + 11, cy + padTop - value.height / 2);
       value.on('pointertap', open);
       this.el.addChild(icon, value);
       let rowW = value.width;
@@ -90,7 +93,7 @@ export class HudMoney implements Widget {
         const income = makeLabel(row.income, { fontSize, fill: 0xaaaaaa });
         income.eventMode = 'static';
         income.cursor = 'pointer';
-        income.position.set(x + iconSize + 11 + value.width, cy - income.height / 2);
+        income.position.set(x + iconSize + 11 + value.width, cy + padTop - income.height / 2);
         income.on('pointertap', open);
         this.el.addChild(income);
         rowW += income.width;
@@ -98,11 +101,16 @@ export class HudMoney implements Widget {
       x += iconSize + 11 + rowW + 6;
       maxH = Math.max(maxH, value.height + 10);
     }
-    this.measured = x;
+    this.measured = x + padSide;
 
-    const bg = makePanel(x, maxH, { fill: 0x333344, alpha: 1, bottomRadiusOnly: true });
+    const bgW = this.measured;
+    const bgH = maxH + padTop + padBottom;
+    const shadow = makePanel(bgW, bgH, { fill: 0x000000, alpha: 0.2, bottomRadiusOnly: true });
+    shadow.position.set(0, 4);
+    const bg = makePanel(bgW, bgH, { fill: 0x333344, alpha: 1, bottomRadiusOnly: true });
     bg.position.set(0, 0);
-    this.el.addChildAt(bg, 0);
+    this.el.addChildAt(shadow, 0);
+    this.el.addChildAt(bg, 1);
     this.layout();
   }
 

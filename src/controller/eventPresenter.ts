@@ -745,6 +745,10 @@ export class EventPresenter {
     this.host.hiddenUnitIds().delete(unit.id);
     mapView.container.removeChild(sprite);
     sprite.destroy();
+    // Persist the final walk facing so the resting unit keeps looking along
+    // its last travel direction (a purely rightward move overrides a previous
+    // left-facing flip).
+    mapView.setUnitFacing(unit.id, facing);
     this.host.render();
     const boarded = e.shipLevel === undefined && unit.shipLevel !== undefined;
     if (boarded) {

@@ -9,12 +9,15 @@ interface GameSettings {
   aiDifficulty: AiDifficulty;
   lang: Language;
   soundOn: boolean;
+  /** The selected-cell info panel collapsed to just the info icon. */
+  selectedInfoClosed: boolean;
 }
 
 const DEFAULTS: GameSettings = {
   aiDifficulty: DEFAULT_AI_DIFFICULTY,
   lang: 'en',
   soundOn: true,
+  selectedInfoClosed: false,
 };
 
 export function loadSettings(): GameSettings {
@@ -56,4 +59,12 @@ export function soundEnabled(): boolean {
 
 export function setSoundEnabled(enabled: boolean): void {
   saveSettings({ ...loadSettings(), soundOn: enabled });
+}
+
+export function selectedInfoClosed(): boolean {
+  return loadSettings().selectedInfoClosed;
+}
+
+export function setSelectedInfoClosed(closed: boolean): void {
+  saveSettings({ ...loadSettings(), selectedInfoClosed: closed });
 }

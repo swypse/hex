@@ -5,6 +5,8 @@ import {
   setAiDifficulty,
   setSoundEnabled,
   soundEnabled,
+  selectedInfoClosed,
+  setSelectedInfoClosed,
 } from '../src/storage/settings';
 
 function fakeStorage(): Map<string, string> {
@@ -56,5 +58,23 @@ describe('Sound setting', () => {
     setSoundEnabled(true);
     expect(soundEnabled()).toBe(true);
     expect(loadSettings().soundOn).toBe(true);
+  });
+});
+
+describe('Selected info panel state', () => {
+  it('defaults to open', () => {
+    fakeStorage();
+    expect(loadSettings().selectedInfoClosed).toBe(false);
+    expect(selectedInfoClosed()).toBe(false);
+  });
+
+  it('round-trips a collapsed panel', () => {
+    fakeStorage();
+    setSelectedInfoClosed(true);
+    expect(selectedInfoClosed()).toBe(true);
+    expect(loadSettings().selectedInfoClosed).toBe(true);
+    setSelectedInfoClosed(false);
+    expect(selectedInfoClosed()).toBe(false);
+    expect(loadSettings().selectedInfoClosed).toBe(false);
   });
 });

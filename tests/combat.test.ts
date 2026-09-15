@@ -113,6 +113,17 @@ describe('chooseBestAttack', () => {
     expect(best?.q).toBe(2);
     expect(best?.r).toBe(0);
   });
+
+  it('prefers a land catapult because it cannot retaliate', () => {
+    const map: GameMap = { radius: 4, tiles: [], spawns: [] };
+    const attacker = makeWarrior('a', 0, 0, 0, MAX_HP);
+    const melee = makeTile(1, 0, TileType.GrasslandLand, makeWarrior('m', 1, 1, 0, MAX_HP));
+    const catapult = makeTile(0, 1, TileType.GrasslandLand, makeCatapult('c', 1, 0, 1, 30));
+    map.tiles.push(makeTile(0, 0, TileType.GrasslandLand, attacker), melee, catapult);
+    const best = chooseBestAttack(map, attacker, 0);
+    expect(best?.q).toBe(0);
+    expect(best?.r).toBe(1);
+  });
 });
 
 describe('performAttack', () => {
@@ -260,6 +271,30 @@ describe('performAttack', () => {
     expect(shield.unit!.hp).toBe(70);
     expect(attacker.hp).toBe(6);
     expect(result.attackerDied).toBe(false);
+  });
+
+  it('a land catapult never counter-attacks when hit', () => {
+    const map: GameMap = { radius: 4, tiles: [], spawns: [] };
+    const attacker = makeWarrior('a', 0, 0, 0, MAX_HP);
+    const catapult = makeTile(1, 0, TileType.GrasslandLand, makeCatapult('c', 1, 1, 0, 30));
+    map.tiles.push(makeTile(0, 0, TileType.GrasslandLand, attacker), catapult);
+    const result = performAttack(map, attacker, catapult, noMiss);
+    expect(catapult.unit!.hp).toBe(10);
+    expect(result.targetDamage).toBe(0);
+    expect(attacker.hp).toBe(MAX_HP);
+  });
+
+  it('a catapult aboard a ship still counter-attacks', () => {
+    const map: GameMap = { radius: 4, tiles: [], spawns: [] };
+    const attacker = makeWarrior('a', 0, 0, 0, MAX_HP);
+    const shipCatapult = makeCatapult('c', 1, 1, 0, 30);
+    shipCatapult.shipLevel = 1;
+    const catapult = makeTile(1, 0, TileType.Water, shipCatapult);
+    map.tiles.push(makeTile(0, 0, TileType.GrasslandLand, attacker), catapult);
+    const result = performAttack(map, attacker, catapult, noMiss);
+    // Level-1 ship counter base is 10: round(10 * 20 / 30) = 7, floored to 10.
+    expect(result.targetDamage).toBe(10);
+    expect(attacker.hp).toBe(MAX_HP - 10);
   });
 
   it('does not apply counter-damage when the attacker is beyond the target reach', () => {
@@ -446,6 +481,12 @@ describe('tradeIsFavorable', () => {
     const archer = unitOf('a', 'archer', 0, 0, 0); // range 2, damage 20
     const warrior = unitOf('w', 'warrior', 1, 2, 0); // range 1 -> cannot counter at distance 2
     expect(tradeIsFavorable(archer, tileWith(2, 0, warrior))).toBe(true);
+  });
+
+  it('returns true when the target is a land catapult, even in range', () => {
+    const warrior = unitOf('w', 'warrior', 0, 0, 0);
+    const catapult = unitOf('c', 'catapult', 1, 1, 0); // range 4, adjacent, but cannot counter
+    expect(tradeIsFavorable(warrior, tileWith(1, 0, catapult))).toBe(true);
   });
 
   it('returns false for a losing melee trade', () => {
