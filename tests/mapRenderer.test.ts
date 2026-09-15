@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { Application, Container, Graphics, ImageSource, Sprite, Text, Texture } from 'pixi.js';
+import { Application, BitmapText, Container, Graphics, ImageSource, Sprite, Texture } from 'pixi.js';
 import { MapView, FIRE_SIZE_MIN, FIRE_SIZE_MAX, captureMarkerPoints } from '../src/render/mapRenderer';
 import { GameMap, MapTile } from '../src/game/mapGen';
 import { TileType } from '../src/game/tileTypes';
@@ -82,8 +82,6 @@ describe('MapView hp bar anchoring', () => {
   let view: MapView;
 
   beforeEach(() => {
-    Object.defineProperty(Text.prototype, 'width', { configurable: true, get: () => 40 });
-    Object.defineProperty(Text.prototype, 'height', { configurable: true, get: () => 14 });
 
     const unitTile: MapTile = {
       q: 0,
@@ -315,7 +313,7 @@ describe('MapView hp bar anchoring', () => {
 
   it('renders the hp label on an opaque black background with the label above', () => {
     const el = hpBarItem().el;
-    const labelIndex = el.children.findIndex((c) => c instanceof Text);
+    const labelIndex = el.children.findIndex((c) => c instanceof BitmapText);
     const labelBg = el.children[labelIndex - 1] as Graphics;
     const context = labelBg.context as unknown as {
       instructions: Array<{ action: string; data: { style: { color: number; alpha: number } } }>;
@@ -338,12 +336,12 @@ describe('MapView hp bar anchoring', () => {
       height: 600,
     });
     const item = view.overlayItems.find((o) =>
-      o.el.children.some((c) => c instanceof Text && String((c as Text).text).includes('Testville')),
+      o.el.children.some((c) => c instanceof BitmapText && String((c as BitmapText).text).includes('Testville')),
     );
     expect(item).toBeDefined();
     const el = item!.el;
     expect(el.sortableChildren).toBe(true);
-    const label = el.children.find((c) => c instanceof Text)!;
+    const label = el.children.find((c) => c instanceof BitmapText)!;
     const labelBg = el.children.find((c) => c instanceof Graphics)!;
     expect(label.zIndex).toBeGreaterThan(labelBg.zIndex);
   });
@@ -370,7 +368,7 @@ describe('MapView hp bar anchoring', () => {
     });
     const items = (v as unknown as { overlayItems: { el: Container }[] }).overlayItems;
     const labels = items.filter((o) =>
-      o.el.children.some((c) => c instanceof Text && String((c as Text).text).startsWith('Own')),
+      o.el.children.some((c) => c instanceof BitmapText && String((c as BitmapText).text).startsWith('Own')),
     );
     expect(labels.length).toBe(2);
     for (const l of labels) {
@@ -536,9 +534,9 @@ describe('MapView hp bar anchoring', () => {
   it('lays the hp label text above its black background', () => {
     const el = hpBarItem().el;
     expect(el.sortableChildren).toBe(true);
-    const labelIndex = el.children.findIndex((c) => c instanceof Text);
+    const labelIndex = el.children.findIndex((c) => c instanceof BitmapText);
     const labelBg = el.children[labelIndex - 1] as Graphics;
-    const label = el.children[labelIndex] as Text;
+    const label = el.children[labelIndex] as BitmapText;
     expect(label.zIndex).toBeGreaterThan(labelBg.zIndex);
   });
 
@@ -553,7 +551,7 @@ describe('MapView hp bar anchoring', () => {
       height: 600,
     });
     const el = hpBarItem().el;
-    const labelIndex = el.children.findIndex((c) => c instanceof Text);
+    const labelIndex = el.children.findIndex((c) => c instanceof BitmapText);
     const labelBg = el.children[labelIndex - 1] as Graphics;
     const context = labelBg.context as unknown as {
       instructions: Array<{ action: string; data: { style: { color: number; alpha: number } } }>;
@@ -572,7 +570,7 @@ describe('MapView hp bar anchoring', () => {
       height: 600,
     }, new Set(), false);
     const el = hpBarItem().el;
-    const labelIndex = el.children.findIndex((c) => c instanceof Text);
+    const labelIndex = el.children.findIndex((c) => c instanceof BitmapText);
     const labelBg = el.children[labelIndex - 1] as Graphics;
     const context = labelBg.context as unknown as {
       instructions: Array<{ action: string; data: { style: { color: number; alpha: number } } }>;
@@ -1018,7 +1016,7 @@ describe('MapView hp bar anchoring', () => {
       height: 600,
     });
     const item = hpBarItem();
-    const label = item.el.children.find((c): c is Text => c instanceof Text);
+    const label = item.el.children.find((c): c is BitmapText => c instanceof BitmapText);
     expect(label).toBeDefined();
     expect(label!.text).toBe('2/50');
     view.clearHpOverrides();
@@ -1030,7 +1028,7 @@ describe('MapView hp bar anchoring', () => {
       height: 600,
     });
     const item2 = hpBarItem();
-    const label2 = item2.el.children.find((c): c is Text => c instanceof Text);
+    const label2 = item2.el.children.find((c): c is BitmapText => c instanceof BitmapText);
     expect(label2!.text).toBe('50/50');
   });
 
@@ -1268,8 +1266,6 @@ describe('MapView road fog visibility', () => {
   });
 
   beforeEach(() => {
-    Object.defineProperty(Text.prototype, 'width', { configurable: true, get: () => 40 });
-    Object.defineProperty(Text.prototype, 'height', { configurable: true, get: () => 14 });
     map = { radius: 1, spawns: [], tiles: [roadTile(0, 0, [0]), roadTile(1, 0, [1])] };
     players = [
       { index: 0, tribe: Tribe.Cats, isHuman: true, name: 'Cats', resources: { ...START_RESOURCES }, score: 0, kills: 0, skills: [], isActive: true },
@@ -1334,8 +1330,6 @@ describe('MapView water roads', () => {
   let view: MapView;
 
   beforeEach(() => {
-    Object.defineProperty(Text.prototype, 'width', { configurable: true, get: () => 40 });
-    Object.defineProperty(Text.prototype, 'height', { configurable: true, get: () => 14 });
     map = {
       radius: 1,
       spawns: [],
@@ -1433,8 +1427,6 @@ describe('MapView bottles', () => {
   let view: MapView;
 
   beforeEach(() => {
-    Object.defineProperty(Text.prototype, 'width', { configurable: true, get: () => 40 });
-    Object.defineProperty(Text.prototype, 'height', { configurable: true, get: () => 14 });
     players = [
       { index: 0, tribe: Tribe.Cats, isHuman: true, name: 'Cats', resources: { ...START_RESOURCES }, score: 0, kills: 0, skills: [], isActive: true },
     ];

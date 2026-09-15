@@ -1,6 +1,7 @@
 import {
-  Application, Circle, Container, Graphics, Sprite, Text, type TextStyleOptions, type Texture, type Ticker
+  Application, BitmapText, Circle, Container, Graphics, Sprite, type TextStyleOptions, type Texture, type Ticker
 } from 'pixi.js';
+import { FONT_REGULAR } from '../ui/kit/bitmapFonts';
 import { axialKey, compareTileY, hexCorners, hexEdge, hexEdgeNeighbor, hexToPixel, splitHexBorder } from '../game/hex';
 import { tileMapByKey, type GameMap, type MapTile } from '../game/mapGen';
 import { bridgeCoastOffsets } from '../game/bridges';
@@ -188,7 +189,7 @@ export class MapView {
   private lastBouncedKey = '';
   private highlights: Graphics[] = [];
   private graphicsPool: Graphics[] = [];
-  private textPool: Text[] = [];
+  private textPool: BitmapText[] = [];
   private hpOverrides = new Map<string, number>();
   private unitOverrides: Map<string, Unit | null> = new Map();
   private shipBobs: { sprite: Sprite; key: string; baseY: number }[] = [];
@@ -1547,14 +1548,14 @@ export class MapView {
     this.graphicsPool.push(g);
   }
 
-  private takeText(text: string, style: TextStyleOptions): Text {
-    const t = this.textPool.pop() ?? new Text({ text: '', style, resolution: this.textResolution });
+  private takeText(text: string, style: TextStyleOptions): BitmapText {
+    const t = this.textPool.pop() ?? new BitmapText({ text: '', style });
     t.text = text;
     t.style = style;
     return t;
   }
 
-  private releaseText(t: Text): void {
+  private releaseText(t: BitmapText): void {
     t.position.set(0, 0);
     t.scale.set(1, 1);
     t.alpha = 1;
@@ -1568,7 +1569,7 @@ export class MapView {
       this.overlay.removeChild(item.el);
       for (const child of item.el.children) {
         if (child instanceof Graphics) this.releaseGraphics(child);
-        else if (child instanceof Text) this.releaseText(child);
+        else if (child instanceof BitmapText) this.releaseText(child);
         else child.destroy();
       }
       item.el.destroy();
@@ -1647,7 +1648,7 @@ export class MapView {
     const label = this.takeText(`${hp}/${maxHp}`, {
       fontSize: 13,
       fill: 0xffffff,
-      fontFamily: 'Roboto, system-ui, sans-serif'
+      fontFamily: FONT_REGULAR
     });
     label.anchor.set(0.5, 1);
     label.position.set(0, -barHeight / 2 - 2 + up);
@@ -1782,7 +1783,7 @@ export class MapView {
     const label = this.takeText(`${tile.settlement!.name ?? ''} ${count}/${capacity}`.trim(), {
       fontSize: 13,
       fill: 0xffffff,
-      fontFamily: 'Roboto, system-ui, sans-serif'
+      fontFamily: FONT_REGULAR
     });
     label.anchor.set(0, 0.5);
     if (icon) {
