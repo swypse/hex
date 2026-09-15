@@ -3,6 +3,7 @@ import { initNavigation, useGameStore } from './store/gameStore';
 import { readJoinCode, setPendingJoin } from './net/joinLink';
 import { ScreenManager } from './ui/ScreenManager';
 import { gameController } from './controller/gameController';
+import { loadBitmapFonts } from './ui/kit/bitmapFonts';
 
 function preventBrowserZoom(): void {
   window.addEventListener(
@@ -26,6 +27,7 @@ async function boot(): Promise<void> {
     document.fonts.load('16px "Roboto"'),
     document.fonts.load('800 16px "Roboto"'),
   ]);
+  await loadBitmapFonts();
   const app = new Application();
   await app.init({
     resizeTo: window,
