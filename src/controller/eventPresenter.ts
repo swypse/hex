@@ -1,4 +1,4 @@
-import { Application, Container, Graphics, Sprite, Text, Texture } from 'pixi.js';
+import { Application, BitmapText, Container, Graphics, Sprite, Texture } from 'pixi.js';
 import { Simulator } from '../game/simulator';
 import { AttackUnitPre, GameEvent } from '../game/events';
 import { MapTile } from '../game/mapGen';
@@ -17,6 +17,7 @@ import { TextureSet } from '../render/textureFactory';
 import { useGameStore } from '../store/gameStore';
 import { EXPLORED_SCORE } from '../game/score';
 import { makeLabel } from '../ui/kit/label';
+import { FONT_BLACK } from '../ui/kit/bitmapFonts';
 import { saveRepository } from '../storage/saveGame';
 import { BonusKind } from '../game/bonus';
 import { SKILLS } from '../game/skills';
@@ -920,9 +921,9 @@ export class EventPresenter {
     const world = hexToPixel(tile, HEX_SIZE);
     const el = new Container();
     el.zIndex = 10;
-    const label = new Text({
+    const label = new BitmapText({
       text,
-      style: { fontSize: 20, fill: color, fontWeight: '800' },
+      style: { fontFamily: FONT_BLACK, fontSize: 20, fill: color },
     });
     label.anchor.set(0.5);
     el.addChild(label);
