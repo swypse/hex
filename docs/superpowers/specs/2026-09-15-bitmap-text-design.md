@@ -25,9 +25,11 @@ glyphs and faster rendering than canvas-measured `Text`.
 
 ### 1. Font assets (`public/fonts`)
 
-Rename the PNGs to match the `.fnt` page references:
-- `roboto-regular.png` → `Roboto Regular.png`
-- `roboto-black.png` → `Roboto Black.png`
+The fonts live as `Roboto Black.fnt` / `Roboto Black.png` and
+`Roboto Regular.fnt` / `Roboto Regular.png`. The `.fnt` page entries reference the matching
+PNG filenames, so no renaming is needed. The baked charset covers ASCII punctuation/letters
+and digits, Cyrillic (`Ё`, `А-Я`, `а-я`, `ё`), `№`, and the special glyphs the game renders:
+`«` `·` `»` `×` `—` `…` `←` `↑` `↓` `→` `✓`.
 
 Keep `Roboto-Regular.ttf` / `Roboto-Black.ttf` (still used by the DOM text-input overlay in
 `src/ui/kit/textInputOverlay.ts`).
@@ -39,7 +41,7 @@ Keep `Roboto-Regular.ttf` / `Roboto-Black.ttf` (still used by the DOM text-input
 - Export `fontFamilyForWeight(weight?: TextStyleFontWeight)` → `FONT_BLACK` for `bold` or
   numeric `>= 700`, else `FONT_REGULAR`.
 - Export `async loadBitmapFonts()` that calls
-  `Assets.load([...BASE_URL/fonts/roboto-regular.fnt, ...BASE_URL/fonts/roboto-black.fnt])`
+  `Assets.load([...BASE_URL/fonts/Roboto Regular.fnt, ...BASE_URL/fonts/Roboto Black.fnt])`
   using `${import.meta.env.BASE_URL}` like the rest of the codebase (e.g.
   `textureFactory.ts`).
 
