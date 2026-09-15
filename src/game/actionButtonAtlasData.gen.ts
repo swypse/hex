@@ -32,7 +32,9 @@ export const ACTION_BUTTON_ATLAS_FRAMES: Record<string, { x: number; y: number }
   'action-spawn-shield': { x: 480, y: 480 },
   'action-spawn-swordsman': { x: 0, y: 600 },
   'action-spawn-warrior': { x: 120, y: 600 },
-  'action-stats': { x: 240, y: 600 },
-  'action-upgrade': { x: 360, y: 600 },
-  'action-water-temple': { x: 480, y: 600 },
+  'action-star': { x: 240, y: 600 },
+  'action-star-empty': { x: 360, y: 600 },
+  'action-stats': { x: 480, y: 600 },
+  'action-upgrade': { x: 0, y: 720 },
+  'action-water-temple': { x: 120, y: 720 },
 };

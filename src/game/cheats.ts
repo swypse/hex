@@ -1,5 +1,5 @@
 export const RESOURCE_CHEAT_WORD = 'resources';
-export const RESOURCE_CHEAT_AMOUNT = 100;
+export const RESOURCE_CHEAT_AMOUNT = 1000;
 export const SKILLS_CHEAT_WORD = 'skills';
 export const FOG_CHEAT_WORD = 'fog';
 export const PIRATES_CHEAT_WORD = 'pirates';

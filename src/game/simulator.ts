@@ -6,7 +6,7 @@ import { buildBridge } from './bridges';
 import { buildRoad } from './roads';
 import { GameEvent, BuildingKind } from './events';
 import { bonusEligibleFor, explorerPath, findClosestVillage, revealExplorerPath, type BonusKind } from './bonus';
-import { bonusScoreFor, captureWinnerIndex, computeWinner, GameMode, expectedTurnsFor } from './gameMode';
+import { captureWinnerIndex, computeWinner, GameMode, quickCaptureScore, quickCaptureTurnsCount } from './gameMode';
 import { hexDistance, hexNeighbors } from './hex';
 import type { GameMap, MapTile } from './mapGen';
 import type { Player } from './players';
@@ -101,7 +101,7 @@ export class Simulator {
     this.currentPlayerIndex = 0;
     this.gameOver = false;
     this.winnerIndex = null;
-    this.expectedTurns = expectedTurnsFor(players.length);
+    this.expectedTurns = quickCaptureTurnsCount(players.length);
     this.bonusAwarded = false;
     this.ensureAchievementBaseline();
   }
@@ -527,6 +527,7 @@ export class Simulator {
     const player = this.currentPlayer;
     if (applySkill(player, skill)) {
       awardScore(player, SKILL_SCORE);
+      this.statsOf(player).skillsOpened += 1;
       this.emit({ type: 'skillOpened', playerIndex: player.index, skill });
       this.emitScoreFly(player.index, SKILL_SCORE, tileAt(this.map, 0, 0)!);
       return true;
@@ -1164,7 +1165,7 @@ export class Simulator {
     const winner = this.players[winnerIndex]!;
     const bonus =
       this.mode === 'capture' && this.turn <= this.expectedTurns
-        ? bonusScoreFor(this.players.length)
+        ? quickCaptureScore(this.players.length)
         : 0;
     if (bonus > 0) {
       awardScore(winner, bonus);

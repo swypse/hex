@@ -125,6 +125,36 @@ describe('planAiActions', () => {
     expect(actions.some((a) => a.type === 'move')).toBe(false);
   });
 
+  it('keeps the last defender in an endangered village when ganging up would move it out', () => {
+    // Enemy rider sits two hexes away (in move distance, so the village is
+    // endangered). focus-fire would move the in-village warrior out to join a
+    // second attacker and empty the village — it must not.
+    const map: GameMap = { radius: 4, tiles: [], spawns: [] };
+    map.tiles.push(
+      makeTile(0, 0, 1, { owner: 1, level: 1, captureReady: false }, makeWarrior('w1', 1, 0, 0)),
+      makeTile(0, 1, null, null, makeWarrior('w2', 1, 0, 1)),
+      makeTile(1, 0),
+      makeTile(2, 0, 0, null, makeRider('enemy', 0, 2, 0)),
+    );
+    const all = planSeeds(map, aiPlayer(), 20);
+    expect(all.some((a) => a.type === 'move' && a.unitId === 'w1')).toBe(false);
+  });
+
+  it('keeps the last defender in an endangered village when an enemy sits adjacent', () => {
+    // A warrior parks on the village's doorstep while focus-fire weighs a
+    // farther rider: the last defender must not march out of the village.
+    const map: GameMap = { radius: 4, tiles: [], spawns: [] };
+    map.tiles.push(
+      makeTile(0, 0, 1, { owner: 1, level: 1, captureReady: false }, makeWarrior('w1', 1, 0, 0)),
+      makeTile(2, -1, 0, null, makeRider('far', 0, 2, -1)),
+      makeTile(1, -1),
+      makeTile(1, 0, 0, null, makeWarrior('adj', 0, 1, 0)),
+      makeTile(0, -1, null, null, makeWarrior('w2', 1, 0, -1)),
+    );
+    const all = planSeeds(map, aiPlayer(), 20);
+    expect(all.some((a) => a.type === 'move' && a.unitId === 'w1')).toBe(false);
+  });
+
   it('sends a unit to capture a reachable free village', () => {
     const map: GameMap = { radius: 4, tiles: [], spawns: [] };
     map.tiles.push(

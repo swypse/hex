@@ -5,14 +5,15 @@ import { Tribe } from '../src/game/tribes';
 import { Player } from '../src/game/players';
 import { Unit } from '../src/game/units';
 import {
-  bonusScoreFor,
   captureWinnerIndex,
   computeWinner,
   countUnits,
-  expectedTurnsFor,
   GAME_MODE_NAMES,
+  quickCaptureScore,
+  quickCaptureTurnsCount,
   rankPlayers,
   shouldPromptWatch,
+  starRating,
 } from '../src/game/gameMode';
 
 function tile(
@@ -44,12 +45,27 @@ describe('gameMode', () => {
     expect(GAME_MODE_NAMES.turns30).toBe('30 Turns');
   });
 
-  it('computes expected turns and bonus', () => {
-    expect(expectedTurnsFor(2)).toBe(15);
-    expect(expectedTurnsFor(3)).toBe(20);
-    expect(expectedTurnsFor(4)).toBe(25);
-    expect(bonusScoreFor(2)).toBe(20);
-    expect(bonusScoreFor(4)).toBe(40);
+  it('computes quick-capture turns and bonus', () => {
+    expect(quickCaptureTurnsCount(2)).toBe(20);
+    expect(quickCaptureTurnsCount(3)).toBe(25);
+    expect(quickCaptureTurnsCount(4)).toBe(30);
+    expect(quickCaptureScore(2)).toBe(40);
+    expect(quickCaptureScore(4)).toBe(80);
+  });
+
+  it('rates capture games by score and the quick-capture turns budget', () => {
+    // 3 players: 3★ needs >= 2500 and turn <= 25; 2★ needs >= 1600.
+    expect(starRating(3000, 3, 'capture', 10)).toBe(3);
+    expect(starRating(3000, 3, 'capture', 26)).toBe(2);
+    expect(starRating(2000, 3, 'capture', 10)).toBe(2);
+    expect(starRating(100, 3, 'capture', 10)).toBe(1);
+  });
+
+  it('rates 30-turn games by score only', () => {
+    // 3 players: 3★ needs >= 4400; 2★ needs >= 3000.
+    expect(starRating(5000, 3, 'turns30', 30)).toBe(3);
+    expect(starRating(4000, 3, 'turns30', 30)).toBe(2);
+    expect(starRating(100, 3, 'turns30', 30)).toBe(1);
   });
 
   it('counts units on the map per player', () => {

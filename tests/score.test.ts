@@ -11,7 +11,10 @@ import {
   boardScore,
   BUILDING_SCORE,
   CAPTURE_SCORE,
+  COMBO_SCORE,
+  EMPTY_STATS,
   EXPLORED_SCORE,
+  gameOverRows,
   KILL_SCORE,
   PIRATE_KILL_SCORE,
   RIDER_SCORE,
@@ -209,7 +212,7 @@ describe('scoreBreakdown', () => {
       resources: { wood: 0, stone: 0, money: 0, ore: 0 },
       score: 25 + 30 + 50 + 20 + 15 + 15 + 20 + 40,
       kills: 2, skills: ['swordsman'], isActive: true,
-      stats: { killedUnits: 3, pirateKills: 1, villagesCaptured: 1, villageUpgrades: 1, knightCombos: 0, enemyShipsKilled: 0, shipsCapturedByPirates: 0, bonusesCollected: 0, tribesEliminated: 0 },
+      stats: { killedUnits: 3, pirateKills: 1, villagesCaptured: 1, villageUpgrades: 1, knightCombos: 0, enemyShipsKilled: 0, shipsCapturedByPirates: 0, bonusesCollected: 0, tribesEliminated: 0, skillsOpened: 0 },
     };
     const items = scoreBreakdown(map, p, 40);
     const byLabel = new Map(items.map((i) => [i.label, i]));
@@ -228,9 +231,104 @@ describe('scoreBreakdown', () => {
     expect(byLabel.get('Village upgrades')!.score).toBe(UPGRADE_SCORE);
     expect(byLabel.get('Skills opened')!.count).toBe(1);
     expect(byLabel.get('Skills opened')!.score).toBe(SKILL_SCORE);
-    expect(byLabel.get('Fast capture-mode bonus')!.score).toBe(40);
+    expect(byLabel.get('Quick capture')!.score).toBe(40);
     const sum = items.reduce((acc, i) => acc + i.score, 0);
     expect(sum).toBe(totalScore(map, p));
+  });
+});
+
+describe('gameOverRows', () => {
+  it('covers every score source in fixed order, summing to totalScore', () => {
+    const village = tile(0, 0, 0, { owner: 0, level: 1, captureReady: false });
+    village.exploredBy = [0];
+    const sawmill = tile(1, 0, 0, null, null, { kind: 'sawmill', level: 1 });
+    sawmill.exploredBy = [0];
+    const temple = tile(2, 0, 0, null, null, { kind: 'temple', level: 2 });
+    temple.exploredBy = [0];
+    const forestTemple = tile(3, 0, 0, null, null, { kind: 'forestTemple', level: 3 });
+    forestTemple.exploredBy = [0];
+    const bridge = {
+      q: 4, r: 0, terrain: TileType.Water, settlement: null, building: null,
+      unit: null, ownedBy: null, claimedByVillage: null, exploredBy: [0],
+      bridge: { owner: 0, dir: 'we' as const },
+    };
+    const warriorTile = tile(5, 0, 0, null, unit('warrior', 0));
+    warriorTile.exploredBy = [0];
+    const map: GameMap = { radius: 2, tiles: [village, sawmill, temple, forestTemple, bridge, warriorTile], spawns: [] };
+
+    const p: Player = {
+      index: 0, tribe: Tribe.Villagers, isHuman: true, name: 'p',
+      resources: { wood: 0, stone: 0, money: 0, ore: 0 },
+      // Award-stock total: 2 normal kills + 1 pirate kill + 2 combos + 1 capture
+      // + 2 upgrades + 1 skill + temples (15 + 20).
+      score: 2 * KILL_SCORE + PIRATE_KILL_SCORE + 2 * COMBO_SCORE + CAPTURE_SCORE + 2 * UPGRADE_SCORE + SKILL_SCORE + 15 + 20,
+      kills: 3, skills: ['shields'], isActive: true,
+      stats: { killedUnits: 5, pirateKills: 1, villagesCaptured: 1, villageUpgrades: 2, knightCombos: 2, enemyShipsKilled: 0, shipsCapturedByPirates: 0, bonusesCollected: 0, tribesEliminated: 2, skillsOpened: 1 },
+    };
+    const rows = gameOverRows(map, p, 0);
+
+    expect(rows.map((r) => r.label)).toEqual([
+      'Tribes destroyed', 'Kills', 'Pirate kills', 'Knight combos', 'Captured villages',
+      'Village upgrades', 'Buildings', 'Bridges', 'WaterTemples', 'ForestTemples',
+      'Skills opened', 'Explored tiles', 'Villages', 'Units', 'Quick capture',
+    ]);
+    expect(rows[0]!.count).toBe(2);
+    expect(rows[0]!.score).toBe(0);
+    expect(rows[1]!.count).toBe(2);
+    expect(rows[1]!.score).toBe(2 * KILL_SCORE);
+    expect(rows[2]!.count).toBe(1);
+    expect(rows[2]!.score).toBe(PIRATE_KILL_SCORE);
+    expect(rows[3]!.count).toBe(2);
+    expect(rows[3]!.score).toBe(2 * COMBO_SCORE);
+    expect(rows[4]!.count).toBe(1);
+    expect(rows[4]!.score).toBe(CAPTURE_SCORE);
+    expect(rows[5]!.count).toBe(2);
+    expect(rows[5]!.score).toBe(2 * UPGRADE_SCORE);
+    expect(rows[6]!.count).toBe(1);
+    expect(rows[6]!.score).toBe(BUILDING_SCORE);
+    expect(rows[7]!.count).toBe(1);
+    expect(rows[7]!.score).toBe(5);
+    expect(rows[8]!.count).toBe(1);
+    expect(rows[8]!.score).toBe(15);
+    expect(rows[9]!.count).toBe(1);
+    expect(rows[9]!.score).toBe(20);
+    expect(rows[10]!.count).toBe(1);
+    expect(rows[10]!.score).toBe(SKILL_SCORE);
+    expect(rows[11]!.count).toBe(6);
+    expect(rows[11]!.score).toBe(6 * EXPLORED_SCORE);
+    expect(rows[12]!.count).toBe(1);
+    expect(rows[12]!.score).toBe(VILLAGE_SCORE);
+    expect(rows[13]!.count).toBe(1);
+    expect(rows[13]!.score).toBe(WARRIOR_SCORE);
+    expect(rows[14]!.count).toBe(0);
+    expect(rows[14]!.score).toBe(0);
+
+    // Every listed score is a real source, so the rows add up to totalScore.
+    const sum = rows.reduce((acc, r) => acc + r.score, 0);
+    expect(sum).toBe(totalScore(map, p));
+  });
+
+  it('counts skills opened through the tree, not start skills', () => {
+    const map: GameMap = { radius: 1, tiles: [], spawns: [] };
+    const p: Player = {
+      index: 0, tribe: Tribe.Cats, isHuman: true, name: 'p',
+      resources: { wood: 0, stone: 0, money: 0, ore: 0 },
+      score: SKILL_SCORE, kills: 0, skills: ['shields', 'science'], isActive: true,
+      stats: { ...EMPTY_STATS, skillsOpened: 1 },
+    };
+    const row = gameOverRows(map, p, 0).find((r) => r.label === 'Skills opened')!;
+    expect(row.count).toBe(1);
+    expect(row.score).toBe(SKILL_SCORE);
+  });
+
+  it('defaults missing stats to zero and honors the fast capture bonus', () => {
+    const map: GameMap = { radius: 1, tiles: [], spawns: [] };
+    const rows = gameOverRows(map, player(), 40);
+    for (const row of rows) {
+      expect(row.count).toBe(0);
+      if (row.label === 'Quick capture') expect(row.score).toBe(40);
+      else expect(row.score).toBe(0);
+    }
   });
 });
 

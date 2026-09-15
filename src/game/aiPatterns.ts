@@ -160,10 +160,16 @@ function attackersForTile(
     const unit = t.unit;
     if (!unit || unit.owner !== player.index) continue;
     if (state.acted.has(unit.id) || state.moved.has(unit.id)) continue;
+    const endangeredGarrison =
+      !!t.settlement && t.settlement.owner === player.index && enemyCanReach(map, t, player.index);
     if (attackableTargets(map, unit, player.index).some((a) => a.q === targetTile.q && a.r === targetTile.r)) {
       out.push({ unit, moveTo: null });
       continue;
     }
+    // A garrison in an endangered village may defend in place, but it must
+    // never march away to join a distant fight (that would leave the village
+    // empty for an enemy that can reach it next turn).
+    if (endangeredGarrison) continue;
     for (const c of reachableTargets(map, unit, undefined, canClimb, canDock, player.index)) {
       if (state.occupied.has(key(c.q, c.r))) continue;
       const ghost: Unit = { ...unit, q: c.q, r: c.r };
@@ -219,6 +225,9 @@ export const AI_PATTERNS: AiPattern[] = [
           continue;
         }
         if (state.moved.has(unit.id)) continue;
+        // A garrison in its own endangered village defends in place; it must
+        // not march to help a different village and leave home empty.
+        if (t.settlement && t.settlement.owner === player.index && enemyCanReach(map, t, player.index)) continue;
         const moveTarget = reachableTargets(map, unit, undefined, undefined, undefined, unit.owner).find(
           (c) =>
             !state.occupied.has(key(c.q, c.r)) &&
@@ -921,6 +930,8 @@ export const AI_PATTERNS: AiPattern[] = [
         if (!unit || unit.owner !== player.index) continue;
         if (unit.type !== 'catapult') continue;
         if (state.acted.has(unit.id) || state.moved.has(unit.id)) continue;
+        // A catapult garrisoning an endangered own village holds its ground.
+        if (t.settlement && t.settlement.owner === player.index && enemyCanReach(map, t, player.index)) continue;
         // Already able to fire: leave it to the attack logic.
         if (attackableTargets(map, unit, player.index).some((a) => a.unit && isNavalEnemy(a.unit))) continue;
         const before = hexDistance(unit, naval.tile);

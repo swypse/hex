@@ -6,6 +6,7 @@ import { Tribe } from '../src/game/tribes';
 import { SeededRandom } from '../src/util/random';
 import { canAttack, canHeal, canMove } from '../src/game/units';
 import { TileType } from '../src/game/tileTypes';
+import { quickCaptureScore, quickCaptureTurnsCount } from '../src/game/gameMode';
 
 describe('Simulator commands', () => {
   it('move moves a unit, marks moved, emits unitMoved', () => {
@@ -565,5 +566,49 @@ describe('build bridge command', () => {
     sim.startGame();
     sim.drainEvents();
     expect(sim.applyCommand({ type: 'buildBridge', q: 1, r: 0 })).toBe(false);
+  });
+});
+
+describe('Quick capture bonus', () => {
+  function captureMap(): { map: ReturnType<typeof makeTestMap>; players: ReturnType<typeof buildPlayers> } {
+    const map = makeTestMap(2);
+    tileAt(map, 0, 0)!.settlement = { owner: 0, level: 1, captureReady: false };
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    players[0]!.score = 100; // disambiguate the winner tie-break
+    return { map, players };
+  }
+
+  it('awards players×20 to a capture-mode win within the turns budget', () => {
+    const { map, players } = captureMap();
+    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    sim.startGame();
+    expect(sim.expectedTurns).toBe(quickCaptureTurnsCount(players.length));
+    const before = players[0]!.score;
+    sim.endNow();
+    expect(sim.winnerIndex).toBe(0);
+    expect(sim.bonusAwarded).toBe(true);
+    expect(players[0]!.score).toBe(before + quickCaptureScore(players.length));
+  });
+
+  it('gives no bonus when the win overshoots the turns budget', () => {
+    const { map, players } = captureMap();
+    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    sim.startGame();
+    sim.turn = quickCaptureTurnsCount(players.length) + 1;
+    const before = players[0]!.score;
+    sim.endNow();
+    expect(sim.bonusAwarded).toBe(false);
+    expect(players[0]!.score).toBe(before);
+  });
+
+  it('never awards the bonus in turns30 mode', () => {
+    const { map, players } = captureMap();
+    const sim = new Simulator(map, players, 'turns30', { rng: () => 0.5 });
+    sim.startGame();
+    sim.turn = 1;
+    const before = players[0]!.score;
+    sim.endNow();
+    expect(sim.bonusAwarded).toBe(false);
+    expect(players[0]!.score).toBe(before);
   });
 });

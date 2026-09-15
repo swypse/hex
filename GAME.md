@@ -8,7 +8,7 @@ The mode is chosen on the setup screen.
 
 1. **Capture the map** — a player wins when they own all non-free villages; the game ends once that player's turn ends
    (i.e., after the whole round completes, not immediately upon the final capture). A player who captures the map within
-   `players × 5 + 5` turns gets a fast-win bonus of `players × 10` points.
+   `10 + 5 × players` turns (Quick capture) gets a bonus of `players × 20` points.
 2. **30 Turns** — the game ends at turn 30; the player with the highest score wins.
 
 **Winner:** among active players, the winner is chosen by: highest total score → most kills → fewest units on the map →
@@ -151,7 +151,12 @@ A player's total score = accumulated action score + current board score.
 - Kill a pirate: 30
 - Combo kill (a knight kills 3 units in one turn): 30
 - Open a skill: 15
-- Fast capture-mode win: `players × 10`
+- Quick capture win: `players × 20`
+
+A finished game is rated 1–3 stars by the winner's total score:
+
+- **Capture** — 3★: score ≥ `1000 + 500 × players` and finished within the quick-capture turns; 2★: score ≥ `700 + 300 × players`; otherwise 1★.
+- **30 Turns** — 3★: score ≥ `2000 + 800 × players`; 2★: score ≥ `1500 + 500 × players`; otherwise 1★.
 
 ## Skills
 

@@ -9,12 +9,31 @@ export const GAME_MODE_NAMES: Record<GameMode, string> = {
   turns30: '30 Turns',
 };
 
-export function expectedTurnsFor(playerCount: number): number {
-  return playerCount * 5 + 5;
+/** Capture-mode turns a game may last before the quick-capture bonus is lost:
+ *  `10 + 5 × players`. */
+export function quickCaptureTurnsCount(playerCount: number): number {
+  return 10 + 5 * playerCount;
 }
 
-export function bonusScoreFor(playerCount: number): number {
-  return playerCount * 10;
+/** Bonus points awarded to the winner when capture mode ends within
+ *  `quickCaptureTurnsCount` turns: `players × 20`. */
+export function quickCaptureScore(playerCount: number): number {
+  return playerCount * 20;
+}
+
+export type StarRating = 1 | 2 | 3;
+
+/** Winner's star rating (1–3) for a finished game. Capture mode awards the top
+ *  tier only when the game also ends within the quick-capture turns budget. */
+export function starRating(score: number, playerCount: number, mode: GameMode, turn: number): StarRating {
+  if (mode === 'capture') {
+    if (score >= 1000 + 500 * playerCount && turn <= quickCaptureTurnsCount(playerCount)) return 3;
+    if (score >= 700 + 300 * playerCount) return 2;
+    return 1;
+  }
+  if (score >= 2000 + 800 * playerCount) return 3;
+  if (score >= 1500 + 500 * playerCount) return 2;
+  return 1;
 }
 
 export function countUnits(map: GameMap, playerIndex: number): number {

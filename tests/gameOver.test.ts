@@ -1,14 +1,15 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { Container, Text } from 'pixi.js';
+import { Container, Sprite, Text } from 'pixi.js';
 import { GameOver, placeColor } from '../src/ui/overlays/GameOver';
 import { useGameStore } from '../src/store/gameStore';
 import { gameController } from '../src/controller/gameController';
 import { type UIHost } from '../src/ui/host';
 import { makeTestMap } from './helpers/testMap';
 import { buildPlayers } from '../src/game/players';
-import { Tribe } from '../src/game/tribes';
+import { Tribe, tribeById } from '../src/game/tribes';
 import { SeededRandom } from '../src/util/random';
 import { Simulator } from '../src/game/simulator';
+import { placeWord } from '../src/i18n/lists';
 
 function makeHost(): UIHost {
   return {
@@ -38,12 +39,16 @@ describe('GameOver screen', () => {
   let root: Container;
   const originalSim = (gameController as unknown as { sim: unknown }).sim;
 
-  const mount = (): Container => {
+  const mount = (opts?: { score?: number; turn?: number }): Container => {
     const map = makeTestMap(3);
     const players = buildPlayers(Tribe.Villagers, 2, new SeededRandom(42));
-    players[0]!.score = 100;
+    players[0]!.score = opts?.score ?? 100;
     players[1]!.score = 50;
     players[2]!.score = 10;
+    players.forEach((p) => {
+      p.knownTribes = players.map((x) => x.tribe);
+      p.kills = 5;
+    });
     const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
     (gameController as unknown as { sim: unknown }).sim = sim;
     Object.defineProperty(Text.prototype, 'width', { configurable: true, get: () => 60 });
@@ -53,7 +58,7 @@ describe('GameOver screen', () => {
       createElement: () => ({ getContext: () => fakeCanvasContext(), width: 0, height: 0 }),
     };
     useGameStore.setState({
-      screen: 'game', players, localPlayerIndex: 0, winnerIndex: 0, mode: 'capture', bonusAwarded: false, turn: 27,
+      screen: 'game', players, localPlayerIndex: 0, winnerIndex: 0, mode: 'capture', bonusAwarded: false, turn: opts?.turn ?? 27,
     });
     root = new Container();
     screen = new GameOver();
@@ -78,38 +83,46 @@ describe('GameOver screen', () => {
     return out;
   };
 
-  const clickIcon = (r: Container, place: string): void => {
-    const found: Container[] = [];
+  const collectStarLabels = (r: Container): string[] => {
+    const out: string[] = [];
     const walk = (c: Container): void => {
       for (const ch of c.children) {
         if (
-          ch instanceof Container
-          && ch.eventMode === 'static'
-          && ch.children.some((x) => x instanceof Text && String((x as Text).text) === place)
+          ch instanceof Sprite
+          && (ch.label === 'action-star' || ch.label === 'action-star-empty')
         ) {
-          found.push(ch);
+          out.push(String(ch.label));
         }
-        if (ch instanceof Container) walk(ch);
+        if (ch instanceof Container) walk(ch as Container);
       }
     };
     walk(r);
-    expect(found.length).toBeGreaterThan(0);
-    found[0]!.emit('pointertap', {} as never);
+    return out;
   };
 
-  it('selects the current player by default and shows their name', () => {
+  it('announces the winner in the banner', () => {
     const r = mount();
     const texts = allTexts(r);
     const localName = useGameStore.getState().players[0]!.name;
     expect(texts.some((t) => t.includes(localName))).toBe(true);
   });
 
-  it('shows place badges 1, 2, 3', () => {
+  it('lists every tribe at once, ranked by place', () => {
     const r = mount();
     const texts = allTexts(r);
-    expect(texts.includes('1')).toBe(true);
-    expect(texts.includes('2')).toBe(true);
-    expect(texts.includes('3')).toBe(true);
+    const players = useGameStore.getState().players;
+    for (const p of players) {
+      const tribeName = tribeById(p.tribe)!.name;
+      expect(texts.some((t) => t.includes(tribeName))).toBe(true);
+    }
+  });
+
+  it('shows place words for each rank', () => {
+    const r = mount();
+    const texts = allTexts(r);
+    expect(texts.includes(placeWord(1))).toBe(true);
+    expect(texts.includes(placeWord(2))).toBe(true);
+    expect(texts.includes(placeWord(3))).toBe(true);
   });
 
   it('shows the game turn count', () => {
@@ -117,11 +130,35 @@ describe('GameOver screen', () => {
     expect(allTexts(r).some((t) => t.includes('Turns: 27'))).toBe(true);
   });
 
-  it('switches details when another tribe icon is selected', () => {
+  it('shows stat rows for every player without requiring selection', () => {
     const r = mount();
-    const other = useGameStore.getState().players[1]!.name;
-    expect(allTexts(r).some((t) => t.includes(other))).toBe(false);
-    clickIcon(r, '2');
-    expect(allTexts(r).some((t) => t.includes(other))).toBe(true);
+    const texts = allTexts(r);
+    // One block of stat rows per player (3 players), each with kills > 0.
+    expect(texts.filter((t) => t === 'Kills').length).toBe(3);
+  });
+
+  it('hides zero-count rows and empty achievement blocks', () => {
+    const r = mount();
+    const texts = allTexts(r);
+    // No player destroyed a tribe or unlocked achievements in this fixture.
+    expect(texts.some((t) => t === 'Tribes destroyed')).toBe(false);
+    expect(texts.some((t) => t === 'Achievements')).toBe(false);
+  });
+
+  it('draws the winner rating as a centered row of 3 stars', () => {
+    // Default fixture: 1★ (low score).
+    const r = mount();
+    expect(collectStarLabels(r)).toEqual(['action-star', 'action-star-empty', 'action-star-empty']);
+  });
+
+  it('fills stars for higher ratings', () => {
+    // 3 players, 3★ needs >= 2500 total and turn <= 25; 2★ needs >= 1600.
+    expect(collectStarLabels(mount({ score: 3000, turn: 10 }))).toEqual([
+      'action-star', 'action-star', 'action-star',
+    ]);
+    // High score but past the quick-capture budget keeps the 3rd star empty.
+    expect(collectStarLabels(mount({ score: 3000, turn: 27 }))).toEqual([
+      'action-star', 'action-star', 'action-star-empty',
+    ]);
   });
 });

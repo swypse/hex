@@ -1,15 +1,17 @@
 import { t } from '../../i18n';
 import { Container, Graphics } from 'pixi.js';
 import { gameController } from '../../controller/gameController';
-import { TRIBES, tribeById } from '../../game/tribes';
-import { Player } from '../../game/players';
-import { scoreBreakdown, totalScore } from '../../game/score';
-import { bonusScoreFor, rankPlayers } from '../../game/gameMode';
-import { achievementNameKey, achievementPoints, unlockedAchievements } from '../../game/achievements';
+import { tribeById } from '../../game/tribes';
+import { UNKNOWN_TRIBE_COLOR } from '../../game/discovery';
+import { gameOverRows, totalScore } from '../../game/score';
+import { quickCaptureScore, quickCaptureTurnsCount, rankPlayers, starRating } from '../../game/gameMode';
+import { achievementNameKey, achievementTotalScore, unlockedAchievements } from '../../game/achievements';
+import { placeWord } from '../../i18n/lists';
 import { useGameStore } from '../../store/gameStore';
 import { type UIHost } from '../host';
 import { Button } from '../kit/button';
-import { makeIcon } from '../kit/icon';
+import { makeActionButtonIcon } from '../kit/actionButtonIcons';
+import { makeIconChip } from '../kit/tribeChip';
 import { makeLabel } from '../kit/label';
 import { Popup } from '../kit/popup';
 
@@ -20,21 +22,18 @@ export function placeColor(place: number): number {
   return 0x888888;
 }
 
-const CIRCLE_R = 28;
-
-interface IconView {
-  el: Container;
-  circle: Graphics;
-  playerIndex: number;
-}
+const CHIP_SIZE = 32;
+const HEADER_LINE = 40;
+const ROW_LINE = 18;
+const ROW_GAP = 6;
+const BLOCK_GAP = 14;
+const STAR_SIZE = 36;
+const STAR_GAP = 12;
 
 export class GameOver {
   private el: Container | null = null;
   private popup: Popup | null = null;
   private host: UIHost | null = null;
-  private selectedIndex = 0;
-  private details: Container | null = null;
-  private icons: IconView[] = [];
 
   mount(host: UIHost, root: Container): void {
     this.host = host;
@@ -59,8 +58,6 @@ export class GameOver {
     const cw = popup.contentWidth;
 
     const ranked = rankPlayers(s.players, map);
-    const placeOf = new Map(ranked.map((p, i) => [p.index, i + 1]));
-    this.selectedIndex = s.localPlayerIndex;
 
     let y = 0;
     const banner = makeLabel(t('gameover.wins', { name: winner.name, tribe: tribe.name }), {
@@ -86,134 +83,125 @@ export class GameOver {
     content.addChild(mode);
     y += mode.height + 14;
 
-    const ordered = [s.players[s.localPlayerIndex], ...ranked.filter((p) => p.index !== s.localPlayerIndex)]
-      .filter((p): p is Player => p !== undefined);
-    const iconRow = new Container();
-    const gap = 72;
-    this.icons = [];
-    ordered.forEach((p, i) => {
-      const place = placeOf.get(p.index)!;
-      const view = this.makePlayerIcon(p.index, place, () => {
-        this.selectedIndex = p.index;
-        this.refresh();
+    if (s.mode === 'capture') {
+      const quick = makeLabel(t('gameover.quickCapture', { turns: quickCaptureTurnsCount(s.players.length) }), {
+        fontSize: 14,
+        fill: 0xcccccc,
+        wordWrap: true,
+        wordWrapWidth: cw,
       });
-      view.el.position.set(i * gap, 0);
-      iconRow.addChild(view.el);
-      this.icons.push(view);
-    });
-    const rowW = (ordered.length - 1) * gap;
-    iconRow.position.set(cw / 2 - rowW / 2, y);
-    content.addChild(iconRow);
-    y += 96;
+      quick.anchor.set(0.5, 0);
+      quick.position.set(cw / 2, y);
+      content.addChild(quick);
+      y += quick.height + 14;
+    }
 
-    this.details = new Container();
-    this.details.position.set(0, y);
-    content.addChild(this.details);
+    const rating = starRating(totalScore(map, winner), s.players.length, s.mode, s.turn);
+    const starRow = new Container();
+    for (let i = 0; i < 3; i++) {
+      const filled = i < rating;
+      const star = makeActionButtonIcon(filled ? 'action-star' : 'action-star-empty', STAR_SIZE);
+      star.label = filled ? 'action-star' : 'action-star-empty';
+      star.position.set(i * (STAR_SIZE + STAR_GAP), 0);
+      starRow.addChild(star);
+    }
+    const starsTotalW = 3 * STAR_SIZE + 2 * STAR_GAP;
+    starRow.position.set(cw / 2 - starsTotalW / 2, y);
+    content.addChild(starRow);
+    y += STAR_SIZE + 14;
+
+    const local = s.players[s.localPlayerIndex];
+    const known = new Set<number>(local ? [local.tribe, ...(local.knownTribes ?? [])] : []);
+
+    ranked.forEach((p, rank) => {
+      const place = rank + 1;
+      const pTribe = tribeById(p.tribe);
+      const knownTribe = pTribe !== undefined && known.has(p.tribe);
+      const tribeColor = knownTribe ? pTribe!.color : UNKNOWN_TRIBE_COLOR;
+      const tribeName = knownTribe ? pTribe!.name : t('ui.unknownTribe');
+
+      if (rank > 0) {
+        const sep = new Graphics();
+        sep.rect(0, y, cw, 1).fill({ color: 0xffffff, alpha: 0.12 });
+        content.addChild(sep);
+        y += BLOCK_GAP;
+      }
+      const headerCentre = y + HEADER_LINE / 2;
+
+      if (knownTribe) {
+        const chip = makeIconChip(`${pTribe!.code}-icon.png`, CHIP_SIZE, { bgColor: 0xffffff });
+        chip.position.set(CHIP_SIZE / 2, headerCentre);
+        content.addChild(chip);
+      } else {
+        const unknown = new Container();
+        const bg = new Graphics();
+        bg.circle(0, 0, CHIP_SIZE / 2).fill(UNKNOWN_TRIBE_COLOR);
+        const q = makeLabel('?', { fontSize: 20, fill: 0xffffff, fontWeight: '800' });
+        q.anchor.set(0.5, 0.5);
+        unknown.addChild(bg, q);
+        unknown.position.set(CHIP_SIZE / 2, headerCentre);
+        content.addChild(unknown);
+      }
+
+      const name = makeLabel(tribeName, { fontSize: 15, fill: tribeColor, fontWeight: '700' });
+      name.anchor.set(0, 0.5);
+      name.position.set(CHIP_SIZE + 8, headerCentre);
+      content.addChild(name);
+
+      const score = totalScore(map, p);
+      const scoreLabel = makeLabel(t('stats.pts', { score }), { fontSize: 20, fill: 0xff8c00, fontWeight: '900' });
+      scoreLabel.anchor.set(1, 0.5);
+      scoreLabel.position.set(cw, headerCentre);
+      content.addChild(scoreLabel);
+      const placeLabel = makeLabel(placeWord(place), { fontSize: 13, fill: placeColor(place), fontWeight: '600' });
+      placeLabel.anchor.set(1, 0.5);
+      placeLabel.position.set(cw - scoreLabel.width - 8, headerCentre);
+      content.addChild(placeLabel);
+
+      y += HEADER_LINE;
+
+      const fastBonus = s.bonusAwarded && s.winnerIndex === p.index ? quickCaptureScore(s.players.length) : 0;
+      const rows = gameOverRows(map, p, fastBonus).filter((row) => row.count !== 0 || row.score !== 0);
+      for (const row of rows) {
+        const centre = y + ROW_LINE / 2;
+        const title = makeLabel(row.label, { fontSize: 13, fill: 0xaaaaaa });
+        title.anchor.set(0, 0.5);
+        title.position.set(0, centre);
+        content.addChild(title);
+        const valueText =
+          row.count === 0 ? `+${row.score}` : row.score > 0 ? `${row.count} · +${row.score}` : String(row.count);
+        const value = makeLabel(valueText, { fontSize: 13, fill: 0xff8c00, fontWeight: '600' });
+        value.anchor.set(1, 0.5);
+        value.position.set(cw, centre);
+        content.addChild(value);
+        y += ROW_LINE + ROW_GAP;
+      }
+
+      const achievementIds = unlockedAchievements(p);
+      if (achievementIds.length > 0) {
+        const achTitle = makeLabel(t('stats.detailAchievements'), { fontSize: 13, fill: 0xaaaaaa });
+        achTitle.anchor.set(0, 0);
+        achTitle.position.set(0, y);
+        content.addChild(achTitle);
+        const achPts = makeLabel(`+${achievementTotalScore(p)}`, { fontSize: 13, fill: 0xff8c00, fontWeight: '600' });
+        achPts.anchor.set(1, 0);
+        achPts.position.set(cw, y);
+        content.addChild(achPts);
+        y += ROW_LINE + ROW_GAP;
+        for (const id of achievementIds) {
+          const line = makeLabel(t(achievementNameKey(id)), { fontSize: 13, fill: 0xeeeeee });
+          line.anchor.set(1, 0);
+          line.position.set(cw, y);
+          content.addChild(line);
+          y += ROW_LINE + ROW_GAP;
+        }
+      }
+    });
 
     root.addChild(popup.el);
     this.el = popup.el;
     this.popup = popup;
-    this.refresh();
     popup.finish();
-  }
-
-  private makePlayerIcon(playerIndex: number, place: number, onClick: () => void): IconView {
-    const p = useGameStore.getState().players[playerIndex]!;
-    const el = new Container();
-    const circle = new Graphics();
-    circle.circle(0, 0, CIRCLE_R).fill(0xffffff);
-    const clip = new Graphics();
-    clip.circle(0, 0, CIRCLE_R).fill(0xffffff);
-    const tribe = tribeById(p.tribe)!;
-    const icon = makeIcon(`${tribe.code}-icon.png`, CIRCLE_R * 2);
-    icon.mask = clip;
-    const badge = new Graphics();
-    badge.circle(0, CIRCLE_R - 10, 11).fill(placeColor(place)).stroke({ width: 2, color: 0xffffff });
-    const badgeText = makeLabel(String(place), { fontSize: 13, fill: 0x1a1a2e, fontWeight: '800' });
-    badgeText.anchor.set(0.5, 0.5);
-    badgeText.position.set(0, CIRCLE_R - 10);
-    el.addChild(circle, clip, icon, badge, badgeText);
-    el.eventMode = 'static';
-    el.cursor = 'pointer';
-    el.on('pointertap', onClick);
-    return { el, circle, playerIndex };
-  }
-
-  private refresh(): void {
-    if (!this.details || !this.popup) return;
-    this.icons.forEach((v) => {
-      v.circle.clear().circle(0, 0, CIRCLE_R).fill(0xffffff);
-      if (v.playerIndex === this.selectedIndex) v.circle.stroke({ width: 4, color: 0x5099ff });
-    });
-    this.details.removeChildren().forEach((c) => c.destroy({ children: true }));
-    const s = useGameStore.getState();
-    const map = gameController.getMap();
-    if (!map) return;
-    const player = s.players[this.selectedIndex]!;
-    const tribe = tribeById(player.tribe)!;
-    const fastBonus = s.bonusAwarded && s.winnerIndex === player.index ? bonusScoreFor(s.players.length) : 0;
-    const cw = this.popup.contentWidth;
-
-    const header = makeLabel(`${player.name} (${tribe.name})`, {
-      fontSize: 16,
-      fill: tribe.color,
-      fontWeight: '700',
-      wordWrap: true,
-      wordWrapWidth: cw,
-    });
-    header.anchor.set(0.5, 0);
-    header.position.set(cw / 2, 0);
-    this.details.addChild(header);
-    let y = header.height + 6;
-    for (const item of scoreBreakdown(map, player, fastBonus)) {
-      const line = item.score === 0
-        ? `${item.label}: ${item.count}`
-        : item.count === 0
-          ? `${item.label}: ${item.score}`
-          : `${item.label}: ${item.count}, ${t('gameover.scores', { score: item.score })}`;
-      const label = makeLabel(line, { fontSize: 14, fill: 0xeeeeee, wordWrap: true, wordWrapWidth: cw });
-      label.anchor.set(0.5, 0);
-      label.position.set(cw / 2, y);
-      this.details.addChild(label);
-      y += label.height + 8;
-    }
-    const openedAch = unlockedAchievements(player);
-    if (openedAch.length > 0) {
-      const heading = makeLabel(t('ach.title'), {
-        fontSize: 14,
-        fill: 0xffffff,
-        fontWeight: '700',
-        wordWrap: true,
-        wordWrapWidth: cw,
-      });
-      heading.anchor.set(0.5, 0);
-      heading.position.set(cw / 2, y + 4);
-      this.details.addChild(heading);
-      y += heading.height + 8;
-      for (const id of openedAch) {
-        const line = makeLabel(`${t(achievementNameKey(id))}: +${achievementPoints(id)}`, {
-          fontSize: 14,
-          fill: 0xeeeeee,
-          wordWrap: true,
-          wordWrapWidth: cw,
-        });
-        line.anchor.set(0.5, 0);
-        line.position.set(cw / 2, y);
-        this.details.addChild(line);
-        y += line.height + 8;
-      }
-    }
-    const total = makeLabel(`${t('gameover.total')} ${totalScore(map, player)}`, {
-      fontSize: 16,
-      fill: 0xffffff,
-      fontWeight: '700',
-      wordWrap: true,
-      wordWrapWidth: cw,
-    });
-    total.anchor.set(0.5, 0);
-    total.position.set(cw / 2, y + 4);
-    this.details.addChild(total);
-    this.popup.reflow();
   }
 
   hide(onDone: () => void): void {
@@ -226,7 +214,5 @@ export class GameOver {
     this.popup = null;
     this.el = null;
     this.host = null;
-    this.details = null;
-    this.icons = [];
   }
 }

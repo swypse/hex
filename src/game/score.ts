@@ -65,6 +65,8 @@ export interface PlayerStats {
   bonusesCollected: number;
   /** Tribes whose last village was captured by this player. */
   tribesEliminated: number;
+  /** Skills paid for through the skill tree (excludes tribe start skills). */
+  skillsOpened: number;
 }
 
 export const EMPTY_STATS: PlayerStats = {
@@ -77,6 +79,7 @@ export const EMPTY_STATS: PlayerStats = {
   shipsCapturedByPirates: 0,
   bonusesCollected: 0,
   tribesEliminated: 0,
+  skillsOpened: 0,
 };
 
 interface ScoreBreakdownItem {
@@ -85,12 +88,28 @@ interface ScoreBreakdownItem {
   score: number;
 }
 
-export function scoreBreakdown(map: GameMap, player: Player, fastBonus: number): ScoreBreakdownItem[] {
-  const stats = player.stats ?? EMPTY_STATS;
-  const pirateKills = stats.pirateKills;
-  const kills = Math.max(0, player.kills - pirateKills);
-  const skillsOpened = player.skills.length;
-  const explored = map.tiles.filter((t) => isExploredFor(t, player.index)).length;
+/** Board-derived tallies for a player (counts and the points they earn). */
+export interface GameOverRow {
+  label: string;
+  count: number;
+  score: number;
+}
+
+interface PlayerBoardCounts {
+  villages: number;
+  buildings: number;
+  buildingScore: number;
+  bridges: number;
+  bridgeScore: number;
+  waterTemples: number;
+  waterTempleScore: number;
+  forestTemples: number;
+  forestTempleScore: number;
+  units: number;
+  unitScore: number;
+}
+
+function boardCounts(map: GameMap, player: Player): PlayerBoardCounts {
   let villages = 0;
   let units = 0;
   let unitScore = 0;
@@ -125,20 +144,63 @@ export function scoreBreakdown(map: GameMap, player: Player, fastBonus: number):
       buildingScore += BUILDING_SCORE;
     }
   }
+  return {
+    villages, buildings, buildingScore, bridges, bridgeScore,
+    waterTemples, waterTempleScore, forestTemples, forestTempleScore, units, unitScore,
+  };
+}
+
+export function scoreBreakdown(map: GameMap, player: Player, fastBonus: number): ScoreBreakdownItem[] {
+  const stats = player.stats ?? EMPTY_STATS;
+  const pirateKills = stats.pirateKills;
+  const kills = Math.max(0, player.kills - pirateKills);
+  const skillsOpened = player.skills.length;
+  const explored = map.tiles.filter((t) => isExploredFor(t, player.index)).length;
+  const b = boardCounts(map, player);
   return [
     { label: t('ui.killedunits'), count: stats.killedUnits, score: 0 },
     { label: t('ui.kills'), count: kills, score: kills * KILL_SCORE },
     { label: t('ui.piratekills'), count: pirateKills, score: pirateKills * PIRATE_KILL_SCORE },
-    { label: t('ui.buildings'), count: buildings, score: buildingScore },
-    { label: t('ui.bridges'), count: bridges, score: bridgeScore },
-    { label: t('ui.watertemples'), count: waterTemples, score: waterTempleScore },
-    { label: t('ui.foresttemples'), count: forestTemples, score: forestTempleScore },
+    { label: t('ui.buildings'), count: b.buildings, score: b.buildingScore },
+    { label: t('ui.bridges'), count: b.bridges, score: b.bridgeScore },
+    { label: t('ui.watertemples'), count: b.waterTemples, score: b.waterTempleScore },
+    { label: t('ui.foresttemples'), count: b.forestTemples, score: b.forestTempleScore },
     { label: t('ui.capturedvillages'), count: stats.villagesCaptured, score: stats.villagesCaptured * CAPTURE_SCORE },
     { label: t('ui.villageupgrades'), count: stats.villageUpgrades, score: stats.villageUpgrades * UPGRADE_SCORE },
     { label: t('ui.skillsopened'), count: skillsOpened, score: skillsOpened * SKILL_SCORE },
     { label: t('ui.exploredtiles'), count: explored, score: explored * EXPLORED_SCORE },
-    { label: t('ui.villages'), count: villages, score: villages * VILLAGE_SCORE },
-    { label: t('ui.units'), count: units, score: unitScore },
-    { label: t('ui.fastcapturemodebonus'), count: 0, score: fastBonus },
+    { label: t('ui.villages'), count: b.villages, score: b.villages * VILLAGE_SCORE },
+    { label: t('ui.units'), count: b.units, score: b.unitScore },
+    { label: t('ui.quickcapture'), count: 0, score: fastBonus },
+  ];
+}
+
+/** Rows shown on the game-over screen. Every score source is covered so the
+ *  listed scores add up to `totalScore` (achievements are a separate block);
+ *  `score` is 0 for rows that earn no points. Rows with count 0 and score 0 are
+ *  hidden by the caller. */
+export function gameOverRows(map: GameMap, player: Player, fastBonus: number): GameOverRow[] {
+  const stats = player.stats ?? EMPTY_STATS;
+  const pirateKills = stats.pirateKills;
+  const kills = Math.max(0, player.kills - pirateKills);
+  const skillsOpened = stats.skillsOpened ?? 0;
+  const explored = map.tiles.filter((t) => isExploredFor(t, player.index)).length;
+  const b = boardCounts(map, player);
+  return [
+    { label: t('stats.detailTribes'), count: stats.tribesEliminated ?? 0, score: 0 },
+    { label: t('ui.kills'), count: kills, score: kills * KILL_SCORE },
+    { label: t('ui.piratekills'), count: pirateKills, score: pirateKills * PIRATE_KILL_SCORE },
+    { label: t('ui.knightcombos'), count: stats.knightCombos ?? 0, score: (stats.knightCombos ?? 0) * COMBO_SCORE },
+    { label: t('ui.capturedvillages'), count: stats.villagesCaptured ?? 0, score: (stats.villagesCaptured ?? 0) * CAPTURE_SCORE },
+    { label: t('ui.villageupgrades'), count: stats.villageUpgrades ?? 0, score: (stats.villageUpgrades ?? 0) * UPGRADE_SCORE },
+    { label: t('ui.buildings'), count: b.buildings, score: b.buildingScore },
+    { label: t('ui.bridges'), count: b.bridges, score: b.bridgeScore },
+    { label: t('ui.watertemples'), count: b.waterTemples, score: b.waterTempleScore },
+    { label: t('ui.foresttemples'), count: b.forestTemples, score: b.forestTempleScore },
+    { label: t('ui.skillsopened'), count: skillsOpened, score: skillsOpened * SKILL_SCORE },
+    { label: t('ui.exploredtiles'), count: explored, score: explored * EXPLORED_SCORE },
+    { label: t('ui.villages'), count: b.villages, score: b.villages * VILLAGE_SCORE },
+    { label: t('ui.units'), count: b.units, score: b.unitScore },
+    { label: t('ui.quickcapture'), count: 0, score: fastBonus },
   ];
 }
