@@ -18,6 +18,6 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['tests/**/*.test.{ts,mjs}'],
-    setupFiles: ['tests/setup.ts'],
+    setupFiles: ['tests/browserGlobals.ts', 'tests/setup.ts'],
   },
 });

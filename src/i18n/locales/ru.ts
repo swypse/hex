@@ -83,7 +83,7 @@ export default {
   'msg.bottleMoney': 'Вы нашли 50 монет в старой бутылке',
   'msg.bottleSkill': 'В бутылке был забытый свиток — открыт навык «{skill}»!',
   'msg.bottleHeal': 'В бутылке было целебное зелье — корабль отремонтирован (+20 HP)',
-  'msg.cheatResources': '+100 к каждому ресурсу (чит)',
+  'msg.cheatResources': '+1000 к каждому ресурсу (чит)',
   'msg.cheatSkills': 'Открыты все навыки (чит)',
   'msg.cheatFog': 'Карта открыта (чит)',
 'msg.comboKill': 'Комбо-убийство!',

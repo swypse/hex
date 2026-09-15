@@ -83,7 +83,7 @@ export default {
   'msg.bottleMoney': 'You found 50 money in an old bottle',
   'msg.bottleSkill': 'The bottle holds a forgotten scroll — {skill} unlocked!',
   'msg.bottleHeal': 'An old healing elixir — your ship is repaired (+20 HP)',
-  'msg.cheatResources': '+100 of each resource (cheat)',
+  'msg.cheatResources': '+1000 of each resource (cheat)',
   'msg.cheatSkills': 'All skills unlocked (cheat)',
   'msg.cheatFog': 'Map revealed (cheat)',
 'msg.comboKill': 'Combo kill!',

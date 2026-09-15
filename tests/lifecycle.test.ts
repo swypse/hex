@@ -39,16 +39,16 @@ describe('GameController lifecycle', () => {
     expect(gameController.getSim()).not.toBeNull();
   });
 
-  it('cheatResources grants +100 of every resource in single-player', async () => {
+  it('cheatResources grants +1000 of every resource in single-player', async () => {
     await gameController.startGame(TRIBES[0]!.id, 1, 'capture');
     const sim = gameController.getSim()!;
     const before = { ...sim.players[0]!.resources };
     expect(gameController.cheatResources()).toBe(true);
     const after = sim.players[0]!.resources;
-    expect(after.money).toBe(before.money + 100);
-    expect(after.wood).toBe(before.wood + 100);
-    expect(after.stone).toBe(before.stone + 100);
-    expect(after.ore).toBe(before.ore + 100);
+    expect(after.money).toBe(before.money + 1000);
+    expect(after.wood).toBe(before.wood + 1000);
+    expect(after.stone).toBe(before.stone + 1000);
+    expect(after.ore).toBe(before.ore + 1000);
   });
 
   it('cheatResources is refused outside single-player', async () => {
