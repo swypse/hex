@@ -1,4 +1,4 @@
-import { Assets, type TextStyleFontWeight } from 'pixi.js';
+import { Assets, type BitmapFont, type TextStyleFontWeight } from 'pixi.js';
 
 export const FONT_REGULAR = 'Roboto Regular';
 export const FONT_BLACK = 'Roboto Black';
@@ -14,5 +14,14 @@ export function fontFamilyForWeight(weight?: TextStyleFontWeight): string {
 }
 
 export async function loadBitmapFonts(): Promise<unknown> {
-  return Assets.load([`${FONT_BASE}Roboto Regular.fnt`, `${FONT_BASE}Roboto Black.fnt`]);
+  const [regular, black] = await Promise.all([
+    Assets.load<BitmapFont>(`${FONT_BASE}Roboto Regular.fnt`),
+    Assets.load<BitmapFont>(`${FONT_BASE}Roboto Black.fnt`),
+  ]);
+  for (const font of [regular, black]) {
+    for (const page of font.pages) {
+      page.texture.source.autoGenerateMipmaps = true;
+    }
+  }
+  return [regular, black];
 }

@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
-import { FONT_BLACK, FONT_REGULAR, fontFamilyForWeight } from '../src/ui/kit/bitmapFonts';
+import { describe, expect, it, vi } from 'vitest';
+import { Assets } from 'pixi.js';
+import { FONT_BLACK, FONT_REGULAR, fontFamilyForWeight, loadBitmapFonts } from '../src/ui/kit/bitmapFonts';
 
 describe('fontFamilyForWeight', () => {
   it('maps undefined and normal weights to Roboto Regular', () => {
@@ -12,5 +13,21 @@ describe('fontFamilyForWeight', () => {
     expect(fontFamilyForWeight('700')).toBe(FONT_BLACK);
     expect(fontFamilyForWeight('800')).toBe(FONT_BLACK);
     expect(fontFamilyForWeight('900')).toBe(FONT_BLACK);
+  });
+});
+
+describe('loadBitmapFonts', () => {
+  it('enables mipmaps on every loaded font page so downscaled text stays antialiased', async () => {
+    const sourceA = { autoGenerateMipmaps: false };
+    const sourceB = { autoGenerateMipmaps: false };
+    const fontA = { pages: [{ texture: { source: sourceA } }] };
+    const fontB = { pages: [{ texture: { source: sourceB } }] };
+    vi.spyOn(Assets, 'load').mockImplementation(((url: string) =>
+      Promise.resolve(url.toString().includes('Black') ? fontB : fontA)) as never);
+
+    await loadBitmapFonts();
+
+    expect(sourceA.autoGenerateMipmaps).toBe(true);
+    expect(sourceB.autoGenerateMipmaps).toBe(true);
   });
 });
