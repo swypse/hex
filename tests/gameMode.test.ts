@@ -54,17 +54,17 @@ describe('gameMode', () => {
   });
 
   it('rates capture games by score and the quick-capture turns budget', () => {
-    // 3 players: 3★ needs >= 2500 and turn <= 25; 2★ needs >= 1600.
-    expect(starRating(3000, 3, 'capture', 10)).toBe(3);
-    expect(starRating(3000, 3, 'capture', 26)).toBe(2);
-    expect(starRating(2000, 3, 'capture', 10)).toBe(2);
+    // 3 players: 3★ needs >= 1100 and turn <= 25; 2★ needs >= 850.
+    expect(starRating(1200, 3, 'capture', 10)).toBe(3);
+    expect(starRating(1200, 3, 'capture', 26)).toBe(2);
+    expect(starRating(900, 3, 'capture', 10)).toBe(2);
     expect(starRating(100, 3, 'capture', 10)).toBe(1);
   });
 
   it('rates 30-turn games by score only', () => {
-    // 3 players: 3★ needs >= 4400; 2★ needs >= 3000.
-    expect(starRating(5000, 3, 'turns30', 30)).toBe(3);
-    expect(starRating(4000, 3, 'turns30', 30)).toBe(2);
+    // 3 players: 3★ needs >= 3400; 2★ needs >= 2600.
+    expect(starRating(3500, 3, 'turns30', 30)).toBe(3);
+    expect(starRating(3000, 3, 'turns30', 30)).toBe(2);
     expect(starRating(100, 3, 'turns30', 30)).toBe(1);
   });
 

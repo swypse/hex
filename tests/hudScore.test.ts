@@ -73,13 +73,15 @@ describe('HudScore buff icons', () => {
     expect(allSprites(r).length).toBe(0);
   });
 
-  it('shows the temple count as the sub score beside each buff icon', () => {
+  it('shows just the buff icon with no number label', () => {
     mount(3);
     const buffRow = (hud as unknown as { buffRow: Container }).buffRow!;
     expect(buffRow.children.length).toBe(1);
-    const texts = buffRow.children[0]!.children.filter((c) => c instanceof Text) as Text[];
-    expect(texts).toHaveLength(1);
-    expect(texts[0]!.text).toBe('3');
+    const item = buffRow.children[0]!;
+    const texts = item.children.filter((c) => c instanceof Text) as Text[];
+    expect(texts).toHaveLength(0);
+    const sprites = item.children.filter((c) => c instanceof Sprite) as Sprite[];
+    expect(sprites).toHaveLength(1);
   });
 
   it('stacks buff items vertically under the score circle', () => {

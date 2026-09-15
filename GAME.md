@@ -155,8 +155,8 @@ A player's total score = accumulated action score + current board score.
 
 A finished game is rated 1–3 stars by the winner's total score:
 
-- **Capture** — 3★: score ≥ `1000 + 500 × players` and finished within the quick-capture turns; 2★: score ≥ `700 + 300 × players`; otherwise 1★.
-- **30 Turns** — 3★: score ≥ `2000 + 800 × players`; 2★: score ≥ `1500 + 500 × players`; otherwise 1★.
+- **Capture** — 3★: score ≥ `500 + 200 × players` and finished within the quick-capture turns; 2★: score ≥ `400 + 150 × players`; otherwise 1★.
+- **30 Turns** — 3★: score ≥ `1000 + 800 × players`; 2★: score ≥ `800 + 600 × players`; otherwise 1★.
 
 ## Skills
 

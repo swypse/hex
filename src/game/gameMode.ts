@@ -27,12 +27,12 @@ export type StarRating = 1 | 2 | 3;
  *  tier only when the game also ends within the quick-capture turns budget. */
 export function starRating(score: number, playerCount: number, mode: GameMode, turn: number): StarRating {
   if (mode === 'capture') {
-    if (score >= 1000 + 500 * playerCount && turn <= quickCaptureTurnsCount(playerCount)) return 3;
-    if (score >= 700 + 300 * playerCount) return 2;
+    if (score >= 500 + 200 * playerCount && turn <= quickCaptureTurnsCount(playerCount)) return 3;
+    if (score >= 400 + 150 * playerCount) return 2;
     return 1;
   }
-  if (score >= 2000 + 800 * playerCount) return 3;
-  if (score >= 1500 + 500 * playerCount) return 2;
+  if (score >= 1000 + 800 * playerCount) return 3;
+  if (score >= 800 + 600 * playerCount) return 2;
   return 1;
 }
 

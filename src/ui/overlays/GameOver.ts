@@ -1,5 +1,5 @@
 import { t } from '../../i18n';
-import { Container, Graphics } from 'pixi.js';
+import { Container, Graphics, Sprite } from 'pixi.js';
 import { gameController } from '../../controller/gameController';
 import { tribeById } from '../../game/tribes';
 import { UNKNOWN_TRIBE_COLOR } from '../../game/discovery';
@@ -29,11 +29,16 @@ const ROW_GAP = 6;
 const BLOCK_GAP = 14;
 const STAR_SIZE = 36;
 const STAR_GAP = 12;
+const STAR_MARGIN = 6;
+const STAR_DELAY_STEP = 160;
+const STAR_BOUNCE_MS = 380;
 
 export class GameOver {
   private el: Container | null = null;
   private popup: Popup | null = null;
   private host: UIHost | null = null;
+  private disposed = false;
+  private tickerFns: Array<(t: { deltaMS: number }) => void> = [];
 
   mount(host: UIHost, root: Container): void {
     this.host = host;
@@ -72,6 +77,19 @@ export class GameOver {
     content.addChild(banner);
     y += banner.height + 10;
 
+    const rating = starRating(totalScore(map, winner), s.players.length, s.mode, s.turn);
+    const starRow = new Container();
+    for (let i = 0; i < 3; i++) {
+      const filled = i < rating;
+      const star = makeActionButtonIcon(filled ? 'action-star' : 'action-star-empty', STAR_SIZE);
+      star.label = filled ? 'action-star' : 'action-star-empty';
+      star.position.set((i - 1) * (STAR_SIZE + STAR_GAP), 0);
+      starRow.addChild(star);
+    }
+    starRow.position.set(cw / 2, y + STAR_MARGIN + STAR_SIZE / 2);
+    content.addChild(starRow);
+    y += STAR_SIZE + STAR_MARGIN * 2;
+
     const mode = makeLabel(t('gameover.modeTurns', { mode: t(s.mode === 'capture' ? 'mode.capture' : 'mode.turns30'), turns: s.turn }), {
       fontSize: 14,
       fill: 0xcccccc,
@@ -95,20 +113,6 @@ export class GameOver {
       content.addChild(quick);
       y += quick.height + 14;
     }
-
-    const rating = starRating(totalScore(map, winner), s.players.length, s.mode, s.turn);
-    const starRow = new Container();
-    for (let i = 0; i < 3; i++) {
-      const filled = i < rating;
-      const star = makeActionButtonIcon(filled ? 'action-star' : 'action-star-empty', STAR_SIZE);
-      star.label = filled ? 'action-star' : 'action-star-empty';
-      star.position.set(i * (STAR_SIZE + STAR_GAP), 0);
-      starRow.addChild(star);
-    }
-    const starsTotalW = 3 * STAR_SIZE + 2 * STAR_GAP;
-    starRow.position.set(cw / 2 - starsTotalW / 2, y);
-    content.addChild(starRow);
-    y += STAR_SIZE + 14;
 
     const local = s.players[s.localPlayerIndex];
     const known = new Set<number>(local ? [local.tribe, ...(local.knownTribes ?? [])] : []);
@@ -160,7 +164,10 @@ export class GameOver {
 
       y += HEADER_LINE;
 
-      const fastBonus = s.bonusAwarded && s.winnerIndex === p.index ? quickCaptureScore(s.players.length) : 0;
+      const fastBonus =
+        p.index === s.winnerIndex && s.mode === 'capture' && s.turn <= quickCaptureTurnsCount(s.players.length)
+          ? quickCaptureScore(s.players.length)
+          : 0;
       const rows = gameOverRows(map, p, fastBonus).filter((row) => row.count !== 0 || row.score !== 0);
       for (const row of rows) {
         const centre = y + ROW_LINE / 2;
@@ -202,6 +209,45 @@ export class GameOver {
     this.el = popup.el;
     this.popup = popup;
     popup.finish();
+    this.animateStars(starRow);
+  }
+
+  /** Appears the header stars one by one, each bouncing in from small and
+   *  settling at 100% scale. */
+  private animateStars(starRow: Container): void {
+    const app = this.host?.app;
+    const ticker = app?.ticker;
+    const stars = starRow.children as Sprite[];
+    if (!ticker) {
+      for (const star of stars) star.scale.set(1);
+      return;
+    }
+    stars.forEach((star, i) => {
+      star.scale.set(0);
+      const delay = i * STAR_DELAY_STEP;
+      let elapsed = 0;
+      const fn = (t: { deltaMS: number }): void => {
+        if (this.disposed || star.destroyed) {
+          ticker.remove(fn);
+          return;
+        }
+        // Cap the per-frame step so a slow first frame can't skip the bounce
+        // and snap the star straight to full size.
+        elapsed += Math.min(t.deltaMS, 50);
+        if (elapsed < delay) return;
+        const p = Math.min(1, (elapsed - delay) / STAR_BOUNCE_MS);
+        const c1 = 1.70158;
+        const c3 = c1 + 1;
+        const eased = 1 + c3 * Math.pow(p - 1, 3) + c1 * Math.pow(p - 1, 2);
+        star.scale.set(eased, eased);
+        if (p >= 1) {
+          star.scale.set(1, 1);
+          ticker.remove(fn);
+        }
+      };
+      this.tickerFns.push(fn);
+      ticker.add(fn);
+    });
   }
 
   hide(onDone: () => void): void {
@@ -210,6 +256,9 @@ export class GameOver {
   }
 
   destroy(): void {
+    this.disposed = true;
+    if (this.host) for (const fn of this.tickerFns) this.host.app.ticker.remove(fn);
+    this.tickerFns = [];
     this.popup?.destroy();
     this.popup = null;
     this.el = null;

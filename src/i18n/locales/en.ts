@@ -3,7 +3,7 @@ export default {
   'lang.ru': 'Русский',
 
   // Start screen
-  'start.title': 'Hex',
+  'start.title': 'Hex Terra',
   'start.single': 'Single player',
   'start.multi': 'Multiplayer',
   'start.tutorial': 'Tutorial',
@@ -11,7 +11,7 @@ export default {
   'start.about': 'About',
   'start.settings': 'Settings',
   'start.aboutTitle': 'About',
-  'start.aboutText': 'Hex is a turn-based strategy game on a hex map. Build and upgrade villages, train warriors, riders, archers, and swordsmen, research skills, and explore a procedurally generated world. Conquer rival tribes by capturing their villages or score the most points by the final turn. Play solo against AI or challenge friends in multiplayer.',
+  'start.aboutText': 'Hex Terra is a turn-based strategy game on a hex map. Build and upgrade villages, train warriors, riders, archers, and swordsmen, research skills, and explore a procedurally generated world. Conquer rival tribes by capturing their villages or score the most points by the final turn. Play solo against AI or challenge friends in multiplayer.',
   'start.author': 'Author: {name}',
   'start.hint': '↑/↓ navigate · Enter select',
 
@@ -224,8 +224,8 @@ export default {
   'ui.villageupgrades': 'Village upgrades',
   'ui.villages': 'Villages',
   'ui.watertemples': 'WaterTemples',
-  'tutorial.welcome.heading': 'Welcome to the Hex tutorial',
-  'tutorial.welcome.text': 'Welcome to the Hex demo. This tutorial teaches you the basics: move a unit, upgrade your village, collect income each turn, research skills, build a sawmill and a mine, spawn an archer, and fight an enemy. Follow each instruction; your current objective is shown at the top of the screen.',
+  'tutorial.welcome.heading': 'Welcome to the Hex Terra tutorial',
+  'tutorial.welcome.text': 'Welcome to the Hex Terra demo. This tutorial teaches you the basics: move a unit, upgrade your village, collect income each turn, research skills, build a sawmill and a mine, spawn an archer, and fight an enemy. Follow each instruction; your current objective is shown at the top of the screen.',
   'tutorial.welcome.button': 'Continue',
   'tutorial.moveUnit.heading': 'Move your Warrior',
   'tutorial.moveUnit.text': 'Select your Warrior (it is already selected) and click a highlighted tile to move it to a new hex.',
@@ -372,7 +372,7 @@ export default {
   'hud.selected.produces.wood': 'Produces: wood {wood}',
   'hud.selected.produces.stoneOre': 'Produces: stone {stone}, ore {ore}',
   'welcome.title': 'Welcome!',
-  'welcome.intro': 'Welcome to Hex! Lead your tribe to victory.',
+  'welcome.intro': 'Welcome to Hex Terra! Lead your tribe to victory.',
   'welcome.capture': 'Goal: capture every village — eliminate rival tribes to win.',
   'welcome.score': 'Goal: most points after 30 turns.',
   'welcome.howTo': 'Select a unit and click a highlighted tile to move. End your turn when done.',

@@ -1,4 +1,4 @@
-# Hex
+# Hex Terra
 
 A 2D turn-based strategy game on a hex map. Build and upgrade villages, train
 warriors, riders, archers, swordsmen, knights, and catapults, research skills

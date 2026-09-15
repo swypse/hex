@@ -175,7 +175,7 @@ export class StartScreen implements ScreenController {
   private root: Container | null = null;
   private host: UIHost | null = null;
   private scroll: ScreenScroll | null = null;
-  private title: Text | null = null;
+  private title: Sprite | null = null;
   private hint: Text | null = null;
   private buttons: Button[] = [];
   private index = 0;
@@ -195,8 +195,15 @@ export class StartScreen implements ScreenController {
     this.addBackgroundImages();
     this.scroll = new ScreenScroll(host.app, this.root);
 
-    this.title = makeLabel(t('start.title'), { fontSize: 64, fill: 0xffffff, fontWeight: '800' });
+    this.title = new Sprite();
     this.title.anchor.set(0.5, 0.5);
+    const img = new Image();
+    img.onload = () => {
+      if (!this.title || this.title.destroyed) return;
+      this.title.texture = Texture.from(img);
+      this.layout();
+    };
+    img.src = `${import.meta.env.BASE_URL}textures/hex-terra.png`;
 
     const single = new Button({
       label: t('start.single'),

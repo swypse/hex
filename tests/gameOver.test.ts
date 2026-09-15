@@ -39,7 +39,7 @@ describe('GameOver screen', () => {
   let root: Container;
   const originalSim = (gameController as unknown as { sim: unknown }).sim;
 
-  const mount = (opts?: { score?: number; turn?: number }): Container => {
+  const mount = (opts?: { score?: number; turn?: number }, hostOverride?: UIHost): Container => {
     const map = makeTestMap(3);
     const players = buildPlayers(Tribe.Villagers, 2, new SeededRandom(42));
     players[0]!.score = opts?.score ?? 100;
@@ -62,7 +62,7 @@ describe('GameOver screen', () => {
     });
     root = new Container();
     screen = new GameOver();
-    screen.mount(makeHost(), root);
+    screen.mount(hostOverride ?? makeHost(), root);
     return root;
   };
 
@@ -92,6 +92,20 @@ describe('GameOver screen', () => {
           && (ch.label === 'action-star' || ch.label === 'action-star-empty')
         ) {
           out.push(String(ch.label));
+        }
+        if (ch instanceof Container) walk(ch as Container);
+      }
+    };
+    walk(r);
+    return out;
+  };
+
+  const collectStarSprites = (r: Container): Sprite[] => {
+    const out: Sprite[] = [];
+    const walk = (c: Container): void => {
+      for (const ch of c.children) {
+        if (ch instanceof Sprite && (ch.label === 'action-star' || ch.label === 'action-star-empty')) {
+          out.push(ch as Sprite);
         }
         if (ch instanceof Container) walk(ch as Container);
       }
@@ -145,6 +159,19 @@ describe('GameOver screen', () => {
     expect(texts.some((t) => t === 'Achievements')).toBe(false);
   });
 
+  it('shows the quick-capture bonus row for the winner when within budget', () => {
+    const r = mount({ turn: 10 });
+    const texts = allTexts(r);
+    expect(texts.includes('Quick capture')).toBe(true);
+    // 3 players × 20 = 60 points.
+    expect(texts.includes('+60')).toBe(true);
+  });
+
+  it('hides the quick-capture row when the win is too slow', () => {
+    const r = mount({ turn: 27 });
+    expect(allTexts(r).some((t) => t === 'Quick capture')).toBe(false);
+  });
+
   it('draws the winner rating as a centered row of 3 stars', () => {
     // Default fixture: 1★ (low score).
     const r = mount();
@@ -152,7 +179,7 @@ describe('GameOver screen', () => {
   });
 
   it('fills stars for higher ratings', () => {
-    // 3 players, 3★ needs >= 2500 total and turn <= 25; 2★ needs >= 1600.
+    // 3 players, 3★ needs >= 1100 total and turn <= 25; 2★ needs >= 850.
     expect(collectStarLabels(mount({ score: 3000, turn: 10 }))).toEqual([
       'action-star', 'action-star', 'action-star',
     ]);
@@ -160,5 +187,41 @@ describe('GameOver screen', () => {
     expect(collectStarLabels(mount({ score: 3000, turn: 27 }))).toEqual([
       'action-star', 'action-star', 'action-star-empty',
     ]);
+  });
+
+  it('appears stars one by one with a bounce-in scale animation', () => {
+    const registered: Array<(t: { deltaMS: number }) => void> = [];
+    const removed: unknown[] = [];
+    const ticker = {
+      add: (fn: (t: { deltaMS: number }) => void) => {
+        registered.push(fn);
+      },
+      remove: (fn: unknown) => {
+        removed.push(fn);
+      },
+    };
+    const host = {
+      app: { screen: { width: 1280, height: 800 }, stage: new Container(), ticker },
+      screenLayer: new Container(),
+      overlayLayer: new Container(),
+    } as unknown as UIHost;
+
+    const r = mount({ score: 3000, turn: 10 }, host);
+    const stars = collectStarSprites(r);
+    expect(stars.length).toBe(3);
+    // One ticker callback per star (plus the popup card entrance tween), all
+    // stars start hidden (scale 0).
+    expect(registered.length).toBeGreaterThanOrEqual(3);
+    expect(stars.every((s) => s.scale.x === 0)).toBe(true);
+
+    // Advance enough time for the staggered delays to resolve (per-frame capped):
+    // each star bounces in from small and settles at exactly 100%.
+    for (let k = 0; k < 20; k++) registered.forEach((fn) => fn({ deltaMS: 200 }));
+    expect(stars.every((s) => s.scale.x === 1)).toBe(true);
+
+    screen.destroy();
+    // Every star's animation callback got removed (self-removal on finish and/or
+    // on destroy), and destroying mid-animation must not throw.
+    expect(removed.length).toBeGreaterThanOrEqual(3);
   });
 });

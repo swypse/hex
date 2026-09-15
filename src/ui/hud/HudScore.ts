@@ -1,13 +1,12 @@
 import { Container, Graphics, Text } from 'pixi.js';
 import { gameController } from '../../controller/gameController';
 import { totalScore } from '../../game/score';
-import { activeBuffs, BUFF_INFO, templeCount, type BuffId } from '../../game/buffs';
+import { activeBuffs, BUFF_INFO, type BuffId } from '../../game/buffs';
 import { useGameStore } from '../../store/gameStore';
 import { type UIHost, type Widget } from '../host';
 import { makeIcon } from '../kit/icon';
 import { makeLabel } from '../kit/label';
 import { Popup, POPUP_BODY_SIZE } from '../kit/popup';
-import { t } from '../../i18n';
 
 const SIZE = 56;
 const PAD = 8;
@@ -100,17 +99,13 @@ export class HudScore implements Widget {
     let y = 0;
     for (const buff of buffs) {
       const info = BUFF_INFO[buff];
-      const count = templeCount(map, s.localPlayerIndex, buff);
       const item = new Container();
       const icon = makeIcon(info.icon, ICON_SIZE);
       icon.position.set(0, 0);
-      const countLabel = makeLabel(String(count), { fontSize: 13, fill: 0xffffff, fontWeight: '700' });
-      countLabel.anchor.set(0, 0.5);
-      countLabel.position.set(ICON_SIZE + 4, ICON_SIZE / 2);
       item.eventMode = 'static';
       item.cursor = 'pointer';
-      item.on('pointertap', () => this.openBuffPopup(buff, count));
-      item.addChild(icon, countLabel);
+      item.on('pointertap', () => this.openBuffPopup(buff));
+      item.addChild(icon);
       item.position.set(0, y);
       this.buffRow.addChild(item);
       y += ICON_SIZE + BUFF_GAP;
@@ -118,12 +113,12 @@ export class HudScore implements Widget {
     this.layout();
   }
 
-  /** Opens a small card describing the tapped protection buff. */
-  private openBuffPopup(buff: BuffId, count: number): void {
+  /** Opens a small card describing the tapped protection buff: when it appears
+   *  and what it gives. */
+  private openBuffPopup(buff: BuffId): void {
     if (!this.host) return;
     this.closeBuffPopup();
     const info = BUFF_INFO[buff];
-    const labelLine = buff === 'waterProtection' ? t('ui.watertemples') : t('ui.foresttemples');
     const onDone = (): void => {
       this.closeBuffPopup();
     };
@@ -144,13 +139,6 @@ export class HudScore implements Widget {
     });
     desc.position.set(0, 0);
     popup.content.addChild(desc);
-    const countLine = makeLabel(`${labelLine}: ${count}`, {
-      fontSize: POPUP_BODY_SIZE,
-      fill: 0xffffff,
-      fontWeight: '700',
-    });
-    countLine.position.set(0, desc.height + 10);
-    popup.content.addChild(countLine);
     this.host.app.stage.addChild(popup.el);
     popup.finish();
     this.buffPopup = popup;
