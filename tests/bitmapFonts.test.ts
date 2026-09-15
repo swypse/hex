@@ -17,9 +17,9 @@ describe('fontFamilyForWeight', () => {
 });
 
 describe('loadBitmapFonts', () => {
-  it('enables mipmaps on every loaded font page so downscaled text stays antialiased', async () => {
-    const sourceA = { autoGenerateMipmaps: false };
-    const sourceB = { autoGenerateMipmaps: false };
+  it('enables mipmaps and samples a single nearest mip level so downscaled text stays sharp', async () => {
+    const sourceA = { autoGenerateMipmaps: false, mipmapFilter: 'linear' };
+    const sourceB = { autoGenerateMipmaps: false, mipmapFilter: 'linear' };
     const fontA = { pages: [{ texture: { source: sourceA } }] };
     const fontB = { pages: [{ texture: { source: sourceB } }] };
     vi.spyOn(Assets, 'load').mockImplementation(((url: string) =>
@@ -29,5 +29,9 @@ describe('loadBitmapFonts', () => {
 
     expect(sourceA.autoGenerateMipmaps).toBe(true);
     expect(sourceB.autoGenerateMipmaps).toBe(true);
+    // Nearest mip selection avoids blending between mip levels, which softens
+    // glyph edges when the 72px bake is downscaled to 10-26px labels.
+    expect(sourceA.mipmapFilter).toBe('nearest');
+    expect(sourceB.mipmapFilter).toBe('nearest');
   });
 });

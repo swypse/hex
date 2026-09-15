@@ -24,6 +24,7 @@ const MAIN_BG = {
 /** Popup-backed dialog the start screen can show (settings / about). */
 interface ModalView {
   destroy(): void;
+
   hide(onDone: () => void): void;
 }
 
@@ -58,7 +59,7 @@ class SettingsPanel {
       hard: 'difficulty.hard',
     };
     const difficultyGroup = new ButtonGroup({
-      fontSize: 12,
+      fontSize: 14,
       items: difficultyOptions.map((d) => ({
         label: t(difficultyKeys[d]),
         onClick: () => {
@@ -83,7 +84,7 @@ class SettingsPanel {
     y += soundLabel.height + 8;
 
     const soundGroup = new ButtonGroup({
-      fontSize: 12,
+      fontSize: 14,
       items: [
         {
           label: t('common.on'),
@@ -124,7 +125,7 @@ class SettingsPanel {
     ];
     const currentLang = loadSettings().lang;
     const langGroup = new ButtonGroup({
-      fontSize: 12,
+      fontSize: 14,
       items: langOptions.map((l) => ({
         label: t(l.key),
         onClick: () => {
@@ -213,13 +214,23 @@ export class StartScreen implements ScreenController {
     this.buttons = buttons;
     this.buttons[0]!.selected = true;
 
-    this.hint = makeLabel(t('start.hint'), { fontSize: 12, fill: 0xeeeeee });
+    this.hint = makeLabel(t('start.hint'), { fontSize: 14, fill: 0xeeeeee });
     this.hint.visible = !isTouchDevice();
     this.hint.alpha = 0.7;
     this.hint.anchor.set(0.5, 0.5);
 
-    this.aboutBtn = new Button({ label: t('start.about'), width: 96, fontSize: 14, onClick: () => this.openModal('about') });
-    this.settingsBtn = new Button({ label: t('start.settings'), width: 110, fontSize: 14, onClick: () => this.openModal('settings') });
+    this.aboutBtn = new Button({
+      label: t('start.about'),
+      width: 96,
+      fontSize: 14,
+      onClick: () => this.openModal('about')
+    });
+    this.settingsBtn = new Button({
+      label: t('start.settings'),
+      width: 110,
+      fontSize: 14,
+      onClick: () => this.openModal('settings')
+    });
     this.root.addChild(this.aboutBtn, this.settingsBtn);
     if (this.scroll) {
       this.scroll.content.addChild(this.title, ...this.buttons, this.hint);
@@ -349,7 +360,7 @@ export class StartScreen implements ScreenController {
       return;
     }
     const opts = kind === 'about'
-      ? { title: t('start.aboutTitle'), lines: [t('start.aboutText'), t('start.author', { name: 'swypse@gmail.com' })] }
+      ? { title: t('start.aboutTitle'), lines: [t('start.aboutText'), t('start.author', { name: 'swypse' })] }
       : { title: t('settings.title'), lines: [] };
     const modal = new Modal({ app: this.host.app, ...opts, onClose: () => this.closeModal() });
     modal.mount(this.root!);

@@ -22,9 +22,9 @@ const DIFFICULTY_OPTIONS: AiDifficulty[] = ['easy', 'normal', 'hard'];
 const MAP_SIZE_OPTIONS: MapSize[] = ['normal', 'big', 'huge'];
 const SELECTOR_COUNT = 6;
 // Title centre to the block content below it (circle tops and button tops).
-const TITLE_TO_CONTENT = 44;
+const TITLE_TO_CONTENT = 22;
 // Vertical gap between the bottom of one block and the title above the next.
-const BLOCK_GAP = 16;
+const BLOCK_GAP = 20;
 // Horizontal margin kept clear on each side when laying out the tribe grid.
 const SIDE_MARGIN = 24;
 const RADIUS = 28;
@@ -64,15 +64,15 @@ export class SetupScreen implements ScreenController {
     host.screenLayer.addChild(this.root);
     this.scroll = new ScreenScroll(host.app, this.root);
 
-    this.tribeTitle = makeLabel(t('common.chooseTribe'), { fontSize: 24, fill: 0xffffff });
+    this.tribeTitle = makeLabel(t('common.chooseTribe'), { fontSize: 16, fill: 0xffffff });
     this.tribeTitle.anchor.set(0.5, 0.5);
-    this.enemiesTitle = makeLabel(t('setup.enemies'), { fontSize: 24, fill: 0xffffff });
+    this.enemiesTitle = makeLabel(t('setup.enemies'), { fontSize: 16, fill: 0xffffff });
     this.enemiesTitle.anchor.set(0.5, 0.5);
-    this.modeTitle = makeLabel(t('common.mode'), { fontSize: 24, fill: 0xffffff });
+    this.modeTitle = makeLabel(t('common.mode'), { fontSize: 16, fill: 0xffffff });
     this.modeTitle.anchor.set(0.5, 0.5);
-    this.difficultyTitle = makeLabel(t('setup.difficulty'), { fontSize: 24, fill: 0xffffff });
+    this.difficultyTitle = makeLabel(t('setup.difficulty'), { fontSize: 16, fill: 0xffffff });
     this.difficultyTitle.anchor.set(0.5, 0.5);
-    this.mapSizeTitle = makeLabel(t('common.mapSize'), { fontSize: 24, fill: 0xffffff });
+    this.mapSizeTitle = makeLabel(t('common.mapSize'), { fontSize: 16, fill: 0xffffff });
     this.mapSizeTitle.anchor.set(0.5, 0.5);
 
     for (const t of TRIBES) {
@@ -83,7 +83,7 @@ export class SetupScreen implements ScreenController {
       const icon = makeIcon(`${t.code}-icon.png`, 60);
       icon.position.set(0, 0);
       icon.mask = clip;
-      const label = makeLabel(t.name, { fontSize: 12, fill: 0xeeeeee });
+      const label = makeLabel(t.name, { fontSize: 14, fill: 0xeeeeee });
       label.anchor.set(0.5, 0);
       label.position.set(0, 34);
       const item = new Container();
@@ -101,7 +101,7 @@ export class SetupScreen implements ScreenController {
     }
 
     this.enemyGroup = new ButtonGroup({
-      fontSize: 12,
+      fontSize: 14,
       items: ENEMY_OPTIONS.map((n) => ({
         label: String(n),
         onClick: () => {
@@ -113,7 +113,7 @@ export class SetupScreen implements ScreenController {
     this.scroll!.content.addChild(this.enemyGroup);
 
     this.modeGroup = new ButtonGroup({
-      fontSize: 12,
+      fontSize: 14,
       items: MODE_OPTIONS.map((m) => ({
         label: m === 'capture' ? t('mode.capture') : t('mode.turns30'),
         onClick: () => {
@@ -125,7 +125,7 @@ export class SetupScreen implements ScreenController {
     this.scroll!.content.addChild(this.modeGroup);
 
     this.difficultyGroup = new ButtonGroup({
-      fontSize: 12,
+      fontSize: 14,
       items: DIFFICULTY_OPTIONS.map((d) => ({
         label: t(d === 'easy' ? 'difficulty.easy' : d === 'normal' ? 'difficulty.normal' : 'difficulty.hard'),
         onClick: () => {
@@ -137,7 +137,7 @@ export class SetupScreen implements ScreenController {
     this.scroll!.content.addChild(this.difficultyGroup);
 
     this.mapSizeGroup = new ButtonGroup({
-      fontSize: 12,
+      fontSize: 14,
       items: MAP_SIZE_OPTIONS.map((s) => ({
         label: t(`mapSize.${s}`),
         onClick: () => {
@@ -155,7 +155,7 @@ export class SetupScreen implements ScreenController {
       paddingY: 14,
       onClick: () => gameController.startGame(this.tribe, this.enemies, useGameStore.getState().mode, this.difficulty, this.mapSize),
     });
-    this.hint = makeLabel(t('setup.hint'), { fontSize: 12, fill: 0xeeeeee });
+    this.hint = makeLabel(t('setup.hint'), { fontSize: 14, fill: 0xeeeeee });
     this.hint.visible = !isTouchDevice();
     this.hint.alpha = 0.7;
     this.hint.anchor.set(0.5, 0.5);
@@ -247,7 +247,7 @@ export class SetupScreen implements ScreenController {
     }
     const wrapW = Math.max(120, Math.min(720, w - SIDE_MARGIN * 2));
     const opts = {
-      fontSize: 18,
+      fontSize: 16,
       fill: 0xcccccc,
       wordWrap: true,
       wordWrapWidth: wrapW,
