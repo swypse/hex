@@ -114,6 +114,25 @@ describe('GameOver screen', () => {
     return out;
   };
 
+  const collectStarWrappers = (r: Container): Container[] => {
+    const out: Container[] = [];
+    const walk = (c: Container): void => {
+      for (const ch of c.children) {
+        if (
+          ch instanceof Container
+          && ch.children.some(
+            (x) => x instanceof Sprite && (x.label === 'action-star' || x.label === 'action-star-empty'),
+          )
+        ) {
+          out.push(ch as Container);
+        }
+        if (ch instanceof Container) walk(ch as Container);
+      }
+    };
+    walk(r);
+    return out;
+  };
+
   it('announces the winner in the banner', () => {
     const r = mount();
     const texts = allTexts(r);
@@ -208,16 +227,18 @@ describe('GameOver screen', () => {
 
     const r = mount({ score: 3000, turn: 10 }, host);
     const stars = collectStarSprites(r);
+    const wrappers = collectStarWrappers(r);
     expect(stars.length).toBe(3);
-    // One ticker callback per star (plus the popup card entrance tween), all
-    // stars start hidden (scale 0).
+    expect(wrappers.length).toBe(3);
+    // One ticker callback per star wrapper (plus the popup card entrance tween);
+    // all wrappers start hidden (scale 0) while the star sprites keep their size.
     expect(registered.length).toBeGreaterThanOrEqual(3);
-    expect(stars.every((s) => s.scale.x === 0)).toBe(true);
+    expect(wrappers.every((w) => w.scale.x === 0)).toBe(true);
 
     // Advance enough time for the staggered delays to resolve (per-frame capped):
-    // each star bounces in from small and settles at exactly 100%.
+    // each wrapper bounces in from small and settles at exactly 100%.
     for (let k = 0; k < 20; k++) registered.forEach((fn) => fn({ deltaMS: 200 }));
-    expect(stars.every((s) => s.scale.x === 1)).toBe(true);
+    expect(wrappers.every((w) => w.scale.x === 1)).toBe(true);
 
     screen.destroy();
     // Every star's animation callback got removed (self-removal on finish and/or

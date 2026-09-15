@@ -119,6 +119,7 @@ export default {
 'net.relayUnreachable': 'Could not reach the game server. Check your connection and try again.',
 'net.hostMessage': 'Failed to process a message from the host.',
   'msg.cheatPirates': '5 pirate ships spawned near AI tribes (cheat)',
+  'msg.cheatWin': 'All enemies eliminated — end your turn to win (cheat)',
   'msg.aiLogsOn': 'AI decision logs ON',
   'msg.aiLogsOff': 'AI decision logs OFF',
 

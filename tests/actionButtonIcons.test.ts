@@ -82,6 +82,22 @@ describe('makeActionButtonIcon', () => {
     expect(tex!.frame.y).toBe(frame.y);
   });
 
+  it('keeps the requested size when the atlas is already loaded', async () => {
+    // Load the atlas once so the module's shared texture is set.
+    const loading = icons.ensureActionButtonAtlas();
+    FakeImage.instances[0]!.onload!.call(FakeImage.instances[0]!);
+    await loading;
+    // A new icon created from the already-loaded atlas must still honour its
+    // requested size (regression: size was applied before the texture existed).
+    const sprite = icons.makeActionButtonIcon('action-upgrade', 40);
+    expect(sprite.width).toBe(40);
+    expect(sprite.height).toBe(40);
+    const frame = ACTION_BUTTON_ATLAS_FRAMES['action-upgrade']!;
+    const tex = (sprite as { texture: Texture | null }).texture;
+    expect(tex!.frame.x).toBe(frame.x);
+    expect(tex!.frame.y).toBe(frame.y);
+  });
+
   it('loads the single packed action-buttons atlas image', () => {
     const sprite = icons.makeActionButtonIcon('action-upgrade', 40);
     expect(FakeImage.instances).toHaveLength(1);

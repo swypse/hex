@@ -2,7 +2,7 @@ import { Container, Graphics } from 'pixi.js';
 import { gameController } from '../../controller/gameController';
 import { useGameStore } from '../../store/gameStore';
 import { t } from '../../i18n';
-import { advanceCheatBuffer, triggeredCheat, SKILLS_CHEAT_WORD, RESOURCE_CHEAT_WORD, FOG_CHEAT_WORD, PIRATES_CHEAT_WORD, AI_LOGS_CHEAT_WORD } from '../../game/cheats';
+import { advanceCheatBuffer, triggeredCheat, SKILLS_CHEAT_WORD, RESOURCE_CHEAT_WORD, FOG_CHEAT_WORD, PIRATES_CHEAT_WORD, AI_LOGS_CHEAT_WORD, WIN_CHEAT_WORD } from '../../game/cheats';
 import { type ScreenController, type UIHost, type Widget } from '../host';
 import { HudScore } from '../hud/HudScore';
 import { HudPlayers } from '../hud/HudPlayers';
@@ -48,6 +48,8 @@ export class GameScreen implements ScreenController {
     } else if (cheat === AI_LOGS_CHEAT_WORD) {
       const on = gameController.cheatToggleAiLogs();
       useGameStore.getState().setCenterMessage(on ? t('msg.aiLogsOn') : t('msg.aiLogsOff'));
+    } else if (cheat === WIN_CHEAT_WORD && gameController.cheatWin()) {
+      useGameStore.getState().setCenterMessage(t('msg.cheatWin'));
     }
   };
 

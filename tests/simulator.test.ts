@@ -73,6 +73,35 @@ describe('Simulator commands', () => {
     expect(sim.applyCommand({ type: 'forfeit', playerIndex: 1 })).toBe(false);
   });
 
+  it('eliminatePlayer frees a player but does not end the game (win cheat)', () => {
+    const map = makeTestMap();
+    tileAt(map, 0, 0)!.settlement = { owner: 0, level: 1, captureReady: false };
+    tileAt(map, 0, 1)!.settlement = { owner: 1, level: 1, captureReady: false };
+    tileAt(map, 0, 0)!.unit = makeUnit('u1', 0, 'warrior', 0, 0);
+    tileAt(map, 0, 1)!.unit = makeUnit('u2', 1, 'warrior', 0, 1);
+    tileAt(map, 1, 0)!.ownedBy = 1;
+    tileAt(map, 1, 0)!.claimedByVillage = { q: 0, r: 1 };
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    sim.startGame();
+    sim.drainEvents();
+
+    const ok = sim.eliminatePlayer(1);
+    expect(ok).toBe(true);
+    expect(players[1]!.isActive).toBe(false);
+    expect(tileAt(map, 0, 1)!.settlement?.owner).toBeNull();
+    expect(tileAt(map, 0, 1)!.unit).toBeNull();
+    expect(tileAt(map, 1, 0)!.ownedBy).toBeNull();
+    expect(tileAt(map, 1, 0)!.claimedByVillage).toBeNull();
+    // Player 0's stuff is untouched.
+    expect(tileAt(map, 0, 0)!.unit?.id).toBe('u1');
+    // Unlike forfeit, the win cheat must not end the game immediately; the
+    // local player's next End Turn resolves the victory.
+    expect(sim.gameOver).toBe(false);
+    // Eliminating an already-inactive player is a no-op.
+    expect(sim.eliminatePlayer(1)).toBe(false);
+  });
+
   it('forfeit releases a touched bonus claimer and the capture-ready of occupied enemy villages', () => {
     const map = makeTestMap();
     tileAt(map, 0, 0)!.settlement = { owner: 0, level: 1, captureReady: false };

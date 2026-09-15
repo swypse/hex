@@ -8,6 +8,7 @@ import {
   FOG_CHEAT_WORD,
   PIRATES_CHEAT_WORD,
   AI_LOGS_CHEAT_WORD,
+  WIN_CHEAT_WORD,
 } from '../src/game/cheats';
 
 function type(word: string, buffer = ''): string {
@@ -46,6 +47,13 @@ describe('cheat code buffer', () => {
     expect(buffer).toBe(AI_LOGS_CHEAT_WORD);
     expect(triggeredCheat(type('xxailogs'))).toBe(AI_LOGS_CHEAT_WORD);
     expect(cheatCodeTriggered(type('ailo'))).toBe(false);
+  });
+
+  it('triggers the win cheat', () => {
+    const buffer = type('win');
+    expect(buffer).toBe(WIN_CHEAT_WORD);
+    expect(triggeredCheat(type('xxwin'))).toBe(WIN_CHEAT_WORD);
+    expect(cheatCodeTriggered(type('wi'))).toBe(false);
   });
 
   it('does not trigger on a partial word', () => {

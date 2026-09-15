@@ -60,6 +60,19 @@ describe('GameController lifecycle', () => {
     expect(sim.players[0]!.resources).toEqual(before);
   });
 
+  it('cheatWin eliminates enemies and the next end turn resolves the win', async () => {
+    await gameController.startGame(TRIBES[0]!.id, 1, 'capture');
+    const sim = gameController.getSim()!;
+    expect(sim.gameOver).toBe(false);
+    expect(gameController.cheatWin()).toBe(true);
+    expect(sim.players[1]!.isActive).toBe(false);
+    // The game is not over until the local player ends their turn.
+    expect(sim.gameOver).toBe(false);
+    sim.applyCommand({ type: 'endTurn' });
+    expect(sim.gameOver).toBe(true);
+    expect(sim.winnerIndex).toBe(0);
+  });
+
   it('does not clear the selected cell when ending the turn', async () => {
     await gameController.startGame(TRIBES[0]!.id, 1, 'capture');
     const store = useGameStore.getState();

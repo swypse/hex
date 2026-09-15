@@ -802,6 +802,27 @@ class GameController {
     return true;
   }
 
+  /** Cheat (single-player only): eliminates every enemy tribe (villages, units
+   *  and territory). The local player's next End Turn then resolves the
+   *  capture-mode victory. Returns true when applied. */
+  cheatWin(): boolean {
+    if (!this.sim) return false;
+    const store = useGameStore.getState();
+    if (store.screen !== 'game' || store.netMode !== 'single') return false;
+    const local = this.sim.players[store.localPlayerIndex];
+    if (!local) return false;
+    let any = false;
+    for (const p of this.sim.players) {
+      if (p.index === store.localPlayerIndex) continue;
+      if (this.sim.eliminatePlayer(p.index)) any = true;
+    }
+    if (!any) return false;
+    this.syncStore();
+    this.saveGame();
+    this.render();
+    return true;
+  }
+
   /** Reveal the whole map and every tribe for the local player. */
   private revealMapForLocal(): void {
     if (!this.sim) return;

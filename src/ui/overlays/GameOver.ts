@@ -1,5 +1,5 @@
 import { t } from '../../i18n';
-import { Container, Graphics, Sprite } from 'pixi.js';
+import { Container, Graphics } from 'pixi.js';
 import { gameController } from '../../controller/gameController';
 import { tribeById } from '../../game/tribes';
 import { UNKNOWN_TRIBE_COLOR } from '../../game/discovery';
@@ -27,7 +27,7 @@ const HEADER_LINE = 40;
 const ROW_LINE = 18;
 const ROW_GAP = 6;
 const BLOCK_GAP = 14;
-const STAR_SIZE = 36;
+const STAR_SIZE = 64;
 const STAR_GAP = 12;
 const STAR_MARGIN = 6;
 const STAR_DELAY_STEP = 160;
@@ -83,8 +83,13 @@ export class GameOver {
       const filled = i < rating;
       const star = makeActionButtonIcon(filled ? 'action-star' : 'action-star-empty', STAR_SIZE);
       star.label = filled ? 'action-star' : 'action-star-empty';
-      star.position.set((i - 1) * (STAR_SIZE + STAR_GAP), 0);
-      starRow.addChild(star);
+      // The sprite keeps its STAR_SIZE scale (so it renders at exactly 32px);
+      // the wrapper carries the bounce-in animation so the sprite's size is
+      // never distorted by the scale tween.
+      const wrap = new Container();
+      wrap.addChild(star);
+      wrap.position.set((i - 1) * (STAR_SIZE + STAR_GAP), 0);
+      starRow.addChild(wrap);
     }
     starRow.position.set(cw / 2, y + STAR_MARGIN + STAR_SIZE / 2);
     content.addChild(starRow);
@@ -213,21 +218,21 @@ export class GameOver {
   }
 
   /** Appears the header stars one by one, each bouncing in from small and
-   *  settling at 100% scale. */
+   *  settling at 100% (the star sprites keep their fixed 32px size). */
   private animateStars(starRow: Container): void {
     const app = this.host?.app;
     const ticker = app?.ticker;
-    const stars = starRow.children as Sprite[];
+    const wrappers = starRow.children as Container[];
     if (!ticker) {
-      for (const star of stars) star.scale.set(1);
+      for (const wrap of wrappers) wrap.scale.set(1);
       return;
     }
-    stars.forEach((star, i) => {
-      star.scale.set(0);
+    wrappers.forEach((wrap, i) => {
+      wrap.scale.set(0);
       const delay = i * STAR_DELAY_STEP;
       let elapsed = 0;
       const fn = (t: { deltaMS: number }): void => {
-        if (this.disposed || star.destroyed) {
+        if (this.disposed || wrap.destroyed) {
           ticker.remove(fn);
           return;
         }
@@ -239,9 +244,9 @@ export class GameOver {
         const c1 = 1.70158;
         const c3 = c1 + 1;
         const eased = 1 + c3 * Math.pow(p - 1, 3) + c1 * Math.pow(p - 1, 2);
-        star.scale.set(eased, eased);
+        wrap.scale.set(eased, eased);
         if (p >= 1) {
-          star.scale.set(1, 1);
+          wrap.scale.set(1, 1);
           ticker.remove(fn);
         }
       };

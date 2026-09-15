@@ -84,7 +84,14 @@ export function makeActionButtonIcon(key: string, size: number, onReady?: () => 
   sprite.height = size;
   if (atlasTexture) {
     const tex = sliceFrame(frameKey, atlasTexture);
-    if (tex) sprite.texture = tex;
+    // Re-apply the requested size after assigning the sliced texture: the size
+    // set above was against the empty texture, which would otherwise leave an
+    // absurd scale and render the icon far bigger than `size` pixels.
+    if (tex) {
+      sprite.texture = tex;
+      sprite.width = size;
+      sprite.height = size;
+    }
     onReady?.();
     return sprite;
   }

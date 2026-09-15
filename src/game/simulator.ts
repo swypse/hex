@@ -749,6 +749,16 @@ export class Simulator {
    *  remove all their units and territories, and mark the tribe inactive so the
    *  end conditions can resolve. */
   private doForfeit(playerIndex: number): boolean {
+    if (!this.eliminatePlayer(playerIndex)) return false;
+    this.emit({ type: 'playerForfeited', playerIndex });
+    if (!this.gameOver) this.checkEndConditions();
+    return true;
+  }
+
+  /** Removes all villages, units, and territory of a player and marks them
+   *  inactive, without ending the game. Used by forfeits and by the win cheat
+   *  (which lets the local player's next End Turn resolve the victory). */
+  eliminatePlayer(playerIndex: number): boolean {
     const player = this.players[playerIndex];
     if (!player || !player.isActive) return false;
     for (const t of this.map.tiles) {
@@ -772,8 +782,6 @@ export class Simulator {
       }
     }
     player.isActive = false;
-    this.emit({ type: 'playerForfeited', playerIndex });
-    if (!this.gameOver) this.checkEndConditions();
     return true;
   }
 
