@@ -4,7 +4,7 @@ const FILES: Record<string, string> = {
   click: 'click.wav',
   claim: 'claim.wav',
   hit: 'hit.wav',
-  arcShot: 'arc-shot.wav',
+  arcShot: 'bow-shot.wav',
   swordHit: 'sword-hit.wav',
   waterSplash: 'water-splash.wav',
   waterSquish: 'water-squish.wav',

@@ -8,12 +8,16 @@ import { useGameStore } from '../../store/gameStore';
 import { type UIHost } from '../host';
 import { Button } from '../kit/button';
 import { makeActionButtonIcon } from '../kit/actionButtonIcons';
+import { makeIcon } from '../kit/icon';
 import { makeLabel } from '../kit/label';
 import { Popup } from '../kit/popup';
 
+// Fixed 3-icon grid: 3 columns, 4px margins around each cell.
+const COLS = 3;
 const CELL_W = 92;
 const CELL_H = 112;
-const ITEM_PAD = 6;
+const ITEM_PAD = 4;
+const RESOURCE_ICON_SIZE = 16;
 
 export class SpawnDialog {
   private el: Container | null = null;
@@ -35,6 +39,8 @@ export class SpawnDialog {
     const popup = new Popup({
       app: host.app,
       title: t('spawn.title'),
+      // Sized so the content area holds exactly 3 columns + the 4px margins.
+      width: 2 * 20 + COLS * CELL_W + (COLS - 1) * ITEM_PAD,
       onClose: () => useGameStore.getState().setOverlay(null),
     });
     root.addChild(popup.el);
@@ -54,9 +60,18 @@ export class SpawnDialog {
     const info = UNIT_TYPES[type];
     const out: string[] = [];
     if (!player) return out;
-    if (player.resources.money < info.price) out.push(t('spawn.reasonMoney', { need: info.price, have: player.resources.money }));
-    if (info.priceWood > 0 && player.resources.wood < info.priceWood) out.push(t('spawn.reasonWood', { need: info.priceWood, have: player.resources.wood }));
-    if (info.priceOre > 0 && player.resources.ore < info.priceOre) out.push(t('spawn.reasonOre', { need: info.priceOre, have: player.resources.ore }));
+    if (player.resources.money < info.price) out.push(t('spawn.reasonMoney', {
+      need: info.price,
+      have: player.resources.money
+    }));
+    if (info.priceWood > 0 && player.resources.wood < info.priceWood) out.push(t('spawn.reasonWood', {
+      need: info.priceWood,
+      have: player.resources.wood
+    }));
+    if (info.priceOre > 0 && player.resources.ore < info.priceOre) out.push(t('spawn.reasonOre', {
+      need: info.priceOre,
+      have: player.resources.ore
+    }));
     if (type === 'rider' && !hasSkill(player, 'riding')) out.push(t('spawn.reasonSkill', { skill: t('skill.riding.name') }));
     if (type === 'knight' && !hasSkill(player, 'knights')) out.push(t('spawn.reasonSkill', { skill: t('skill.knights.name') }));
     if (type === 'swordsman' && !hasSkill(player, 'swordsman')) out.push(t('spawn.reasonSkill', { skill: t('skill.swordsman.name') }));
@@ -76,7 +91,7 @@ export class SpawnDialog {
     this.reasonFor = null;
     this.clearContent();
     const types = this.types();
-    const cols = Math.min(4, Math.max(1, Math.floor((this.popup.contentWidth + ITEM_PAD) / (CELL_W + ITEM_PAD))));
+    const cols = COLS;
     const content = this.popup.content;
     types.forEach((type, i) => {
       const col = i % cols;
@@ -94,16 +109,11 @@ export class SpawnDialog {
       icon.position.set(CELL_W / 2, 30);
       item.addChild(icon);
 
-      const name = makeLabel(UNIT_TYPE_NAMES[type], { fontSize: 12, fill: 0xeeeeee });
+      const name = makeLabel(UNIT_TYPE_NAMES[type], { fontSize: 14, fill: 0xffffff });
       name.position.set((CELL_W - name.width) / 2, 66);
       item.addChild(name);
 
-      const info = UNIT_TYPES[type];
-      const woodText = info.priceWood > 0 ? ` + ${info.priceWood} ${t('res.wood')}` : '';
-      const oreText = info.priceOre > 0 ? ` + ${info.priceOre} ${t('res.ore')}` : '';
-      const price = makeLabel(`${info.price}${woodText}${oreText}`, { fontSize: 12, fill: 0xeeeeee });
-      price.position.set((CELL_W - price.width) / 2, 84);
-      item.addChild(price);
+      this.addPriceRow(item, type);
 
       const reasons = this.reasons(type);
       const disabled = reasons.length > 0;
@@ -120,18 +130,49 @@ export class SpawnDialog {
     this.popup.reflow();
   }
 
+  /** Money / wood / ore costs as a centred row of 16px resource icons next to
+   *  their amounts, e.g. `30 💰 20 🪵 5 ⛏`. Zero-cost resources are omitted. */
+  private addPriceRow(item: Container, type: UnitType): void {
+    const info = UNIT_TYPES[type];
+    const parts: { icon: string; label: string }[] = [{ icon: 'gold-32', label: String(info.price) }];
+    if (info.priceWood > 0) parts.push({ icon: 'wood-32', label: String(info.priceWood) });
+    if (info.priceOre > 0) parts.push({ icon: 'ore-32', label: String(info.priceOre) });
+
+    const row = new Container();
+    let x = 0;
+    for (const p of parts) {
+      const value = makeLabel(p.label, { fontSize: 14, fill: 0xffffff });
+      const icon = makeIcon(p.icon, RESOURCE_ICON_SIZE);
+      icon.position.set(x + value.width + RESOURCE_ICON_SIZE / 2 + 2, RESOURCE_ICON_SIZE / 2);
+      value.position.set(x, 0);
+      row.addChild(value, icon);
+      x += value.width + RESOURCE_ICON_SIZE + 2 + 6;
+    }
+    row.position.set((CELL_W - x) / 2, 84);
+    item.addChild(row);
+  }
+
   private drawReasons(type: UnitType): void {
     if (!this.popup) return;
     this.reasonFor = type;
     this.clearContent();
     const content = this.popup.content;
     const lines = this.reasons(type);
-    const name = makeLabel(t('spawn.cannot', { unit: UNIT_TYPE_NAMES[type] }), { fontSize: 14, fill: 0xffffff, fontWeight: '700' });
+    const name = makeLabel(t('spawn.cannot', { unit: UNIT_TYPE_NAMES[type] }), {
+      fontSize: 14,
+      fill: 0xffffff,
+      fontWeight: '700'
+    });
     name.position.set(0, 0);
     content.addChild(name);
     let y = name.height + 8;
     for (const line of lines) {
-      const t = makeLabel(line, { fontSize: 14, fill: 0xcccccc, wordWrap: true, wordWrapWidth: this.popup.contentWidth });
+      const t = makeLabel(line, {
+        fontSize: 14,
+        fill: 0xcccccc,
+        wordWrap: true,
+        wordWrapWidth: this.popup.contentWidth
+      });
       t.position.set(0, y);
       y += t.height + 6;
       content.addChild(t);

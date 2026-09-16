@@ -561,6 +561,54 @@ describe('HudSelected bonus info', () => {
   });
 });
 
+describe('HudSelected turn visibility', () => {
+  let hud: HudSelected;
+  const originalSim = (gameController as unknown as { sim: unknown }).sim;
+
+  const boot = (currentPlayerIndex: number): void => {
+    (globalThis as { CanvasRenderingContext2D?: unknown }).CanvasRenderingContext2D = class {};
+    (globalThis as { document?: unknown }).document = {
+      createElement: () => ({ getContext: () => fakeCanvasContext(), width: 0, height: 0 }),
+    };
+    const map = makeTestMap(2);
+    const tile = tileAt(map, 0, 0)!;
+    tile.unit = makeUnit('u1', 0, 'warrior', 0, 0);
+    const players = buildPlayers(Tribe.Villagers, 2, new SeededRandom(1));
+    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    (gameController as unknown as { sim: Simulator | null }).sim = sim;
+    useGameStore.setState({
+      screen: 'game',
+      players,
+      localPlayerIndex: 0,
+      currentPlayerIndex,
+      selection: { kind: 'unit', q: 0, r: 0 },
+      netMode: 'single',
+      tutorial: false,
+      tutorialStep: null,
+    });
+    hud = new HudSelected();
+    hud.mount(makeHost(), new Container());
+  };
+
+  afterEach(() => {
+    hud?.destroy();
+    useGameStore.setState({ currentPlayerIndex: 0 });
+    (gameController as unknown as { sim: unknown }).sim = originalSim;
+  });
+
+  const visible = (): boolean => ((hud as unknown as { el: Container }).el!.visible);
+
+  it('shows the selected info panel during the local player turn', () => {
+    boot(0);
+    expect(visible()).toBe(true);
+  });
+
+  it('hides the selected info panel while another player is acting', () => {
+    boot(1);
+    expect(visible()).toBe(false);
+  });
+});
+
 describe('HudSelected close button and collapsed state', () => {
   let hud: HudSelected;
   const originalSim = (gameController as unknown as { sim: unknown }).sim;

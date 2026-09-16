@@ -1,4 +1,4 @@
-import { Container } from 'pixi.js';
+import { BitmapText, Container } from 'pixi.js';
 import { gameController } from '../../controller/gameController';
 import { useGameStore } from '../../store/gameStore';
 import { t } from '../../i18n';
@@ -6,11 +6,14 @@ import { TRIBES, type Tribe, tribeById } from '../../game/tribes';
 import { type GameMode } from '../../game/gameMode';
 import { type MapSize } from '../../game/mapGen';
 import { buildJoinLink, consumePendingJoin } from '../../net/joinLink';
+import { playerName, setPlayerName } from '../../storage/settings';
 import { type ScreenController, type UIHost } from '../host';
 import { Button } from '../kit/button';
+import { ButtonGroup } from '../kit/buttonGroup';
 import { makeLabel } from '../kit/label';
 import { makeTribeOption } from '../kit/tribeOption';
-import { TRIBE_ROW_STEP, positionTribes } from '../kit/tribeLayout';
+import { TRIBE_GAP, TRIBE_ROW_STEP, positionTribes } from '../kit/tribeLayout';
+import { TITLE_TO_CONTENT, BLOCK_GAP } from '../kit/screenLayout';
 import { TextInputOverlay } from '../kit/textInputOverlay';
 import { isTouchDevice } from '../touch';
 import { ScreenScroll } from '../verticalScroll';
@@ -18,6 +21,9 @@ import { ScreenScroll } from '../verticalScroll';
 type View = 'menu' | 'host' | 'join';
 
 const HOST_NAV_ITEMS = 7;
+// Tribe option circle radius (matches makeTribeOption), used to place the
+// tribe row below its heading like the setup screen.
+const RADIUS = 28;
 const CREATE_ROOM_FOCUS = HOST_NAV_ITEMS - 2;
 const MAP_SIZE_OPTIONS: MapSize[] = ['normal', 'big', 'huge'];
 
@@ -31,7 +37,7 @@ export class LobbyScreen implements ScreenController {
   private humans = 2;
   private aiCount = 1;
   private tribe: Tribe = TRIBES[0]!.id;
-  private name = 'Player';
+  private name = playerName();
   private code = '';
   private focus = 0;
   private menuIndex = 0;
@@ -225,91 +231,126 @@ export class LobbyScreen implements ScreenController {
     return label;
   }
 
-  private renderHost(): void {
+private renderHost(): void {
     const cx = this.host!.app.screen.width / 2;
     this.title(t('lobby.hostGame'));
-    let y = 110;
 
     const nameInput = new TextInputOverlay({
-      x: cx - 100, y, width: 200, height: 34, value: this.name,
-      onChange: (v) => { this.name = v; this.updateCreate(); },
+      x: cx - 100, y: 110, width: 200, height: 34, value: this.name,
+      onChange: (v) => { this.name = v; setPlayerName(v); this.updateCreate(); },
     });
     this.inputs.push(nameInput);
     this.viewContent.addChild(nameInput.container);
-    y += 60;
 
-    const tribeLabel = this.groupLabel(t('lobby.tribe'), 0);
-    tribeLabel.position.set(cx, y);
+    // Tribe block top, matching the setup screen's heading-to-content rhythm.
+    const tribeLabel = this.groupLabel(t('common.chooseTribe'), 0);
+    tribeLabel.position.set(cx, 170);
     this.viewContent.addChild(tribeLabel);
-    y += 46;
     const tribeOpts: Container[] = [];
-    TRIBES.forEach((t) => {
-      const opt = makeTribeOption(t.name, `${t.code}-icon.png`, () => { this.tribe = t.id; this.render(); }, t.id === this.tribe);
+    TRIBES.forEach((tr) => {
+      const opt = makeTribeOption(tr.name, `${tr.code}-icon.png`, () => { this.tribe = tr.id; this.render(); }, tr.id === this.tribe, tr.color);
       tribeOpts.push(opt.el);
       this.viewContent.addChild(opt.el);
     });
-    const tribeRows = positionTribes(cx, y, tribeOpts, Math.max(0, this.host!.app.screen.width - 48));
-    const rowDelta = (tribeRows - 1) * TRIBE_ROW_STEP;
+    const tribeRows = positionTribes(cx, 170 + TITLE_TO_CONTENT + RADIUS, tribeOpts, Math.max(0, this.host!.app.screen.width - 48), TRIBE_GAP * 2);
+    // Block bottom = last tribe row's bottom (circle + label column).
+    const tribeOptionLabelH = (tribeOpts[0]?.children.find((c) => c instanceof BitmapText)?.height ?? 14);
+    const tribeBottom = 170 + TITLE_TO_CONTENT + RADIUS + (tribeRows - 1) * TRIBE_ROW_STEP + RADIUS + 34 + tribeOptionLabelH;
+    const titleHalf = tribeLabel.height / 2;
 
+    // Human players block.
+    const humansHeading = tribeBottom + BLOCK_GAP + titleHalf;
     const humansLabel = this.groupLabel(t('lobby.humans'), 1);
-    humansLabel.position.set(cx, y + 76 + rowDelta);
+    humansLabel.position.set(cx, humansHeading);
     this.viewContent.addChild(humansLabel);
     const humanOpts = [2, 3, 4, 5, 6];
-    const humanStart = cx - (humanOpts.length * 56 + (humanOpts.length - 1) * 4) / 2;
-    humanOpts.forEach((n, i) => {
-      const b = new Button({ label: String(n), width: 56, selected: n === this.humans, onClick: () => { this.humans = n; this.aiCount = Math.min(this.aiCount, 7 - n); this.render(); } });
-      b.position.set(humanStart + i * 60, y + 126 + rowDelta);
-      this.viewContent.addChild(b);
+    const humansGroup = new ButtonGroup({
+      items: humanOpts.map((n) => ({
+        label: String(n),
+        onClick: () => { this.humans = n; this.aiCount = Math.min(this.aiCount, 7 - n); this.render(); },
+      })),
     });
+    const humansTop = humansHeading + TITLE_TO_CONTENT;
+    humansGroup.position.set(cx - humansGroup.groupWidth / 2, humansTop);
+    humansGroup.buttons.forEach((b, i) => { b.selected = humanOpts[i] === this.humans; });
+    this.viewContent.addChild(humansGroup);
+    const humansBottom = humansTop + humansGroup.buttonHeight;
 
+    // AI opponents block.
+    const aiHeading = humansBottom + BLOCK_GAP + titleHalf;
     const aiLabel = this.groupLabel(t('lobby.ai'), 2);
-    aiLabel.position.set(cx, y + 176 + rowDelta);
+    aiLabel.position.set(cx, aiHeading);
     this.viewContent.addChild(aiLabel);
     const maxAi = 7 - this.humans;
-    const aiStart = cx - (maxAi * 56 + (maxAi - 1) * 4) / 2;
-    Array.from({ length: maxAi }, (_, i) => i).forEach((n, i) => {
-      const b = new Button({ label: String(n), width: 56, selected: n === this.aiCount, onClick: () => { this.aiCount = n; this.render(); } });
-      b.position.set(aiStart + i * 60, y + 226 + rowDelta);
-      this.viewContent.addChild(b);
+    const aiOpts = Array.from({ length: maxAi }, (_, i) => i);
+    const aiGroup = new ButtonGroup({
+      items: Array.from({ length: maxAi }, (_, i) => i).map((n) => ({
+        label: String(n),
+        onClick: () => { this.aiCount = n; this.render(); },
+      })),
     });
+    const aiTop = aiHeading + TITLE_TO_CONTENT;
+    aiGroup.position.set(cx - aiGroup.groupWidth / 2, aiTop);
+    aiGroup.buttons.forEach((b, i) => { b.selected = aiOpts[i] === this.aiCount; });
+    this.viewContent.addChild(aiGroup);
+    const aiBottom = aiTop + aiGroup.buttonHeight;
 
     const total = makeLabel(
       t('lobby.total', { total: this.humans + this.aiCount, humans: this.humans, ai: this.aiCount }),
       { fontSize: 14, fill: 0xeeeeee },
     );
     total.anchor.set(0.5, 0.5);
-    total.position.set(cx, y + 276 + rowDelta);
+    const totalTop = aiBottom + BLOCK_GAP;
+    total.position.set(cx, totalTop);
     this.viewContent.addChild(total);
 
+    // Mode block.
+    const modeHeading = totalTop + total.height + BLOCK_GAP + titleHalf;
     const modeLabel = this.groupLabel(t('common.mode'), 3);
-    modeLabel.position.set(cx, y + 326 + rowDelta);
+    modeLabel.position.set(cx, modeHeading);
     this.viewContent.addChild(modeLabel);
-    (['capture', 'turns30'] as GameMode[]).forEach((m, i) => {
-      const b = new Button({ label: t(m === 'capture' ? 'mode.capture' : 'mode.turns30'), width: 200, selected: m === this.mode, onClick: () => { this.mode = m; this.render(); } });
-      b.position.set(cx - 220 + i * 240, y + 376 + rowDelta);
-      this.viewContent.addChild(b);
+    const modeOpts: GameMode[] = ['capture', 'turns30'];
+    const modeGroup = new ButtonGroup({
+      items: (['capture', 'turns30'] as GameMode[]).map((m) => ({
+        label: t(m === 'capture' ? 'mode.capture' : 'mode.turns30'),
+        onClick: () => { this.mode = m; this.render(); },
+      })),
     });
+    const modeTop = modeHeading + TITLE_TO_CONTENT;
+    modeGroup.position.set(cx - modeGroup.groupWidth / 2, modeTop);
+    modeGroup.buttons.forEach((b, i) => { b.selected = modeOpts[i] === this.mode; });
+    this.viewContent.addChild(modeGroup);
+    const modeBottom = modeTop + modeGroup.buttonHeight;
 
+    // Map size block.
+    const mapHeading = modeBottom + BLOCK_GAP + titleHalf;
     const mapLabel = this.groupLabel(t('common.mapSize'), 4);
-    mapLabel.position.set(cx, y + 436 + rowDelta);
+    mapLabel.position.set(cx, mapHeading);
     this.viewContent.addChild(mapLabel);
-    MAP_SIZE_OPTIONS.forEach((s, i) => {
-      const b = new Button({ label: t(`mapSize.${s}`), width: 140, selected: s === this.mapSize, onClick: () => { this.mapSize = s; this.render(); } });
-      b.position.set(cx - 226 + i * 156, y + 486 + rowDelta);
-      this.viewContent.addChild(b);
+    const mapGroup = new ButtonGroup({
+      items: MAP_SIZE_OPTIONS.map((s) => ({
+        label: t(`mapSize.${s}`),
+        onClick: () => { this.mapSize = s; this.render(); },
+      })),
     });
+    const mapTop = mapHeading + TITLE_TO_CONTENT;
+    mapGroup.position.set(cx - mapGroup.groupWidth / 2, mapTop);
+    mapGroup.buttons.forEach((b, i) => { b.selected = MAP_SIZE_OPTIONS[i] === this.mapSize; });
+    this.viewContent.addChild(mapGroup);
+    const mapBottom = mapTop + mapGroup.buttonHeight;
 
     this.createBtn = new Button({ label: t('lobby.createRoom'), width: 240, selected: this.focus === CREATE_ROOM_FOCUS, onClick: () => this.createRoom() });
     const back = new Button({ label: t('common.back'), width: 96, fontSize: 14, selected: this.focus === HOST_NAV_ITEMS - 1, onClick: () => { this.view = 'menu'; this.render(); } });
-    this.createBtn.position.set(cx - 120, y + 556 + rowDelta);
-    back.position.set(cx - 48, y + 616 + rowDelta);
+    const startTop = mapBottom + 30;
+    this.createBtn.position.set(cx - 120, startTop);
+    back.position.set(cx - 48, startTop + this.createBtn.height + 16);
     this.viewContent.addChild(this.createBtn, back);
     this.updateCreate();
 
     const hint = makeLabel(t('lobby.hostHint'), { fontSize: 12, fill: 0x888888 });
     hint.visible = !isTouchDevice();
     hint.anchor.set(0.5, 0.5);
-    hint.position.set(cx, y + 676 + rowDelta);
+    hint.position.set(cx, startTop + this.createBtn.height + 16 + back.height + 16);
     this.viewContent.addChild(hint);
   }
 
@@ -336,7 +377,7 @@ export class LobbyScreen implements ScreenController {
 
     const nameInput = new TextInputOverlay({
       x: cx - 100, y, width: 200, height: 34, value: this.name,
-      onChange: (v) => { this.name = v; this.updateJoin(); },
+      onChange: (v) => { this.name = v; setPlayerName(v); this.updateJoin(); },
     });
     this.inputs.push(nameInput);
     this.viewContent.addChild(nameInput.container);
@@ -448,7 +489,7 @@ export class LobbyScreen implements ScreenController {
         if (!pickable) return;
         if (isHost) gameController.pickHostTribe(t.id);
         else gameController.pickClientTribe(t.id);
-      }, t.id === ownTribeId);
+      }, t.id === ownTribeId, t.color);
       if (!pickable) {
         opt.el.eventMode = 'none';
         opt.el.alpha = 0.45;
@@ -456,7 +497,7 @@ export class LobbyScreen implements ScreenController {
       tribeOpts.push(opt.el);
       this.viewContent.addChild(opt.el);
     });
-    const tribeRows = positionTribes(cx, y, tribeOpts, Math.max(0, this.host!.app.screen.width - 48));
+    const tribeRows = positionTribes(cx, y, tribeOpts, Math.max(0, this.host!.app.screen.width - 48), TRIBE_GAP * 2);
     y += 70 + (tribeRows - 1) * TRIBE_ROW_STEP;
 
     if (isHost) {

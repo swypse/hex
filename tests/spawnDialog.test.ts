@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { Container, Text } from 'pixi.js';
+import { Container, Sprite, Text } from 'pixi.js';
 import { SpawnDialog } from '../src/ui/overlays/SpawnDialog';
 import { gameController } from '../src/controller/gameController';
 import { useGameStore } from '../src/store/gameStore';
@@ -102,6 +102,48 @@ describe('SpawnDialog', () => {
       expect(urls.some((u) => u.endsWith(old))).toBe(false);
     }
     expect(urls.some((u) => u.endsWith('action-buttons-atlas.png'))).toBe(true);
+    dialog.destroy();
+  });
+
+  it('lays out spawn icons at 3 per row and gives the popup exactly 3 columns', () => {
+    const dialog = new SpawnDialog();
+    dialog.mount(host, root);
+    const popup = (dialog as unknown as { popup: { content: Container; contentWidth: number } }).popup;
+    const items = popup.content.children.filter((c) => c instanceof Container && c.cursor === 'pointer');
+    // 7 unit types, 3 per row -> 3 rows (3+3+1).
+    expect(items.length).toBe(7);
+    const ys = items.map((c) => c.position.y);
+    const xs = items.map((c) => c.position.x);
+    const rowY = [...new Set(ys)].sort();
+    expect(rowY.length).toBe(3);
+    // First row exactly 3 icons with 4px gaps.
+    const firstRow = items.filter((c) => c.position.y === rowY[0]!);
+    expect(firstRow).toHaveLength(3);
+    const rowXs = firstRow.map((c) => c.position.x).sort((a, b) => a - b);
+    expect(rowXs[1]! - rowXs[0]!).toBeCloseTo(92 + 4, 5);
+    expect(rowXs[2]! - rowXs[1]!).toBeCloseTo(92 + 4, 5);
+    // Popup width fits exactly 3 cells: 3 * CELL_W + 2 * 4px gaps.
+    expect(popup.contentWidth).toBeCloseTo(3 * 92 + 2 * 4, 5);
+    dialog.destroy();
+  });
+
+  it('renders the price row with 16px gold, wood and ore icons', () => {
+    const dialog = new SpawnDialog();
+    dialog.mount(host, root);
+    const popup = (dialog as unknown as { popup: { content: Container } }).popup;
+    const spriteSizes = new Set<number>();
+    const walk = (c: Container): void => {
+      for (const ch of c.children) {
+        if (ch instanceof Sprite) spriteSizes.add(ch.width);
+        if (ch instanceof Container) walk(ch as Container);
+      }
+    };
+    walk(popup.content);
+    // Action icons are 56px; resource icons must be 16px.
+    expect(spriteSizes).toContain(16);
+    for (const size of spriteSizes) {
+      expect(size).toBeGreaterThanOrEqual(16);
+    }
     dialog.destroy();
   });
 });

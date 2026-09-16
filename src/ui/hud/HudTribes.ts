@@ -1,5 +1,4 @@
 import { Container, Graphics } from 'pixi.js';
-import { UNKNOWN_TRIBE_COLOR } from '../../game/discovery';
 import { TRIBES, tribeById } from '../../game/tribes';
 import { useGameStore } from '../../store/gameStore';
 import { type UIHost, type Widget } from '../host';
@@ -67,7 +66,7 @@ export class HudTribes implements Widget {
     }
     const chip = new Container();
     const bg = new Graphics();
-    bg.circle(0, 0, RADIUS).fill(UNKNOWN_TRIBE_COLOR);
+    bg.circle(0, 0, RADIUS).fill({ color: 0x000000, alpha: 0.3 });
     const question = makeLabel('?', { fontSize: 22, fill: 0xffffff, fontWeight: '800' });
     question.anchor.set(0.5, 0.5);
     chip.addChild(bg, question);

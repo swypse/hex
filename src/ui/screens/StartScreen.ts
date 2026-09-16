@@ -59,7 +59,6 @@ class SettingsPanel {
       hard: 'difficulty.hard',
     };
     const difficultyGroup = new ButtonGroup({
-      fontSize: 14,
       items: difficultyOptions.map((d) => ({
         label: t(difficultyKeys[d]),
         onClick: () => {
@@ -84,7 +83,6 @@ class SettingsPanel {
     y += soundLabel.height + 8;
 
     const soundGroup = new ButtonGroup({
-      fontSize: 14,
       items: [
         {
           label: t('common.on'),
@@ -125,7 +123,6 @@ class SettingsPanel {
     ];
     const currentLang = loadSettings().lang;
     const langGroup = new ButtonGroup({
-      fontSize: 14,
       items: langOptions.map((l) => ({
         label: t(l.key),
         onClick: () => {
@@ -182,10 +179,15 @@ export class StartScreen implements ScreenController {
 
     this.title = new Sprite();
     this.title.anchor.set(0.5, 0.5);
+    // The 194x170 hex-terra.png is baked at 2x; display it at 97px wide and
+    // scale the height to keep the aspect ratio.
+    const TITLE_WIDTH = 97;
     const img = new Image();
     img.onload = () => {
       if (!this.title || this.title.destroyed) return;
       this.title.texture = Texture.from(img);
+      this.title.width = TITLE_WIDTH;
+      this.title.height = Math.round(TITLE_WIDTH * img.naturalHeight / img.naturalWidth);
       this.layout();
     };
     img.src = `${import.meta.env.BASE_URL}textures/hex-terra.png`;

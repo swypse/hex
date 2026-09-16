@@ -1,9 +1,9 @@
 export const THEME = {
   bg: 0x1a1a2e,
   button: 0x4b516f,
-  buttonHover: 0xF15EDF,
-  buttonPressed: 0xE045CD,
-  buttonSelected: 0xF15EDF,
+  buttonHover: 0x5297FF,
+  buttonPressed: 0x3977D8,
+  buttonSelected: 0x5297FF,
   panelBg: 0x000000,
   panelAlpha: 0.6,
   dialogBg: 0x222222,

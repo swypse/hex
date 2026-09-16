@@ -75,7 +75,9 @@ export class HudSelected implements Widget {
     const s = useGameStore.getState();
     const selection = s.selection;
     const map = gameController.getMap();
-    if (!selection || !map) {
+    // Hide the selected-cell info while another player is acting: it would
+    // show stale local actions (attacks/builds are not available out of turn).
+    if (!selection || !map || s.currentPlayerIndex !== s.localPlayerIndex) {
       this.el.visible = false;
       return;
     }

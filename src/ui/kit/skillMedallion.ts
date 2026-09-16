@@ -7,7 +7,9 @@ import { THEME } from './theme';
 interface SkillMedallionOpts {
   skill: SkillId;
   opened: boolean;
-  /** Text in the top-right badge: the money price, or a checkmark when opened. */
+  /** Text in the top-right badge: the money price, or a checkmark when opened.
+   *  Opened medallions omit the badge circle entirely (the orange stroke
+   *  already marks them as researched). */
   priceText: string;
   /** Full circle diameter in px (default 40). */
   size?: number;
@@ -42,18 +44,20 @@ export function makeSkillMedallion(opts: SkillMedallionOpts): Container {
   const badgeX = Math.round(R * 0.78);
   const badgeY = -Math.round(R * 0.78);
   const badgeR = Math.max(6, Math.round(size * 0.21));
-  const badge = new Graphics();
-  badge.circle(badgeX, badgeY, badgeR).fill(opts.opened ? THEME.skillTree.openedSkillStroke : THEME.skillTree.closedSkillStroke);
-  el.addChild(badge);
+  if (!opts.opened) {
+    const badge = new Graphics();
+    badge.circle(badgeX, badgeY, badgeR).fill(THEME.skillTree.closedSkillStroke);
+    el.addChild(badge);
 
-  const label = makeLabel(opts.priceText, {
-    fontSize: Math.max(8, Math.round(size * 0.26)),
-    fill: THEME.white,
-    fontWeight: '800',
-  });
-  label.anchor.set(0.5, 0.5);
-  label.position.set(badgeX, badgeY);
-  el.addChild(label);
+    const label = makeLabel(opts.priceText, {
+      fontSize: Math.max(8, Math.round(size * 0.26)),
+      fill: THEME.white,
+      fontWeight: '800',
+    });
+    label.anchor.set(0.5, 0.5);
+    label.position.set(badgeX, badgeY);
+    el.addChild(label);
+  }
 
   return el;
 }

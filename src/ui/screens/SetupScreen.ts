@@ -1,4 +1,4 @@
-import { Container, Graphics, BitmapText } from 'pixi.js';
+import { Container, BitmapText } from 'pixi.js';
 import { gameController } from '../../controller/gameController';
 import { useGameStore } from '../../store/gameStore';
 import { TRIBES, type Tribe, tribeById } from '../../game/tribes';
@@ -12,19 +12,16 @@ import { type ScreenController, type UIHost } from '../host';
 import { ScreenScroll } from '../verticalScroll';
 import { Button } from '../kit/button';
 import { ButtonGroup } from '../kit/buttonGroup';
-import { makeIcon } from '../kit/icon';
 import { makeLabel } from '../kit/label';
+import { makeTribeOption, type TribeOption } from '../kit/tribeOption';
 import { TRIBE_GAP, TRIBE_ROW_STEP, tribeSlots } from '../kit/tribeLayout';
+import { TITLE_TO_CONTENT, BLOCK_GAP } from '../kit/screenLayout';
 
 const ENEMY_OPTIONS = [1, 2, 3, 4, 5];
 const MODE_OPTIONS: GameMode[] = ['capture', 'turns30'];
 const DIFFICULTY_OPTIONS: AiDifficulty[] = ['easy', 'normal', 'hard'];
 const MAP_SIZE_OPTIONS: MapSize[] = ['normal', 'big', 'huge'];
 const SELECTOR_COUNT = 6;
-// Title centre to the block content below it (circle tops and button tops).
-const TITLE_TO_CONTENT = 22;
-// Vertical gap between the bottom of one block and the title above the next.
-const BLOCK_GAP = 20;
 // Horizontal margin kept clear on each side when laying out the tribe grid.
 const SIDE_MARGIN = 24;
 const RADIUS = 28;
@@ -45,9 +42,7 @@ export class SetupScreen implements ScreenController {
   private modeTitle: BitmapText | null = null;
   private difficultyTitle: BitmapText | null = null;
   private mapSizeTitle: BitmapText | null = null;
-  private tribeItems: Container[] = [];
-  private tribeCircles: Graphics[] = [];
-  private tribeItemLabels: BitmapText[] = [];
+  private tribeItems: TribeOption[] = [];
   private tribeDesc: BitmapText | null = null;
   private tribeDescH = 0;
   private enemyGroup: ButtonGroup | null = null;
@@ -75,33 +70,22 @@ export class SetupScreen implements ScreenController {
     this.mapSizeTitle = makeLabel(t('common.mapSize'), { fontSize: 16, fill: 0xffffff });
     this.mapSizeTitle.anchor.set(0.5, 0.5);
 
-    for (const t of TRIBES) {
-      const circle = new Graphics();
-      circle.circle(0, 0, 28).fill(0xffffff);
-      const clip = new Graphics();
-      clip.circle(0, 0, 28).fill(0xffffff);
-      const icon = makeIcon(`${t.code}-icon.png`, 60);
-      icon.position.set(0, 0);
-      icon.mask = clip;
-      const label = makeLabel(t.name, { fontSize: 14, fill: 0xeeeeee });
-      label.anchor.set(0.5, 0);
-      label.position.set(0, 34);
-      const item = new Container();
-      item.addChild(circle, clip, icon, label);
-      item.eventMode = 'static';
-      item.cursor = 'pointer';
-      item.on('pointertap', () => {
-        this.tribe = t.id;
-        this.refresh();
-      });
-      this.tribeItems.push(item);
-      this.tribeCircles.push(circle);
-      this.tribeItemLabels.push(label);
-      this.scroll!.content.addChild(item);
+    for (const tr of TRIBES) {
+      const opt = makeTribeOption(
+        tr.name,
+        `${tr.code}-icon.png`,
+        () => {
+          this.tribe = tr.id;
+          this.refresh();
+        },
+        tr.id === this.tribe,
+        tr.color,
+      );
+      this.tribeItems.push(opt);
+      this.scroll!.content.addChild(opt.el);
     }
 
     this.enemyGroup = new ButtonGroup({
-      fontSize: 14,
       items: ENEMY_OPTIONS.map((n) => ({
         label: String(n),
         onClick: () => {
@@ -113,7 +97,6 @@ export class SetupScreen implements ScreenController {
     this.scroll!.content.addChild(this.enemyGroup);
 
     this.modeGroup = new ButtonGroup({
-      fontSize: 14,
       items: MODE_OPTIONS.map((m) => ({
         label: m === 'capture' ? t('mode.capture') : t('mode.turns30'),
         onClick: () => {
@@ -125,7 +108,6 @@ export class SetupScreen implements ScreenController {
     this.scroll!.content.addChild(this.modeGroup);
 
     this.difficultyGroup = new ButtonGroup({
-      fontSize: 14,
       items: DIFFICULTY_OPTIONS.map((d) => ({
         label: t(d === 'easy' ? 'difficulty.easy' : d === 'normal' ? 'difficulty.normal' : 'difficulty.hard'),
         onClick: () => {
@@ -137,7 +119,6 @@ export class SetupScreen implements ScreenController {
     this.scroll!.content.addChild(this.difficultyGroup);
 
     this.mapSizeGroup = new ButtonGroup({
-      fontSize: 14,
       items: MAP_SIZE_OPTIONS.map((s) => ({
         label: t(`mapSize.${s}`),
         onClick: () => {
@@ -274,9 +255,8 @@ export class SetupScreen implements ScreenController {
     const modeIndex = MODE_OPTIONS.indexOf(useGameStore.getState().mode);
     const difficultyIndex = DIFFICULTY_OPTIONS.indexOf(this.difficulty);
     const mapSizeIndex = MAP_SIZE_OPTIONS.indexOf(this.mapSize);
-    this.tribeCircles.forEach((c, i) => {
-      c.clear().circle(0, 0, 28).fill(0xffffff);
-      if (i === tribeIndex) c.stroke({ width: 4, color: 0x5099ff });
+    this.tribeItems.forEach((opt, i) => {
+      opt.setSelected(i === tribeIndex);
     });
     this.enemyGroup?.buttons.forEach((b, i) => {
       b.selected = i === enemiesIndex;
@@ -305,7 +285,7 @@ export class SetupScreen implements ScreenController {
     const h = this.host.app.screen.height;
     const cx = w / 2;
     const titleHalf = this.tribeTitle?.height ? this.tribeTitle.height / 2 : 15;
-    const labelH = this.tribeItemLabels[0]?.height ?? 16;
+    const labelH = this.tribeItems[0]?.label.height ?? 16;
     const buttonH = this.enemyGroup?.buttonHeight ?? 36;
     const startH = this.startBtn?.height ?? 0;
     const backH = this.backBtn?.height ?? 0;
@@ -347,7 +327,7 @@ export class SetupScreen implements ScreenController {
     const tribeRow1Centre = TITLE_TO_CONTENT + RADIUS;
     this.tribeItems.forEach((item, i) => {
       const s = grid.slots[i]!;
-      item.position.set(cx + s.x, y(tribeRow1Centre) + s.y);
+      item.el.position.set(cx + s.x, y(tribeRow1Centre) + s.y);
     });
     if (this.tribeDesc) this.tribeDesc.position.set(cx, y(descTop));
 
@@ -383,8 +363,6 @@ export class SetupScreen implements ScreenController {
     this.root = null;
     this.host = null;
     this.tribeItems = [];
-    this.tribeCircles = [];
-    this.tribeItemLabels = [];
     this.tribeDesc?.destroy();
     this.tribeDesc = null;
     this.enemyGroup = null;

@@ -15,11 +15,11 @@ describe('theme helpers', () => {
     expect(isLightColor(0x2f6fb3)).toBe(false);
   });
   it('buttonPressed is darker than buttonHover', () => {
-    expect(THEME.buttonPressed).toBe(0xe045cd);
+    expect(THEME.buttonPressed).toBe(0x3977d8);
     expect(THEME.buttonPressed).toBeLessThan(THEME.buttonHover);
   });
   it('buttonSelected is the active style color', () => {
-    expect(THEME.buttonSelected).toBe(0xf15edf);
+    expect(THEME.buttonSelected).toBe(0x5297ff);
   });
   it('idle and selected button colors differ', () => {
     expect(THEME.button).not.toBe(THEME.buttonSelected);

@@ -75,9 +75,13 @@ describe('HudTribes', () => {
   const textOf = (chip: Container): string[] =>
     chip.children.filter((c): c is BitmapText => c instanceof BitmapText).map((c) => String(c.text));
 
-  const hasFill = (chip: Container, color: number): boolean =>
+  const hasFill = (chip: Container, color: number, alpha?: number): boolean =>
     (chip.children.filter((c) => c instanceof Graphics) as Graphics[]).some((g) =>
-      (g as unknown as { context?: { instructions?: { action: string; data?: { style?: { color?: number } } }[] } }).context?.instructions?.some((i) => i.action === 'fill' && i.data?.style?.color === color) ?? false,
+      (g as unknown as { context?: { instructions?: { action: string; data?: { style?: { color?: number; alpha?: number } } }[] } }).context?.instructions?.some((i) =>
+        i.action === 'fill' &&
+        i.data?.style?.color === color &&
+        (alpha === undefined || (i.data?.style?.alpha ?? 1) === alpha),
+      ) ?? false,
     );
 
   it('is hidden outside the game screen', () => {
@@ -114,7 +118,7 @@ describe('HudTribes', () => {
     expect(chip.alpha).toBe(1);
   });
 
-  it('shows a grey circle with a white question mark for an unexplored tribe', () => {
+  it('shows a black circle with a white question mark for an unexplored tribe', () => {
     setGame(
       player(0, Tribe.Cats, 'Cats', true, [Tribe.Cats]),
       [player(1, Tribe.Forest, 'Forest')],
@@ -124,7 +128,7 @@ describe('HudTribes', () => {
     const chip = chips()[0]!;
     expect(spritesIn(chip)).toBe(0);
     expect(textOf(chip)).toEqual(['?']);
-    expect(hasFill(chip, UNKNOWN_TRIBE_COLOR)).toBe(true);
+    expect(hasFill(chip, 0x000000, 0.3)).toBe(true);
     const q = chip.children.find((c): c is BitmapText => c instanceof BitmapText)!;
     expect((q.style as { fill?: string | number }).fill).toBe(0xffffff);
   });

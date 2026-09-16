@@ -6,6 +6,7 @@ import { TRIBES, Tribe } from '../src/game/tribes';
 import { useGameStore } from '../src/store/gameStore';
 import { type UIHost } from '../src/ui/host';
 import { Button } from '../src/ui/kit/button';
+import { ButtonGroup } from '../src/ui/kit/buttonGroup';
 
 function makeHost(): UIHost {
   return {
@@ -143,8 +144,20 @@ describe('LobbyScreen host keyboard navigation', () => {
     (screen as unknown as { humans: number }).humans = 2;
     key('ArrowLeft');
     expect(state().humans).toBeGreaterThanOrEqual(2);
-    const humanButtons = uiNodes(screen).filter((c) => c instanceof Button && (c as Container).position.y === 342);
-    expect(humanButtons.map((b) => textsOf(b as Container).find((t) => /^\d$/.test(t))).sort()).toEqual(['2', '3', '4', '5', '6']);
+    // Human players is the ButtonGroup whose buttons are the digits 2..6.
+    const humanGroup = uiNodes(screen).find((c) => {
+      if (!(c instanceof ButtonGroup)) return false;
+      const digits = c.children
+        .map((b) => textsOf(b as Container).find((t) => /^\d$/.test(t)))
+        .filter((t): t is string => t !== undefined);
+      return digits.length === 5 && digits.includes('2') && digits.includes('6');
+    });
+    expect(humanGroup).toBeDefined();
+    const digits = humanGroup!.children
+      .map((b) => textsOf(b as Container).find((t) => /^\d$/.test(t)))
+      .filter((t): t is string => t !== undefined)
+      .sort();
+    expect(digits).toEqual(['2', '3', '4', '5', '6']);
   });
 
   it('creates a room on Enter', () => {
@@ -158,6 +171,11 @@ describe('LobbyScreen host keyboard navigation', () => {
   it('goes back to the menu on Backspace', () => {
     key('Backspace');
     expect(state().view).toBe('menu');
+  });
+
+  it('prefills the name input from the saved player name', () => {
+    // Defaults to "Player" when nothing is saved.
+    expect((screen as unknown as { name: string }).name).toBe('Player');
   });
 
   it('places the back button as the last navigable button below create room', () => {
@@ -188,24 +206,29 @@ describe('LobbyScreen host keyboard navigation', () => {
       (c as Container).children.some((ch) => ch instanceof Sprite && (ch as { mask: unknown }).mask !== null),
     );
     const xs = options.map((o) => (o as Container).position.x).sort((a, b) => a - b);
-    expect(xs[1]! - xs[0]!).toBeCloseTo(72, 5);
+    // SetupScreen uses TRIBE_GAP * 2 (88px step); the lobby must match.
+    expect(xs[1]! - xs[0]!).toBeCloseTo(88, 5);
     expect(xs[0]! + xs[xs.length - 1]!).toBeCloseTo(1280, 5);
   });
 
   it('centers the human player and AI opponent buttons', () => {
-    const buttons = uiNodes(screen).filter((c) => c instanceof Button) as Container[];
-    const humanButtons = buttons.filter((b) => b.position.y === 342);
-    const aiButtons = buttons.filter((b) => b.position.y === 442);
-    expect(humanButtons.length).toBe(5);
-    expect(aiButtons.length).toBe(5);
-    const centered = (btns: Container[]): boolean => {
-      const xs = btns.map((b) => b.position.x);
-      const minX = Math.min(...xs);
-      const maxX = Math.max(...xs);
-      return Math.abs(maxX + 56 - 2 * 640 + minX) < 0.5;
+    const groups = uiNodes(screen).filter((c) => c instanceof ButtonGroup) as Container[];
+    const firstDigit = (g: Container): string =>
+      textsOf(g.children[0] as Container).find((t) => /^\d$/.test(t)) ?? '';
+    const humanGroup = groups.find((g) => firstDigit(g) === '2')!;
+    const aiGroup = groups.find((g) => firstDigit(g) === '0')!;
+    expect(humanGroup).toBeDefined();
+    expect(aiGroup).toBeDefined();
+    expect(humanGroup.children.length).toBe(5);
+    expect(aiGroup.children.length).toBe(5);
+    const centered = (g: Container): boolean => {
+      const groupW = g.children.reduce((acc, b) => acc + (b as Container).width, 0);
+      return Math.abs(g.position.x + groupW / 2 - 640) < 0.5;
     };
-    expect(centered(humanButtons)).toBe(true);
-    expect(centered(aiButtons)).toBe(true);
+    expect(centered(humanGroup)).toBe(true);
+    expect(centered(aiGroup)).toBe(true);
+    // The AI block sits below the human block (block gap rhythm).
+    expect(aiGroup.position.y).toBeGreaterThan(humanGroup.position.y);
   });
 
   it('selects the create room button via arrow keys and creates the room with Enter', () => {
@@ -437,7 +460,8 @@ describe('LobbyScreen client room tribe selection', () => {
     );
     expect(options.length).toBe(TRIBES.length);
     const xs = options.map((o) => (o as Container).position.x).sort((a, b) => a - b);
-    expect(xs[1]! - xs[0]!).toBeCloseTo(72, 5);
+    // Same 88px grid step as the single-player picker (TRIBE_GAP * 2).
+    expect(xs[1]! - xs[0]!).toBeCloseTo(88, 5);
     expect(xs[0]! + xs[xs.length - 1]!).toBeCloseTo(1280, 5);
   });
 

@@ -197,7 +197,8 @@ describe('LobbyScreen host copy join link button', () => {
     );
     expect(options.length).toBe(TRIBES.length);
     const xs = options.map((o) => (o as Container).position.x).sort((a, b) => a - b);
-    expect(xs[1]! - xs[0]!).toBeCloseTo(72, 5);
+    // Same 88px grid step as the single-player picker (TRIBE_GAP * 2).
+    expect(xs[1]! - xs[0]!).toBeCloseTo(88, 5);
     expect(xs[0]! + xs[xs.length - 1]!).toBeCloseTo(1280, 5);
     expect(allTexts(root)).toContain('Choose your tribe');
   });

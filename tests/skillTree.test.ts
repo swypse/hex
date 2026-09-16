@@ -61,6 +61,18 @@ describe('SkillTree zoom and pan', () => {
     tree.destroy();
   });
 
+  it('opens at 2x zoom, centered on the tree', () => {
+    const ring = (tree as unknown as { ring: Container }).ring!;
+    // 1280x800 screen: fitScale = min(1280/900, 800/760, 1) = 1, so 2x zoom
+    // doubles the ring scale.
+    expect(ring.scale.x).toBeCloseTo(2, 5);
+    expect(ring.scale.y).toBeCloseTo(2, 5);
+    // CX = 400, CY = 340, scale = fitScale * zoom = 2: the tree centre must
+    // land in the middle of the screen.
+    expect(ring.position.x + 400 * ring.scale.x).toBeCloseTo(640, 5);
+    expect(ring.position.y + 340 * ring.scale.y).toBeCloseTo(400, 5);
+  });
+
   it('zooms in around the cursor on wheel up', () => {
     const ring = (tree as unknown as { ring: Container }).ring!;
     const before = ring.scale.x;

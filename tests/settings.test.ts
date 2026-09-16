@@ -7,6 +7,8 @@ import {
   soundEnabled,
   selectedInfoClosed,
   setSelectedInfoClosed,
+  playerName,
+  setPlayerName,
 } from '../src/storage/settings';
 
 function fakeStorage(): Map<string, string> {
@@ -76,5 +78,26 @@ describe('Selected info panel state', () => {
     setSelectedInfoClosed(false);
     expect(selectedInfoClosed()).toBe(false);
     expect(loadSettings().selectedInfoClosed).toBe(false);
+  });
+});
+
+describe('Player name setting', () => {
+  it('defaults to Player', () => {
+    fakeStorage();
+    expect(loadSettings().playerName).toBe('Player');
+    expect(playerName()).toBe('Player');
+  });
+
+  it('round-trips a saved name', () => {
+    fakeStorage();
+    setPlayerName('Alex');
+    expect(playerName()).toBe('Alex');
+    expect(loadSettings().playerName).toBe('Alex');
+  });
+
+  it('falls back to Player for a blank saved name', () => {
+    fakeStorage();
+    setPlayerName('   ');
+    expect(playerName()).toBe('Player');
   });
 });

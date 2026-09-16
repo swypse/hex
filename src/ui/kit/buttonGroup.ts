@@ -7,9 +7,11 @@ interface ButtonGroupItem {
   onClick: () => void;
 }
 
+/** Uniform font size for every button in the group. */
+const GROUP_FONT_SIZE = 14;
+
 interface ButtonGroupOpts {
   items: ButtonGroupItem[];
-  fontSize?: number;
   /** Fixed widths per item; when omitted each button sizes to its label. */
   widths?: number[];
 }
@@ -44,7 +46,7 @@ export class ButtonGroup extends Container {
               : [0, 0, 0, 0];
       const b = new Button({
         label: item.label,
-        fontSize: opts.fontSize,
+        fontSize: GROUP_FONT_SIZE,
         width: opts.widths?.[i],
         shadow: false,
         corners,

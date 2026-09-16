@@ -5,12 +5,16 @@ const SETTINGS_KEY = 'hex-settings-v1';
 
 export type Language = 'en' | 'ru';
 
+export const DEFAULT_PLAYER_NAME = 'Player';
+
 interface GameSettings {
   aiDifficulty: AiDifficulty;
   lang: Language;
   soundOn: boolean;
   /** The selected-cell info panel collapsed to just the info icon. */
   selectedInfoClosed: boolean;
+  /** The player name used as the multiplayer lobby default. */
+  playerName: string;
 }
 
 const DEFAULTS: GameSettings = {
@@ -18,6 +22,7 @@ const DEFAULTS: GameSettings = {
   lang: 'en',
   soundOn: true,
   selectedInfoClosed: false,
+  playerName: DEFAULT_PLAYER_NAME,
 };
 
 export function loadSettings(): GameSettings {
@@ -67,4 +72,13 @@ export function selectedInfoClosed(): boolean {
 
 export function setSelectedInfoClosed(closed: boolean): void {
   saveSettings({ ...loadSettings(), selectedInfoClosed: closed });
+}
+
+export function playerName(): string {
+  const name = loadSettings().playerName.trim();
+  return name.length > 0 ? name : DEFAULT_PLAYER_NAME;
+}
+
+export function setPlayerName(name: string): void {
+  saveSettings({ ...loadSettings(), playerName: name.trim() || DEFAULT_PLAYER_NAME });
 }

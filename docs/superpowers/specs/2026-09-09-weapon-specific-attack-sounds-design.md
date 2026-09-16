@@ -105,13 +105,13 @@ event, driven by the attacker).
 - Catapult, pirate, ship, warrior, rider, shield impacts keep `hit.wav`.
 - No audio for archer *counter*-attacks (a surviving archer answering damage in
   the same event is not its own event).
-- `hit.wav`, `arc-shot.wav`, `sword-hit.wav` files are already present; no asset
+- `hit.wav`, `bow-shot.wav`, `sword-hit.wav` files are already present; no asset
   work.
 
 ## Testing
 
 - `tests/sfx.test.ts`: `soundUrl('arcShot')` and `soundUrl('swordHit')` match
-  `sounds/arc-shot.wav` / `sounds/sword-hit.wav`.
+  `sounds/bow-shot.wav` / `sounds/sword-hit.wav`.
 - New `tests/attackSounds.test.ts` covering the mapping table: archer
   hit → `{ launch, impact: hit }`; archer miss → `{ launch }`; swordsman/knight
   hit → `{ impact: swordHit }`; their misses → empty; generic unit hit → `hit`;
