@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Application, BitmapText, Container, Graphics, ImageSource, Sprite, Texture } from 'pixi.js';
 import { MapView, FIRE_SIZE_MIN, FIRE_SIZE_MAX, captureMarkerPoints } from '../src/render/mapRenderer';
 import { GameMap, MapTile } from '../src/game/mapGen';
@@ -1877,8 +1877,11 @@ describe('damage preview badges', () => {
     const before = badgesOf(v);
     expect(before).toHaveLength(0);
 
+    vi.useFakeTimers();
     v.showDamagePreview(t00.unit!, t10);
+    vi.advanceTimersByTime(100);
     v.update(m, players, { kind: 'unit', q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
+    vi.useRealTimers();
     const badges = badgesOf(v);
     // warrior vs warrior: attackForce 20, defenseForce 10, total 30:
     // round((20/30)*20*1.5) = 20 over target, round((10/30)*10*1.5) = 5 over attacker.
@@ -1886,7 +1889,7 @@ describe('damage preview badges', () => {
     v.destroy();
   });
 
-  it('hides the attacker badge when the enemy cannot counter', () => {
+ it('shows the attacker badge even when the enemy cannot counter (informational)', () => {
     const t00 = tileOf(0, 0, unit('mine', 0, 0, 0), 0);
     // A warrior enemy three hexes away: out of its own attack range.
     const t30 = tileOf(3, 0, unit('them', 1, 3, 0), 1);
@@ -1898,10 +1901,14 @@ describe('damage preview badges', () => {
     const v = new MapView(app, buildTextures(m), HEX, SPRITE_SCALE, 2);
     const players = playersOf();
     v.update(m, players, { kind: 'unit', q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
+    vi.useFakeTimers();
     v.showDamagePreview(t00.unit!, t30);
+    vi.advanceTimersByTime(100);
     v.update(m, players, { kind: 'unit', q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
+    vi.useRealTimers();
     const badges = badgesOf(v);
-    expect(badges.map((b) => b.text)).toEqual(['-20']);
+    // Both badges show: attacker deals 20 to target, would take 5 in counter.
+    expect(badges.map((b) => b.text).sort()).toEqual(['-20', '-5']);
     v.destroy();
   });
 

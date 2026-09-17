@@ -127,10 +127,10 @@ describe('WebGL context loss recovery', () => {
     const before = controller.mapView!;
     const root = controller.mapRoot!;
     expect(root.children).toContain(before.container);
-    // Ground markers mount above the overlay so they never sit under the
-    // village labels / hp bars / capture icons drawn there.
+    // Overlay (hp bars, damage badges) mounts above markers so they never sit
+    // under move/attack ground markers.
     const rootIdx = (c: Container): number => root.children.indexOf(c);
-    expect(rootIdx(before.markerLayer)).toBeGreaterThan(rootIdx(before.overlay));
+    expect(rootIdx(before.overlay)).toBeGreaterThan(rootIdx(before.markerLayer));
     expect(rootIdx(before.overlay)).toBeGreaterThan(rootIdx(before.container));
 
     const texturesBefore = controller.textures!;

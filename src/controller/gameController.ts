@@ -1220,8 +1220,8 @@ class GameController {
         }
       });
       this.mapRoot!.addChild(this.mapView.container);
-      this.mapRoot!.addChild(this.mapView.overlay);
       this.mapRoot!.addChild(this.mapView.markerLayer);
+      this.mapRoot!.addChild(this.mapView.overlay);
       this.mapRoot!.addChild(this.mapView.badgeLayer);
       if (this.edgeLayerTarget) this.mapView.attachEdgeLayerTo(this.edgeLayerTarget);
     }

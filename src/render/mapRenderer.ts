@@ -2,9 +2,9 @@ import {
   Application, BitmapText, Circle, Container, Graphics, Sprite, type TextStyleOptions, type Texture, type Ticker
 } from 'pixi.js';
 import { FONT_REGULAR } from '../ui/kit/bitmapFonts';
-import { axialKey, compareTileY, hexCorners, hexDistance, hexEdge, hexEdgeNeighbor, hexToPixel, splitHexBorder } from '../game/hex';
+import { axialKey, compareTileY, hexCorners, hexEdge, hexEdgeNeighbor, hexToPixel, splitHexBorder } from '../game/hex';
 import { tileMapByKey, type GameMap, type MapTile } from '../game/mapGen';
-import { resolveCombat, canCounterAttack } from '../game/combat';
+import { resolveCombat } from '../game/combat';
 import { bridgeCoastOffsets } from '../game/bridges';
 import { portDirection } from '../game/buildings';
 import { Player } from '../game/players';
@@ -462,14 +462,28 @@ export class MapView {
 
   /** Arm an expected-damage preview from `attacker` (the local selected unit)
    *  against `target` (an enemy standing on a tile). The badges are rendered the
-   *  next time `update` runs, so a caller usually arms then triggers a re-render. */
+   *  next time `update` runs, so a caller usually arms then triggers a re-render.
+   *  The counter-attack badge appears 100ms after the target badge. */
   showDamagePreview(attacker: Unit, target: MapTile): void {
     this.damagePreviewFor = { attacker, target };
+    this.damagePreviewAttackerVisible = false;
+    if (this.damagePreviewAttackerTimer !== null) {
+      clearTimeout(this.damagePreviewAttackerTimer);
+      this.damagePreviewAttackerTimer = null;
+    }
+    this.damagePreviewAttackerTimer = setTimeout(() => {
+      this.damagePreviewAttackerVisible = true;
+    }, 100);
   }
 
   /** Drop the expected-damage preview. Cleared again on the next update. */
   hideDamagePreview(): void {
     this.damagePreviewFor = null;
+    this.damagePreviewAttackerVisible = false;
+    if (this.damagePreviewAttackerTimer !== null) {
+      clearTimeout(this.damagePreviewAttackerTimer);
+      this.damagePreviewAttackerTimer = null;
+    }
     this.animateDamageBadgesOut();
   }
 
@@ -490,6 +504,9 @@ export class MapView {
   private liveDamageBadges = new Set<Container>();
   /** World anchors for damage badges in overlay (screen-space position tracking). */
   private damageBadgeAnchors = new Map<Container, { worldX: number; worldY: number; screenOffsetY: number }>();
+  /** Whether the attacker counter-attack badge is visible (delayed 100ms). */
+  private damagePreviewAttackerVisible = false;
+  private damagePreviewAttackerTimer: ReturnType<typeof setTimeout> | null = null;
   /** Badge elements in an active fade phase. */
   private badgeAnim = new Map<Container, { phase: 'in' | 'out'; start: number }>();
   private badgeAnimRemove: (() => void) | null = null;
@@ -589,13 +606,9 @@ export class MapView {
     const { attackerDamage, counterDamage } = resolveCombat(this.map, preview.attacker, preview.target);
     // Badge over the long-pressed enemy: what the selected unit would deal.
     this.addDamageBadge(preview.target, targetUnit, players, attackerDamage, localPlayerIndex);
-    // Badge over the selected unit: the counter it would take, but only when
-    // the fight would actually draw one (target survives, is in its own attack
-    // range, and may counter) — mirroring performAttack.
-    const dist = hexDistance(preview.target, { q: preview.attacker.q, r: preview.attacker.r });
-    const targetSurvives = attackerDamage < preview.target.unit!.hp;
-    const counterReaches = dist <= preview.target.unit!.attackDistance;
-    if (targetSurvives && counterReaches && canCounterAttack(targetUnit) && counterDamage > 0) {
+    // Badge over the selected unit: the counter it would take, delayed 100ms
+    // so the player sees the target badge first.
+    if (this.damagePreviewAttackerVisible) {
       this.addDamageBadge(attackerTile, preview.attacker, players, counterDamage, localPlayerIndex);
     }
   }
