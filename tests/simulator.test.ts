@@ -496,7 +496,7 @@ describe('knight bloodlust and combos', () => {
     expect(knight.hasAttacked).toBe(true);
     expect(canAttack(knight)).toBe(true); // next enemy is in range after the advance
     expect(sim.applyCommand({ type: 'attack', unitId: 'k1', q: 2, r: 0 })).toBe(true);
-    // Swordsman survived (knight deals 54 on its 80 hp): no extra attack remains.
+    // Swordsman survived (knight deals 40 on its 80 hp): no extra attack remains.
     expect(knight.canExtraAttack).toBe(false);
     expect(canAttack(knight)).toBe(false);
     expect(sim.applyCommand({ type: 'attack', unitId: 'k1', q: 2, r: 0 })).toBe(false);
