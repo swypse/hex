@@ -16,7 +16,7 @@ import { awardScore, awardTempleScores, CAPTURE_SCORE, COMBO_SCORE, EMPTY_STATS,
 import { hasSkill, openSkill as applySkill, randomUnopenedSkill, SkillId } from './skills';
 import { evaluateAchievements, awardAchievementScores, currentlyMetIds, type AchievementId } from './achievements';
 import { gainShipAbility, revertShip, upgradeShip } from './ship';
-import { moveRange, canAttack, canDisband, canHeal, canMove, disbandCost, hasPirateDeal, healUnit, makeUnit, unitMaintenance, PIRATE_DEAL_COST, PIRATE_OWNER, UNIT_TYPES, Unit, UnitType, UNIT_MOVEMENT } from './units';
+import { movePoints, canAttack, canDisband, canHeal, canMove, disbandCost, hasPirateDeal, healUnit, makeUnit, unitMaintenance, PIRATE_DEAL_COST, PIRATE_OWNER, UNIT_TYPES, Unit, UnitType, UNIT_MOVE_POINTS } from './units';
 import { reachableTargets, moveUnit, pathBetween, tileAt } from './selection';
 import { spawnUnit } from './spawn';
 import { exploreUnitPath } from './explore';
@@ -301,10 +301,10 @@ export class Simulator {
     const target = tileAt(this.map, q, r);
     if (!target) return false;
     if (unit.shipLevel !== undefined && target.terrain !== TileType.Water) return false;
-    const reachable = reachableTargets(this.map, unit, moveRange(unit, tileAt(this.map, unit.q, unit.r), this.map), canClimb, canDock, unit.owner);
+    const reachable = reachableTargets(this.map, unit, movePoints(unit), canClimb, canDock, unit.owner);
     if (!reachable.some((t) => t.q === q && t.r === r)) return false;
     const from = { q: unit.q, r: unit.r };
-    const path = pathBetween(this.map, from, { q, r }, canClimb, unit.shipLevel !== undefined, canDock, unit.owner);
+    const path = pathBetween(this.map, from, { q, r }, canClimb, unit.shipLevel !== undefined, canDock, unit.owner, movePoints(unit));
     const shipLevel = unit.shipLevel;
     const fromTile = tileAt(this.map, from.q, from.r);
     moveUnit(this.map, unit, target);
@@ -585,10 +585,10 @@ export class Simulator {
     const player = this.players[unit.owner]!;
     const canClimb = hasSkill(player, 'climbing');
     const canDock = hasSkill(player, 'navigation');
-    const reachable = reachableTargets(this.map, unit, moveRange(unit, tileAt(this.map, unit.q, unit.r), this.map), canClimb, canDock, unit.owner);
+    const reachable = reachableTargets(this.map, unit, movePoints(unit), canClimb, canDock, unit.owner);
     if (!reachable.some((t) => t.q === q && t.r === r)) return false;
     const from = { q: unit.q, r: unit.r };
-    const path = pathBetween(this.map, from, { q, r }, canClimb, true, canDock, unit.owner);
+    const path = pathBetween(this.map, from, { q, r }, canClimb, true, canDock, unit.owner, movePoints(unit));
     const shipLevel = unit.shipLevel;
     moveUnit(this.map, unit, target);
     exploreUnitPath(this.map, path, unit, unit.owner);
@@ -979,7 +979,7 @@ export class Simulator {
       const d = DIRS[(start + i) % DIRS.length]!;
       const first = tileAt(this.map, pos.q + d.q, pos.r + d.r);
       if (!first || !isWaterType(first.terrain) || first.unit) continue;
-      for (let k = 0; k < UNIT_MOVEMENT.pirate; k++) {
+      for (let k = 0; k < Math.floor(UNIT_MOVE_POINTS.pirate / 10); k++) {
         const next = tileAt(this.map, pos.q + d.q, pos.r + d.r);
         if (!next || !isWaterType(next.terrain) || next.unit) break;
         steps.push({ q: next.q, r: next.r });
@@ -1068,7 +1068,7 @@ export class Simulator {
       this.pirateMoveRandom(unit);
       return;
     }
-    const steps = path.slice(0, UNIT_MOVEMENT.pirate);
+    const steps = path.slice(0, Math.floor(UNIT_MOVE_POINTS.pirate / 10));
     const from = { q: unit.q, r: unit.r };
     const to = steps[steps.length - 1]!;
     moveUnit(this.map, unit, tileAt(this.map, to.q, to.r)!);

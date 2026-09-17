@@ -3,7 +3,7 @@ import type { Player } from './players';
 import { canAfford, pay } from './resources';
 import type { Unit } from './units';
 
-export const SHIP_MOVEMENT: Record<1 | 2 | 3, number> = { 1: 2, 2: 3, 3: 4 };
+export const SHIP_MOVE_POINTS: Record<1 | 2 | 3, number> = { 1: 20, 2: 30, 3: 40 };
 export const SHIP_ATTACK: Record<1 | 2 | 3, number> = { 1: 10, 2: 20, 3: 30 };
 export const SHIP_ATTACK_DISTANCE: Record<1 | 2 | 3, number> = { 1: 2, 2: 2, 3: 3 };
 export const SHIP_UPGRADE_COST: Record<2 | 3, { money: number; wood: number; ore: number }> = {
@@ -15,8 +15,8 @@ export function isShip(unit: Unit): boolean {
   return unit.shipLevel !== undefined;
 }
 
-export function shipMovement(unit: Unit): number {
-  return SHIP_MOVEMENT[unit.shipLevel!];
+export function shipMovePoints(unit: Unit): number {
+  return SHIP_MOVE_POINTS[unit.shipLevel!];
 }
 
 export function shipAttack(unit: Unit): number {

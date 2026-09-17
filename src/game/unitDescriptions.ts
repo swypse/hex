@@ -1,5 +1,5 @@
 import { UNIT_TYPE_NAMES, UNIT_TYPES, Unit, UnitType, unitMaintenance } from './units';
-import { SHIP_ATTACK, SHIP_ATTACK_DISTANCE, SHIP_MOVEMENT, SHIP_UPGRADE_COST, shipMovement } from './ship';
+import { SHIP_ATTACK, SHIP_ATTACK_DISTANCE, SHIP_MOVE_POINTS, SHIP_UPGRADE_COST, shipMovePoints } from './ship';
 import { t } from '../i18n';
 
 /** i18n keys for the short feature bullets shown for each land unit. */
@@ -47,7 +47,7 @@ interface UnitHelpStat {
 /** The five stat rows shown in the unit info popup, using current ship-level
  *  values when the unit is a ship (movement/attack/upkeep by level). */
 export function unitHelpStats(unit: Unit): UnitHelpStat[] {
-  const movement = unit.shipLevel !== undefined ? shipMovement(unit) : UNIT_TYPES[unit.type].movement;
+  const movement = unit.shipLevel !== undefined ? shipMovePoints(unit) : UNIT_TYPES[unit.type].movePoints;
   const attack = unit.shipLevel !== undefined ? SHIP_ATTACK[unit.shipLevel] : UNIT_TYPES[unit.type].attack;
   const hp = UNIT_TYPES[unit.type].maxHp;
   const upkeep = unitMaintenance(unit);
@@ -67,7 +67,7 @@ export function unitHelpLines(unit: Unit): string[] {
   return [
     t('help.ship.crew', { crew }),
     t('help.ship.stats', {
-      m1: SHIP_MOVEMENT[1], m2: SHIP_MOVEMENT[2], m3: SHIP_MOVEMENT[3],
+      m1: SHIP_MOVE_POINTS[1], m2: SHIP_MOVE_POINTS[2], m3: SHIP_MOVE_POINTS[3],
       a1: SHIP_ATTACK[1], a2: SHIP_ATTACK[2], a3: SHIP_ATTACK[3],
       d1: SHIP_ATTACK_DISTANCE[1], d2: SHIP_ATTACK_DISTANCE[2], d3: SHIP_ATTACK_DISTANCE[3],
     }),

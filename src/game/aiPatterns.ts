@@ -4,7 +4,7 @@ import { canAfford, villageUpgradeCost } from './resources';
 import { isWaterType } from './tileTypes';
 import { canOpenSkill, hasSkill, SkillId } from './skills';
 import { reachableTargets, tileAt } from './selection';
-import { UNIT_MOVEMENT, UNIT_TYPES, UNIT_ATTACK_DISTANCE, canHeal, HEAL_AMOUNT, Unit, UnitType } from './units';
+import { UNIT_MOVE_POINTS, UNIT_TYPES, UNIT_ATTACK_DISTANCE, canHeal, HEAL_AMOUNT, Unit, UnitType } from './units';
 import { SeededRandom } from '../util/random';
 import { hexDistance, hexNeighbors } from './hex';
 import { attackableTargets, attackDamage, canCounterAttack, counterDamageTo as counterDamageToFromCombat, resolveCombat, tradeIsFavorable } from './combat';
@@ -14,7 +14,7 @@ import { isExploredFor } from './explore';
 import { AiAction, AiDirectives, AiPlannerState, SpawnPreference } from './aiTypes';
 import { AiDifficultyProfile } from './aiDifficulty';
 import { AiSituation, coastExposedTile, isMelee, isNavalEnemy } from './aiSituation';
-import { isShip, shipAttackDistance, shipMovement, canUpgradeShip } from './ship';
+import { isShip, shipAttackDistance, shipMovePoints, canUpgradeShip } from './ship';
 
 export interface AiPatternContext {
   map: GameMap;
@@ -37,11 +37,13 @@ function key(q: number, r: number): string {
 }
 
 /** Movement and attack reach of a unit in hexes, honoring ship stat tables.
- *  Ships keep their land-unit `.type`, so the raw UNIT_MOVEMENT/ATTACK_DISTANCE
- *  tables drastically underestimate a levelled enemy ship's strike zone. */
+ *  Ships keep their land-unit `.type`, so the raw MOVE_POINTS/ATTACK_DISTANCE
+ *  tables drastically underestimate a levelled enemy ship's strike zone.
+ *  Move points are converted to flat-land hexes via the standard 10-point
+ *  tile cost. */
 function enemyReach(unit: Unit): { move: number; attack: number } {
-  if (isShip(unit)) return { move: shipMovement(unit), attack: shipAttackDistance(unit) };
-  return { move: UNIT_MOVEMENT[unit.type], attack: UNIT_ATTACK_DISTANCE[unit.type] };
+  if (isShip(unit)) return { move: shipMovePoints(unit) / 10, attack: shipAttackDistance(unit) };
+  return { move: UNIT_MOVE_POINTS[unit.type] / 10, attack: UNIT_ATTACK_DISTANCE[unit.type] };
 }
 
 export function enemyCanReach(map: GameMap, tile: MapTile, playerIndex: number): boolean {
@@ -445,7 +447,7 @@ export const AI_PATTERNS: AiPattern[] = [
           // do not strip it for garrison duty (that causes pointless retreat
           // loops when the unit is the only one left).
           if (attackableTargets(map, unit, player.index).length > 0) continue;
-          if (hexDistance(t, v) > d.enemyTurns * UNIT_MOVEMENT[unit.type]) continue;
+          if (hexDistance(t, v) > (d.enemyTurns * UNIT_MOVE_POINTS[unit.type]) / 10) continue;
           const reach = reachableTargets(map, unit, undefined, canClimb, canDock, player.index).filter(
             (c) =>
               !state.occupied.has(key(c.q, c.r)) &&

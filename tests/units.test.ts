@@ -1,11 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { Tribe } from '../src/game/tribes';
-import { GameMap, MapTile } from '../src/game/mapGen';
-import { TileType } from '../src/game/tileTypes';
 import {
   UNIT_TYPES,
   UNIT_IMAGE_FILES,
-  UNIT_MOVEMENT,
+  UNIT_MOVE_POINTS,
   UNIT_ATTACK,
   UNIT_ATTACK_DISTANCE,
   UNIT_TYPE_NAMES,
@@ -15,7 +13,7 @@ import {
   PIRATE_HP,
   canMove,
   healUnit,
-  moveRange,
+  movePoints,
   makeUnit,
   HEAL_AMOUNT,
   unitMaintenance,
@@ -23,27 +21,27 @@ import {
 
 describe('UNIT_TYPES', () => {
   it('defines warrior, rider, archer, swordsman', () => {
-    expect(UNIT_TYPES.warrior).toEqual({ movement: 1, attack: 20, attackDistance: 1, maxHp: 50, defense: 10, price: 4, priceWood: 0, priceOre: 0, shape: 'circle' });
-    expect(UNIT_TYPES.rider).toEqual({ movement: 4, attack: 20, attackDistance: 1, maxHp: 40, defense: 7, price: 6, priceWood: 0, priceOre: 0, shape: 'square' });
-    expect(UNIT_TYPES.archer).toEqual({ movement: 1, attack: 20, attackDistance: 2, maxHp: 40, defense: 7, price: 6, priceWood: 0, priceOre: 0, shape: 'triangle' });
-    expect(UNIT_TYPES.swordsman).toEqual({ movement: 1, attack: 40, attackDistance: 1, maxHp: 80, defense: 20, price: 10, priceWood: 0, priceOre: 2, shape: 'swordsman' });
+    expect(UNIT_TYPES.warrior).toEqual({ movePoints: 10, attack: 20, attackDistance: 1, maxHp: 50, defense: 10, price: 4, priceWood: 0, priceOre: 0, shape: 'circle' });
+    expect(UNIT_TYPES.rider).toEqual({ movePoints: 40, attack: 20, attackDistance: 1, maxHp: 40, defense: 7, price: 6, priceWood: 0, priceOre: 0, shape: 'square' });
+    expect(UNIT_TYPES.archer).toEqual({ movePoints: 10, attack: 20, attackDistance: 2, maxHp: 40, defense: 7, price: 6, priceWood: 0, priceOre: 0, shape: 'triangle' });
+    expect(UNIT_TYPES.swordsman).toEqual({ movePoints: 10, attack: 40, attackDistance: 1, maxHp: 80, defense: 20, price: 10, priceWood: 0, priceOre: 2, shape: 'swordsman' });
   });
 
-  it('defines the shield unit with 80 hp, 1 movement and a 8 money + 2 ore price', () => {
-    expect(UNIT_TYPES.shield).toEqual({ movement: 1, attack: 7, attackDistance: 1, maxHp: 80, defense: 20, price: 8, priceWood: 0, priceOre: 2, shape: 'square' });
+  it('defines the shield unit with 80 hp, 10 move points and a 8 money + 2 ore price', () => {
+    expect(UNIT_TYPES.shield).toEqual({ movePoints: 10, attack: 7, attackDistance: 1, maxHp: 80, defense: 20, price: 8, priceWood: 0, priceOre: 2, shape: 'square' });
   });
 
   it('defines the catapult unit with siege stats and a wood cost', () => {
-    expect(UNIT_TYPES.catapult).toEqual({ movement: 1, attack: 50, attackDistance: 4, maxHp: 30, defense: 0, price: 15, priceWood: 10, priceOre: 3, shape: 'square' });
-    expect(UNIT_MOVEMENT.catapult).toBe(1);
+    expect(UNIT_TYPES.catapult).toEqual({ movePoints: 10, attack: 50, attackDistance: 4, maxHp: 30, defense: 0, price: 15, priceWood: 10, priceOre: 3, shape: 'square' });
+    expect(UNIT_MOVE_POINTS.catapult).toBe(10);
     expect(UNIT_ATTACK.catapult).toBe(50);
     expect(UNIT_ATTACK_DISTANCE.catapult).toBe(4);
     expect(UNIT_TYPE_NAMES.catapult).toBe('Catapult');
   });
 
-  it('defines the knight unit with 3 movement, 4 attack and an ore cost', () => {
-    expect(UNIT_TYPES.knight).toEqual({ movement: 3, attack: 40, attackDistance: 1, maxHp: 60, defense: 7, price: 14, priceWood: 0, priceOre: 5, shape: 'swordsman' });
-    expect(UNIT_MOVEMENT.knight).toBe(3);
+  it('defines the knight unit with 30 move points, 4 attack and an ore cost', () => {
+    expect(UNIT_TYPES.knight).toEqual({ movePoints: 30, attack: 40, attackDistance: 1, maxHp: 60, defense: 7, price: 14, priceWood: 0, priceOre: 5, shape: 'swordsman' });
+    expect(UNIT_MOVE_POINTS.knight).toBe(30);
     expect(UNIT_ATTACK.knight).toBe(40);
     expect(UNIT_ATTACK_DISTANCE.knight).toBe(1);
     expect(UNIT_TYPE_NAMES.knight).toBe('Knight');
@@ -51,7 +49,7 @@ describe('UNIT_TYPES', () => {
 
   it('gives pirates 80 hp and 5 defense', () => {
     expect(PIRATE_HP).toBe(80);
-    expect(UNIT_TYPES.pirate).toEqual({ movement: 5, attack: 15, attackDistance: 3, maxHp: 80, defense: 5, price: 0, priceWood: 0, priceOre: 0, shape: 'square' });
+    expect(UNIT_TYPES.pirate).toEqual({ movePoints: 50, attack: 15, attackDistance: 3, maxHp: 80, defense: 5, price: 0, priceWood: 0, priceOre: 0, shape: 'square' });
     const pirate = makeUnit(-1, 'pirate', 0, 0);
     expect(pirate.hp).toBe(80);
     expect(pirate.defense).toBe(5);
@@ -135,9 +133,14 @@ describe('action availability', () => {
     expect(canMove(mkUnit({ hasHealed: true }))).toBe(false);
     expect(canMove(mkUnit({ hasAttacked: true }))).toBe(false);
     expect(canMove(mkUnit({ type: 'rider', hasAttacked: true }))).toBe(true);
-    expect(moveRange(mkUnit({ type: 'rider', hasAttacked: true }))).toBe(4);
-    expect(moveRange(mkUnit())).toBe(1);
-    expect(moveRange(mkUnit({ type: 'rider' }))).toBe(4);
+    expect(movePoints(mkUnit({ type: 'rider', hasAttacked: true }))).toBe(40);
+    expect(movePoints(mkUnit())).toBe(10);
+    expect(movePoints(mkUnit({ type: 'rider' }))).toBe(40);
+    expect(movePoints(mkUnit({ type: 'knight' }))).toBe(30);
+    expect(movePoints(mkUnit({ type: 'pirate' }))).toBe(50);
+    expect(movePoints(mkUnit({ shipLevel: 1 }))).toBe(20);
+    expect(movePoints(mkUnit({ shipLevel: 2 }))).toBe(30);
+    expect(movePoints(mkUnit({ shipLevel: 3 }))).toBe(40);
   });
 
   it('canAttack: available after moving, blocked after attacking/healing', () => {
@@ -231,49 +234,6 @@ describe('makeUnit', () => {
   it('defaults id from type and position when omitted', () => {
     const u = makeUnit(0, 'rider', 5, -2);
     expect(u.id).toBe('rider-5,-2');
-  });
-});
-
-describe('moveRange road bonus', () => {
-  function roadTile(owner: number | null): MapTile {
-    return {
-      q: 0, r: 0, terrain: TileType.GrasslandLand, height: 0.1,
-      settlement: null, building: null, roadOwner: owner,
-      unit: null, ownedBy: owner, claimedByVillage: null, exploredBy: [],
-    };
-  }
-
-  it('moveRange adds +1 on the unit own road tile only', () => {
-    expect(moveRange(mkUnit(), roadTile(null))).toBe(1);
-    expect(moveRange(mkUnit(), roadTile(1))).toBe(1);
-    expect(moveRange(mkUnit(), roadTile(0))).toBe(2);
-    expect(moveRange(mkUnit({ type: 'rider' }), roadTile(0))).toBe(5);
-    expect(moveRange(mkUnit({ type: 'rider', hasAttacked: true }), roadTile(0))).toBe(5);
-    expect(moveRange(mkUnit())).toBe(1);
-  });
-
-  it('moveRange adds +1 on the unit own village connected to a road', () => {
-    const village: MapTile = {
-      q: 0, r: 0, terrain: TileType.GrasslandLand, height: 0.1,
-      settlement: { owner: 0, level: 1, captureReady: false },
-      building: null, roadOwner: null,
-      unit: null, ownedBy: 0, claimedByVillage: { q: 0, r: 0 }, exploredBy: [],
-    };
-    const emptyNeighbor: MapTile = {
-      q: 1, r: 0, terrain: TileType.GrasslandLand, height: 0.1,
-      settlement: null, building: null, roadOwner: null,
-      unit: null, ownedBy: 0, claimedByVillage: null, exploredBy: [],
-    };
-    const road: MapTile = { ...emptyNeighbor, roadOwner: 0 };
-    const enemyRoad: MapTile = { ...emptyNeighbor, roadOwner: 1 };
-    const map: GameMap = { radius: 2, tiles: [village, road], spawns: [] };
-    // No road connected yet: no bonus.
-    expect(moveRange(mkUnit(), village, { ...map, tiles: [village, emptyNeighbor] })).toBe(1);
-    // Road of another player adjacent: no bonus.
-    expect(moveRange(mkUnit(), village, { ...map, tiles: [village, enemyRoad] })).toBe(1);
-    // Own road adjacent: +1 bonus.
-    expect(moveRange(mkUnit(), village, map)).toBe(2);
-    expect(moveRange(mkUnit({ type: 'rider' }), village, map)).toBe(5);
   });
 });
 

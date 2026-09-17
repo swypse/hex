@@ -1,8 +1,6 @@
 import { t } from '../i18n';
-import { shipMovement } from './ship';
-import { hexNeighbors } from './hex';
+import { shipMovePoints } from './ship';
 import { Tribe } from './tribes';
-import type { GameMap, MapTile } from './mapGen';
 
 export type UnitType = 'warrior' | 'rider' | 'archer' | 'swordsman' | 'shield' | 'catapult' | 'knight' | 'pirate';
 type PlayableUnitType = Exclude<UnitType, 'pirate'>;
@@ -16,7 +14,8 @@ export const PIRATE_COLOR = 0x111111;
 export const PIRATE_DEAL_COST = 50;
 
 interface UnitTypeInfo {
-  movement: number;
+  /** Move points a unit type can spend per turn (tile costs are 10-20). */
+  movePoints: number;
   attack: number;
   attackDistance: number;
   maxHp: number;
@@ -28,14 +27,14 @@ interface UnitTypeInfo {
 }
 
 export const UNIT_TYPES: Record<UnitType, UnitTypeInfo> = {
-  warrior: { movement: 1, attack: 20, attackDistance: 1, maxHp: 50, defense: 10, price: 4, priceWood: 0, priceOre: 0, shape: 'circle' },
-  rider: { movement: 4, attack: 20, attackDistance: 1, maxHp: 40, defense: 7, price: 6, priceWood: 0, priceOre: 0, shape: 'square' },
-  archer: { movement: 1, attack: 20, attackDistance: 2, maxHp: 40, defense: 7, price: 6, priceWood: 0, priceOre: 0, shape: 'triangle' },
-  swordsman: { movement: 1, attack: 40, attackDistance: 1, maxHp: 80, defense: 20, price: 10, priceWood: 0, priceOre: 2, shape: 'swordsman' },
-  shield: { movement: 1, attack: 7, attackDistance: 1, maxHp: 80, defense: 20, price: 8, priceWood: 0, priceOre: 2, shape: 'square' },
-  catapult: { movement: 1, attack: 50, attackDistance: 4, maxHp: 30, defense: 0, price: 15, priceWood: 10, priceOre: 3, shape: 'square' },
-  knight: { movement: 3, attack: 40, attackDistance: 1, maxHp: 60, defense: 7, price: 14, priceWood: 0, priceOre: 5, shape: 'swordsman' },
-  pirate: { movement: 5, attack: 15, attackDistance: 3, maxHp: PIRATE_HP, defense: 5, price: 0, priceWood: 0, priceOre: 0, shape: 'square' },
+  warrior: { movePoints: 10, attack: 20, attackDistance: 1, maxHp: 50, defense: 10, price: 4, priceWood: 0, priceOre: 0, shape: 'circle' },
+  rider: { movePoints: 40, attack: 20, attackDistance: 1, maxHp: 40, defense: 7, price: 6, priceWood: 0, priceOre: 0, shape: 'square' },
+  archer: { movePoints: 10, attack: 20, attackDistance: 2, maxHp: 40, defense: 7, price: 6, priceWood: 0, priceOre: 0, shape: 'triangle' },
+  swordsman: { movePoints: 10, attack: 40, attackDistance: 1, maxHp: 80, defense: 20, price: 10, priceWood: 0, priceOre: 2, shape: 'swordsman' },
+  shield: { movePoints: 10, attack: 7, attackDistance: 1, maxHp: 80, defense: 20, price: 8, priceWood: 0, priceOre: 2, shape: 'square' },
+  catapult: { movePoints: 10, attack: 50, attackDistance: 4, maxHp: 30, defense: 0, price: 15, priceWood: 10, priceOre: 3, shape: 'square' },
+  knight: { movePoints: 30, attack: 40, attackDistance: 1, maxHp: 60, defense: 7, price: 14, priceWood: 0, priceOre: 5, shape: 'swordsman' },
+  pirate: { movePoints: 50, attack: 15, attackDistance: 3, maxHp: PIRATE_HP, defense: 5, price: 0, priceWood: 0, priceOre: 0, shape: 'square' },
 };
 
 export const UNIT_IMAGE_FILES: Record<Tribe, Record<PlayableUnitType, string>> = {
@@ -71,15 +70,15 @@ export interface Unit {
   paidBy?: number[];
 }
 
-export const UNIT_MOVEMENT: Record<UnitType, number> = {
-  warrior: UNIT_TYPES.warrior.movement,
-  rider: UNIT_TYPES.rider.movement,
-  archer: UNIT_TYPES.archer.movement,
-  swordsman: UNIT_TYPES.swordsman.movement,
-  shield: UNIT_TYPES.shield.movement,
-  catapult: UNIT_TYPES.catapult.movement,
-  knight: UNIT_TYPES.knight.movement,
-  pirate: UNIT_TYPES.pirate.movement,
+export const UNIT_MOVE_POINTS: Record<UnitType, number> = {
+  warrior: UNIT_TYPES.warrior.movePoints,
+  rider: UNIT_TYPES.rider.movePoints,
+  archer: UNIT_TYPES.archer.movePoints,
+  swordsman: UNIT_TYPES.swordsman.movePoints,
+  shield: UNIT_TYPES.shield.movePoints,
+  catapult: UNIT_TYPES.catapult.movePoints,
+  knight: UNIT_TYPES.knight.movePoints,
+  pirate: UNIT_TYPES.pirate.movePoints,
 };
 
 export const UNIT_ATTACK: Record<UnitType, number> = {
@@ -200,17 +199,10 @@ export function canMove(unit: Unit): boolean {
   return unit.type === 'rider' || !unit.hasAttacked;
 }
 
-export function moveRange(unit: Unit, tile?: MapTile, map?: GameMap): number {
-  const base = unit.shipLevel !== undefined ? shipMovement(unit) : UNIT_MOVEMENT[unit.type];
-  if (tile?.roadOwner === unit.owner) return base + 1;
-  if (map && tile?.settlement && tile.settlement.owner === unit.owner) {
-    const connected = hexNeighbors(tile).some((n) => {
-      const t = map.tiles.find((x) => x.q === n.q && x.r === n.r);
-      return t !== undefined && t.roadOwner === unit.owner;
-    });
-    if (connected) return base + 1;
-  }
-  return base;
+/** Move points a unit may spend this turn (road bonuses are handled per tile
+ *  by the movement-cost model). */
+export function movePoints(unit: Unit): number {
+  return unit.shipLevel !== undefined ? shipMovePoints(unit) : UNIT_MOVE_POINTS[unit.type];
 }
 
 export function canAttack(unit: Unit): boolean {

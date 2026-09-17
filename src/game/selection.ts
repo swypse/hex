@@ -1,10 +1,9 @@
-import { Axial, axialKey, hexDistance, hexNeighbors } from './hex';
+import { Axial, axialKey, hexNeighbors } from './hex';
 import { GameMap, MapTile } from './mapGen';
-import { TileType } from './tileTypes';
-import { isMountainType } from './tileTypes';
-import { isShip } from './ship';
+import { isMountainType, TileType, isWaterType } from './tileTypes';
 import { isExploredFor } from './explore';
-import { Unit, moveRange } from './units';
+import { movePoints as unitMovePoints, Unit } from './units';
+import { tileMoveCost, waterRouteKeys } from './movementCost';
 
 type SelectionKind = 'unit' | 'village' | 'terrain';
 
@@ -46,43 +45,117 @@ export function cycleSelection(current: Selection | null, tile: MapTile): Select
   return { kind: layers[0]!, q: tile.q, r: tile.r };
 }
 
-function hasWaterNeighbor(map: GameMap, tile: MapTile): boolean {
+/** A tile the moving unit may step onto: explored, unoccupied, and allowed by
+ *  the terrain/move-type rules. Ships see land tiles as terminal (coast). */
+function isEnterable(
+  map: GameMap,
+  tile: MapTile,
+  canSail: boolean,
+  canClimb: boolean,
+  canDock: boolean,
+  playerIndex: number,
+): boolean {
+  if (!isExploredFor(tile, playerIndex)) return false;
+  if (tile.unit) return false;
+  if (isWaterType(tile.terrain)) {
+    if (canSail) return true;
+    if (tile.bridge) return true;
+    return tile.building !== null && tile.building.kind === 'port' && tile.ownedBy === playerIndex && canDock;
+  }
+  if (!canClimb && isMountainType(tile.terrain)) return false;
+  return true;
+}
+
+function isAdjacentToEnemy(map: GameMap, tile: MapTile, playerIndex: number): boolean {
   return hexNeighbors(tile).some((n) => {
     const t = tileAt(map, n.q, n.r);
-    return t !== undefined && t.terrain === TileType.Water;
+    return t !== undefined && t.unit != null && t.unit.owner !== playerIndex;
   });
+}
+
+function tkey(a: Axial): string {
+  return `${a.q},${a.r}`;
+}
+
+/** Move-points cost of walking `path` (tiles after `from`, destination last):
+ *  every left tile costs its leave-cost, the destination is free. */
+function pathCost(map: GameMap, from: Axial, path: Axial[], owner: number, waterKeys: Set<string>): number {
+  const origin = tileAt(map, from.q, from.r);
+  let total = origin ? tileMoveCost(map, origin, owner, waterKeys) : 0;
+  for (let i = 0; i + 1 < path.length; i++) {
+    const tile = tileAt(map, path[i]!.q, path[i]!.r);
+    if (!tile) return Number.POSITIVE_INFINITY;
+    total += tileMoveCost(map, tile, owner, waterKeys);
+  }
+  return total;
 }
 
 export function reachableTargets(
   map: GameMap,
   unit: Unit,
-  range?: number,
+  movePoints?: number,
   canClimb = false,
   canDock = false,
   playerIndex = 0,
 ): MapTile[] {
-  const effectiveRange = range ?? moveRange(unit, tileAt(map, unit.q, unit.r), map);
+  const points = movePoints ?? unitMovePoints(unit);
   const from = { q: unit.q, r: unit.r };
-  const candidates = map.tiles.filter((t) => {
-    if (hexDistance(from, t) > effectiveRange) return false;
-    if (!isExploredFor(t, playerIndex)) return false;
-    if (t.terrain === TileType.Water) {
-      const bridged = t.bridge !== undefined && t.bridge !== null;
-      if (!isShip(unit) && !bridged && !(t.building && t.building.kind === 'port' && t.ownedBy === playerIndex && canDock)) return false;
-    } else if (isShip(unit) && !hasWaterNeighbor(map, t)) {
-      return false;
+  const canSail = unit.shipLevel !== undefined;
+  const waterKeys = waterRouteKeys(map);
+  const start = tileAt(map, from.q, from.r);
+  if (!start) return [];
+  // Cost-bucketed Dijkstra: leaving a tile pays its move cost, so the edge
+  // weight depends only on the tile departed.
+  const buckets: MapTile[][] = Array.from({ length: points + 1 }, () => []);
+  const dist = new Map<string, number>();
+  const reached = new Set<string>();
+  const result: MapTile[] = [];
+  dist.set(tkey(from), 0);
+  buckets[0]!.push(start);
+  for (let cost = 0; cost <= points; cost++) {
+    const bucket = buckets[cost]!;
+    while (bucket.length > 0) {
+      const cur = bucket.pop()!;
+      const ck = tkey(cur);
+      if (reached.has(ck)) continue;
+      reached.add(ck);
+      if (ck !== tkey(from)) result.push(cur);
+      // Movement ends at the first cell adjacent to an enemy.
+      if (isAdjacentToEnemy(map, cur, playerIndex)) continue;
+      // A ship may never pass through land; landing tiles are terminal.
+      if (canSail && !isWaterType(cur.terrain)) continue;
+      for (const n of hexNeighbors(cur)) {
+        const tile = tileAt(map, n.q, n.r);
+        if (!tile) continue;
+        const nk = tkey(n);
+        if (reached.has(nk)) continue;
+        if (!isEnterable(map, tile, canSail, canClimb, canDock, playerIndex)) continue;
+        const next = cost + tileMoveCost(map, cur, unit.owner, waterKeys);
+        if (next > points) continue;
+        if (dist.get(nk) !== undefined && dist.get(nk)! <= next) continue;
+        dist.set(nk, next);
+        buckets[next]!.push(tile);
+      }
     }
-    if (!canClimb && isMountainType(t.terrain)) return false;
-    if (t.unit) return false;
-    return true;
-  });
-  return candidates.filter((t) => {
-    const path = pathBetween(map, from, t, canClimb, isShip(unit), canDock, playerIndex);
-    return path.length > 0 && path.length <= effectiveRange;
-  });
+  }
+  // Always-move-one: every enterable direct neighbour is reachable even when
+  // the unit has no move points left to pay for it.
+  for (const n of hexNeighbors(from)) {
+    const t = tileAt(map, n.q, n.r);
+    if (!t) continue;
+    const nk = tkey(t);
+    if (reached.has(nk)) continue;
+    if (isEnterable(map, t, canSail, canClimb, canDock, playerIndex)) {
+      reached.add(nk);
+      result.push(t);
+    }
+  }
+  return result;
 }
 
-export function pathBetween(
+/** Historical shortest-step path (unit-step BFS), reused whenever it fits the
+ *  move-points budget so routes and animations keep their old look. */
+function pathBetweenSteps(
   map: GameMap,
   from: Axial,
   to: Axial,
@@ -132,11 +205,84 @@ export function pathBetween(
   return [];
 }
 
-function isAdjacentToEnemy(map: GameMap, tile: MapTile, playerIndex: number): boolean {
-  return hexNeighbors(tile).some((n) => {
-    const t = tileAt(map, n.q, n.r);
-    return t !== undefined && t.unit != null && t.unit.owner !== playerIndex;
-  });
+/** Weighted fallback: the cheapest route within `cap` points (used when the
+ *  shortest-step route overspends the unit's move points). */
+function pathBetweenCost(
+  map: GameMap,
+  from: Axial,
+  to: Axial,
+  cap: number,
+  canClimb: boolean,
+  canSail: boolean,
+  canDock: boolean,
+  playerIndex: number,
+  waterKeys: Set<string>,
+): Axial[] {
+  const start = tileAt(map, from.q, from.r);
+  if (!start) return [];
+  const buckets: MapTile[][] = Array.from({ length: cap + 1 }, () => []);
+  const done = new Set<string>();
+  const best = new Map<string, number>();
+  const cameFrom = new Map<string, Axial>();
+  best.set(tkey(from), 0);
+  buckets[0]!.push(start);
+  for (let cost = 0; cost <= cap; cost++) {
+    const bucket = buckets[cost]!;
+    while (bucket.length > 0) {
+      const cur = bucket.pop()!;
+      const ck = tkey(cur);
+      if (done.has(ck)) continue;
+      done.add(ck);
+      if (ck === tkey(to)) {
+        const path: Axial[] = [];
+        let c: Axial = { q: to.q, r: to.r };
+        while (c.q !== from.q || c.r !== from.r) {
+          path.unshift({ q: c.q, r: c.r });
+          const prev = cameFrom.get(tkey(c));
+          if (!prev) return [];
+          c = prev;
+        }
+        return path;
+      }
+      if (isAdjacentToEnemy(map, cur, playerIndex)) continue;
+      if (canSail && !isWaterType(cur.terrain)) continue;
+      for (const n of hexNeighbors(cur)) {
+        const tile = tileAt(map, n.q, n.r);
+        if (!tile) continue;
+        const nk = tkey(n);
+        if (done.has(nk)) continue;
+        if (!isEnterable(map, tile, canSail, canClimb, canDock, playerIndex)) continue;
+        const next = cost + tileMoveCost(map, cur, playerIndex, waterKeys);
+        if (next > cap) continue;
+        if (best.get(nk) !== undefined && best.get(nk)! <= next) continue;
+        best.set(nk, next);
+        cameFrom.set(nk, { q: cur.q, r: cur.r });
+        buckets[next]!.push(tile);
+      }
+    }
+  }
+  return [];
+}
+
+export function pathBetween(
+  map: GameMap,
+  from: Axial,
+  to: Axial,
+  canClimb = false,
+  canSail = false,
+  canDock = false,
+  playerIndex = 0,
+  movePoints: number | undefined = undefined,
+): Axial[] {
+  if (from.q === to.q && from.r === to.r) return [];
+  const waterKeys = waterRouteKeys(map);
+  const quick = pathBetweenSteps(map, from, to, canClimb, canSail, canDock, playerIndex);
+  if (quick.length === 0) return quick;
+  if (movePoints === undefined || pathCost(map, from, quick, playerIndex, waterKeys) <= movePoints) {
+    return quick;
+  }
+  // The shortest-step route overspends the budget: look for a cheaper route.
+  return pathBetweenCost(map, from, to, movePoints, canClimb, canSail, canDock, playerIndex, waterKeys);
 }
 
 export function moveUnit(map: GameMap, unit: Unit, target: MapTile): void {

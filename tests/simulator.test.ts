@@ -134,15 +134,27 @@ describe('Simulator commands', () => {
     expect(ok).toBe(false);
   });
 
-  it('allows a +1 move from the unit own road tile', () => {
-    const map = makeTestMap();
-    tileAt(map, 0, 0)!.unit = makeUnit('u1', 0, 'warrior', 0, 0);
-    tileAt(map, 0, 0)!.roadOwner = 0;
+  it('a rider reaches one tile farther over its own road network', () => {
+    const map = makeTestMap(5);
+    tileAt(map, 0, 0)!.unit = makeUnit('u1', 0, 'rider', 0, 0);
+    tileAt(map, 0, 1)!.roadOwner = 0;
+    tileAt(map, 0, 2)!.roadOwner = 0;
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
-    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    const sim = new Simulator(map, players, 'turns30', { rng: () => 0.5 });
     sim.startGame();
     sim.drainEvents();
-    expect(sim.applyCommand({ type: 'move', unitId: 'u1', q: 0, r: 2 })).toBe(true);
+    // 5 land tiles would cost 50 > 40 move points; the two own roads on the
+    // route (leaving them costs 5 each) bring the trip down to 40.
+    expect(sim.applyCommand({ type: 'move', unitId: 'u1', q: 0, r: 5 })).toBe(true);
+
+    // Negative control: without the roads the same 5-tile hop is out of reach.
+    const plain = makeTestMap(5);
+    tileAt(plain, 0, 0)!.unit = makeUnit('u2', 0, 'rider', 0, 0);
+    const p2 = buildPlayers(Tribe.Villagers, 1, new SeededRandom(7));
+    const sim2 = new Simulator(plain, p2, 'turns30', { rng: () => 0.5 });
+    sim2.startGame();
+    sim2.drainEvents();
+    expect(sim2.applyCommand({ type: 'move', unitId: 'u2', q: 0, r: 5 })).toBe(false);
   });
 
   it('rejects the +1 move when the unit does not start on its own road', () => {

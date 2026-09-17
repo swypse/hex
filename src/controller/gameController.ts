@@ -12,7 +12,7 @@ import { buildPlayers } from '../game/players';
 import { AiDifficulty, DEFAULT_AI_DIFFICULTY } from '../game/aiDifficulty';
 import { hasSkill, SKILLS, SkillId } from '../game/skills';
 import { attackableTargets } from '../game/combat';
-import { moveRange, canMove, canAttack, canDisband, makeUnit, PIRATE_OWNER, type Unit, type UnitType } from '../game/units';
+import { movePoints, canMove, canAttack, canDisband, makeUnit, PIRATE_OWNER, type Unit, type UnitType } from '../game/units';
 import { cycleSelection, reachableTargets, tileAt } from '../game/selection';
 import { shouldPromptWatch, type GameMode } from '../game/gameMode';
 import { isExploredFor, initialExplorationFor } from '../game/explore';
@@ -1236,7 +1236,7 @@ class GameController {
       if (unit && unit.owner === store.localPlayerIndex && canMove(unit)) {
         const canClimb = hasSkill(store.players[unit.owner]!, 'climbing');
         const canDock = hasSkill(store.players[unit.owner]!, 'navigation');
-        this.reachableKeys = new Set(reachableTargets(this.sim.map, unit, moveRange(unit, tileAt(this.sim.map, unit.q, unit.r), this.sim.map), canClimb, canDock, store.localPlayerIndex).map((t) => axialKey(t)));
+        this.reachableKeys = new Set(reachableTargets(this.sim.map, unit, movePoints(unit), canClimb, canDock, store.localPlayerIndex).map((t) => axialKey(t)));
       }
       if (unit && unit.owner === store.localPlayerIndex && canAttack(unit)) {
         this.attackableKeys = new Set(attackableTargets(this.sim.map, unit, store.localPlayerIndex).map((t) => axialKey(t)));

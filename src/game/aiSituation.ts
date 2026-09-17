@@ -4,8 +4,8 @@ import { GameMode } from './gameMode';
 import { AiDifficultyProfile } from './aiDifficulty';
 import { isExploredFor } from './explore';
 import { hexDistance, hexNeighbors } from './hex';
-import { isShip, shipAttackDistance, shipMovement } from './ship';
-import { UNIT_ATTACK_DISTANCE, UNIT_MOVEMENT, Unit, UnitType } from './units';
+import { isShip, shipAttackDistance, shipMovePoints } from './ship';
+import { UNIT_ATTACK_DISTANCE, UNIT_MOVE_POINTS, Unit, UnitType } from './units';
 import { isWaterType } from './tileTypes';
 import { attackDamage } from './combat';
 
@@ -108,11 +108,13 @@ export function isMelee(unit: Unit): boolean {
 }
 
 function movementOf(unit: Unit): number {
-  return unit.shipLevel !== undefined ? shipMovement(unit) : UNIT_MOVEMENT[unit.type];
+  return unit.shipLevel !== undefined ? shipMovePoints(unit) : UNIT_MOVE_POINTS[unit.type];
 }
 
 export function turnsToOccupy(from: MapTile, to: MapTile, mover: Unit): number {
-  return Math.max(1, Math.ceil(hexDistance(from, to) / movementOf(mover)));
+  // Flat-terrain estimate: a land tile costs 10 move points, so points/10
+  // tiles per turn.
+  return Math.max(1, Math.ceil((hexDistance(from, to) * 10) / movementOf(mover)));
 }
 
 export function visibleEnemies(map: GameMap, playerIndex: number): EnemyUnit[] {

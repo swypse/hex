@@ -12,11 +12,11 @@ import {
   revertShip,
   SHIP_ATTACK,
   SHIP_ATTACK_DISTANCE,
-  SHIP_MOVEMENT,
+  SHIP_MOVE_POINTS,
   SHIP_UPGRADE_COST,
   shipAttack,
   shipAttackDistance,
-  shipMovement,
+  shipMovePoints,
   upgradeShip,
 } from '../src/game/ship';
 
@@ -46,7 +46,7 @@ function tile(ownedBy: number | null): MapTile {
 
 describe('ship', () => {
   it('has the specified stats per level', () => {
-    expect(SHIP_MOVEMENT).toEqual({ 1: 2, 2: 3, 3: 4 });
+    expect(SHIP_MOVE_POINTS).toEqual({ 1: 20, 2: 30, 3: 40 });
     expect(SHIP_ATTACK).toEqual({ 1: 10, 2: 20, 3: 30 });
     expect(SHIP_ATTACK_DISTANCE).toEqual({ 1: 2, 2: 2, 3: 3 });
     expect(SHIP_UPGRADE_COST).toEqual({
@@ -66,9 +66,9 @@ describe('ship', () => {
     expect(isShip(u)).toBe(false);
   });
 
-  it('shipMovement returns the ship range', () => {
-    expect(shipMovement(unit({ shipLevel: 1 }))).toBe(2);
-    expect(shipMovement(unit({ shipLevel: 3 }))).toBe(4);
+  it('shipMovePoints returns the ship move points', () => {
+    expect(shipMovePoints(unit({ shipLevel: 1 }))).toBe(20);
+    expect(shipMovePoints(unit({ shipLevel: 3 }))).toBe(40);
   });
 
   it('shipAttack uses fixed values per level', () => {
