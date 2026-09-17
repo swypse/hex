@@ -112,7 +112,7 @@ describe('UnitHelpDialog', () => {
     dialog.mount(host, root);
     const texts = allTexts(root);
     expect(texts).toContain('Basic melee unit. Moves onto the tile of a unit it kills in melee.');
-    expect(texts).toContain('1 movement');
+    expect(texts).toContain('10 move points');
     expect(texts).toContain('20 attack');
     expect(texts).toContain('50 HP');
     expect(texts).toContain('1 upkeep');

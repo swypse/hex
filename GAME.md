@@ -38,15 +38,15 @@ Tribes currently differ only by color.
 Units belong to a tribe's player. Spawned in owned villages (see Spawning). A unit can perform one action per turn; a
 freshly spawned unit must wait until the next turn.
 
-| Unit      | Movement | Attack | Attack range | HP | Spawn cost                 |
-|-----------|----------|--------|--------------|----|----------------------------|
-| Warrior   | 1        | 2      | 1            | 5  | 4 money                    |
-| Rider     | 4        | 2      | 1            | 4  | 6 money                    |
-| Archer    | 1        | 2      | 2            | 4  | 6 money                    |
-| Swordsman | 1        | 4      | 1            | 8  | 10 money + 2 ore           |
-| Shield    | 1        | 0.7    | 1            | 8  | 8 money + 2 ore            |
-| Catapult  | 1        | 5      | 4            | 3  | 15 money + 10 wood + 3 ore |
-| Knight    | 3        | 4      | 1            | 6  | 14 money + 5 ore           |
+| Unit      | Move points | Attack | Attack range | HP | Spawn cost                 |
+|-----------|--------------|--------|--------------|----|----------------------------|
+| Warrior   | 10           | 2      | 1            | 5  | 4 money                    |
+| Rider     | 40           | 2      | 1            | 4  | 6 money                    |
+| Archer    | 10           | 2      | 2            | 4  | 6 money                    |
+| Swordsman | 10           | 4      | 1            | 8  | 10 money + 2 ore           |
+| Shield    | 10           | 0.7    | 1            | 8  | 8 money + 2 ore            |
+| Catapult  | 10           | 5      | 4            | 3  | 15 money + 10 wood + 3 ore |
+| Knight    | 30           | 4      | 1            | 6  | 14 money + 5 ore           |
 
 - **Rider** additionally requires the *Riding* skill.
 - **Knight** additionally requires the *Knights* skill. After killing an enemy it may attack again in the same turn;
@@ -59,7 +59,7 @@ freshly spawned unit must wait until the next turn.
   turn in which it has already moved, and never moves onto a killed enemy's tile. A land catapult never counter-attacks
   when attacked (aboard a ship the crew still fights back with the ship's cannon).
 - **Ships:** when a unit moves onto its own port it becomes a ship, but can't move or attack again until the next turn.
-  Ships move 2/3/4 (levels 1/2/3) and traverse water; they can land only on coast tiles as the final step. A ship may
+  Ships have 20/30/40 move points (levels 1/2/3) and traverse water; they can land only on coast tiles as the final step. A ship may
   always attack in the same turn it has moved (the shield/catapult "cannot attack after moving" limit does not apply
   once a unit is on a ship), but a ship can never move again in the turn it has attacked. A ship reveals the map with
   its own ship-level attack distance, regardless of the original unit type it carries. Ship attack: level 1 = 1 at range
@@ -68,7 +68,7 @@ freshly spawned unit must wait until the next turn.
   back into a normal unit and consumes the whole turn: the unit may neither move, attack, nor heal again until the next
   turn.
 - **Pirates:** neutral units that belong to no tribe. From turn 7 onward, on every odd turn, there is a 15% chance a
-  pirate spawns on an edge water cell. Pirates move 5 on sea only, have attack 3 at range 1 and 15 HP. If any pirate is
+  pirate spawns on an edge water cell. Pirates have 50 move points on sea only, have attack 3 at range 1 and 15 HP. If any pirate is
   on the map, they take their turn after all players, attacking the nearest player unit (ship or land) or moving toward
   it. A pirate adjacent to a ship tries to **capture** it with a 25% success chance: on success the ship becomes a
   pirate ship (keeping its HP and damage); on failure the pirate loses 2 HP and the ship loses 1 HP. Killing a pirate
@@ -82,10 +82,18 @@ freshly spawned unit must wait until the next turn.
 
 ## Unit actions
 
-- **Move** — move up to the unit's movement. Mountains block movement until *Climbing* is learned. Water blocks movement
-  (except for ships with *Navigation*). A rider that already attacked this turn can still move up to its full movement.
-  Movement stops at the first cell adjacent to an enemy: that cell can be entered, but cells beyond it along the path
-  are not available (a unit next to an enemy can always move at least 1 cell).
+- **Move** — spend up to the unit's move points. Leaving a tile costs that
+  tile's move points: land and water 10, forest 14, mountain 20 (entering a
+  tile is free — the cost is paid when the unit leaves it). A unit may always
+  make a 1-tile move even without move points left. Mountains block movement
+  until *Climbing* is learned, and water blocks movement (except for ships
+  with *Navigation*). A rider that already attacked this turn can still move
+  up to its full move points. Leaving the unit's own road tile, a road on its
+  own territory, its own village linked to its road network, or a water-route
+  tile of its own ports halves the tile's cost (rounded down), so road
+  networks are the fast lanes. Movement stops at the first cell adjacent to an
+  enemy: that cell can be entered, but cells beyond it along the path are not
+  available (a unit next to an enemy can always move at least 1 cell).
 - **Attack** — attack an enemy within attack range, once per turn. Combat uses
   a Polytopia-style force-ratio formula with a scale constant of 1.5:
   `attackForce = attack × current hp / max hp`;
@@ -117,7 +125,8 @@ freshly spawned unit must wait until the next turn.
 - **Auto port connections** — a player's own ports are connected automatically, drawn as a light-blue route over the
   shortest path of own water tiles between them. Two ports connect only when a path over own water cells exists (each of
   a cluster's ports is reachable); otherwise they stay unconnected. Villages reached through a port's water route count
-  as connected like roads. Water-route tiles never grant movement bonuses. Connections are recomputed live as territory
+  as connected like roads. Water-route tiles halve the move-points cost for
+  their owner. Connections are recomputed live as territory
   and ownership change (a captured village can dissolve or create them).
 
 ## Fog of war

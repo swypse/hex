@@ -54,13 +54,13 @@ describe('unit help stat rows', () => {
     const rows = unitHelpStats(unit('warrior'));
     const move = rows.find((r) => r.icon === '16/move-16.png');
     expect(move).not.toBeUndefined();
-    expect(move!.text).toBe('1 movement');
+    expect(move!.text).toBe('10 move points');
   });
 
   it('renders attack, hp, upkeep and defense rows with their values', () => {
     const rows = unitHelpStats(unit('warrior'));
     expect(rows).toEqual([
-      { icon: '16/move-16.png', text: '1 movement' },
+      { icon: '16/move-16.png', text: '10 move points' },
       { icon: '16/attack-16.png', text: '20 attack' },
       { icon: '16/hp-16.png', text: '50 HP' },
       { icon: '16/gold-16.png', text: '1 upkeep' },
@@ -70,7 +70,7 @@ describe('unit help stat rows', () => {
 
   it('uses the current ship level values for a ship at that level', () => {
     const rows = unitHelpStats(unit('rider', 2));
-    expect(rows.find((r) => r.icon === '16/move-16.png')!.text).toBe('3 movement');
+    expect(rows.find((r) => r.icon === '16/move-16.png')!.text).toBe('30 move points');
     expect(rows.find((r) => r.icon === '16/attack-16.png')!.text).toBe('20 attack');
     expect(rows.find((r) => r.icon === '16/gold-16.png')!.text).toBe('3 upkeep');
   });
