@@ -30,17 +30,20 @@ describe('icons16 atlas generation', () => {
     expect(a.manifestTs).toBe(b.manifestTs);
   });
 
-  it('lays out the icons in a single row of 16x16 cells', () => {
+  it('lays the icons out on a 16x16 cell grid', () => {
     const { frames, width, height } = generateIcons16Atlas(SOURCE_DIR_URL, ICONS16_COLS);
+    const rows = Math.ceil(FILES.length / ICONS16_COLS);
     expect(width).toBe(ICONS16_COLS * ICONS16_CELL);
-    expect(height).toBe(ICONS16_CELL);
+    expect(height).toBe(rows * ICONS16_CELL);
     for (const id of FILES) {
       const f = frames[id];
       expect(f).not.toBeUndefined();
       expect([f.w, f.h]).toEqual([ICONS16_CELL, ICONS16_CELL]);
-      expect(f.y).toBe(0);
-      expect(f.x).toBeGreaterThanOrEqual(0);
+      const index = FILES.indexOf(id);
+      expect(f.x).toBe((index % ICONS16_COLS) * ICONS16_CELL);
+      expect(f.y).toBe(Math.floor(index / ICONS16_COLS) * ICONS16_CELL);
       expect(f.x + ICONS16_CELL).toBeLessThanOrEqual(width);
+      expect(f.y + ICONS16_CELL).toBeLessThanOrEqual(height);
     }
   });
 

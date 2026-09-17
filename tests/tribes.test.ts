@@ -17,13 +17,13 @@ describe('TRIBES', () => {
     expect(TRIBES.map((t) => t.code)).toEqual(['cats', 'villagers', 'warriors', 'barbarians', 'forest', 'aqua']);
   });
 
-  it('names and colors the new tribes', () => {
+  it('names and colors the forest and aqua tribes', () => {
     const forest = TRIBES.find((t) => t.code === 'forest')!;
     const aqua = TRIBES.find((t) => t.code === 'aqua')!;
     expect(forest.name).toBe('Forest people');
-    expect(forest.color).toBe(0x47b220);
+    expect(forest.color).toBe(0x6fd304);
     expect(aqua.name).toBe('Aqua people');
-    expect(aqua.color).toBe(0x4da2da);
+    expect(aqua.color).toBe(0x207dd9);
   });
 
   it('declares the tribe starting bonuses', () => {
