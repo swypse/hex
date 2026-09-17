@@ -19,7 +19,7 @@ function makeWarrior(id: string, owner: number, q: number, r: number, hp: number
 }
 
 function makeShield(id: string, owner: number, q: number, r: number, hp: number): Unit {
-  return { id, owner, type: 'shield', q, r, hasMoved: false, hasAttacked: false, hasHealed: false, hp, attack: 10, attackDistance: 1, defense: 20, spawnVillage: null };
+  return { id, owner, type: 'shield', q, r, hasMoved: false, hasAttacked: false, hasHealed: false, hp, attack: 7, attackDistance: 1, defense: 20, spawnVillage: null };
 }
 
 function makeCatapult(id: string, owner: number, q: number, r: number, hp: number): Unit {
@@ -146,7 +146,7 @@ describe('chooseBestAttack', () => {
 
   it('prefers a target that cannot retaliate', () => {
     const map: GameMap = { radius: 4, tiles: [], spawns: [] };
-    const archer: Unit = { id: 'a', owner: 0, type: 'archer', q: 0, r: 0, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 30, attack: 20, attackDistance: 2, defense: 10, spawnVillage: null };
+    const archer: Unit = { id: 'a', owner: 0, type: 'archer', q: 0, r: 0, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 40, attack: 20, attackDistance: 2, defense: 7, spawnVillage: null };
     const melee = makeTile(1, 0, TileType.GrasslandLand, makeWarrior('m', 1, 1, 0, 1));
     const farMelee = makeTile(2, 0, TileType.GrasslandLand, makeWarrior('f', 1, 2, 0, 1));
     map.tiles.push(makeTile(0, 0, TileType.GrasslandLand, archer), melee, farMelee);
@@ -207,7 +207,7 @@ describe('performAttack', () => {
 
   it('does not move an archer onto the killed tile', () => {
     const map = makeMap();
-    const archer: Unit = { id: 'arc', owner: 0, type: 'archer', q: 0, r: 0, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 30, attack: 20, attackDistance: 3, defense: 10, spawnVillage: null };
+    const archer: Unit = { id: 'arc', owner: 0, type: 'archer', q: 0, r: 0, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 40, attack: 20, attackDistance: 3, defense: 7, spawnVillage: null };
     map.tiles[0]!.unit = archer;
     const dying = makeTile(1, 0, TileType.GrasslandLand, makeWarrior('b', 1, 1, 0, 1));
     map.tiles[1]! = dying;
@@ -348,12 +348,12 @@ describe('performAttack', () => {
 
   it('does not apply counter-damage when the attacker is beyond the target reach', () => {
     const map: GameMap = { radius: 4, tiles: [], spawns: [] };
-    const archer: Unit = { id: 'arc', owner: 0, type: 'archer', q: 0, r: 0, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 30, attack: 20, attackDistance: 2, defense: 10, spawnVillage: null };
+    const archer: Unit = { id: 'arc', owner: 0, type: 'archer', q: 0, r: 0, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 40, attack: 20, attackDistance: 2, defense: 7, spawnVillage: null };
     const far = makeTile(2, 0, TileType.GrasslandLand, makeWarrior('w', 1, 2, 0, 30));
     map.tiles.push(makeTile(0, 0, TileType.GrasslandLand, archer), far);
     const result = performAttack(map, archer, far, noMiss);
     expect(result.targetDamage).toBe(0);
-    expect(archer.hp).toBe(30);
+    expect(archer.hp).toBe(40);
     // attackForce 20, defenseForce 10*(30/50)=6, total 26: round((20/26)*20*1.5)=23
     expect(far.unit!.hp).toBe(7);
   });
@@ -363,7 +363,7 @@ describe('ship attacks', () => {  it('a level-3 ship attacks at distance 3 with 
     const ship: Unit = {
       id: 's', owner: 0, type: 'archer', q: 0, r: 0,
       hasMoved: false, hasAttacked: false, hasHealed: false,
-      hp: 30, attack: 20, attackDistance: 2, defense: 10, spawnVillage: null,
+      hp: 40, attack: 20, attackDistance: 2, defense: 7, spawnVillage: null,
       shipLevel: 3,
     };
     const map: GameMap = { radius: 4, tiles: [], spawns: [] };
@@ -526,7 +526,7 @@ describe('tradeIsFavorable', () => {
   }
 
   it('returns true for a kill', () => {
-    const knight = unitOf('k', 'knight', 0, 0, 0); // damage 50
+    const knight = unitOf('k', 'knight', 0, 0, 0); // attack 40
     const weak = unitOf('w', 'warrior', 1, 1, 0);
     weak.hp = 10;
     expect(tradeIsFavorable(knight, tileWith(1, 0, weak))).toBe(true);
