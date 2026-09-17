@@ -29,12 +29,12 @@ interface UnitTypeInfo {
 
 export const UNIT_TYPES: Record<UnitType, UnitTypeInfo> = {
   warrior: { movement: 1, attack: 20, attackDistance: 1, maxHp: 50, defense: 10, price: 4, priceWood: 0, priceOre: 0, shape: 'circle' },
-  rider: { movement: 4, attack: 20, attackDistance: 1, maxHp: 40, defense: 10, price: 6, priceWood: 0, priceOre: 0, shape: 'square' },
-  archer: { movement: 1, attack: 20, attackDistance: 2, maxHp: 30, defense: 10, price: 6, priceWood: 0, priceOre: 0, shape: 'triangle' },
-  swordsman: { movement: 1, attack: 40, attackDistance: 1, maxHp: 80, defense: 20, price: 15, priceWood: 0, priceOre: 3, shape: 'swordsman' },
-  shield: { movement: 1, attack: 10, attackDistance: 1, maxHp: 80, defense: 20, price: 10, priceWood: 0, priceOre: 3, shape: 'square' },
-  catapult: { movement: 1, attack: 50, attackDistance: 4, maxHp: 30, defense: 0, price: 30, priceWood: 20, priceOre: 5, shape: 'square' },
-  knight: { movement: 3, attack: 50, attackDistance: 1, maxHp: 50, defense: 10, price: 20, priceWood: 0, priceOre: 10, shape: 'swordsman' },
+  rider: { movement: 4, attack: 20, attackDistance: 1, maxHp: 40, defense: 7, price: 6, priceWood: 0, priceOre: 0, shape: 'square' },
+  archer: { movement: 1, attack: 20, attackDistance: 2, maxHp: 40, defense: 7, price: 6, priceWood: 0, priceOre: 0, shape: 'triangle' },
+  swordsman: { movement: 1, attack: 40, attackDistance: 1, maxHp: 80, defense: 20, price: 10, priceWood: 0, priceOre: 2, shape: 'swordsman' },
+  shield: { movement: 1, attack: 7, attackDistance: 1, maxHp: 80, defense: 20, price: 8, priceWood: 0, priceOre: 2, shape: 'square' },
+  catapult: { movement: 1, attack: 50, attackDistance: 4, maxHp: 30, defense: 0, price: 15, priceWood: 10, priceOre: 3, shape: 'square' },
+  knight: { movement: 3, attack: 40, attackDistance: 1, maxHp: 60, defense: 7, price: 14, priceWood: 0, priceOre: 5, shape: 'swordsman' },
   pirate: { movement: 5, attack: 15, attackDistance: 3, maxHp: PIRATE_HP, defense: 5, price: 0, priceWood: 0, priceOre: 0, shape: 'square' },
 };
 
