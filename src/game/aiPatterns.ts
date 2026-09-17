@@ -7,7 +7,7 @@ import { reachableTargets, tileAt } from './selection';
 import { UNIT_MOVEMENT, UNIT_TYPES, UNIT_ATTACK_DISTANCE, canHeal, HEAL_AMOUNT, Unit, UnitType } from './units';
 import { SeededRandom } from '../util/random';
 import { hexDistance, hexNeighbors } from './hex';
-import { attackableTargets, attackDamage, canCounterAttack, resolveCombat, tradeIsFavorable } from './combat';
+import { attackableTargets, attackDamage, canCounterAttack, counterDamageTo as counterDamageToFromCombat, resolveCombat, tradeIsFavorable } from './combat';
 import { canBuildPort, canBuildSawmill, canBuildMine, BUILDING_COSTS } from './buildings';
 import { unitsInVillage, villageCapacity } from './village';
 import { isExploredFor } from './explore';
@@ -108,13 +108,7 @@ export function counterDamageTo(
   attackerTile: MapTile,
   targetTile: MapTile,
 ): number {
-  const target = targetTile.unit!;
-  const { attackerDamage, counterDamage } = resolveCombat(map, attacker, targetTile);
-  if (attackerDamage >= target.hp) return 0;
-  const dist = hexDistance({ q: attacker.q, r: attacker.r }, { q: target.q, r: target.r });
-  if (dist > target.attackDistance) return 0;
-  if (!canCounterAttack(target)) return 0;
-  return counterDamage;
+  return counterDamageToFromCombat(map, attacker, targetTile);
 }
 
 export type GarrisonGuardResult = { kind: 'attack'; guardType?: UnitType } | { kind: 'hold' };

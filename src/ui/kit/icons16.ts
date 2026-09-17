@@ -7,6 +7,7 @@ const TEXTURE_BASE = `${import.meta.env.BASE_URL}textures/`;
 export const ICONS16_FILES: Record<string, string> = {
   hp: 'hp-16',
   attack: 'attack-16',
+  skull: 'skull-16',
   def: 'def-16',
   upkeep: 'gold-16',
   move: 'move-16',

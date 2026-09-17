@@ -11,5 +11,6 @@ export const ICONS16_ATLAS_FRAMES: Record<string, { x: number; y: number }> = {
   'help-16': { x: 48, y: 0 },
   'hp-16': { x: 64, y: 0 },
   'move-16': { x: 80, y: 0 },
-  'village-16': { x: 96, y: 0 },
+  'skull-16': { x: 96, y: 0 },
+  'village-16': { x: 0, y: 16 },
 };

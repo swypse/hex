@@ -708,7 +708,7 @@ class GameController {
     if (!attacker) return;
     this.suppressNextTap = true;
     this.damagePreviewShown = true;
-    this.mapView.showDamagePreview(attacker, victim);
+    this.mapView.showDamagePreview(attacker, victim, () => this.render());
     this.render();
   }
 

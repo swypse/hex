@@ -72,6 +72,24 @@ export function canCounterAttack(unit: Unit): boolean {
   return !(unit.type === 'catapult' && !isShip(unit));
 }
 
+/** Counter damage an attack on `target` would draw back onto `attacker` (0
+ *  when the target dies, is out of range, or cannot counter), mirroring
+ *  performAttack's exact formula: the target's defense force shares the
+ *  incoming attack force, so its retaliation is the defense result. */
+export function counterDamageTo(
+  map: GameMap,
+  attacker: Unit,
+  targetTile: MapTile,
+): number {
+  const target = targetTile.unit!;
+  const { attackerDamage, counterDamage } = resolveCombat(map, attacker, targetTile);
+  if (attackerDamage >= target.hp) return 0;
+  const dist = hexDistance({ q: attacker.q, r: attacker.r }, targetTile);
+  if (dist > (target.attackDistance ?? 0)) return 0;
+  if (!canCounterAttack(target)) return 0;
+  return counterDamage;
+}
+
 export function attackableTargets(map: GameMap, unit: Unit, playerIndex = 0): MapTile[] {
   return map.tiles.filter((t) => {
     if (!t.unit) return false;

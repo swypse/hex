@@ -7,6 +7,8 @@ import {
   SCORE_PAD,
   SCORE_TOP_OFFSET,
   SCORE_CHIP_RADIUS,
+  SCORE_TEXT_CHIP_GAP,
+  SCORE_TEXT_HEIGHT,
   SCORE_BUFF_CHIP_GAP,
   SCORE_BUTTON_GAP,
   scoreButtonsPosition,
@@ -43,7 +45,8 @@ describe('score-stack button placement', () => {
     expect(el.position.y).toBe(pos.y);
     expect(el.position.x).toBe(chipX - BUTTON_SIZE / 2);
     const chipY = SCORE_PAD + SCORE_TOP_OFFSET + SCORE_CHIP_RADIUS;
-    expect(el.position.y).toBe(chipY + SCORE_CHIP_RADIUS + SCORE_BUFF_CHIP_GAP + SCORE_BUTTON_GAP);
+    // The score text now sits between the chip and the buff/button stack.
+    expect(el.position.y).toBe(chipY + SCORE_CHIP_RADIUS + SCORE_TEXT_CHIP_GAP + SCORE_TEXT_HEIGHT + SCORE_BUFF_CHIP_GAP + SCORE_BUTTON_GAP);
     skills.destroy();
   });
 

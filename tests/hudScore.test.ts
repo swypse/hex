@@ -11,6 +11,7 @@ import { Tribe } from '../src/game/tribes';
 import { SeededRandom } from '../src/util/random';
 import { Simulator } from '../src/game/simulator';
 import { TileType } from '../src/game/tileTypes';
+import { SCORE_PAD, SCORE_TOP_OFFSET, SCORE_CHIP_RADIUS, SCORE_TEXT_CHIP_GAP, SCORE_TEXT_HEIGHT } from '../src/ui/layout';
 
 function makeHost(): UIHost {
   return {
@@ -69,19 +70,26 @@ describe('HudScore buff icons', () => {
     expect(allSprites(buffRow).length).toBeGreaterThan(0);
   });
 
-  it('renders the local player tribe chip and orange bold score text', () => {
+  it('renders the local player tribe chip and orange bold score text below it', () => {
     mount(0);
     const hudAny = hud as unknown as { text: BitmapText | null; tribeChip: Container | null };
     expect(hudAny.tribeChip).not.toBeNull();
     expect(hudAny.text).not.toBeNull();
-    // Orange bold 24px score label (bold = Roboto Black family).
-    expect(hudAny.text!.style.fontSize).toBe(24);
+    // Orange bold 16px score label (bold = Roboto Black family).
+    expect(hudAny.text!.style.fontSize).toBe(16);
     expect(hudAny.text!.style.fill).toBe(0xffc465);
     expect(hudAny.text!.style.fontFamily).toBe(FONT_BLACK);
     // The chip holds a white circle + clipped tribe icon sprite.
     expect(hudAny.tribeChip!.children.some((c) => c instanceof Sprite)).toBe(true);
-    // The chip sits to the right of the score text.
-    expect(hudAny.tribeChip!.position.x).toBeGreaterThan(hudAny.text!.position.x);
+    // The score text sits below the chip, centred on it, with a 6px gap.
+    const chipX = host.app.screen.width - SCORE_PAD - SCORE_CHIP_RADIUS;
+    const chipY = SCORE_PAD + SCORE_TOP_OFFSET + SCORE_CHIP_RADIUS;
+    expect(hudAny.tribeChip!.position.x).toBeCloseTo(chipX, 5);
+    expect(hudAny.tribeChip!.position.y).toBeCloseTo(chipY, 5);
+    expect(hudAny.text!.position.x).toBeCloseTo(chipX, 5);
+    // Text centred vertically so the top of the label sits 6px below the chip
+    // bottom edge.
+    expect(hudAny.text!.position.y).toBeCloseTo(chipY + SCORE_CHIP_RADIUS + SCORE_TEXT_CHIP_GAP + SCORE_TEXT_HEIGHT / 2, 5);
   });
 
   it('shows no buff icon with only 2 water temples', () => {

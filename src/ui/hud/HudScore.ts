@@ -12,17 +12,17 @@ import {
   SCORE_PAD,
   SCORE_TOP_OFFSET,
   SCORE_CHIP_RADIUS,
+  SCORE_TEXT_CHIP_GAP,
+  SCORE_TEXT_HEIGHT,
   SCORE_BUFF_CHIP_GAP,
 } from '../layout';
 
-const SCORE_FONT_SIZE = 24;
+const SCORE_FONT_SIZE = 16;
 const SCORE_COLOR = 0xffc465;
 const CHIP_RADIUS = SCORE_CHIP_RADIUS;
 const PAD = SCORE_PAD;
 const TOP_OFFSET = SCORE_TOP_OFFSET;
 const ICON_SIZE = 16;
-/** Horizontal gap between the score text and the tribe chip. */
-const SCORE_CHIP_GAP = 8;
 /** Vertical gap between buff items (icon + sub score) under the score circle. */
 const BUFF_GAP = 8;
 
@@ -46,7 +46,7 @@ export class HudScore implements Widget {
       fill: SCORE_COLOR,
       fontWeight: '700',
     });
-    text.anchor.set(1, 0.5);
+    text.anchor.set(0.5, 0.5);
 
     // The local player's tribe logo clipped into a white circle chip.
     const s = useGameStore.getState();
@@ -92,14 +92,14 @@ export class HudScore implements Widget {
 
   private layout = (): void => {
     if (!this.el || !this.host || !this.text || !this.tribeChip || !this.buffRow) return;
-    // The row hugs the top-right: tribe chip at the right edge, score text to
-    // its left, buff icons centred under the chip.
+    // The row hugs the top-right: tribe chip at the right edge, the score text
+    // centred below it (6px gap), buff icons centred under the chip.
     const chipX = this.host.app.screen.width - PAD - CHIP_RADIUS;
     const chipY = PAD + TOP_OFFSET + CHIP_RADIUS;
     this.tribeChip.position.set(chipX, chipY);
-    this.text.position.set(chipX - CHIP_RADIUS - SCORE_CHIP_GAP, chipY);
+    this.text.position.set(chipX, chipY + CHIP_RADIUS + SCORE_TEXT_CHIP_GAP + SCORE_TEXT_HEIGHT / 2);
     this.el.position.set(0, 0);
-    this.buffRow.position.set(chipX - ICON_SIZE / 2, chipY + CHIP_RADIUS + SCORE_BUFF_CHIP_GAP);
+    this.buffRow.position.set(chipX - ICON_SIZE / 2, chipY + CHIP_RADIUS + SCORE_TEXT_CHIP_GAP + SCORE_TEXT_HEIGHT + SCORE_BUFF_CHIP_GAP);
   };
 
   private readScore(): number {

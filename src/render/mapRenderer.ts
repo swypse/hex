@@ -2,9 +2,9 @@ import {
   Application, BitmapText, Circle, Container, Graphics, Sprite, type TextStyleOptions, type Texture, type Ticker
 } from 'pixi.js';
 import { FONT_REGULAR } from '../ui/kit/bitmapFonts';
-import { axialKey, compareTileY, hexCorners, hexEdge, hexEdgeNeighbor, hexToPixel, splitHexBorder } from '../game/hex';
+import { axialKey, compareTileY, hexCorners, hexDistance, hexEdge, hexEdgeNeighbor, hexToPixel, splitHexBorder } from '../game/hex';
 import { tileMapByKey, type GameMap, type MapTile } from '../game/mapGen';
-import { resolveCombat } from '../game/combat';
+import { counterDamageTo, resolveCombat } from '../game/combat';
 import { bridgeCoastOffsets } from '../game/bridges';
 import { portDirection } from '../game/buildings';
 import { Player } from '../game/players';
@@ -90,10 +90,10 @@ const DAMAGE_BADGE_CARET = 5;
 const DAMAGE_BADGE_CARET_W = 9;
 /** Duration of the badge in/out animation (ms). */
 const DAMAGE_BADGE_ANIM_MS = 200;
-/** Scale overshoot while the badge bounces in/out. */
-const DAMAGE_BADGE_BOUNCE = 0.15;
-/** Vertical up/down travel (world px) of the badge during in/out. */
-const DAMAGE_BADGE_RISE = 6;
+/** Delay between consecutive reachable/attackable marker rings (ms). */
+const MARKER_STAGGER_DELAY_MS = 80;
+/** Duration of the marker fade-in once its delay elapses (ms). */
+const MARKER_STAGGER_FADE_MS = 120;
 
 type CaptureMarkerSide = 'l' | 'r' | 't' | 'b';
 
@@ -293,6 +293,10 @@ export class MapView {
     this.tutorialMarkerParts = [];
     this.attackPulseParts = [];
     this.movePulseParts = [];
+    this.stopMarkerRevealTick();
+    this.markerRevealTimes.clear();
+    this.markerRevealEls.clear();
+    this.markerRevealSig = '';
     this.stopBounce();
     this.stopHexBounce();
     this.container.destroy({ children: true });
@@ -463,8 +467,9 @@ export class MapView {
   /** Arm an expected-damage preview from `attacker` (the local selected unit)
    *  against `target` (an enemy standing on a tile). The badges are rendered the
    *  next time `update` runs, so a caller usually arms then triggers a re-render.
-   *  The counter-attack badge appears 100ms after the target badge. */
-  showDamagePreview(attacker: Unit, target: MapTile): void {
+   *  The counter-attack badge appears 100ms after the target badge.
+   *  `onRender` is called after the delay to trigger the next render pass. */
+  showDamagePreview(attacker: Unit, target: MapTile, onRender?: () => void): void {
     this.damagePreviewFor = { attacker, target };
     this.damagePreviewAttackerVisible = false;
     if (this.damagePreviewAttackerTimer !== null) {
@@ -473,6 +478,7 @@ export class MapView {
     }
     this.damagePreviewAttackerTimer = setTimeout(() => {
       this.damagePreviewAttackerVisible = true;
+      onRender?.();
     }, 100);
   }
 
@@ -511,6 +517,61 @@ export class MapView {
   private badgeAnim = new Map<Container, { phase: 'in' | 'out'; start: number }>();
   private badgeAnimRemove: (() => void) | null = null;
 
+  /** Stagger reveal state for move/attack markers: tile key -> reveal start
+   *  time (performance.now when the marker's distance ring is due to fade in). */
+  private markerRevealTimes = new Map<string, number>();
+  /** Live marker graphics currently staged for a fade-in, keyed by tile key. */
+  private markerRevealEls = new Map<string, Graphics>();
+  private markerRevealRemove: (() => void) | null = null;
+  /** Signature of the marker key set that the current reveal times belong to;
+   *  when the selection changes we reset the stagger clock. */
+  private markerRevealSig = '';
+
+  /** Starts (or reuses) a ticker that fades in any marker whose reveal time
+   *  has passed. Stops itself once no marker is still fading. */
+  private ensureMarkerRevealTick(): void {
+    if (this.markerRevealRemove) return;
+    if (this.markerRevealEls.size === 0) return;
+    const fn = (): void => {
+      const now = performance.now();
+      let allDone = true;
+      for (const [key, g] of this.markerRevealEls) {
+        if (g.destroyed) continue;
+        const start = this.markerRevealTimes.get(key);
+        if (start === undefined) continue;
+        const t = (now - start) / MARKER_STAGGER_FADE_MS;
+        g.alpha = Math.max(0, Math.min(1, t));
+        if (t < 1) allDone = false;
+      }
+      if (allDone) this.stopMarkerRevealTick();
+    };
+    const remover = (): void => {
+      this.app.ticker.remove(fn);
+    };
+    this.app.ticker.add(fn);
+    this.markerRevealRemove = remover;
+  }
+
+  private stopMarkerRevealTick(): void {
+    if (this.markerRevealRemove) {
+      const fn = this.markerRevealRemove;
+      this.markerRevealRemove = null;
+      fn();
+    }
+  }
+
+  /** Fades a marker in with a per-distance delay: the reveal for a tile at
+   *  distance d from the selection starts at (d - 1) * MARKER_STAGGER_DELAY. */
+  private revealMarker(key: string, dist: number, g: Graphics): void {
+    if (!this.markerRevealTimes.has(key)) {
+      this.markerRevealTimes.set(key, performance.now() + (dist - 1) * MARKER_STAGGER_DELAY_MS);
+    }
+    const start = this.markerRevealTimes.get(key)!;
+    const t = (performance.now() - start) / MARKER_STAGGER_FADE_MS;
+    g.alpha = Math.max(0, Math.min(1, t));
+    this.markerRevealEls.set(key, g);
+  }
+
   private ensureBadgeTick(): void {
     if (this.badgeAnimRemove) return;
     const fn = (): void => {
@@ -529,22 +590,12 @@ export class MapView {
         const t = Math.min(1, (now - anim.start) / DAMAGE_BADGE_ANIM_MS);
         if (anim.phase === 'in') {
           el.alpha = t;
-          const bounce = 1 + DAMAGE_BADGE_BOUNCE * Math.sin(t * Math.PI);
-          el.scale.set(bounce, bounce);
-          // Dip down mid-way, then settle back up.
-          el.position.y = DAMAGE_BADGE_RISE * Math.sin(t * Math.PI);
           if (t >= 1) {
             el.alpha = 1;
-            el.scale.set(1, 1);
-            el.position.y = 0;
             this.badgeAnim.delete(el);
           }
         } else {
           el.alpha = 1 - t;
-          const bounce = 1 - DAMAGE_BADGE_BOUNCE * Math.sin(t * Math.PI);
-          el.scale.set(bounce, bounce);
-          // Rise up as it fades out (the reverse of the in-dip).
-          el.position.y = DAMAGE_BADGE_RISE * Math.cos(t * Math.PI);
           if (t >= 1) {
             const outer = el.parent as Container | undefined;
             if (outer) {
@@ -603,21 +654,28 @@ export class MapView {
     const attackerTile = this.tileIndex.get(axialKey({ q: preview.attacker.q, r: preview.attacker.r }));
     if (!attackerTile || attackerTile.unit !== preview.attacker) return;
 
-    const { attackerDamage, counterDamage } = resolveCombat(this.map, preview.attacker, preview.target);
+    const { attackerDamage } = resolveCombat(this.map, preview.attacker, preview.target);
     // Badge over the long-pressed enemy: what the selected unit would deal.
-    this.addDamageBadge(preview.target, targetUnit, players, attackerDamage, localPlayerIndex);
+    // A lethal hit (damage >= target hp) shows the skull icon; 0 damage shows
+    // nothing.
+    if (attackerDamage > 0) {
+      this.addDamageBadge(preview.target, targetUnit, players, attackerDamage, localPlayerIndex, attackerDamage >= targetUnit.hp);
+    }
     // Badge over the selected unit: the counter it would take, delayed 100ms
-    // so the player sees the target badge first.
-    if (this.damagePreviewAttackerVisible) {
-      this.addDamageBadge(attackerTile, preview.attacker, players, counterDamage, localPlayerIndex);
+    // so the player sees the target badge first. Mirrors a real attack: the
+    // counter only lands when the target survives, is in range, and can
+    // counter-attack — otherwise no retaliation badge is shown.
+    const counterDamage = counterDamageTo(this.map, preview.attacker, preview.target);
+    if (counterDamage > 0 && this.damagePreviewAttackerVisible) {
+      this.addDamageBadge(attackerTile, preview.attacker, players, counterDamage, localPlayerIndex, counterDamage >= preview.attacker.hp);
     }
   }
 
   /** A tooltip-style damage badge: a `#111` rounded rect with no stroke, an
-   *  attack icon (14px) + white `-N` text, and a small `#111`
-   *  caret pointing down at the bottom — rendered in screen-space overlay so
-   *  it stays zoom-independent (just like unit HP bars). */
-  private addDamageBadge(tile: MapTile, unit: Unit, players: Player[], n: number, localPlayerIndex: number): void {
+   *  attack (or skull on a lethal hit) icon (14px) + white `-N` text, and a
+   *  small `#111` caret pointing down at the bottom — rendered in screen-space
+   *  overlay so it stays zoom-independent (just like unit HP bars). */
+  private addDamageBadge(tile: MapTile, unit: Unit, players: Player[], n: number, localPlayerIndex: number, kill = false): void {
     const p = hexToPixel(tile, this.hexSize);
     const y = p.y - tileElevation(tile, this.hexSize);
     const center = this.unitTextureTop(unit, players);
@@ -630,7 +688,9 @@ export class MapView {
     });
     label.anchor.set(0.5, 0.5);
 
-    const icon = makeIcon16('attack', DAMAGE_BADGE_ICON_SIZE);
+    const iconKey = kill ? 'skull' : 'attack';
+    const icon = makeIcon16(iconKey, DAMAGE_BADGE_ICON_SIZE);
+    icon.label = iconKey === 'skull' ? 'skull-16' : 'attack-16';
     icon.anchor.set(0.5, 0.5);
 
     const gap = DAMAGE_BADGE_ICON_GAP;
@@ -673,8 +733,8 @@ export class MapView {
     this.overlay.addChild(outer);
     this.damageBadgeAnchors.set(outer, { worldX: anchor.x, worldY: anchor.y, screenOffsetY });
     this.liveDamageBadges.add(outer);
-    // Fade the badge in with a scale bounce (the inner surface animates; the
-    // outer tracks the world position via syncBadgePositions).
+    // Fade the badge in (alpha only; the outer tracks the world position via
+    // syncBadgePositions).
     el.alpha = 0;
     this.badgeAnim.set(el, { phase: 'in', start: performance.now() });
     this.ensureBadgeTick();
@@ -1073,6 +1133,13 @@ export class MapView {
     }
     this.startTutorialPulse();
     const selectedKey = selection ? axialKey(selection) : '';
+    // When the reachable/attackable key set changes (new selection), reset the
+    // marker stagger clock so the new ring fades in from the start.
+    const markerKeys = [...reachableKeys.values()].sort().join(',') + '|' + [...attackableKeys.values()].sort().join(',') + '|' + selectedKey;
+    if (markerKeys !== this.markerRevealSig) {
+      this.markerRevealSig = markerKeys;
+      this.markerRevealTimes.clear();
+    }
     const dotRadius = this.hexSize * 0.16;
     for (const tile of map.tiles) {
       const key = axialKey(tile);
@@ -1084,6 +1151,8 @@ export class MapView {
         this.markerLayer.addChild(dot);
         this.highlights.push(dot);
         this.movePulseParts.push({ g: dot, x: p.x, y, base: dotRadius, color: reachableColor });
+        const dist = selection ? hexDistance({ q: selection.q, r: selection.r }, tile) : 1;
+        this.revealMarker(key, dist, dot);
         continue;
       }
       if (key === selectedKey && selection && selection.kind === 'unit' && tile.unit) {
@@ -1106,11 +1175,14 @@ export class MapView {
       const p = hexToPixel(tile, this.hexSize);
       const attackDot = this.takeGraphics();
       this.attackPulseParts.push({ g: attackDot, x: p.x, y, base: dotRadius });
+      const dist = selection ? hexDistance({ q: selection.q, r: selection.r }, tile) : 1;
+      this.revealMarker(key, dist, attackDot);
       this.markerLayer.addChild(attackDot);
       this.highlights.push(attackDot);
     }
     this.startAttackPulse();
     this.startMovePulse();
+    this.ensureMarkerRevealTick();
   }
 
   /** Draws the ground marker a move/attack target sits on: a filled hexagon
@@ -1817,6 +1889,8 @@ export class MapView {
     this.tutorialMarkerParts = [];
     this.attackPulseParts = [];
     this.movePulseParts = [];
+    this.markerRevealEls.clear();
+    this.stopMarkerRevealTick();
     for (const g of this.highlights) {
       g.parent?.removeChild(g);
       this.releaseGraphics(g);

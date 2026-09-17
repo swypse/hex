@@ -686,6 +686,53 @@ describe('MapView hp bar anchoring', () => {
     v.destroy();
   });
 
+  it('reveals move markers staggeringly: dist 2 starts fading only after dist 1', () => {
+    const callbacks: Array<() => void> = [];
+    const app = {
+      screen: { width: 800, height: 600 },
+      ticker: { add: (fn: () => void) => callbacks.push(fn), remove: (): void => {} },
+    } as unknown as Application;
+    const tile = (q: number, r: number): MapTile => ({
+      q, r, terrain: TileType.GrasslandLand, height: 0.1, settlement: null, building: null,
+      roadOwner: null, unit: null, ownedBy: null, claimedByVillage: null, exploredBy: [0],
+    });
+    const m: GameMap = { radius: 2, spawns: [], tiles: [tile(0, 0), tile(1, 0), tile(2, 0)] };
+    const v = new MapView(app, buildTextures(m), HEX, SPRITE_SCALE, 2);
+    const selection = { kind: 'unit', q: 0, r: 0 } as const;
+    const origNow = performance.now;
+    let now = 0;
+    (performance as { now: () => number }).now = () => now;
+    try {
+      v.update(m, players, selection, new Set(['1,0', '2,0']), new Set(), 0, new Set(), {
+        x: 400, y: 300, scale: 1, width: 800, height: 600,
+      });
+      const dots = v.markerLayer.children as Graphics[];
+      // children order follows map.tiles: [1,0] then [2,0].
+      const dist1 = dots[0]!;
+      const dist2 = dots[1]!;
+      expect(dots.length).toBe(2);
+      now = 0;
+      for (const fn of callbacks) fn();
+      expect(dist1.alpha).toBe(0);
+      expect(dist2.alpha).toBe(0);
+      now = 50; // dist1 is fading, dist2 (reveal at 80ms) is not yet
+      for (const fn of callbacks) fn();
+      expect(dist1.alpha).toBeGreaterThan(0);
+      expect(dist1.alpha).toBeLessThan(1);
+      expect(dist2.alpha).toBe(0);
+      now = 100; // dist2 fade now started
+      for (const fn of callbacks) fn();
+      expect(dist2.alpha).toBeGreaterThan(0);
+      now = 320; // both fully revealed
+      for (const fn of callbacks) fn();
+      expect(dist1.alpha).toBe(1);
+      expect(dist2.alpha).toBe(1);
+    } finally {
+      (performance as { now: () => number }).now = origNow;
+      v.destroy();
+    }
+  });
+
   it('shows a steady glow behind a selected unit and hides it when deselected', () => {
     const selection = { kind: 'unit', q: 0, r: 0 } as const;
     view.update(map, players, selection, new Set(), new Set(), 0, new Set(), {
@@ -1889,9 +1936,10 @@ describe('damage preview badges', () => {
     v.destroy();
   });
 
- it('shows the attacker badge even when the enemy cannot counter (informational)', () => {
+ it('omits the counter badge when the enemy is out of its counter range', () => {
     const t00 = tileOf(0, 0, unit('mine', 0, 0, 0), 0);
-    // A warrior enemy three hexes away: out of its own attack range.
+    // A warrior enemy three hexes away: out of its own attack range, so no
+    // real counter would occur (mirrors performAttack).
     const t30 = tileOf(3, 0, unit('them', 1, 3, 0), 1);
     const m: GameMap = { radius: 3, spawns: [], tiles: [t00, t30] };
     const app = {
@@ -1907,8 +1955,34 @@ describe('damage preview badges', () => {
     v.update(m, players, { kind: 'unit', q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
     vi.useRealTimers();
     const badges = badgesOf(v);
-    // Both badges show: attacker deals 20 to target, would take 5 in counter.
-    expect(badges.map((b) => b.text).sort()).toEqual(['-20', '-5']);
+    // Only the target badge: the attacker takes no counter in a real attack.
+    expect(badges.map((b) => b.text).sort()).toEqual(['-20']);
+    v.destroy();
+  });
+
+  it('omits the counter badge when the attack kills the target', () => {
+    const t00 = tileOf(0, 0, unit('mine', 0, 0, 0), 0);
+    // 10 hp target: attacker deals 27 (=round(20/22*20*1.5)), so the target
+    // dies and never counters.
+    const them = unit('them', 1, 1, 0);
+    them.hp = 10;
+    const t10 = tileOf(1, 0, them, 1);
+    const m: GameMap = { radius: 1, spawns: [], tiles: [t00, t10] };
+    const app = {
+      screen: { width: 800, height: 600 },
+      ticker: { add: (): void => {}, remove: (): void => {} },
+    } as unknown as Application;
+    const v = new MapView(app, buildTextures(m), HEX, SPRITE_SCALE, 2);
+    const players = playersOf();
+    v.update(m, players, { kind: 'unit', q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
+    vi.useFakeTimers();
+    v.showDamagePreview(t00.unit!, t10);
+    vi.advanceTimersByTime(100);
+    v.update(m, players, { kind: 'unit', q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
+    vi.useRealTimers();
+    const badges = badgesOf(v);
+    // Only the target badge: a dead target never counter-attacks.
+    expect(badges.map((b) => b.text).sort()).toEqual(['-27']);
     v.destroy();
   });
 
@@ -1960,6 +2034,54 @@ describe('damage preview badges', () => {
     expect(label!.style.fontSize).toBe(14);
     expect(label!.style.fill).toBe(0xffffff);
     expect(label!.text).toBe('-20');
+    // A non-lethal hit keeps the attack icon.
+    expect((icon as { label: string }).label).toBe('attack-16');
+    v.destroy();
+  });
+
+  it('does not draw a badge when the damage value is 0', () => {
+    const t00 = tileOf(0, 0, unit('mine', 0, 0, 0), 0);
+    t00.unit!.hp = 0;
+    const t10 = tileOf(1, 0, unit('them', 1, 1, 0), 1);
+    const m: GameMap = { radius: 1, spawns: [], tiles: [t00, t10] };
+    const app = {
+      screen: { width: 800, height: 600 },
+      ticker: { add: (): void => {}, remove: (): void => {} },
+    } as unknown as Application;
+    const v = new MapView(app, buildTextures(m), HEX, SPRITE_SCALE, 2);
+    const players = playersOf();
+    v.update(m, players, { kind: 'unit', q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
+    vi.useFakeTimers();
+    v.showDamagePreview(t00.unit!, t10);
+    vi.advanceTimersByTime(100);
+    v.update(m, players, { kind: 'unit', q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
+    vi.useRealTimers();
+    const badges = badgesOf(v);
+    // The 0-damage target badge is skipped; only the 15 counter badge remains.
+    expect(badges.some((b) => b.text === '-0')).toBe(false);
+    expect(badges.map((b) => b.text)).toEqual(['-15']);
+    v.destroy();
+  });
+
+  it('draws a skull icon on the badge when the attack kills the target', () => {
+    const t00 = tileOf(0, 0, unit('mine', 0, 0, 0), 0);
+    const them = unit('them', 1, 1, 0);
+    them.hp = 10;
+    const t10 = tileOf(1, 0, them, 1);
+    const m: GameMap = { radius: 1, spawns: [], tiles: [t00, t10] };
+    const app = {
+      screen: { width: 800, height: 600 },
+      ticker: { add: (): void => {}, remove: (): void => {} },
+    } as unknown as Application;
+    const v = new MapView(app, buildTextures(m), HEX, SPRITE_SCALE, 2);
+    const players = playersOf();
+    v.update(m, players, { kind: 'unit', q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
+    v.showDamagePreview(t00.unit!, t10);
+    v.update(m, players, { kind: 'unit', q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
+    const el = badgeEl(v, '-27');
+    const icon = el.children.find((c) => c instanceof Sprite) as Sprite | undefined;
+    expect(icon).toBeDefined();
+    expect((icon as { label: string }).label).toBe('skull-16');
     v.destroy();
   });
 
@@ -2043,7 +2165,7 @@ describe('damage preview badges', () => {
     v.destroy();
   });
 
-  it('fades the badge in with a scale bounce on show and out on hide', () => {
+  it('fades the badge with only alpha in and out (no scale or position animation)', () => {
     const callbacks: Array<() => void> = [];
     const app = {
       screen: { width: 800, height: 600 },
@@ -2068,9 +2190,13 @@ describe('damage preview badges', () => {
       expect(el.alpha).toBeLessThan(1);
       now = 150; // midpoint of the in-animation
       for (const fn of callbacks) fn();
-      // The badge dips DOWN during the in-animation (positive y), then settles.
+      // Alpha-only fade: no scale bounce and no position dip.
       const midY = el.position.y;
-      expect(midY).toBeGreaterThan(0);
+      expect(el.alpha).toBeGreaterThan(0);
+      expect(el.alpha).toBeLessThan(1);
+      expect(el.scale.x).toBe(1);
+      expect(el.scale.y).toBe(1);
+      expect(midY).toBe(0);
       now = 300; // past the in-animation (200ms)
       for (const fn of callbacks) fn();
       expect(el.alpha).toBe(1);
@@ -2079,6 +2205,12 @@ describe('damage preview badges', () => {
       // hide -> out animation fades the badge back to 0 and removes it.
       v.hideDamagePreview();
       expect(el.alpha).toBe(1);
+      now = 400; // midpoint of the out-animation
+      for (const fn of callbacks) fn();
+      expect(el.alpha).toBeGreaterThan(0);
+      expect(el.alpha).toBeLessThan(1);
+      expect(el.scale.x).toBe(1);
+      expect(el.position.y).toBe(0);
       now = 500; // past the out-animation (another 200ms)
       for (const fn of callbacks) fn();
       expect(el.alpha).toBe(0);

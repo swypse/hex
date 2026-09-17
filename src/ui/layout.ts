@@ -11,6 +11,10 @@ export const ACTION_TOOLBAR_MAX_WIDTH = 600;
 export const SCORE_PAD = 8;
 export const SCORE_TOP_OFFSET = 20;
 export const SCORE_CHIP_RADIUS = 20;
+/** Gap between the chip bottom and the score text below it. */
+export const SCORE_TEXT_CHIP_GAP = 6;
+/** Height of the score text (font size) below the chip. */
+export const SCORE_TEXT_HEIGHT = 16;
 /** Gap between the chip bottom and the first buff icon below it. */
 export const SCORE_BUFF_CHIP_GAP = 6;
 /** Gap between the last buff icon and the first action button. */
@@ -43,7 +47,8 @@ export function scoreButtonsPosition(
   const chipX = screenWidth - SCORE_PAD - SCORE_CHIP_RADIUS;
   const chipY = SCORE_PAD + SCORE_TOP_OFFSET + SCORE_CHIP_RADIUS;
   const buffHeight = buffCount > 0 ? buffCount * SCORE_BUFF_ICON + (buffCount - 1) * SCORE_BUFF_GAP : 0;
-  const skillsTop = chipY + SCORE_CHIP_RADIUS + SCORE_BUFF_CHIP_GAP + buffHeight + SCORE_BUTTON_GAP;
+  const buffTop = chipY + SCORE_CHIP_RADIUS + SCORE_TEXT_CHIP_GAP + SCORE_TEXT_HEIGHT + SCORE_BUFF_CHIP_GAP;
+  const skillsTop = buffTop + buffHeight + SCORE_BUTTON_GAP;
   const x = chipX - SKILLS_BUTTON_SIZE / 2;
   return {
     skills: { x, y: skillsTop },

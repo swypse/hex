@@ -268,7 +268,7 @@ function makeUnitImageTexture(
  *  never clipped at the texture frame edge. */
 const GLOW_PADDING = 4;
 /** Baked-px blur radius of the unit selection glow. */
-const GLOW_BLUR = 8;
+const GLOW_BLUR = 12;
 
 /** Bakes a glow that hugs the non-empty pixels of a unit texture: the
  *  art is flattened to pure color, blurred outward by `GLOW_BLUR`, and baked
@@ -284,9 +284,9 @@ function makeUnitGlowTexture(app: Application, base: TileTexture): TileTexture {
   sprite.anchor.set(0.5, base.anchorY);
   const blurColor = new ColorMatrixFilter();
   blurColor.matrix = [
+    0, 0, 0, 0, 0,
     0, 0, 0, 0, 1,
-    0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0,
+    0, 0, 0, 0, 1,
     0, 0, 0, 1, 0,
   ];
   const blur = new BlurFilter({ strength: GLOW_BLUR });

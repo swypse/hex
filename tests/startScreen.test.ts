@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { Container, ImageSource, Sprite, Text, Texture } from 'pixi.js';
+import { BitmapText, Container, ImageSource, Sprite, Text, Texture } from 'pixi.js';
 import { StartScreen } from '../src/ui/screens/StartScreen';
 import { type UIHost } from '../src/ui/host';
 
@@ -97,6 +97,30 @@ describe('StartScreen background images', () => {
     expect(labels).toContain('SINGLE PLAYER');
     expect(labels).toContain('MULTIPLAYER');
     expect(labels).toContain('TUTORIAL');
+    screen.destroy();
+  });
+
+  it('shows a white 14px alpha-version text below the menu', () => {
+    const screen = new StartScreen();
+    screen.mount(host);
+    const root = (screen as unknown as { root: Container }).root!;
+    // The version label lives in the scroll content alongside the buttons.
+    const walk = (c: Container): BitmapText | undefined => {
+      for (const child of c.children) {
+        if (child instanceof BitmapText && (child as unknown as { text: string }).text === 'alpha-version') return child as BitmapText;
+        if (child instanceof Container) {
+          const hit = walk(child as Container);
+          if (hit) return hit;
+        }
+      }
+      return undefined;
+    };
+    const version = walk(root);
+    expect(version).toBeDefined();
+    expect(version!.style.fontSize).toBe(14);
+    expect(version!.style.fill).toBe(0xffffff);
+    version!.anchor.set(0.5, 0.5);
+    expect(version!.position.x).toBeCloseTo(640, 5);
     screen.destroy();
   });
 });
