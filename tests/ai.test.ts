@@ -24,11 +24,11 @@ function makeWarrior(id: string, owner: number, q: number, r: number): Unit {
 }
 
 function makeRider(id: string, owner: number, q: number, r: number): Unit {
-  return { id, owner, type: 'rider', q, r, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 40, attack: 20, attackDistance: 1, defense: 10, spawnVillage: null };
+  return { id, owner, type: 'rider', q, r, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 40, attack: 20, attackDistance: 1, defense: 7, spawnVillage: null };
 }
 
-function makeArcher(id: string, owner: number, q: number, r: number, hp = 30): Unit {
-  return { id, owner, type: 'archer', q, r, hasMoved: false, hasAttacked: false, hasHealed: false, hp, attack: 20, attackDistance: 2, defense: 10, spawnVillage: { q, r } };
+function makeArcher(id: string, owner: number, q: number, r: number, hp = 40): Unit {
+  return { id, owner, type: 'archer', q, r, hasMoved: false, hasAttacked: false, hasHealed: false, hp, attack: 20, attackDistance: 2, defense: 7, spawnVillage: { q, r } };
 }
 
 function makeSwordsman(id: string, owner: number, q: number, r: number): Unit {
@@ -36,7 +36,7 @@ function makeSwordsman(id: string, owner: number, q: number, r: number): Unit {
 }
 
 function makeKnight(id: string, owner: number, q: number, r: number): Unit {
-  return { id, owner, type: 'knight', q, r, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 50, attack: 50, attackDistance: 1, defense: 10, spawnVillage: null };
+  return { id, owner, type: 'knight', q, r, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 60, attack: 40, attackDistance: 1, defense: 7, spawnVillage: null };
 }
 
 function aiPlayer(): import('../src/game/players').Player {
