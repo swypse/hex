@@ -56,7 +56,7 @@ describe('spawnUnit', () => {
     expect(player.resources.money).toBe(6);
   });
 
-  it('spawns a shield unit for 10 money + 3 ore with 80 hp when the Shields skill is open', () => {
+  it('spawns a shield unit for 8 money + 2 ore with 80 hp when the Shields skill is open', () => {
     const map = makeMap();
     const village = map.tiles[0]!;
     const player = makePlayer(0, 10);
@@ -65,8 +65,8 @@ describe('spawnUnit', () => {
     expect(spawnUnit(map, village, 'shield', player)).toBe(true);
     expect(village.unit!.type).toBe('shield');
     expect(village.unit!.hp).toBe(80);
-    expect(player.resources.money).toBe(0);
-    expect(player.resources.ore).toBe(0);
+    expect(player.resources.money).toBe(2);
+    expect(player.resources.ore).toBe(1);
   });
 
   it('rejects shield spawn without the Shields skill', () => {
@@ -126,7 +126,7 @@ describe('spawnUnit', () => {
     expect(village.unit!.hasHealed).toBe(true);
   });
 
-  it('swordsman requires the swordsman skill and 15 money + 3 ore', () => {
+  it('swordsman requires the swordsman skill and 10 money + 2 ore', () => {
     const map = makeMap();
     const village = map.tiles[0]!;
     const noSkill = makePlayer(0, 20);
@@ -137,12 +137,12 @@ describe('spawnUnit', () => {
     skilled.resources.ore = 3;
     skilled.skills = ['swordsman'];
     expect(spawnUnit(map, village, 'swordsman', skilled)).toBe(true);
-    expect(skilled.resources.money).toBe(5);
-    expect(skilled.resources.ore).toBe(0);
+    expect(skilled.resources.money).toBe(10);
+    expect(skilled.resources.ore).toBe(1);
     expect(village.unit!.type).toBe('swordsman');
   });
 
-  it('catapult requires the catapult skill and pays 30 money + 20 wood + 5 ore', () => {
+  it('catapult requires the catapult skill and pays 15 money + 10 wood + 3 ore', () => {
     const map = makeMap();
     const village = map.tiles[0]!;
     const noSkill = makePlayer(0, 40);
@@ -156,9 +156,9 @@ describe('spawnUnit', () => {
     skilled.skills = ['catapult'];
     expect(spawnUnit(map, village, 'catapult', skilled)).toBe(true);
     expect(village.unit!.type).toBe('catapult');
-    expect(skilled.resources.money).toBe(10);
-    expect(skilled.resources.wood).toBe(0);
-    expect(skilled.resources.ore).toBe(0);
+    expect(skilled.resources.money).toBe(25);
+    expect(skilled.resources.wood).toBe(10);
+    expect(skilled.resources.ore).toBe(2);
   });
 
   it('rider requires the Riding skill', () => {
@@ -174,7 +174,7 @@ describe('spawnUnit', () => {
     expect(skilled.resources.money).toBe(14);
   });
 
-  it('knight requires the Knights skill and pays 20 money + 10 ore', () => {
+  it('knight requires the Knights skill and pays 14 money + 5 ore', () => {
     const map = makeMap();
     const village = map.tiles[0]!;
     const noSkill = makePlayer(0, 30);
@@ -186,8 +186,8 @@ describe('spawnUnit', () => {
     skilled.skills = ['knights'];
     expect(spawnUnit(map, village, 'knight', skilled)).toBe(true);
     expect(village.unit!.type).toBe('knight');
-    expect(skilled.resources.money).toBe(10);
-    expect(skilled.resources.ore).toBe(0);
+    expect(skilled.resources.money).toBe(16);
+    expect(skilled.resources.ore).toBe(5);
   });
 
   it('gives every spawned unit a unique id even with back-to-back spawns', () => {
