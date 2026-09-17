@@ -42,11 +42,11 @@ freshly spawned unit must wait until the next turn.
 |-----------|----------|--------|--------------|----|----------------------------|
 | Warrior   | 1        | 2      | 1            | 5  | 4 money                    |
 | Rider     | 4        | 2      | 1            | 4  | 6 money                    |
-| Archer    | 1        | 2      | 2            | 3  | 6 money                    |
-| Swordsman | 1        | 4      | 1            | 8  | 15 money + 3 ore           |
-| Shield    | 1        | 1      | 1            | 10 | 10 money                   |
-| Catapult  | 1        | 5      | 4            | 3  | 30 money + 20 wood + 5 ore |
-| Knight    | 3        | 5      | 1            | 5  | 20 money + 10 ore          |
+| Archer    | 1        | 2      | 2            | 4  | 6 money                    |
+| Swordsman | 1        | 4      | 1            | 8  | 10 money + 2 ore           |
+| Shield    | 1        | 0.7    | 1            | 8  | 8 money + 2 ore            |
+| Catapult  | 1        | 5      | 4            | 3  | 15 money + 10 wood + 3 ore |
+| Knight    | 3        | 4      | 1            | 6  | 14 money + 5 ore           |
 
 - **Rider** additionally requires the *Riding* skill.
 - **Knight** additionally requires the *Knights* skill. After killing an enemy it may attack again in the same turn;
@@ -190,13 +190,13 @@ whole game.
 | Forestry      | 1     | —        | Allows building factories on owned land near forests                                    |
 | Forest temple | 2     | Forestry | Future forest temple features                                                           |
 | Science       | 1     | —        | Allows advanced research; cuts the owner's attack miss chance to 5%                     |
-| Catapult      | 2     | Science  | Allows spawning catapult units (30 money + 20 wood + 5 ore)                             |
+| Catapult      | 2     | Science  | Allows spawning catapult units (15 money + 10 wood + 3 ore)                             |
 | Roads         | 2     | Forestry | Allows building roads between villages                                                  |
 | Shields       | 1     | —        | Allows spawning shield units                                                            |
 | Defense       | 2     | Shields  | Unlocks the Build village walls action (coming soon)                                    |
 | Riding        | 1     | —        | Allows spawning rider units                                                             |
 | Bridges       | 2     | Riding   | Allows building bridges across water (10 wood + 15 money + 5 stone)                     |
-| Knights       | 2     | Riding   | Allows spawning knight units (20 money + 10 ore)                                        |
+| Knights       | 2     | Riding   | Allows spawning knight units (14 money + 5 ore)                                        |
 
 ## Buildings
 
