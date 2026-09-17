@@ -6,6 +6,8 @@ import { Tribe } from '../src/game/tribes';
 import { SeededRandom } from '../src/util/random';
 import { canAttack, canHeal, canMove } from '../src/game/units';
 import { TileType } from '../src/game/tileTypes';
+import { isExploredFor } from '../src/game/explore';
+import { hexNeighbors } from '../src/game/hex';
 import { quickCaptureScore, quickCaptureTurnsCount } from '../src/game/gameMode';
 
 describe('Simulator commands', () => {
@@ -132,6 +134,26 @@ describe('Simulator commands', () => {
     sim.drainEvents();
     const ok = sim.applyCommand({ type: 'move', unitId: 'u1', q: 0, r: 2 });
     expect(ok).toBe(false);
+  });
+
+  it('a warrior leaving an expensive tile still reveals the destination ring', () => {
+    const map = makeTestMap(3);
+    tileAt(map, 0, 0)!.unit = makeUnit('u1', 0, 'warrior', 0, 0);
+    tileAt(map, 0, 0)!.terrain = TileType.GrasslandForest;
+    // Fog for the local player except the warrior's origin and destination.
+    for (const t of map.tiles) t.exploredBy = [];
+    tileAt(map, 0, 0)!.exploredBy = [0];
+    tileAt(map, 0, 1)!.exploredBy = [0];
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    sim.startGame();
+    sim.drainEvents();
+    // Leaving the forest costs 14 > the warrior's 10 move points, yet the move
+    // is legal (always-move-one) and must still explore the destination ring.
+    expect(sim.applyCommand({ type: 'move', unitId: 'u1', q: 0, r: 1 })).toBe(true);
+    for (const n of hexNeighbors({ q: 0, r: 1 })) {
+      expect(isExploredFor(tileAt(map, n.q, n.r)!, 0), `ring cell (${n.q},${n.r}) explored`).toBe(true);
+    }
   });
 
   it('a rider reaches one tile farther over its own road network', () => {

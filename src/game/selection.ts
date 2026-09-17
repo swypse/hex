@@ -1,4 +1,4 @@
-import { Axial, axialKey, hexNeighbors } from './hex';
+import { Axial, axialKey, hexDistance, hexNeighbors } from './hex';
 import { GameMap, MapTile } from './mapGen';
 import { isMountainType, TileType, isWaterType } from './tileTypes';
 import { isExploredFor } from './explore';
@@ -278,6 +278,10 @@ export function pathBetween(
   const waterKeys = waterRouteKeys(map);
   const quick = pathBetweenSteps(map, from, to, canClimb, canSail, canDock, playerIndex);
   if (quick.length === 0) return quick;
+  // Always-move-one: a direct neighbour is reachable even when the first step
+  // costs more than the unit's move points (e.g. leaving a 14-20 cost tile
+  // with only 10 points), so the walk must exist for it too.
+  if (hexDistance(from, to) <= 1) return quick;
   if (movePoints === undefined || pathCost(map, from, quick, playerIndex, waterKeys) <= movePoints) {
     return quick;
   }

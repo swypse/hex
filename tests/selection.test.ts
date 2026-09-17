@@ -365,6 +365,20 @@ describe('pathBetween', () => {
     ]);
   });
 
+  it('walks a direct neighbour even when the first step costs more than the move points', () => {
+    const unit = mkUnit(0, 'warrior', 0, 0);
+    const start: MapTile = { ...L(0, 0), terrain: TileType.GrasslandForest, unit };
+    const map: GameMap = { radius: 8, tiles: [start, L(1, 0)], spawns: [] };
+    // Leaving the forest costs 14 > the warrior's 10 points, yet the adjacent
+    // tile is always reachable (always-move-one), so its walk must exist —
+    // otherwise a legal move would skip the fog exploration entirely.
+    const reached = reachableTargets(map, unit, 10).map((t) => `${t.q},${t.r}`);
+    expect(reached).toContain('1,0');
+    expect(pathBetween(map, { q: 0, r: 0 }, { q: 1, r: 0 }, false, false, false, 0, 10)).toEqual([{ q: 1, r: 0 }]);
+    // A tile beyond the direct neighbour still needs the full budget.
+    expect(pathBetween(map, { q: 0, r: 0 }, { q: 2, r: 0 }, false, false, false, 0, 10)).toEqual([]);
+  });
+
   it('stops movement at the first cell adjacent to an enemy', () => {
     const map: GameMap = { radius: 4, tiles: [], spawns: [] };
     const enemy = mkUnit(1, 'warrior', 2, 1);

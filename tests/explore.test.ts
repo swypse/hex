@@ -106,6 +106,14 @@ describe('exploreUnitPath', () => {
     expect(isExploredFor(map.tiles.find((t) => t.q === 2 && t.r === 0)!, 0)).toBe(false);
   });
 
+  it('always reveals at least the distance-1 ring around a visited cell', () => {
+    const map = makeMap();
+    const noSight: Unit = { ...unit(1), attackDistance: 0 };
+    exploreUnitPath(map, [{ q: 0, r: 0 }], noSight, 0);
+    expect(isExploredFor(map.tiles.find((t) => t.q === 1 && t.r === 0)!, 0)).toBe(true);
+    expect(isExploredFor(map.tiles.find((t) => t.q === 2 && t.r === 0)!, 0)).toBe(false);
+  });
+
   it('a step onto a mountain explores at least radius 2', () => {
     const map = makeMap();
     map.tiles.find((t) => t.q === 0 && t.r === 0)!.terrain = TileType.GrasslandMountain;

@@ -39,12 +39,14 @@ export function exploreUnitPath(
     : unit.type === 'catapult'
       ? 1
       : unit.attackDistance;
+  // A visited cell always reveals at least its own surrounding ring.
+  const minRadius = Math.max(baseRadius, 1);
   const newly: MapTile[] = [];
   const seen = new Set<MapTile>();
   for (const step of path) {
     const center = map.tiles.find((t) => t.q === step.q && t.r === step.r);
     if (!center) continue;
-    const radius = isMountainType(center.terrain) ? Math.max(baseRadius, 2) : baseRadius;
+    const radius = isMountainType(center.terrain) ? Math.max(minRadius, 2) : minRadius;
     for (const t of exploreAround(map, center, radius, playerIndex)) {
       if (!seen.has(t)) {
         seen.add(t);

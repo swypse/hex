@@ -135,7 +135,8 @@ Exploration is tracked separately for every player (including AI). Only tiles ex
 on screen; everything else shows as a gray hex that matches the height of the underlying terrain. At the start, each
 player's own tiles are explored.
 
-- When a unit moves, each cell it visits reveals all tiles within that unit's attack distance for its owner — revealed
+- When a unit moves, each cell it visits reveals all tiles within that unit's attack distance for its owner — at
+  minimum the cells adjacent to the visited cell are always revealed — and revealed
   cells show a gray hex that flies up and fades away, uncovering the map underneath (animated for the human view).
 - A village reveals the surrounding tiles for its owner in a circle of `territory radius + 1` hexes (level 1 → 2, level
   2–4 → 3, level 5+ → 4). This happens on game start for each owned village, when a village is upgraded, and when a
