@@ -1,5 +1,5 @@
 import { t } from '../../i18n';
-import { Container, Graphics } from 'pixi.js';
+import { Container, Graphics, Rectangle } from 'pixi.js';
 import { gameController } from '../../controller/gameController';
 import { captureWinnerIndex } from '../../game/gameMode';
 import { useGameStore } from '../../store/gameStore';
@@ -9,7 +9,7 @@ import { IconButton } from '../kit/iconButton';
 import { ACTION_BUTTON_ICON_FILES, makeActionButtonIcon } from '../kit/actionButtonIcons';
 import { ActionTooltip } from '../kit/actionTooltip';
 import { tooltipsEnabled } from '../kit/tooltipGate';
-import { TOOLBAR_HEIGHT, isWideScreen, ACTION_TOOLBAR_MAX_WIDTH } from '../layout';
+import { TOOLBAR_HEIGHT, TURN_BAR_HEIGHT } from '../layout';
 import { toolbarSpecs } from './toolbarSpecs';
 import { hasAnyAvailableAction } from '../../game/playerActions';
 import { STEP_CONFIG } from '../../game/tutorial/tutorialSteps';
@@ -36,10 +36,6 @@ const ICON_ACTIONS: Record<string, string> = {
 
 const LAST_TURN_COLOR = 0x9cff55;
 const SIDE_PADDING = 12;
-const PANEL_PADDING_X = 4;
-const PANEL_CORNER_RADIUS = 4;
-const OUTER_BG = 0x5297ff;
-const INNER_BG = 0x3977d8;
 const ACTION_BTN = {
   color: 0xd0e3ff,
   hoverColor: 0xffffff,
@@ -51,12 +47,8 @@ const ACTION_BTN = {
 
 export class HudToolbar implements Widget {
   private el: Container | null = null;
-  private bg: Graphics | null = null;
-  private panel: Container | null = null;
-  private inner: Graphics | null = null;
+  private hit: Graphics | null = null;
   private row: Container | null = null;
-  private endTurnRow: Container | null = null;
-  private statsRow: Container | null = null;
   private host: UIHost | null = null;
   private unsub: (() => void) | null = null;
   private onResize: (() => void) | null = null;
@@ -69,22 +61,13 @@ export class HudToolbar implements Widget {
   mount(host: UIHost, root: Container): void {
     this.host = host;
     const el = new Container();
-    const bg = new Graphics();
-    const panel = new Container();
-    const inner = new Graphics();
+    const hit = new Graphics();
     const row = new Container();
-    const endTurnRow = new Container();
-    const statsRow = new Container();
-    el.addChild(bg, panel);
-    panel.addChild(inner, statsRow, endTurnRow, row);
+    el.addChild(hit, row);
     root.addChild(el);
     this.el = el;
-    this.bg = bg;
-    this.panel = panel;
-    this.inner = inner;
+    this.hit = hit;
     this.row = row;
-    this.endTurnRow = endTurnRow;
-    this.statsRow = statsRow;
     this.layout();
     this.update();
     this.unsub = useGameStore.subscribe(() => this.update());
@@ -93,52 +76,26 @@ export class HudToolbar implements Widget {
   }
 
   private layout = (): void => {
-    if (!this.el || !this.bg || !this.panel || !this.inner || !this.host) return;
+    if (!this.el || !this.hit || !this.row || !this.host) return;
     const screenW = this.host.app.screen.width;
     const screenH = this.host.app.screen.height;
-    const barW = isWideScreen(screenW) ? ACTION_TOOLBAR_MAX_WIDTH : screenW;
-    const barX = isWideScreen(screenW) ? (screenW - barW) / 2 : 0;
-    const panelW = barW - PANEL_PADDING_X * 2;
-    this.bg.clear().rect(0, 0, barW, TOOLBAR_HEIGHT).fill(OUTER_BG);
-    this.bg.eventMode = 'static';
-    this.panel.position.set(PANEL_PADDING_X, 0);
-    const r = PANEL_CORNER_RADIUS;
-    this.inner
-      .clear()
-      .moveTo(0, TOOLBAR_HEIGHT)
-      .lineTo(0, r)
-      .arcTo(0, 0, r, 0, r)
-      .lineTo(panelW - r, 0)
-      .arcTo(panelW, 0, panelW, r, r)
-      .lineTo(panelW, TOOLBAR_HEIGHT)
-      .closePath()
-      .fill(INNER_BG);
-    this.el.position.set(barX, screenH - TOOLBAR_HEIGHT);
+    this.hit.eventMode = 'static';
+    this.hit.hitArea = new Rectangle(0, 0, screenW, TOOLBAR_HEIGHT);
+    this.el.position.set(0, screenH - TURN_BAR_HEIGHT - TOOLBAR_HEIGHT);
     const barY = (TOOLBAR_HEIGHT - 48) / 2;
-    if (this.statsRow) {
-      this.statsRow.position.set(SIDE_PADDING, barY);
-    }
-    if (this.endTurnRow) {
-      const btn = this.endTurnRow.children.length > 0 ? this.endTurnRow.getChildAt(0) : null;
-      const width = btn ? btn.width : 48;
-      this.endTurnRow.position.set(panelW - width - SIDE_PADDING, barY);
-    }
-    if (this.row) {
-      const statsW = this.statsRow ? this.statsRow.width : 0;
-      const endTurnW = this.endTurnRow ? this.endTurnRow.width : 0;
-      const freeLeft = SIDE_PADDING + statsW + 8;
-      const freeRight = panelW - SIDE_PADDING - endTurnW - 8;
-      const freeW = Math.max(0, freeRight - freeLeft);
-      const maxW = Math.min(freeW, ACTION_TOOLBAR_MAX_WIDTH * 0.9);
-      const scale = this.row.width > maxW ? maxW / this.row.width : 1;
-      this.row.scale.set(scale, scale);
-      const center = freeW > 0 ? (freeLeft + freeRight) / 2 : panelW / 2;
-      this.row.position.set(center - (this.row.width * scale) / 2, barY);
-    }
+    const maxW = Math.max(0, screenW - SIDE_PADDING * 2);
+    const rowW = this.row.width;
+    const scale = rowW > maxW ? maxW / rowW : 1;
+    this.row.scale.set(scale, scale);
+    this.row.position.set(screenW / 2 - (rowW * scale) / 2, barY);
   };
 
   private update(): void {
-    if (!this.el || !this.row || !this.endTurnRow || !this.statsRow || !this.host) return;
+    if (!this.el || !this.row || !this.host) return;
+    const store = useGameStore.getState();
+    // While another player (or the AI) is taking their move the actions are not
+    // usable, so hide the whole toolbar instead of showing disabled buttons.
+    this.el.visible = !store.aiActive;
     if (this.stopEndTurnPulse) {
       this.stopEndTurnPulse();
       this.stopEndTurnPulse = null;
@@ -154,13 +111,6 @@ export class HudToolbar implements Widget {
     while (this.row.children.length > 0) {
       this.row.removeChildAt(0).destroy({ children: true });
     }
-    while (this.endTurnRow.children.length > 0) {
-      this.endTurnRow.removeChildAt(0).destroy({ children: true });
-    }
-    while (this.statsRow.children.length > 0) {
-      this.statsRow.removeChildAt(0).destroy({ children: true });
-    }
-    const store = useGameStore.getState();
     const actions = toolbarSpecs();
     const GAP = 12;
     const storeStep = store.tutorial && store.tutorialStep !== null ? store.tutorialStep : null;
@@ -209,16 +159,6 @@ export class HudToolbar implements Widget {
       else addText(spec.label, spec.disabled, spec.onClick, 16, spec.key);
     }
 
-    const stats = new IconButton({
-      icon: ACTION_BUTTON_ICON_FILES['stats']!,
-      size: 48,
-      onClick: () => useGameStore.getState().setOverlay({ kind: 'stats' }),
-      iconFactory: makeActionButtonIcon,
-      ...ACTION_BTN,
-    });
-    this.statsRow.addChild(stats);
-    if (tooltipsEnabled()) this.tooltips.push(new ActionTooltip(this.el!, stats, t('hud.stats')));
-
     const endTurn = new IconButton({
       icon: ACTION_BUTTON_ICON_FILES['end-turn']!,
       disabled: store.aiActive,
@@ -228,13 +168,16 @@ export class HudToolbar implements Widget {
       ...ACTION_BTN,
       color: isLastTurn() ? LAST_TURN_COLOR : ACTION_BTN.color,
     });
-    this.endTurnRow.addChild(endTurn);
+    endTurn.position.set(x, 0);
+    this.row.addChild(endTurn);
+    x += endTurn.width + GAP;
     if (tooltipsEnabled()) this.tooltips.push(new ActionTooltip(this.el!, endTurn, t('hud.endTurn')));
 
     if (store.tutorialHighlightEndTurn && !store.aiActive) {
       const ring = new Graphics();
+      ring.position.set(endTurn.position.x, 0);
       ring.circle(24, 24, 26).stroke({ width: 4, color: 0xffd700, alpha: 0.9 });
-      this.endTurnRow.addChild(ring);
+      this.row.addChild(ring);
       this.endTurnPulse = ring;
       this.startEndTurnPulse();
     }
@@ -251,8 +194,9 @@ export class HudToolbar implements Widget {
       !hasAnyAvailableAction(map, human, store.turn);
     if (noActions && !store.tutorialHighlightEndTurn && !this.endTurnPulse) {
       const ring = new Graphics();
+      ring.position.set(endTurn.position.x, 0);
       ring.circle(24, 24, 26).stroke({ width: 4, color: 0xffd700, alpha: 0.9 });
-      this.endTurnRow.addChild(ring);
+      this.row.addChild(ring);
       this.endTurnPulse = ring;
       this.startEndTurnPulse();
     }
@@ -315,12 +259,8 @@ export class HudToolbar implements Widget {
     this.onResize = null;
     this.el?.destroy({ children: true });
     this.el = null;
-    this.bg = null;
-    this.panel = null;
-    this.inner = null;
+    this.hit = null;
     this.row = null;
-    this.endTurnRow = null;
-    this.statsRow = null;
     this.host = null;
   }
 }

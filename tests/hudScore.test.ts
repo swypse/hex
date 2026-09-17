@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { Container, Sprite, BitmapText } from 'pixi.js';
 import { HudScore } from '../src/ui/hud/HudScore';
+import { FONT_BLACK } from '../src/ui/kit/bitmapFonts';
 import { useGameStore } from '../src/store/gameStore';
 import { gameController } from '../src/controller/gameController';
 import { type UIHost } from '../src/ui/host';
@@ -63,13 +64,30 @@ describe('HudScore buff icons', () => {
   };
 
   it('shows a water protection icon when the player has 3 water temples', () => {
-    const r = mount(3);
-    expect(allSprites(r).length).toBeGreaterThan(0);
+    mount(3);
+    const buffRow = (hud as unknown as { buffRow: Container }).buffRow!;
+    expect(allSprites(buffRow).length).toBeGreaterThan(0);
+  });
+
+  it('renders the local player tribe chip and orange bold score text', () => {
+    mount(0);
+    const hudAny = hud as unknown as { text: BitmapText | null; tribeChip: Container | null };
+    expect(hudAny.tribeChip).not.toBeNull();
+    expect(hudAny.text).not.toBeNull();
+    // Orange bold 24px score label (bold = Roboto Black family).
+    expect(hudAny.text!.style.fontSize).toBe(24);
+    expect(hudAny.text!.style.fill).toBe(0xffc465);
+    expect(hudAny.text!.style.fontFamily).toBe(FONT_BLACK);
+    // The chip holds a white circle + clipped tribe icon sprite.
+    expect(hudAny.tribeChip!.children.some((c) => c instanceof Sprite)).toBe(true);
+    // The chip sits to the right of the score text.
+    expect(hudAny.tribeChip!.position.x).toBeGreaterThan(hudAny.text!.position.x);
   });
 
   it('shows no buff icon with only 2 water temples', () => {
-    const r = mount(2);
-    expect(allSprites(r).length).toBe(0);
+    mount(2);
+    const buffRow = (hud as unknown as { buffRow: Container }).buffRow!;
+    expect(allSprites(buffRow).length).toBe(0);
   });
 
   it('shows just the buff icon with no number label', () => {
@@ -134,37 +152,40 @@ describe('HudScore buff icons', () => {
     expect(stage.children.length).toBe(0);
   });
 
-  it('cancels the bounce animation when destroyed mid-bounce', () => {
+  it('does not run an animation when a new score is claimed', () => {
     const map = makeTestMap(3);
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(42));
-    
+
     useGameStore.setState({ screen: 'game', players, localPlayerIndex: 0 });
 
-    const registered: Array<(t: { deltaMS: number }) => void> = [];
-    const removed: Array<unknown> = [];
+    const registered: Array<() => void> = [];
     const host = makeHost();
-    const ticker = host.app.ticker as unknown as {
-      add: (fn: (t: { deltaMS: number }) => void) => void;
-      remove: (fn: unknown) => void;
-    };
-    ticker.add = (fn) => {
+    (host.app.ticker as unknown as { add: (fn: () => void) => void }).add = (fn) => {
       registered.push(fn);
-    };
-    ticker.remove = (fn) => {
-      removed.push(fn);
     };
     const root = new Container();
     const score = new HudScore();
     score.mount(host, root);
 
-    // A score change starts the bounce animation's ticker callback.
     players[0]!.score += 10;
     useGameStore.setState({ players });
-    expect(registered.length).toBeGreaterThan(0);
-
-    // Destroy mid-bounce (e.g. quitting the skill tree): the ticker callback
-    // must be cancelled, otherwise the next tick dereferences a null element.
+    expect(registered.length).toBe(0);
     score.destroy();
-    expect(removed).toContain(registered[0]);
+  });
+
+  it('fires onTap when the score chip is tapped', () => {
+    const map = makeTestMap(3);
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(42));
+    useGameStore.setState({ screen: 'game', players, localPlayerIndex: 0 });
+    root = new Container();
+    host = makeHost();
+    let tapped = 0;
+    hud = new HudScore();
+    hud.onTap = () => {
+      tapped++;
+    };
+    hud.mount(host, root);
+    (hud as unknown as { el: Container }).el!.emit('pointertap', {} as never);
+    expect(tapped).toBe(1);
   });
 });

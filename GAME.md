@@ -54,7 +54,8 @@ freshly spawned unit must wait until the next turn.
 
 - **Swordsman** additionally requires the *Swordsman* skill.
 - **Shield** additionally requires the *Shields* skill.
-- **Catapult** additionally requires the *Catapult* skill. It deals 5–10 random damage per attack, cannot attack in a
+- **Catapult** additionally requires the *Catapult* skill. It attacks at range 4 with a fixed attack value (no random
+  damage roll), cannot attack in a
   turn in which it has already moved, and never moves onto a killed enemy's tile. A land catapult never counter-attacks
   when attacked (aboard a ship the crew still fights back with the ship's cannon).
 - **Ships:** when a unit moves onto its own port it becomes a ship, but can't move or attack again until the next turn.
@@ -85,13 +86,22 @@ freshly spawned unit must wait until the next turn.
   (except for ships with *Navigation*). A rider that already attacked this turn can still move up to its full movement.
   Movement stops at the first cell adjacent to an enemy: that cell can be entered, but cells beyond it along the path
   are not available (a unit next to an enemy can always move at least 1 cell).
-- **Attack** — attack an enemy within attack range, once per turn. Damage = `round(attack × current hp / max hp)`. Each
-  attack has a 10% chance to miss (5% if the attacker's owner has opened Science), dealing no damage (the attack still
-  counts as used). If the target survives and is in range, it counter-attacks, except a land catapult never
-  counter-attacks. A defending shield counters with
-  `round(7 × current hp / max hp)`. A shield cannot attack in a turn in which it has already moved (as a ship this limit
-  does not apply). On a kill, the attacker moves onto the target's tile (unless the attacker is an archer or a pirate,
-  is a ship, or the target was a pirate or a ship).
+- **Attack** — attack an enemy within attack range, once per turn. Combat uses
+  a Polytopia-style force-ratio formula with a scale constant of 1.5:
+  `attackForce = attack × current hp / max hp`;
+  `defenseForce = defense × current hp / max hp × defenseBonus`, where
+  `defenseBonus = 1 + tile reduction / 10` (own village ×1.5, walled village
+  ×1.8, temple protections ×2.0); damage to the target is
+  `round(attackForce / (attackForce + defenseForce) × attack × 1.5)`. Each
+  attack has a 10% chance to miss (5% if the attacker's owner has opened
+  Science), dealing no damage (the attack still counts as used). If the target
+  survives and is in range, it counter-attacks with
+  `round(defenseForce / (attackForce + defenseForce) × defense × 1.5)`, except
+  a land catapult never counter-attacks (aboard a ship the crew still fights
+  back with the ship's cannon). A shield cannot attack in a turn in which it
+  has already moved (as a ship this limit does not apply). On a kill, the
+  attacker moves onto the target's tile (unless the attacker is an archer or a
+  pirate, is a ship, or the target was a pirate or a ship).
 - **Heal** — if the unit hasn't moved/attacked this turn, restore +2 HP (once per turn).
 - **Capture village** — a unit standing on an enemy or free village marked capturable (red triangle) captures it.
 - **Upgrade village** — costs 2 wood + 1 stone + 2 money at level 1, scaling by level (×2 wood, ×1 stone, ×2 money per

@@ -7,6 +7,7 @@ import { SeededRandom } from '../src/util/random';
 import { gameController } from '../src/controller/gameController';
 import { useGameStore } from '../src/store/gameStore';
 import { HudToolbar } from '../src/ui/hud/HudToolbar';
+import { IconButton } from '../src/ui/kit/iconButton';
 import { TileType } from '../src/game/tileTypes';
 import { hexNeighbors } from '../src/game/hex';
 import { type UIHost } from '../src/ui/host';
@@ -91,14 +92,14 @@ describe('HudToolbar build actions', () => {
       hexNeighbors(tile).some((n) => n.q === t.q && n.r === t.r))!;
     neighbor.terrain = TileType.GrasslandForest;
     select(tile);
-    expect(row.children.length).toBe(1);
+    expect(row.children.length).toBe(2);
     expect(isIconButton(row.children[0] as Container)).toBe(true);
   });
 
   it('renders the build mine action as an icon button', () => {
     const tile = ownedTile(TileType.GrasslandMountain);
     select(tile);
-    expect(row.children.length).toBe(1);
+    expect(row.children.length).toBe(2);
     expect(isIconButton(row.children[0] as Container)).toBe(true);
   });
 
@@ -110,7 +111,7 @@ describe('HudToolbar build actions', () => {
     shore.terrain = TileType.GrasslandLand;
     shore.ownedBy = 0;
     select(tile);
-    expect(row.children.length).toBe(1);
+    expect(row.children.length).toBe(2);
     expect(isIconButton(row.children[0] as Container)).toBe(true);
   });
 
@@ -124,7 +125,7 @@ describe('HudToolbar build actions', () => {
     };
     useGameStore.getState().setTurn(2);
     select(t);
-    expect(row.children.length).toBe(2);
+    expect(row.children.length).toBe(3);
     expect(row.children.every((c) => isIconButton(c as Container))).toBe(true);
   });
 
@@ -135,7 +136,8 @@ describe('HudToolbar build actions', () => {
       hexNeighbors(tile).some((n) => n.q === t.q && n.r === t.r))!;
     neighbor.terrain = TileType.GrasslandForest;
     select(tile);
-    expect(row.children.length).toBe(0);
+    const iconButtons = row.children.filter((c) => c instanceof IconButton);
+    expect(iconButtons.length).toBe(1);
   });
 
   it('shows no action buttons while the AI is acting but keeps end turn visible', () => {
@@ -145,10 +147,17 @@ describe('HudToolbar build actions', () => {
     neighbor.terrain = TileType.GrasslandForest;
     useGameStore.getState().setAiActive(true);
     select(tile);
-    expect(row.children.length).toBe(0);
-    const endTurnRow = (toolbar as unknown as { endTurnRow: Container }).endTurnRow;
-    expect(endTurnRow.children.length).toBe(1);
+    expect(row.children.length).toBe(1);
     useGameStore.getState().setAiActive(false);
+  });
+
+  it('hides the whole toolbar while another player is moving', () => {
+    const el = (toolbar as unknown as { el: Container }).el!;
+    expect(el.visible).toBe(true);
+    useGameStore.getState().setAiActive(true);
+    expect(el.visible).toBe(false);
+    useGameStore.getState().setAiActive(false);
+    expect(el.visible).toBe(true);
   });
 
   it('pulses the end turn button when no action is available anywhere', () => {
@@ -166,8 +175,7 @@ describe('HudToolbar build actions', () => {
     store.setTutorial(false);
     store.setTutorialStep(null);
     store.setTutorialHighlightEndTurn(false);
-    const endTurnRow = (toolbar as unknown as { endTurnRow: Container }).endTurnRow;
-    expect(endTurnRow.children.some((c) => c instanceof Graphics)).toBe(true);
+    expect(row.children.some((c) => c instanceof Graphics)).toBe(true);
   });
 
   it('does not pulse the end turn button while an action remains', () => {
@@ -178,8 +186,7 @@ describe('HudToolbar build actions', () => {
     store.setTutorial(false);
     store.setTutorialStep(null);
     store.setTutorialHighlightEndTurn(false);
-    const endTurnRow = (toolbar as unknown as { endTurnRow: Container }).endTurnRow;
-    expect(endTurnRow.children.some((c) => c instanceof Graphics)).toBe(false);
+    expect(row.children.some((c) => c instanceof Graphics)).toBe(false);
   });
 });
 
@@ -240,7 +247,7 @@ describe('HudToolbar tutorial build highlights', () => {
     store.setTutorial(true);
     store.setTutorialStep('buildSawmill');
     select(tile);
-    expect(row.children.length).toBe(2);
+    expect(row.children.length).toBe(3);
     expect(row.children[1]).toBeInstanceOf(Graphics);
   });
 
@@ -250,7 +257,7 @@ describe('HudToolbar tutorial build highlights', () => {
     store.setTutorial(true);
     store.setTutorialStep('buildMine');
     select(tile);
-    expect(row.children.length).toBe(2);
+    expect(row.children.length).toBe(3);
     expect(row.children[1]).toBeInstanceOf(Graphics);
   });
 
@@ -260,7 +267,7 @@ describe('HudToolbar tutorial build highlights', () => {
     store.setTutorial(true);
     store.setTutorialStep('upgradeVillage');
     select(capital);
-    expect(row.children.length).toBe(3);
+    expect(row.children.length).toBe(4);
     expect(row.children[1]).toBeInstanceOf(Graphics);
   });
 
@@ -273,7 +280,7 @@ describe('HudToolbar tutorial build highlights', () => {
     store.setTutorial(true);
     store.setTutorialStep('spawnArcher');
     select(tile);
-    expect(row.children.length).toBe(1);
+    expect(row.children.length).toBe(2);
   });
 
   it('creates no action tooltips while the tutorial is active', () => {

@@ -1,12 +1,19 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { Container } from 'pixi.js';
 import { HudSkills } from '../src/ui/hud/HudSkills';
-import { TOOLBAR_HEIGHT, TURN_BAR_HEIGHT, ACTION_TOOLBAR_MAX_WIDTH } from '../src/ui/layout';
+import { HudAchievements } from '../src/ui/hud/HudAchievements';
+import { IconButton } from '../src/ui/kit/iconButton';
+import {
+  SCORE_PAD,
+  SCORE_TOP_OFFSET,
+  SCORE_CHIP_RADIUS,
+  SCORE_BUFF_CHIP_GAP,
+  SCORE_BUTTON_GAP,
+  scoreButtonsPosition,
+} from '../src/ui/layout';
 import { type UIHost } from '../src/ui/host';
 
-const BUTTON_SIZE = 48;
-const TURN_BAR_GAP = 6;
-const TOOLBAR_SIDE_PADDING = 12;
+const BUTTON_SIZE = 40;
 
 function makeHost(width = 1280, height = 800): UIHost {
   return {
@@ -16,7 +23,7 @@ function makeHost(width = 1280, height = 800): UIHost {
   } as unknown as UIHost;
 }
 
-describe('HudSkills placement', () => {
+describe('score-stack button placement', () => {
   let host: UIHost;
   let root: Container;
 
@@ -25,23 +32,44 @@ describe('HudSkills placement', () => {
     root = new Container();
   });
 
-  it('aligns to the right edge of the centered action panel on wide screens', () => {
+  it('stacks the skills button under the player score chip with no buffs', () => {
     const skills = new HudSkills();
     skills.mount(host, root);
     const el = (skills as unknown as { el: Container }).el!;
-    const { width, height } = host.app.screen;
-    const barRight = (width + ACTION_TOOLBAR_MAX_WIDTH) / 2;
-    expect(el.position.x).toBe(barRight - TOOLBAR_SIDE_PADDING - BUTTON_SIZE);
-    expect(el.position.y).toBe(height - TOOLBAR_HEIGHT - TURN_BAR_HEIGHT - TURN_BAR_GAP - BUTTON_SIZE);
+    const { width } = host.app.screen;
+    const chipX = width - SCORE_PAD - SCORE_CHIP_RADIUS;
+    const { skills: pos } = scoreButtonsPosition(width, host.app.screen.height, 0);
+    expect(el.position.x).toBe(pos.x);
+    expect(el.position.y).toBe(pos.y);
+    expect(el.position.x).toBe(chipX - BUTTON_SIZE / 2);
+    const chipY = SCORE_PAD + SCORE_TOP_OFFSET + SCORE_CHIP_RADIUS;
+    expect(el.position.y).toBe(chipY + SCORE_CHIP_RADIUS + SCORE_BUFF_CHIP_GAP + SCORE_BUTTON_GAP);
     skills.destroy();
   });
 
-  it('aligns to the screen right edge on narrow screens', () => {
-    host = makeHost(400, 800);
+  it('sits the achievements button directly below the skills button', () => {
     const skills = new HudSkills();
-    skills.mount(host, new Container());
+    skills.mount(host, root);
+    const ach = new HudAchievements();
+    ach.mount(host, root);
     const el = (skills as unknown as { el: Container }).el!;
-    expect(el.position.x).toBe(400 - TOOLBAR_SIDE_PADDING - BUTTON_SIZE);
+    const achEl = (ach as unknown as { el: Container }).el!;
+    expect(achEl.position.x).toBe(el.position.x);
+    expect(achEl.position.y).toBe(el.position.y + BUTTON_SIZE + SCORE_BUTTON_GAP);
     skills.destroy();
+    ach.destroy();
+  });
+
+  it('uses a button the size of the player chip (radius 20 → 40px) with translucent black bg', () => {
+    const skills = new HudSkills();
+    skills.mount(host, root);
+    const ach = new HudAchievements();
+    ach.mount(host, root);
+    const btn = (skills as unknown as { el: Container }).el!.children[0] as IconButton;
+    const achBtn = (ach as unknown as { el: Container }).el!.children[0] as IconButton;
+    expect(btn.width).toBe(SCORE_CHIP_RADIUS * 2);
+    expect(achBtn.width).toBe(SCORE_CHIP_RADIUS * 2);
+    skills.destroy();
+    ach.destroy();
   });
 });

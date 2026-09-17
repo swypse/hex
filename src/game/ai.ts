@@ -12,7 +12,7 @@ import { SeededRandom } from '../util/random';
 import { buildingsInVillage, villageBuildingLimit } from './village';
 import { isMountainType } from './tileTypes';
 import { TRIBES } from './tribes';
-import { AI_PATTERNS, AiPatternContext, bestSpawnableUnitType, enemyCanAttackNext, enemyCanReach, isFrontierTile, landEnemyCanReach, nearestEnemyDistanceFrom, nearestFreeVillageDistanceFrom, nearestOwnUnitDistanceFrom, nearestVillageDistanceFrom } from './aiPatterns';
+import { AI_PATTERNS, AiPatternContext, bestSpawnableUnitType, enemyCanAttackNext, enemyCanReach, guardGarrisonAttack, isFrontierTile, landEnemyCanReach, nearestEnemyDistanceFrom, nearestFreeVillageDistanceFrom, nearestOwnUnitDistanceFrom, nearestVillageDistanceFrom } from './aiPatterns';
 import { AiAction, AiDirectives, AiPlannerState } from './aiTypes';
 import { attackableTargets, chooseBestAttack, tradeIsFavorable } from './combat';
 import { isExploredFor } from './explore';
@@ -260,8 +260,22 @@ function bestAvailableAction(
     }
     const attackTile = chooseBestAttack(map, unit, unit.owner);
     if (attackTile && (!difficulty || !difficulty.checkTrades || !mustering(directives) || tradeIsFavorable(unit, attackTile))) {
-      candidates.push({ score: 4000 + jitter(), action: { type: 'attack', unitId: unit.id, q: attackTile.q, r: attackTile.r } });
-      continue;
+      const garrisonGuard = guardGarrisonAttack(map, player, unit, attackTile, state);
+      if (garrisonGuard.kind !== 'hold') {
+        const guardType = garrisonGuard.guardType;
+        candidates.push({
+          score: 4000 + jitter(),
+          action: guardType
+            ? [
+                { type: 'attack', unitId: unit.id, q: attackTile.q, r: attackTile.r },
+                { type: 'spawn', q: t.q, r: t.r, unitType: guardType },
+              ]
+            : { type: 'attack', unitId: unit.id, q: attackTile.q, r: attackTile.r },
+        });
+        continue;
+      }
+      // The village's last defender cannot be replaced: fall through to the
+      // move/heal handling below instead of trading its life.
     }
     if (state.moved.has(unit.id)) continue;
     if (canHeal(unit) && unit.hp < UNIT_TYPES[unit.type].maxHp && !enemyCanAttackNext(map, t, player.index)) {

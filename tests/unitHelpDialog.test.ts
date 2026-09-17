@@ -116,7 +116,7 @@ describe('UnitHelpDialog', () => {
     expect(texts).toContain('20 attack');
     expect(texts).toContain('50 HP');
     expect(texts).toContain('1 upkeep');
-    expect(texts).toContain('0 defense');
+    expect(texts).toContain('10 defense');
     const sprites = allSprites(root).filter((s) => s.width === 16);
     expect(sprites.length).toBe(5);
     dialog.destroy();

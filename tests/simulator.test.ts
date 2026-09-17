@@ -490,13 +490,13 @@ describe('knight bloodlust and combos', () => {
   it('may attack again after each kill, and stops after a non-kill attack', () => {
     const { map, sim, knight } = setup([
       { q: 1, r: 0, type: 'warrior', hp: 1 },
-      { q: 2, r: 0, type: 'swordsman', hp: 50 },
+      { q: 2, r: 0, type: 'swordsman' },
     ]);
     expect(sim.applyCommand({ type: 'attack', unitId: 'k1', q: 1, r: 0 })).toBe(true);
     expect(knight.hasAttacked).toBe(true);
     expect(canAttack(knight)).toBe(true); // next enemy is in range after the advance
     expect(sim.applyCommand({ type: 'attack', unitId: 'k1', q: 2, r: 0 })).toBe(true);
-    // Swordsman survived (8 hp vs 5 damage): no extra attack remains.
+    // Swordsman survived (knight deals 54 on its 80 hp): no extra attack remains.
     expect(knight.canExtraAttack).toBe(false);
     expect(canAttack(knight)).toBe(false);
     expect(sim.applyCommand({ type: 'attack', unitId: 'k1', q: 2, r: 0 })).toBe(false);

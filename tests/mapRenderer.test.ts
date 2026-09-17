@@ -184,6 +184,24 @@ describe('MapView hp bar anchoring', () => {
     expect(tileView(0, 0).capitalDot).toBeFalsy();
   });
 
+  it('hides hp bars and village names when zoomed out, shows them at default', () => {
+    const tile = map.tiles.find((t) => t.q === 0 && t.r === 0)!;
+    tile.settlement = { owner: 0, level: 1, captureReady: false };
+    tile.ownedBy = 0;
+    tile.unit = {
+      id: 'me', owner: 0, type: 'warrior', q: 0, r: 0,
+      hasMoved: false, hasAttacked: false, hasHealed: false,
+      hp: 50, attack: 20, attackDistance: 1, defense: 10, spawnVillage: null,
+    };
+    const base = { x: 400, y: 300, scale: 1, width: 800, height: 600 };
+
+    view.update(map, players, null, new Set(), new Set(), 0, new Set(), { ...base, zoomOut: 0 });
+    expect(view.overlayItems.some((o) => o.el.children[0] instanceof Graphics)).toBe(true);
+
+    view.update(map, players, null, new Set(), new Set(), 0, new Set(), { ...base, zoomOut: 1 });
+    expect(view.overlayItems.some((o) => o.el.children[0] instanceof Graphics)).toBe(false);
+  });
+
   it('positions the capture icon 4px above the unit hp bar', () => {
     textures.captureTexture = tex(64, 64);
     const tile = map.tiles.find((t) => t.q === 0 && t.r === 0)!;
@@ -622,7 +640,7 @@ describe('MapView hp bar anchoring', () => {
     v.destroy();
   });
 
-  it('adds a larger unfilled white ring around the move marker dot', () => {
+  it('draws the move marker as a filled hexagon with a larger unfilled hexagon outline', () => {
     const t00: MapTile = {
       q: 0, r: 0, terrain: TileType.GrasslandLand, height: 0.1, settlement: null, building: null,
       roadOwner: null, unit: null, ownedBy: 0, claimedByVillage: null, exploredBy: [0],
@@ -642,15 +660,29 @@ describe('MapView hp bar anchoring', () => {
       x: 400, y: 300, scale: 1, width: 800, height: 600,
     });
     const moveMarker = v.markerLayer.children[0] as Graphics;
-    const ctx = moveMarker.context as unknown as { instructions: Array<{ action: string; data: { style: { width: number; color: number; alpha: number; alignment: number } } }> };
+    const ctx = moveMarker.context as unknown as {
+      instructions: Array<{
+        action: string;
+        data: {
+          style: { width: number; color: number; alpha: number; alignment: number };
+          path: { instructions: Array<{ action: string; data: unknown[] }> };
+        };
+      }>;
+    };
     const strokes = ctx.instructions.filter((i) => i.action === 'stroke');
     const fills = ctx.instructions.filter((i) => i.action === 'fill');
-    // Inner filled circle + outer unfilled ring (two strokes, one fill).
+    // Inner filled hexagon + outer unfilled hexagon outline (two strokes, one fill).
     expect(strokes.length).toBe(2);
     expect(fills.length).toBe(1);
-    // Both strokes sit outside the circle path so the ring outline does not
-    // cover the filled dot.
+    // Both strokes sit outside the polygon path so the outline does not cover
+    // the filled dot.
     for (const s of strokes) expect(s.data.style.alignment).toBe(0);
+    // Both shapes are hexagons: a closed polygon with six vertices.
+    for (const item of [fills[0], ...strokes]) {
+      const poly = item!.data.path.instructions.find((p) => p.action === 'poly');
+      expect(poly).toBeDefined();
+      expect((poly!.data[0] as number[]).length).toBe(12);
+    }
     v.destroy();
   });
 
@@ -1740,5 +1772,332 @@ describe('MapView road-port connection', () => {
     const tvs = (view as unknown as { tileViews: Map<string, { roadGraphics: Graphics | null }> }).tileViews;
     expect(tvs.get('0,0')!.roadGraphics).toBeNull();
     view.destroy();
+  });
+});
+
+describe('damage preview badges', () => {
+  const viewport = { x: 400, y: 300, scale: 1, width: 800, height: 600 };
+
+  function unit(id: string, owner: number, q: number, r: number, type: 'warrior' | 'archer' = 'warrior'): Unit {
+    const t = UNIT_TYPES[type];
+    return {
+      id, owner, type, q, r,
+      hasMoved: false, hasAttacked: false, hasHealed: false,
+      hp: 50, attack: t.attack, attackDistance: t.attackDistance, defense: t.defense,
+      spawnVillage: { q, r },
+    };
+  }
+
+  function tileOf(q: number, r: number, u: Unit | null, owner: number | null = null, explored = true): MapTile {
+    return {
+      q, r, terrain: TileType.GrasslandLand, height: 0.1, settlement: null, building: null,
+      roadOwner: null, unit: u, ownedBy: owner, claimedByVillage: null,
+      exploredBy: explored ? [0, 1] : [],
+    };
+  }
+
+  function playersOf(): Player[] {
+    return [
+      { index: 0, tribe: Tribe.Cats, isHuman: true, name: 'Cats', resources: { ...START_RESOURCES }, score: 0, kills: 0, skills: [], isActive: true },
+      { index: 1, tribe: Tribe.Villagers, isHuman: false, name: 'Villagers', resources: { ...START_RESOURCES }, score: 0, kills: 0, skills: [], isActive: true },
+    ];
+  }
+
+  function badgesOf(v: MapView): { text: string; world: { x: number; y: number } }[] {
+    const out: { text: string; world: { x: number; y: number } }[] = [];
+    const overlay = v.overlay;
+    const collect = (c: Container): void => {
+      for (const child of c.children) {
+        if (child instanceof BitmapText && /^-\d+$/.test((child as BitmapText).text)) {
+          out.push({ text: (child as BitmapText).text, world: { x: c.position.x, y: c.position.y } });
+        } else if (child instanceof Container) {
+          collect(child as Container);
+        }
+      }
+    };
+    collect(overlay);
+    return out;
+  }
+
+  function badgeEls(v: MapView): Container[] {
+    const out: Container[] = [];
+    const overlay = v.overlay;
+    const seek = (c: Container): void => {
+      for (const child of c.children) {
+        if (child instanceof Container && child.children.some((x) => x instanceof BitmapText && /^-\d+$/.test((x as BitmapText).text))) {
+          out.push(child as Container);
+        } else if (child instanceof Container) {
+          seek(child as Container);
+        }
+      }
+    };
+    seek(overlay);
+    return out;
+  }
+
+  function badgeEl(v: MapView, text: string): Container {
+    const el = badgeEls(v).find((c) =>
+      (c.children.find((x) => x instanceof BitmapText) as BitmapText).text === text);
+    if (!el) throw new Error(`no badge "${text}"`);
+    return el;
+  }
+
+  it('renders the damage-preview badges in the overlay above markers', () => {
+    const t00 = tileOf(0, 0, unit('mine', 0, 0, 0), 0);
+    const t10 = tileOf(1, 0, unit('them', 1, 1, 0), 1);
+    const m: GameMap = { radius: 1, spawns: [], tiles: [t00, t10] };
+    const app = {
+      screen: { width: 800, height: 600 },
+      ticker: { add: (): void => {}, remove: (): void => {} },
+    } as unknown as Application;
+    const v = new MapView(app, buildTextures(m), HEX, SPRITE_SCALE, 2);
+    const players = playersOf();
+    v.update(m, players, { kind: 'unit', q: 0, r: 0 }, new Set(['1,0']), new Set(), 0, new Set(), viewport);
+    v.showDamagePreview(t00.unit!, t10);
+    v.update(m, players, { kind: 'unit', q: 0, r: 0 }, new Set(['1,0']), new Set(), 0, new Set(), viewport);
+    // Badges live in the unscaled overlay (zoom-independent, like HP bars).
+    expect(v.markerLayer.children.length).toBeGreaterThan(0);
+    const hasText = (c: Container): boolean =>
+      c.children.some((ch) => ch instanceof BitmapText || (ch instanceof Container && hasText(ch)));
+    expect(hasText(v.overlay)).toBe(true);
+    v.destroy();
+  });
+
+  it('shows -N over the target and the counter over the attacker', () => {
+    const t00 = tileOf(0, 0, unit('mine', 0, 0, 0), 0);
+    const t10 = tileOf(1, 0, unit('them', 1, 1, 0), 1);
+    const m: GameMap = { radius: 1, spawns: [], tiles: [t00, t10] };
+    const app = {
+      screen: { width: 800, height: 600 },
+      ticker: { add: (): void => {}, remove: (): void => {} },
+    } as unknown as Application;
+    const v = new MapView(app, buildTextures(m), HEX, SPRITE_SCALE, 2);
+    const players = playersOf();
+    v.update(m, players, { kind: 'unit', q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
+    const before = badgesOf(v);
+    expect(before).toHaveLength(0);
+
+    v.showDamagePreview(t00.unit!, t10);
+    v.update(m, players, { kind: 'unit', q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
+    const badges = badgesOf(v);
+    // warrior vs warrior: attackForce 20, defenseForce 10, total 30:
+    // round((20/30)*20*1.5) = 20 over target, round((10/30)*10*1.5) = 5 over attacker.
+    expect(badges.map((b) => b.text).sort()).toEqual(['-20', '-5']);
+    v.destroy();
+  });
+
+  it('hides the attacker badge when the enemy cannot counter', () => {
+    const t00 = tileOf(0, 0, unit('mine', 0, 0, 0), 0);
+    // A warrior enemy three hexes away: out of its own attack range.
+    const t30 = tileOf(3, 0, unit('them', 1, 3, 0), 1);
+    const m: GameMap = { radius: 3, spawns: [], tiles: [t00, t30] };
+    const app = {
+      screen: { width: 800, height: 600 },
+      ticker: { add: (): void => {}, remove: (): void => {} },
+    } as unknown as Application;
+    const v = new MapView(app, buildTextures(m), HEX, SPRITE_SCALE, 2);
+    const players = playersOf();
+    v.update(m, players, { kind: 'unit', q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
+    v.showDamagePreview(t00.unit!, t30);
+    v.update(m, players, { kind: 'unit', q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
+    const badges = badgesOf(v);
+    expect(badges.map((b) => b.text)).toEqual(['-20']);
+    v.destroy();
+  });
+
+  it('shows a badge even when the enemy is out of attack range', () => {
+    const t00 = tileOf(0, 0, unit('mine', 0, 0, 0), 0);
+    const t30 = tileOf(3, 0, unit('them', 1, 3, 0), 1);
+    const m: GameMap = { radius: 3, spawns: [], tiles: [t00, t30] };
+    const app = {
+      screen: { width: 800, height: 600 },
+      ticker: { add: (): void => {}, remove: (): void => {} },
+    } as unknown as Application;
+    const v = new MapView(app, buildTextures(m), HEX, SPRITE_SCALE, 2);
+    const players = playersOf();
+    v.update(m, players, { kind: 'unit', q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
+    v.showDamagePreview(t00.unit!, t30);
+    v.update(m, players, { kind: 'unit', q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
+    expect(badgesOf(v).some((b) => b.text === '-20')).toBe(true);
+    v.destroy();
+  });
+
+  it('draws the badge as a #111 rounded rect without stroke, attack icon and caret', () => {
+    const t00 = tileOf(0, 0, unit('mine', 0, 0, 0), 0);
+    const t10 = tileOf(1, 0, unit('them', 1, 1, 0), 1);
+    const m: GameMap = { radius: 1, spawns: [], tiles: [t00, t10] };
+    const app = {
+      screen: { width: 800, height: 600 },
+      ticker: { add: (): void => {}, remove: (): void => {} },
+    } as unknown as Application;
+    const v = new MapView(app, buildTextures(m), HEX, SPRITE_SCALE, 2);
+    const players = playersOf();
+    v.update(m, players, { kind: 'unit', q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
+    v.showDamagePreview(t00.unit!, t10);
+    v.update(m, players, { kind: 'unit', q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
+    const el = badgeEl(v, '-20');
+    // #111 fill, no stroke, rounded rect.
+    const g = el.children.find((c) => c instanceof Graphics) as Graphics | undefined;
+    expect(g).toBeDefined();
+    const fills = g!.context.instructions.filter((i) => i.action === 'fill') as {
+      data: { style: { color: number; alpha: number } | undefined } | undefined;
+    }[];
+    expect(fills.some((f) => f.data?.style?.color === 0x111111)).toBe(true);
+    expect(g!.context.instructions.some((i) => i.action === 'stroke')).toBe(false);
+    // A 14px attack icon sprite inside the badge.
+    const icon = el.children.find((c) => c instanceof Sprite) as Sprite | undefined;
+    expect(icon).toBeDefined();
+    expect(icon!.width).toBe(14);
+    // White 14px label with no " hp" suffix.
+    const label = el.children.find((c) => c instanceof BitmapText) as BitmapText | undefined;
+    expect(label!.style.fontSize).toBe(14);
+    expect(label!.style.fill).toBe(0xffffff);
+    expect(label!.text).toBe('-20');
+    v.destroy();
+  });
+
+  it('sticks the caret triangle directly to the rect bottom edge', () => {
+    const t00 = tileOf(0, 0, unit('mine', 0, 0, 0), 0);
+    const t10 = tileOf(1, 0, unit('them', 1, 1, 0), 1);
+    const m: GameMap = { radius: 1, spawns: [], tiles: [t00, t10] };
+    const app = {
+      screen: { width: 800, height: 600 },
+      ticker: { add: (): void => {}, remove: (): void => {} },
+    } as unknown as Application;
+    const v = new MapView(app, buildTextures(m), HEX, SPRITE_SCALE, 2);
+    const players = playersOf();
+    v.update(m, players, { kind: 'unit', q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
+    v.showDamagePreview(t00.unit!, t10);
+    v.update(m, players, { kind: 'unit', q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
+    const el = badgeEl(v, '-20');
+    const g = el.children.find((c) => c instanceof Graphics) as Graphics;
+    const nested = g.context.instructions.flatMap((i) => {
+      const path = (i.data as { path?: { instructions: Array<{
+        action: string;
+        data: unknown;
+      }> } })?.path;
+      return path ? path.instructions : [];
+    });
+    const round = nested.find((i) => i.action === 'roundRect') as {
+      data: [number, number, number, number, number];
+    };
+    expect(round).toBeDefined();
+    const rectBottom = round!.data[1] + round!.data[3];
+    const caret = nested.find((i) => i.action === 'poly') as {
+      data: [number[]];
+    };
+    expect(caret).toBeDefined();
+    // The caret's two base points sit exactly on the rect's bottom edge.
+    const pts = caret!.data[0];
+    expect(pts[1]).toBe(rectBottom);
+    expect(pts[3]).toBe(rectBottom);
+    v.destroy();
+  });
+
+  it('sits the badge caret 4px above the hp text top', () => {
+    const t00 = tileOf(0, 0, unit('mine', 0, 0, 0), 0);
+    const t10 = tileOf(1, 0, unit('them', 1, 1, 0), 1);
+    const m: GameMap = { radius: 1, spawns: [], tiles: [t00, t10] };
+    const app = {
+      screen: { width: 800, height: 600 },
+      ticker: { add: (): void => {}, remove: (): void => {} },
+    } as unknown as Application;
+    const v = new MapView(app, buildTextures(m), HEX, SPRITE_SCALE, 2);
+    const players = playersOf();
+    v.update(m, players, { kind: 'unit', q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
+    v.showDamagePreview(t00.unit!, t10);
+    v.update(m, players, { kind: 'unit', q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
+    const el = badgeEl(v, '-20');
+    // The badge's local caret tip is the bottom of the caret triangle; the
+    // badge's world anchor is its outer wrapper's position.
+    const outer = el.parent!;
+    const g = el.children.find((c) => c instanceof Graphics) as Graphics;
+    const nested = g.context.instructions.flatMap((i) => {
+      const path = (i.data as { path?: { instructions: Array<{ action: string; data: unknown }> } })?.path;
+      return path ? path.instructions : [];
+    });
+    const caretPath = nested.find((i) => i.action === 'poly') as { data: number[][] };
+    const caretTipLocal = caretPath?.data?.[0]?.[5] ?? 0;
+    const caretTipWorld = outer.position.y + caretTipLocal;
+
+    // Find the same unit's hp bar label height from the rendered overlay item.
+    const hpBar = v.overlayItems.find((o) => {
+      const t = o.el.children.find((c) => c instanceof BitmapText);
+      return t instanceof BitmapText && t.text === '50/50';
+    })!;
+    const hpLabel = hpBar.el.children.find((c) => c instanceof BitmapText) as BitmapText;
+    const p = hexToPixel(t10, HEX);
+    const anchorY = p.y - tileElevation(t10, HEX) - 10 + 40;
+    // hp label bottom sits 13px above the anchor; the text top rises hpLabel.height
+    // above that; the caret tip must be 4px above the text top.
+    // In screen-space (viewport.y = 300, scale = 1) the caret tip y =
+    // viewport.y + anchorY - 13 - hpLabel.height - 4.
+    expect(caretTipWorld).toBeCloseTo(300 + anchorY - 13 - hpLabel.height - 4, 5);
+    v.destroy();
+  });
+
+  it('fades the badge in with a scale bounce on show and out on hide', () => {
+    const callbacks: Array<() => void> = [];
+    const app = {
+      screen: { width: 800, height: 600 },
+      ticker: { add: (fn: () => void) => callbacks.push(fn), remove: (): void => {} },
+    } as unknown as Application;
+    const t00 = tileOf(0, 0, unit('mine', 0, 0, 0), 0);
+    const t10 = tileOf(1, 0, unit('them', 1, 1, 0), 1);
+    const m: GameMap = { radius: 1, spawns: [], tiles: [t00, t10] };
+    const v = new MapView(app, buildTextures(m), HEX, SPRITE_SCALE, 2);
+    const players = playersOf();
+    const origNow = performance.now;
+    let now = 0;
+    (performance as { now: () => number }).now = () => now;
+    try {
+      v.update(m, players, { kind: 'unit', q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
+      v.showDamagePreview(t00.unit!, t10);
+      v.update(m, players, { kind: 'unit', q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
+      const el = badgeEl(v, '-20');
+      expect(el.alpha).toBe(0);
+      now = 0;
+      for (const fn of callbacks) fn();
+      expect(el.alpha).toBeLessThan(1);
+      now = 150; // midpoint of the in-animation
+      for (const fn of callbacks) fn();
+      // The badge dips DOWN during the in-animation (positive y), then settles.
+      const midY = el.position.y;
+      expect(midY).toBeGreaterThan(0);
+      now = 300; // past the in-animation (200ms)
+      for (const fn of callbacks) fn();
+      expect(el.alpha).toBe(1);
+      expect(el.scale.x).toBe(1);
+      expect(el.position.y).toBe(0);
+      // hide -> out animation fades the badge back to 0 and removes it.
+      v.hideDamagePreview();
+      expect(el.alpha).toBe(1);
+      now = 500; // past the out-animation (another 200ms)
+      for (const fn of callbacks) fn();
+      expect(el.alpha).toBe(0);
+      expect(el.destroyed).toBe(true);
+      expect(v.overlayItems.some((o) => o.el === el)).toBe(false);
+    } finally {
+      (performance as { now: () => number }).now = origNow;
+      v.destroy();
+    }
+  });
+
+  it('clears all badges after hideDamagePreview', () => {
+    const t00 = tileOf(0, 0, unit('mine', 0, 0, 0), 0);
+    const t10 = tileOf(1, 0, unit('them', 1, 1, 0), 1);
+    const m: GameMap = { radius: 1, spawns: [], tiles: [t00, t10] };
+    const app = {
+      screen: { width: 800, height: 600 },
+      ticker: { add: (): void => {}, remove: (): void => {} },
+    } as unknown as Application;
+    const v = new MapView(app, buildTextures(m), HEX, SPRITE_SCALE, 2);
+    const players = playersOf();
+    v.update(m, players, { kind: 'unit', q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
+    v.showDamagePreview(t00.unit!, t10);
+    v.hideDamagePreview();
+    v.update(m, players, { kind: 'unit', q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
+    expect(badgesOf(v)).toHaveLength(0);
+    v.destroy();
   });
 });

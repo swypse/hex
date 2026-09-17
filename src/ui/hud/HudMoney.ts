@@ -60,12 +60,12 @@ export class HudMoney implements Widget {
     this.el.removeChildren();
 
     const compact = this.host.app.screen.width <= 600;
-    const iconSize = compact ? 17 : 21;
+    const iconSize = compact ? 11 : 13;
     const fontSize = compact ? 11 : 13;
     const cy = compact ? 13 : 15;
-    const padTop = 4;
-    const padSide = 12;
-    const padBottom = 4;
+    const padTop = 0;
+    const padSide = 6;
+    const padBottom = 0;
     const rows = [
       { key: 'money', icon: 'gold-32', value: `${r.money}`, income: r.moneyIncome > 0 ? ` (+${r.moneyIncome})` : '' },
       { key: 'wood', icon: 'wood-32', value: `${r.wood}`, income: r.building.wood > 0 ? ` (+${r.building.wood})` : '' },

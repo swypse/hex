@@ -7,7 +7,7 @@ import { reachableTargets, tileAt } from './selection';
 import { UNIT_MOVEMENT, UNIT_TYPES, UNIT_ATTACK_DISTANCE, canHeal, HEAL_AMOUNT, Unit, UnitType } from './units';
 import { SeededRandom } from '../util/random';
 import { hexDistance, hexNeighbors } from './hex';
-import { attackableTargets, attackDamage, tradeIsFavorable } from './combat';
+import { attackableTargets, attackDamage, canCounterAttack, resolveCombat, tradeIsFavorable } from './combat';
 import { canBuildPort, canBuildSawmill, canBuildMine, BUILDING_COSTS } from './buildings';
 import { unitsInVillage, villageCapacity } from './village';
 import { isExploredFor } from './explore';
@@ -96,6 +96,58 @@ export function bestSpawnableUnitType(
     if (canAfford(player.resources, cost)) return type;
   }
   return null;
+}
+
+/** Counter damage an attack on `target` would draw back onto `attacker` (0
+ *  when the target dies, is out of range, or cannot counter), mirroring
+ *  performAttack's exact formula: the target's defense force shares the
+ *  incoming attack force, so its retaliation is the defense result. */
+export function counterDamageTo(
+  map: GameMap,
+  attacker: Unit,
+  attackerTile: MapTile,
+  targetTile: MapTile,
+): number {
+  const target = targetTile.unit!;
+  const { attackerDamage, counterDamage } = resolveCombat(map, attacker, targetTile);
+  if (attackerDamage >= target.hp) return 0;
+  const dist = hexDistance({ q: attacker.q, r: attacker.r }, { q: target.q, r: target.r });
+  if (dist > target.attackDistance) return 0;
+  if (!canCounterAttack(target)) return 0;
+  return counterDamage;
+}
+
+export type GarrisonGuardResult = { kind: 'attack'; guardType?: UnitType } | { kind: 'hold' };
+
+/** A unit standing on its own village must never trade its life for a kill if
+ *  that would leave the village with no garrison and no way to replace one.
+ *  - `{ kind: 'hold' }`: the enemy counter would kill the garrison and no
+ *    fresh defender can be spawned on the village right after — hold instead.
+ *  - `{ kind: 'attack', guardType }`: the attack may proceed, but the caller
+ *    must *also* plan a spawn so the village is covered if the garrison dies.
+ *  - `{ kind: 'attack' }`: either the attack cannot kill the garrison, or the
+ *    unit is not on its own village — no guard required. */
+export function guardGarrisonAttack(
+  map: GameMap,
+  player: Player,
+  unit: Unit,
+  targetTile: MapTile,
+  state?: AiPlannerState,
+): GarrisonGuardResult {
+  const tile = map.tiles.find((t) => t.unit === unit);
+  if (!tile?.settlement || tile.settlement.owner !== player.index) return { kind: 'attack' };
+  if (counterDamageTo(map, unit, tile, targetTile) < unit.hp) return { kind: 'attack' };
+
+  const vk = key(tile.q, tile.r);
+  if (state?.occupied.has(vk)) return { kind: 'hold' };
+  // The dying garrison frees a spawn slot: a guard fits as long as the
+  // village is not already at capacity with its other spawns.
+  const garrisonHome = unit.spawnVillage !== null && key(unit.spawnVillage.q, unit.spawnVillage.r) === vk;
+  const stayed = unitsInVillage(map, tile) - (garrisonHome ? 1 : 0);
+  if (stayed >= villageCapacity(tile.settlement.level)) return { kind: 'hold' };
+  const guardType = bestSpawnableUnitType(player, 'defense');
+  if (!guardType) return { kind: 'hold' };
+  return { kind: 'attack', guardType };
 }
 
 export function nearestEnemyDistanceFrom(map: GameMap, owner: number, tile: MapTile): number {
@@ -221,7 +273,12 @@ export const AI_PATTERNS: AiPattern[] = [
             (a) => a.q === enemyInVillage.q && a.r === enemyInVillage.r,
           )
         ) {
+          const garrisonGuard = guardGarrisonAttack(map, player, unit, enemyInVillage, state);
+          if (garrisonGuard.kind === 'hold') continue;
           actions.push({ type: 'attack', unitId: unit.id, q: enemyInVillage.q, r: enemyInVillage.r });
+          if (garrisonGuard.guardType) {
+            actions.push({ type: 'spawn', q: t.q, r: t.r, unitType: garrisonGuard.guardType });
+          }
           continue;
         }
         if (state.moved.has(unit.id)) continue;
@@ -271,8 +328,17 @@ export const AI_PATTERNS: AiPattern[] = [
       if (!best) return null;
       const actions: AiAction[] = [];
       for (const a of best.attackers) {
+        // A garrison that joins from its own village without moving first may
+        // take a lethal counter: it must not unless a spawn covers the village,
+        // or hold entirely when it cannot be replaced.
+        const garrisonGuard = a.moveTo ? null : guardGarrisonAttack(map, player, a.unit, best.t, state);
+        if (garrisonGuard?.kind === 'hold') continue;
         if (a.moveTo) actions.push({ type: 'move', unitId: a.unit.id, q: a.moveTo.q, r: a.moveTo.r });
         actions.push({ type: 'attack', unitId: a.unit.id, q: best.t.q, r: best.t.r });
+        if (garrisonGuard?.guardType) {
+          const home = map.tiles.find((x) => x.unit === a.unit);
+          if (home) actions.push({ type: 'spawn', q: home.q, r: home.r, unitType: garrisonGuard.guardType });
+        }
       }
       return actions;
     },

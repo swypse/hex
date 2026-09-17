@@ -23,10 +23,10 @@ import {
 
 describe('UNIT_TYPES', () => {
   it('defines warrior, rider, archer, swordsman', () => {
-    expect(UNIT_TYPES.warrior).toEqual({ movement: 1, attack: 20, attackDistance: 1, maxHp: 50, defense: 0, price: 4, priceWood: 0, priceOre: 0, shape: 'circle' });
-    expect(UNIT_TYPES.rider).toEqual({ movement: 4, attack: 20, attackDistance: 1, maxHp: 40, defense: 5, price: 6, priceWood: 0, priceOre: 0, shape: 'square' });
-    expect(UNIT_TYPES.archer).toEqual({ movement: 1, attack: 20, attackDistance: 2, maxHp: 30, defense: 5, price: 6, priceWood: 0, priceOre: 0, shape: 'triangle' });
-    expect(UNIT_TYPES.swordsman).toEqual({ movement: 1, attack: 40, attackDistance: 1, maxHp: 80, defense: 10, price: 15, priceWood: 0, priceOre: 3, shape: 'swordsman' });
+    expect(UNIT_TYPES.warrior).toEqual({ movement: 1, attack: 20, attackDistance: 1, maxHp: 50, defense: 10, price: 4, priceWood: 0, priceOre: 0, shape: 'circle' });
+    expect(UNIT_TYPES.rider).toEqual({ movement: 4, attack: 20, attackDistance: 1, maxHp: 40, defense: 10, price: 6, priceWood: 0, priceOre: 0, shape: 'square' });
+    expect(UNIT_TYPES.archer).toEqual({ movement: 1, attack: 20, attackDistance: 2, maxHp: 30, defense: 10, price: 6, priceWood: 0, priceOre: 0, shape: 'triangle' });
+    expect(UNIT_TYPES.swordsman).toEqual({ movement: 1, attack: 40, attackDistance: 1, maxHp: 80, defense: 20, price: 15, priceWood: 0, priceOre: 3, shape: 'swordsman' });
   });
 
   it('defines the shield unit with 80 hp, 1 movement and a 10 money + 3 ore price', () => {
@@ -34,9 +34,9 @@ describe('UNIT_TYPES', () => {
   });
 
   it('defines the catapult unit with siege stats and a wood cost', () => {
-    expect(UNIT_TYPES.catapult).toEqual({ movement: 1, attack: 40, attackDistance: 4, maxHp: 30, defense: 0, price: 30, priceWood: 20, priceOre: 5, shape: 'square' });
+    expect(UNIT_TYPES.catapult).toEqual({ movement: 1, attack: 50, attackDistance: 4, maxHp: 30, defense: 0, price: 30, priceWood: 20, priceOre: 5, shape: 'square' });
     expect(UNIT_MOVEMENT.catapult).toBe(1);
-    expect(UNIT_ATTACK.catapult).toBe(40);
+    expect(UNIT_ATTACK.catapult).toBe(50);
     expect(UNIT_ATTACK_DISTANCE.catapult).toBe(4);
     expect(UNIT_TYPE_NAMES.catapult).toBe('Catapult');
   });

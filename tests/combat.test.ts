@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { GameMap, MapTile, Settlement } from '../src/game/mapGen';
-import { attackDamage, attackableTargets, chooseBestAttack, counterAttackDamage, MISS_CHANCE, missChanceFor, performAttack, rollAttackDamage, MIN_DAMAGE, tradeIsFavorable } from '../src/game/combat';
+import { attackDamage, attackableTargets, chooseBestAttack, resolveCombat, defenseBonusFor, MISS_CHANCE, missChanceFor, performAttack, tradeIsFavorable, COMBAT_SCALE } from '../src/game/combat';
 import type { Player } from '../src/game/players';
 import { TileType } from '../src/game/tileTypes';
 import { Unit, UNIT_TYPES, MAX_HP } from '../src/game/units';
@@ -15,7 +15,7 @@ function makeTile(
 }
 
 function makeWarrior(id: string, owner: number, q: number, r: number, hp: number): Unit {
-  return { id, owner, type: 'warrior', q, r, hasMoved: false, hasAttacked: false, hasHealed: false, hp, attack: 20, attackDistance: 1, defense: 0, spawnVillage: null };
+  return { id, owner, type: 'warrior', q, r, hasMoved: false, hasAttacked: false, hasHealed: false, hp, attack: 20, attackDistance: 1, defense: 10, spawnVillage: null };
 }
 
 function makeShield(id: string, owner: number, q: number, r: number, hp: number): Unit {
@@ -23,7 +23,7 @@ function makeShield(id: string, owner: number, q: number, r: number, hp: number)
 }
 
 function makeCatapult(id: string, owner: number, q: number, r: number, hp: number): Unit {
-  return { id, owner, type: 'catapult', q, r, hasMoved: false, hasAttacked: false, hasHealed: false, hp, attack: 40, attackDistance: 4, defense: 0, spawnVillage: null };
+  return { id, owner, type: 'catapult', q, r, hasMoved: false, hasAttacked: false, hasHealed: false, hp, attack: 50, attackDistance: 4, defense: 0, spawnVillage: null };
 }
 
 function makeMap(): GameMap {
@@ -44,28 +44,69 @@ describe('attackDamage', () => {
   });
 });
 
-describe('counterAttackDamage', () => {
-  it('scales a shield counter-attack by 50', () => {
-    expect(counterAttackDamage(makeShield('s', 0, 0, 0, 80))).toBe(50);
-    expect(counterAttackDamage(makeShield('s', 0, 0, 0, 40))).toBe(25);
-    expect(counterAttackDamage(makeShield('s', 0, 0, 0, 1))).toBe(1);
+describe('resolveCombat', () => {
+  it('applies the Polytopia force-ratio formula with COMBAT_SCALE 1.5', () => {
+    const map = makeMap();
+    const attacker = map.tiles[0]!.unit!;
+    const target = map.tiles[1]!;
+    const { attackerDamage, counterDamage } = resolveCombat(map, attacker, target);
+    // attackForce 20, defenseForce 10, total 30:
+    // round((20/30) * 20 * 1.5) = 20, round((10/30) * 10 * 1.5) = 5
+    expect(attackerDamage).toBe(20);
+    expect(counterDamage).toBe(5);
+    expect(COMBAT_SCALE).toBe(1.5);
   });
 
-  it('keeps non-shield counter-attacks at the normal attack scaling', () => {
-    expect(counterAttackDamage(makeWarrior('w', 0, 0, 0, 50))).toBe(20);
+  it('deals full attack * scale against a zero-defense target', () => {
+    const map = makeMap();
+    const attacker = map.tiles[0]!.unit!;
+    const target = map.tiles[1]!;
+    target.unit!.defense = 0;
+    const { attackerDamage, counterDamage } = resolveCombat(map, attacker, target);
+    expect(attackerDamage).toBe(Math.round(20 * COMBAT_SCALE));
+    expect(counterDamage).toBe(0);
+  });
+
+  it('an attacker with zero force deals zero total damage', () => {
+    const map = makeMap();
+    const attacker = map.tiles[0]!.unit!;
+    attacker.hp = 0;
+    map.tiles[1]!.unit!.defense = 0;
+    const { attackerDamage, counterDamage } = resolveCombat(map, attacker, map.tiles[1]!);
+    expect(attackerDamage).toBe(0);
+    expect(counterDamage).toBe(0);
+  });
+
+  it('does not mutate either unit', () => {
+    const map = makeMap();
+    const attacker = map.tiles[0]!.unit!;
+    const target = map.tiles[1]!;
+    const before = target.unit!.hp;
+    resolveCombat(map, attacker, target);
+    expect(attacker.hp).toBe(MAX_HP);
+    expect(target.unit!.hp).toBe(before);
   });
 });
 
-describe('rollAttackDamage', () => {
-  it('rolls a uniform 40..60 for a catapult', () => {
-    const c = makeCatapult('c', 0, 0, 0, 30);
-    expect(rollAttackDamage(c, () => 0.0)).toBe(40);
-    expect(rollAttackDamage(c, () => 0.99)).toBe(60);
-    expect(rollAttackDamage(c, () => 0.5)).toBe(50);
+describe('defenseBonusFor', () => {
+  it('returns 1 without any reduction', () => {
+    const map = makeMap();
+    const tile = map.tiles[1]!;
+    expect(defenseBonusFor(map, tile.unit!, tile)).toBe(1);
   });
 
-  it('keeps the standard scaling for other units', () => {
-    expect(rollAttackDamage(makeWarrior('w', 0, 0, 0, 50), () => 0.99)).toBe(20);
+  it('scales 1 + reduction / 10 for an own village', () => {
+    const map = makeMap();
+    const attacker = map.tiles[0]!.unit!;
+    const tile = map.tiles[1]!;
+    tile.settlement = { owner: 1, level: 1, captureReady: false };
+    tile.settlement!.owner = 1;
+    // VILLAGE_DEFENSE 5 -> 1 + 5/10 = 1.5
+    expect(defenseBonusFor(map, tile.unit!, tile)).toBe(1.5);
+  });
+
+  it('returns 1 for a null map (no context)', () => {
+    expect(defenseBonusFor(null, makeWarrior('x', 0, 0, 0, 50), makeTile(0, 0, TileType.GrasslandLand))).toBe(1);
   });
 });
 
@@ -105,7 +146,7 @@ describe('chooseBestAttack', () => {
 
   it('prefers a target that cannot retaliate', () => {
     const map: GameMap = { radius: 4, tiles: [], spawns: [] };
-    const archer: Unit = { id: 'a', owner: 0, type: 'archer', q: 0, r: 0, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 30, attack: 20, attackDistance: 2, defense: 5, spawnVillage: null };
+    const archer: Unit = { id: 'a', owner: 0, type: 'archer', q: 0, r: 0, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 30, attack: 20, attackDistance: 2, defense: 10, spawnVillage: null };
     const melee = makeTile(1, 0, TileType.GrasslandLand, makeWarrior('m', 1, 1, 0, 1));
     const farMelee = makeTile(2, 0, TileType.GrasslandLand, makeWarrior('f', 1, 2, 0, 1));
     map.tiles.push(makeTile(0, 0, TileType.GrasslandLand, archer), melee, farMelee);
@@ -133,13 +174,13 @@ describe('performAttack', () => {
     const target = map.tiles[1]!;
     const result = performAttack(map, attacker, target, noMiss);
     expect(target.unit!.hp).toBe(30);
-    expect(attacker.hp).toBe(38);
+    expect(attacker.hp).toBe(45);
     expect(attacker.hasAttacked).toBe(true);
     expect(attacker.hasMoved).toBe(false);
     expect(target.unit!.hasMoved).toBe(false);
     expect(target.unit!.hasAttacked).toBe(false);
     expect(result.attackerDamage).toBe(20);
-    expect(result.targetDamage).toBe(12);
+    expect(result.targetDamage).toBe(5);
   });
 
   it('kills the target at zero hp and removes it from the tile', () => {
@@ -166,7 +207,7 @@ describe('performAttack', () => {
 
   it('does not move an archer onto the killed tile', () => {
     const map = makeMap();
-    const archer: Unit = { id: 'arc', owner: 0, type: 'archer', q: 0, r: 0, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 30, attack: 20, attackDistance: 3, defense: 5, spawnVillage: null };
+    const archer: Unit = { id: 'arc', owner: 0, type: 'archer', q: 0, r: 0, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 30, attack: 20, attackDistance: 3, defense: 10, spawnVillage: null };
     map.tiles[0]!.unit = archer;
     const dying = makeTile(1, 0, TileType.GrasslandLand, makeWarrior('b', 1, 1, 0, 1));
     map.tiles[1]! = dying;
@@ -175,14 +216,15 @@ describe('performAttack', () => {
     expect(map.tiles[1]!.unit).toBeNull();
   });
 
-  it('does not move a catapult onto the killed tile and rolls 40..60 damage', () => {
+  it('does not move a catapult onto the killed tile and deals fixed formula damage', () => {
     const map: GameMap = { radius: 4, tiles: [], spawns: [] };
     const catapult = makeCatapult('c', 0, 0, 0, 30);
     const dying = makeTile(1, 0, TileType.GrasslandLand, makeWarrior('b', 1, 1, 0, 5));
     map.tiles.push(makeTile(0, 0, TileType.GrasslandLand, catapult), dying);
-    const result = performAttack(map, catapult, dying, () => 0.99);
-    expect(result.attackerDamage).toBeGreaterThanOrEqual(40);
-    expect(result.attackerDamage).toBeLessThanOrEqual(60);
+    const result = performAttack(map, catapult, dying, noMiss);
+    // attackForce 50, defenseForce 10*(5/50)=1, total 51:
+    // round((50/51)*50*1.5) = round(73.5) = 74
+    expect(result.attackerDamage).toBe(74);
     expect(result.targetDied).toBe(true);
     expect(map.tiles[0]!.unit).toBe(catapult);
     expect(map.tiles[1]!.unit).toBeNull();
@@ -190,29 +232,33 @@ describe('performAttack', () => {
     expect(catapult.r).toBe(0);
   });
 
-  it('a shield takes 20 less damage from a catapult attack via its defense', () => {
+  it('a shield reduces a catapult volley via its defense force', () => {
     const map: GameMap = { radius: 4, tiles: [], spawns: [] };
     const catapult = makeCatapult('c', 0, 0, 0, 30);
-    const shield = makeTile(1, 0, TileType.GrasslandLand, makeShield('s', 1, 1, 0, 100));
+    const shield = makeTile(1, 0, TileType.GrasslandLand, makeShield('s', 1, 1, 0, 80));
     map.tiles.push(makeTile(0, 0, TileType.GrasslandLand, catapult), shield);
-    const result = performAttack(map, catapult, shield, () => 0.99);
-    expect(result.attackerDamage).toBe(40);
-    expect(shield.unit!.hp).toBe(60);
+    const result = performAttack(map, catapult, shield, noMiss);
+    // attackForce 50, defenseForce 20, total 70:
+    // round((50/70)*50*1.5) = round(53.6) = 54
+    expect(result.attackerDamage).toBe(54);
+    expect(shield.unit!.hp).toBe(26);
   });
 
-  it('a shield reduces any attack down to the 10 damage floor', () => {
+  it('a shield absorbs a warrior hit down via its defense force (no floor)', () => {
     const map: GameMap = { radius: 4, tiles: [], spawns: [] };
     const warrior = makeWarrior('w', 0, 0, 0, 50);
-    const shield = makeTile(1, 0, TileType.GrasslandLand, makeShield('s', 1, 1, 0, 100));
+    const shield = makeTile(1, 0, TileType.GrasslandLand, makeShield('s', 1, 1, 0, 80));
     map.tiles.push(makeTile(0, 0, TileType.GrasslandLand, warrior), shield);
     const result = performAttack(map, warrior, shield, noMiss);
-    expect(result.attackerDamage).toBe(10);
-    expect(shield.unit!.hp).toBe(90);
+    // attackForce 20, defenseForce 20, total 40:
+    // round((20/40)*20*1.5) = 15
+    expect(result.attackerDamage).toBe(15);
+    expect(shield.unit!.hp).toBe(65);
   });
 
   it('does not move a ship onto the killed tile', () => {
     const map = makeMap();
-    const ship: Unit = { id: 'ship', owner: 0, type: 'warrior', q: 0, r: 0, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 50, attack: 20, attackDistance: 1, defense: 0, spawnVillage: null, shipLevel: 1 };
+    const ship: Unit = { id: 'ship', owner: 0, type: 'warrior', q: 0, r: 0, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 50, attack: 20, attackDistance: 1, defense: 10, spawnVillage: null, shipLevel: 1 };
     map.tiles[0]!.unit = ship;
     const dying = makeTile(1, 0, TileType.GrasslandLand, makeWarrior('b', 1, 1, 0, 1));
     map.tiles[1]! = dying;
@@ -224,7 +270,7 @@ describe('performAttack', () => {
   it('does not move a land attacker onto a killed ship tile', () => {
     const map = makeMap();
     const attacker = map.tiles[0]!.unit!;
-    const dyingShip: Unit = { id: 'ship', owner: 1, type: 'warrior', q: 0, r: -1, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 1, attack: 20, attackDistance: 1, defense: 0, spawnVillage: null, shipLevel: 1 };
+    const dyingShip: Unit = { id: 'ship', owner: 1, type: 'warrior', q: 0, r: -1, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 1, attack: 20, attackDistance: 1, defense: 10, spawnVillage: null, shipLevel: 1 };
     const shipTile = makeTile(0, -1, TileType.Water, dyingShip);
     map.tiles[2]! = shipTile;
     performAttack(map, attacker, shipTile, noMiss);
@@ -236,9 +282,9 @@ describe('performAttack', () => {
 
   it('does not move a ship attacker onto a killed ship tile', () => {
     const map = makeMap();
-    const ship: Unit = { id: 'shipA', owner: 0, type: 'warrior', q: 0, r: 0, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 50, attack: 20, attackDistance: 1, defense: 0, spawnVillage: null, shipLevel: 1 };
+    const ship: Unit = { id: 'shipA', owner: 0, type: 'warrior', q: 0, r: 0, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 50, attack: 20, attackDistance: 1, defense: 10, spawnVillage: null, shipLevel: 1 };
     map.tiles[0]!.unit = ship;
-    const dyingShip: Unit = { id: 'shipB', owner: 1, type: 'warrior', q: 0, r: -1, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 1, attack: 20, attackDistance: 1, defense: 0, spawnVillage: null, shipLevel: 1 };
+    const dyingShip: Unit = { id: 'shipB', owner: 1, type: 'warrior', q: 0, r: -1, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 1, attack: 20, attackDistance: 1, defense: 10, spawnVillage: null, shipLevel: 1 };
     const shipTile = makeTile(0, -1, TileType.Water, dyingShip);
     map.tiles[2]! = shipTile;
     performAttack(map, ship, shipTile, noMiss);
@@ -249,7 +295,7 @@ describe('performAttack', () => {
   it('does not move a land attacker onto a killed pirate tile', () => {
     const map = makeMap();
     const attacker = map.tiles[0]!.unit!;
-    const pirate: Unit = { id: 'pir', owner: -1, type: 'pirate', q: 0, r: -1, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 1, attack: 30, attackDistance: 3, defense: 10, spawnVillage: null };
+    const pirate: Unit = { id: 'pir', owner: -1, type: 'pirate', q: 0, r: -1, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 1, attack: 30, attackDistance: 3, defense: 5, spawnVillage: null };
     const pirateTile = makeTile(0, -1, TileType.Water, pirate);
     map.tiles[2]! = pirateTile;
     performAttack(map, attacker, pirateTile, noMiss);
@@ -259,53 +305,57 @@ describe('performAttack', () => {
     expect(attacker.r).toBe(0);
   });
 
-  it('a defending shield counters with 50-based damage', () => {
+  it('a defending shield counters with defense-based damage', () => {
     const map: GameMap = { radius: 4, tiles: [], spawns: [] };
-    const attacker = makeWarrior('a', 0, 0, 0, 50);
+    const attacker = makeWarrior('a', 0, 0, 0, MAX_HP);
     const shield = makeTile(1, 0, TileType.GrasslandLand, makeShield('s', 1, 1, 0, 80));
     map.tiles.push(makeTile(0, 0, TileType.GrasslandLand, attacker), shield);
     const result = performAttack(map, attacker, shield, noMiss);
-    expect(result.attackerDamage).toBe(10);
-    // The shield counters with its hp after the hit (70): round(50 * 70 / 80) = 44.
-    expect(result.targetDamage).toBe(44);
-    expect(shield.unit!.hp).toBe(70);
-    expect(attacker.hp).toBe(6);
+    // Both forces 20 -> attack 15, counter 15.
+    expect(result.attackerDamage).toBe(15);
+    expect(result.targetDamage).toBe(15);
+    expect(shield.unit!.hp).toBe(65);
+    expect(attacker.hp).toBe(35);
     expect(result.attackerDied).toBe(false);
   });
 
   it('a land catapult never counter-attacks when hit', () => {
     const map: GameMap = { radius: 4, tiles: [], spawns: [] };
     const attacker = makeWarrior('a', 0, 0, 0, MAX_HP);
-    const catapult = makeTile(1, 0, TileType.GrasslandLand, makeCatapult('c', 1, 1, 0, 30));
-    map.tiles.push(makeTile(0, 0, TileType.GrasslandLand, attacker), catapult);
-    const result = performAttack(map, attacker, catapult, noMiss);
-    expect(catapult.unit!.hp).toBe(10);
+    const catapult = makeCatapult('c', 1, 1, 0, 40);
+    const catapultTile = makeTile(1, 0, TileType.GrasslandLand, catapult);
+    map.tiles.push(makeTile(0, 0, TileType.GrasslandLand, attacker), catapultTile);
+    const result = performAttack(map, attacker, catapultTile, noMiss);
+    // defenseForce 0, attackForce 20: round((20/20)*20*1.5) = 30
+    expect(catapultTile.unit!.hp).toBe(10);
     expect(result.targetDamage).toBe(0);
     expect(attacker.hp).toBe(MAX_HP);
   });
 
-  it('a catapult aboard a ship still counter-attacks', () => {
+  it('a ship crew counter-attacks with its defense', () => {
     const map: GameMap = { radius: 4, tiles: [], spawns: [] };
     const attacker = makeWarrior('a', 0, 0, 0, MAX_HP);
-    const shipCatapult = makeCatapult('c', 1, 1, 0, 30);
-    shipCatapult.shipLevel = 1;
-    const catapult = makeTile(1, 0, TileType.Water, shipCatapult);
-    map.tiles.push(makeTile(0, 0, TileType.GrasslandLand, attacker), catapult);
-    const result = performAttack(map, attacker, catapult, noMiss);
-    // Level-1 ship counter base is 10: round(10 * 20 / 30) = 7, floored to 10.
-    expect(result.targetDamage).toBe(10);
-    expect(attacker.hp).toBe(MAX_HP - 10);
+    const shipWarrior = makeWarrior('c', 1, 1, 0, MAX_HP);
+    shipWarrior.shipLevel = 1;
+    const target = makeTile(1, 0, TileType.Water, shipWarrior);
+    map.tiles.push(makeTile(0, 0, TileType.GrasslandLand, attacker), target);
+    const result = performAttack(map, attacker, target, noMiss);
+    // attackForce 20, defenseForce 10, total 30: 20 / 5.
+    expect(result.attackerDamage).toBe(20);
+    expect(result.targetDamage).toBe(5);
+    expect(attacker.hp).toBe(45);
   });
 
   it('does not apply counter-damage when the attacker is beyond the target reach', () => {
     const map: GameMap = { radius: 4, tiles: [], spawns: [] };
-    const archer: Unit = { id: 'arc', owner: 0, type: 'archer', q: 0, r: 0, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 30, attack: 20, attackDistance: 2, defense: 5, spawnVillage: null };
+    const archer: Unit = { id: 'arc', owner: 0, type: 'archer', q: 0, r: 0, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 30, attack: 20, attackDistance: 2, defense: 10, spawnVillage: null };
     const far = makeTile(2, 0, TileType.GrasslandLand, makeWarrior('w', 1, 2, 0, 30));
     map.tiles.push(makeTile(0, 0, TileType.GrasslandLand, archer), far);
     const result = performAttack(map, archer, far, noMiss);
     expect(result.targetDamage).toBe(0);
     expect(archer.hp).toBe(30);
-    expect(far.unit!.hp).toBe(10);
+    // attackForce 20, defenseForce 10*(30/50)=6, total 26: round((20/26)*20*1.5)=23
+    expect(far.unit!.hp).toBe(7);
   });
 });
 
@@ -313,7 +363,7 @@ describe('ship attacks', () => {  it('a level-3 ship attacks at distance 3 with 
     const ship: Unit = {
       id: 's', owner: 0, type: 'archer', q: 0, r: 0,
       hasMoved: false, hasAttacked: false, hasHealed: false,
-      hp: 30, attack: 20, attackDistance: 2, defense: 5, spawnVillage: null,
+      hp: 30, attack: 20, attackDistance: 2, defense: 10, spawnVillage: null,
       shipLevel: 3,
     };
     const map: GameMap = { radius: 4, tiles: [], spawns: [] };
@@ -450,15 +500,20 @@ describe('temple protection', () => {
     const attacker = map.tiles.find((t) => t.unit?.id === 'a')!.unit!;
     const target = map.tiles.find((t) => t.unit?.id === 'b')!;
     const result = performAttack(map, attacker, target, noMiss);
-    expect(result.attackerDamage).toBe(Math.max(MIN_DAMAGE, attackDamage(attacker) - 10));
+    // defenseBonus 1 + 10/10 = 2 -> defenseForce 20, total 40: round((20/40)*20*1.5) = 15
+    expect(result.attackerDamage).toBe(15);
+    expect(target.unit!.hp).toBe(35);
   });
 
-  it('reduces counter damage when the attacker has water protection', () => {
+  it('applies the attacker own-buff bonus to the counter it receives', () => {
     const map = waterProtectedMap();
     const attacker = map.tiles.find((t) => t.unit?.id === 'b')!.unit!;
     const target = map.tiles.find((t) => t.unit?.id === 'a')!;
     const result = performAttack(map, attacker, target, noMiss);
-    expect(result.targetDamage).toBe(Math.max(MIN_DAMAGE, counterAttackDamage(target.unit!) - 10));
+    // attacker(df?) is b a level-1 ship: attackForce = 10. target defenseForce 10,
+    // total 20: attack round((10/20)*20*1.5)=15, counter round((10/20)*10*1.5)=8
+    expect(result.attackerDamage).toBe(15);
+    expect(result.targetDamage).toBe(8);
   });
 });
 
@@ -490,12 +545,13 @@ describe('tradeIsFavorable', () => {
   });
 
   it('returns false for a losing melee trade', () => {
-    const warrior = unitOf('w', 'warrior', 0, 0, 0); // damage 20
-    const swordsman = unitOf('s', 'swordsman', 1, 1, 0); // counter ~40
+    const warrior = unitOf('w', 'warrior', 0, 0, 0);
+    warrior.hp = 10; // this warrior is wounded: low attack force
+    const swordsman = unitOf('s', 'swordsman', 1, 1, 0);
     expect(tradeIsFavorable(warrior, tileWith(1, 0, swordsman))).toBe(false);
   });
 
-  it('returns true for an even melee trade', () => {
+  it('returns true for an equal melee trade', () => {
     const a = unitOf('a', 'warrior', 0, 0, 0);
     const b = unitOf('b', 'warrior', 1, 1, 0);
     expect(tradeIsFavorable(a, tileWith(1, 0, b))).toBe(true);

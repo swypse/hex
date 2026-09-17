@@ -4,7 +4,9 @@ import { type UIHost, type Widget } from '../host';
 import { IconButton } from '../kit/iconButton';
 import { ACTION_BUTTON_ICON_FILES, makeActionButtonIcon } from '../kit/actionButtonIcons';
 import { skillPulseStep } from '../../game/tutorial/tutorialSteps';
-import { SKILLS_BUTTON_SIZE, skillsButtonPosition } from '../layout';
+import { SKILLS_BUTTON_SIZE, scoreButtonsPosition, SCORE_ACTION_BG, SCORE_ACTION_BG_ACTIVE } from '../layout';
+import { activeBuffs } from '../../game/buffs';
+import { gameController } from '../../controller/gameController';
 
 export class HudSkills implements Widget {
   private el: Container | null = null;
@@ -20,7 +22,9 @@ export class HudSkills implements Widget {
     const btn = new IconButton({
       icon: ACTION_BUTTON_ICON_FILES['skills']!,
       size: SKILLS_BUTTON_SIZE,
-      color: 0x373748,
+      color: SCORE_ACTION_BG,
+      hoverColor: SCORE_ACTION_BG_ACTIVE,
+      pressedColor: SCORE_ACTION_BG_ACTIVE,
       onClick: () => useGameStore.getState().setOverlay({ kind: 'skill' }),
       iconFactory: makeActionButtonIcon,
     });
@@ -30,16 +34,26 @@ export class HudSkills implements Widget {
     this.el = el;
     this.layout();
     this.update();
-    this.unsub = useGameStore.subscribe(() => this.update());
+    this.unsub = useGameStore.subscribe(() => {
+      this.layout();
+      this.update();
+    });
     this.onResize = () => this.layout();
     window.addEventListener('resize', this.onResize);
   }
 
   private layout = (): void => {
     if (!this.el || !this.host) return;
-    const pos = skillsButtonPosition(this.host.app.screen.width, this.host.app.screen.height);
+    const pos = scoreButtonsPosition(this.host.app.screen.width, this.host.app.screen.height, this.buffCount()).skills;
     this.el.position.set(pos.x, pos.y);
   };
+
+  private buffCount(): number {
+    const map = gameController.getMap();
+    if (!map) return 0;
+    const s = useGameStore.getState();
+    return activeBuffs(map, s.localPlayerIndex).length;
+  }
 
   private update(): void {
     if (!this.el || !this.host) return;

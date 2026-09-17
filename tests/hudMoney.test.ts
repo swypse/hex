@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, afterEach } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { Container, Text } from 'pixi.js';
 import { HudMoney } from '../src/ui/hud/HudMoney';
 import { useGameStore } from '../src/store/gameStore';

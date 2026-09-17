@@ -2,15 +2,27 @@ import { Container, Graphics, BitmapText } from 'pixi.js';
 import { gameController } from '../../controller/gameController';
 import { totalScore } from '../../game/score';
 import { activeBuffs, BUFF_INFO, type BuffId } from '../../game/buffs';
+import { tribeById } from '../../game/tribes';
 import { useGameStore } from '../../store/gameStore';
 import { type UIHost, type Widget } from '../host';
 import { makeIcon } from '../kit/icon';
 import { makeLabel } from '../kit/label';
 import { Popup, POPUP_BODY_SIZE } from '../kit/popup';
+import {
+  SCORE_PAD,
+  SCORE_TOP_OFFSET,
+  SCORE_CHIP_RADIUS,
+  SCORE_BUFF_CHIP_GAP,
+} from '../layout';
 
-const SIZE = 56;
-const PAD = 8;
+const SCORE_FONT_SIZE = 24;
+const SCORE_COLOR = 0xffc465;
+const CHIP_RADIUS = SCORE_CHIP_RADIUS;
+const PAD = SCORE_PAD;
+const TOP_OFFSET = SCORE_TOP_OFFSET;
 const ICON_SIZE = 16;
+/** Horizontal gap between the score text and the tribe chip. */
+const SCORE_CHIP_GAP = 8;
 /** Vertical gap between buff items (icon + sub score) under the score circle. */
 const BUFF_GAP = 8;
 
@@ -19,28 +31,31 @@ export class HudScore implements Widget {
   onTap: (() => void) | null = null;
   private el: Container | null = null;
   private text: BitmapText | null = null;
+  private tribeChip: Container | null = null;
   private buffRow: Container | null = null;
   private host: UIHost | null = null;
   private unsub: (() => void) | null = null;
   private lastScore = 0;
   private buffPopup: Popup | null = null;
-  private bounceRemove: (() => void) | null = null;
 
   mount(host: UIHost, root: Container): void {
     this.host = host;
     const el = new Container();
-    const size = SIZE;
-    const pad = PAD;
-    const bg = new Graphics();
-    bg.circle(0, 0, size / 2).fill(0xffc465).stroke({ width: 4, color: 0xffe8b5 });
     const text = makeLabel('0', {
-      fontSize: 20,
-      fill: 0xffffff,
-      fontWeight: '800',
+      fontSize: SCORE_FONT_SIZE,
+      fill: SCORE_COLOR,
+      fontWeight: '700',
     });
-    text.anchor.set(0.5, 0.5);
+    text.anchor.set(1, 0.5);
+
+    // The local player's tribe logo clipped into a white circle chip.
+    const s = useGameStore.getState();
+    const localPlayer = s.players[s.localPlayerIndex];
+    const tribe = localPlayer ? tribeById(localPlayer.tribe) : undefined;
+    const tribeChip = this.makeTribeChip(tribe?.code);
+
     const buffRow = new Container();
-    el.addChild(bg, text, buffRow);
+    el.addChild(text, tribeChip, buffRow);
     if (this.onTap) {
       el.eventMode = 'static';
       el.cursor = 'pointer';
@@ -49,6 +64,7 @@ export class HudScore implements Widget {
     root.addChild(el);
     this.el = el;
     this.text = text;
+    this.tribeChip = tribeChip;
     this.buffRow = buffRow;
     this.lastScore = this.readScore();
     this.layout();
@@ -61,13 +77,29 @@ export class HudScore implements Widget {
     this.updateBuffs();
   }
 
+  private makeTribeChip(code: string | undefined): Container {
+    const chip = new Container();
+    const radius = CHIP_RADIUS;
+    const circle = new Graphics();
+    circle.circle(0, 0, radius).fill(0xffffff);
+    const clip = new Graphics();
+    clip.circle(0, 0, radius).fill(0xffffff);
+    const icon = makeIcon(`${code ?? '?'}-icon.png`, radius * 2);
+    icon.mask = clip;
+    chip.addChild(circle, clip, icon);
+    return chip;
+  }
+
   private layout = (): void => {
-    if (!this.el || !this.host || !this.buffRow) return;
-    const centerX = this.host.app.screen.width - PAD - SIZE / 2;
-    const centerY = PAD + SIZE / 2 + 20;
-    this.el.position.set(centerX, centerY);
-    // Buff items stack in a vertical column centred under the score circle.
-    this.buffRow.position.set(-ICON_SIZE / 2, SIZE / 2 + 6);
+    if (!this.el || !this.host || !this.text || !this.tribeChip || !this.buffRow) return;
+    // The row hugs the top-right: tribe chip at the right edge, score text to
+    // its left, buff icons centred under the chip.
+    const chipX = this.host.app.screen.width - PAD - CHIP_RADIUS;
+    const chipY = PAD + TOP_OFFSET + CHIP_RADIUS;
+    this.tribeChip.position.set(chipX, chipY);
+    this.text.position.set(chipX - CHIP_RADIUS - SCORE_CHIP_GAP, chipY);
+    this.el.position.set(0, 0);
+    this.buffRow.position.set(chipX - ICON_SIZE / 2, chipY + CHIP_RADIUS + SCORE_BUFF_CHIP_GAP);
   };
 
   private readScore(): number {
@@ -84,7 +116,6 @@ export class HudScore implements Widget {
     if (score === this.lastScore) return;
     this.lastScore = score;
     this.text.text = String(score);
-    this.bounce();
   }
 
   private updateBuffs(): void {
@@ -148,40 +179,15 @@ export class HudScore implements Widget {
     this.buffPopup = null;
   }
 
-  private bounce(): void {
-    if (!this.host || !this.el) return;
-    this.stopBounce();
-    const start = performance.now();
-    const fn = (): void => {
-      const t = Math.min(1, (performance.now() - start) / 300);
-      const s = 1 + 0.2 * Math.sin(t * Math.PI);
-      this.el!.scale.set(s, s);
-      if (t >= 1) {
-        this.el!.scale.set(1, 1);
-        this.host!.app.ticker.remove(fn);
-        this.bounceRemove = null;
-      }
-    };
-    this.host.app.ticker.add(fn);
-    this.bounceRemove = () => this.host!.app.ticker.remove(fn);
-  }
-
-  private stopBounce(): void {
-    if (this.bounceRemove) {
-      this.bounceRemove();
-      this.bounceRemove = null;
-    }
-  }
-
   destroy(): void {
-    if (this.unsub) this.unsub();
+    this.unsub?.();
     window.removeEventListener('resize', this.layout);
-    this.stopBounce();
     this.closeBuffPopup();
     this.unsub = null;
     this.el?.destroy({ children: true });
     this.el = null;
     this.text = null;
+    this.tribeChip = null;
     this.buffRow = null;
     this.host = null;
   }

@@ -9,6 +9,8 @@ export interface Viewport {
   scale: number;
   width: number;
   height: number;
+  /** 0 = default fit view, 1 = fully zoomed out; used to hide detail text. */
+  zoomOut?: number;
 }
 
 export function tileSignature(

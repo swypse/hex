@@ -17,24 +17,53 @@ interface AttackResult {
 
 export const MISS_CHANCE = 0.1;
 const SCIENCE_MISS_CHANCE = 0.05;
-export const MIN_DAMAGE = 10;
+
+/** Polytopia-style combat scale, derived from this game's own stat block: a
+ *  full-HP warrior (attack 20) vs a same-armour warrior (defense 10) trades
+ *  at a raw ratio of 20/30 × 20 ≈ 13.3; calibrating that back to the long-
+ *  standing warrior trade damage of 20 gives 20 / 13.3 = 1.5. */
+export const COMBAT_SCALE = 1.5;
 
 export function missChanceFor(player: Player): number {
   return hasSkill(player, 'science') ? SCIENCE_MISS_CHANCE : MISS_CHANCE;
 }
 
+/** Raw attack force: attack × current hp ratio (no defense applied). */
 export function attackDamage(attacker: Unit): number {
   return Math.round((shipAttack(attacker) * attacker.hp) / UNIT_TYPES[attacker.type].maxHp);
 }
 
-export function rollAttackDamage(attacker: Unit, rng: () => number): number {
-  if (attacker.type === 'catapult') return 40 + Math.floor(rng() * 21);
-  return attackDamage(attacker);
+/** Terrain/protection bonus applied to the defender's defense force.
+ *  `1 + reduction / 10`: own village (5) → ×1.5, walled village (+3 → ×1.8),
+ *  temple protections (+10 → ×2.0). */
+export function defenseBonusFor(map: GameMap | null, unit: Unit, tile: MapTile): number {
+  if (!map || unit.owner < 0) return 1;
+  return 1 + damageReduction(map, unit, tile) / 10;
 }
 
-export function counterAttackDamage(unit: Unit): number {
-  const base = unit.type === 'shield' ? 50 : shipAttack(unit);
-  return Math.round((base * unit.hp) / UNIT_TYPES[unit.type].maxHp);
+export interface CombatResolution {
+  attackerDamage: number;
+  counterDamage: number;
+}
+
+/** Polytopia-style force-ratio resolution for one attack, pure (no mutation):
+ *      attackForce  = attacker.attack  × attacker.hp / maxHp
+ *      defenseForce = defender.defense × defender.hp / maxHp × defenseBonus
+ *      total        = attackForce + defenseForce
+ *      attackerDamage = round(attackForce / total × attacker.attack  × COMBAT_SCALE)
+ *      counterDamage  = round(defenseForce / total × defender.defense × COMBAT_SCALE)
+ */
+export function resolveCombat(map: GameMap | null, attacker: Unit, target: MapTile): CombatResolution {
+  const defender = target.unit!;
+  const attackForce = (shipAttack(attacker) * attacker.hp) / UNIT_TYPES[attacker.type].maxHp;
+  const defenseForce =
+    ((defender.defense ?? 0) * defender.hp) / UNIT_TYPES[defender.type].maxHp *
+    defenseBonusFor(map, defender, target);
+  const total = attackForce + defenseForce;
+  if (total <= 0) return { attackerDamage: 0, counterDamage: 0 };
+  const attackerDamage = Math.round((attackForce / total) * attacker.attack * COMBAT_SCALE);
+  const counterDamage = Math.round((defenseForce / total) * (defender.defense ?? 0) * COMBAT_SCALE);
+  return { attackerDamage, counterDamage };
 }
 
 /** Whether a unit retaliates when it survives an attack. Land catapults never
@@ -80,11 +109,12 @@ export function chooseBestAttack(map: GameMap, unit: Unit, playerIndex = 0): Map
 export function tradeIsFavorable(attacker: Unit, targetTile: MapTile): boolean {
   const target = targetTile.unit;
   if (!target) return true;
-  if (attackDamage(attacker) >= target.hp) return true;
+  const { attackerDamage, counterDamage } = resolveCombat(null, attacker, targetTile);
+  if (attackerDamage >= target.hp) return true;
   const dist = hexDistance({ q: attacker.q, r: attacker.r }, { q: target.q, r: target.r });
   if (dist > shipAttackDistance(target)) return true; // no counter available
   if (!canCounterAttack(target)) return true;
-  return attackDamage(attacker) >= counterAttackDamage(target);
+  return attackerDamage >= counterDamage;
 }
 
 export function performAttack(
@@ -109,10 +139,7 @@ export function performAttack(
     };
   }
 
-  const attackerDamage = Math.max(
-    MIN_DAMAGE,
-    rollAttackDamage(attacker, rng) - (targetUnit.defense ?? 0) - damageReduction(map, targetUnit, target),
-  );
+  const { attackerDamage, counterDamage } = resolveCombat(map, attacker, target);
   const targetDied = targetUnit.hp - attackerDamage <= 0;
   targetUnit.hp = Math.max(0, targetUnit.hp - attackerDamage);
   attacker.hasAttacked = true;
@@ -125,8 +152,7 @@ export function performAttack(
     { q: target.q, r: target.r },
   );
   if (!targetDied && distance <= targetUnit.attackDistance && canCounterAttack(targetUnit)) {
-    const counterReduction = attackerTile ? damageReduction(map, attacker, attackerTile) : 0;
-    targetDamage = Math.max(MIN_DAMAGE, counterAttackDamage(targetUnit) - (attacker.defense ?? 0) - counterReduction);
+    targetDamage = counterDamage;
     attackerDied = attacker.hp - targetDamage <= 0;
     attacker.hp = Math.max(0, attacker.hp - targetDamage);
   }

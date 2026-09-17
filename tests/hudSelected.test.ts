@@ -168,7 +168,7 @@ describe('HudSelected village building constraints', () => {
     const labels = texts();
     expect(labels).toContain('50/50');
     expect(labels).toContain('20');
-    expect(labels).toContain('0');
+    expect(labels).toContain('10');
     expect(labels).toContain('1');
     expect(all).toContain('+3 DEF — village wall');
     expect(all).not.toContain('DEF 0');

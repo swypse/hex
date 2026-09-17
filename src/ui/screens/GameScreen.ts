@@ -15,7 +15,13 @@ import { HudAchievements } from '../hud/HudAchievements';
 import { HudToolbar } from '../hud/HudToolbar';
 import { HudTribes } from '../hud/HudTribes';
 import { HudWatchExit } from '../hud/HudWatchExit';
-import { TOOLBAR_HEIGHT, isWideScreen } from '../layout';
+
+/** The score HUD: tapping the player's chip opens the stats popup. */
+function scoreHud(): HudScore {
+  const hud = new HudScore();
+  hud.onTap = () => useGameStore.getState().setOverlay({ kind: 'stats' });
+  return hud;
+}
 
 export class GameScreen implements ScreenController {
   private root: Container | null = null;
@@ -73,7 +79,7 @@ export class GameScreen implements ScreenController {
     gameController.init(host.app, this.mapLayer!, host.overlayLayer);
 
     const gameWidgets: Widget[] = [
-      new HudScore(),
+      scoreHud(),
       new HudPlayers(),
       new HudTurn(),
       new HudWatchExit(),
@@ -112,10 +118,9 @@ export class GameScreen implements ScreenController {
 
   private layoutMask(): void {
     if (!this.mapMask || !this.host) return;
-    const height = isWideScreen(this.host.app.screen.width)
-      ? this.host.app.screen.height
-      : this.host.app.screen.height - TOOLBAR_HEIGHT;
-    this.mapMask.clear().rect(0, 0, this.host.app.screen.width, height).fill(0xffffff);
+    // The map always covers the full screen height (including under the
+    // toolbar), regardless of screen width.
+    this.mapMask.clear().rect(0, 0, this.host.app.screen.width, this.host.app.screen.height).fill(0xffffff);
   }
 
   destroy(): void {

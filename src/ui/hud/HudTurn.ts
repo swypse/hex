@@ -1,11 +1,11 @@
 import { Container, Graphics, BitmapText } from 'pixi.js';
 
-import { TRIBES, tribeById } from '../../game/tribes';
+import { tribeById } from '../../game/tribes';
 import { useGameStore } from '../../store/gameStore';
 import { type UIHost, type Widget } from '../host';
 import { makeLabel } from '../kit/label';
 import { t } from '../../i18n';
-import { TOOLBAR_HEIGHT, TURN_BAR_HEIGHT, TURN_BAR_COLOR, isWideScreen, ACTION_TOOLBAR_MAX_WIDTH } from '../layout';
+import { TURN_BAR_HEIGHT, TURN_BAR_COLOR } from '../layout';
 
 export class HudTurn implements Widget {
   private el: Container | null = null;
@@ -19,7 +19,8 @@ export class HudTurn implements Widget {
     this.host = host;
     const el = new Container();
     const panel = new Graphics();
-    const text = makeLabel('', { fontSize: 13, fill: 0xffffff, fontWeight: '700' });
+    const fontSize = 13;
+    const text = makeLabel('', { fontSize, fill: 0xffffff });
     text.anchor.set(0.5, 0.5);
     el.addChild(panel, text);
     root.addChild(el);
@@ -35,17 +36,17 @@ export class HudTurn implements Widget {
 
   private layout = (): void => {
     if (!this.el || !this.host) return;
-    const screenW = this.host.app.screen.width;
-    const wide = isWideScreen(screenW);
-    const barW = wide ? ACTION_TOOLBAR_MAX_WIDTH : screenW;
-    this.el.position.set(wide ? (screenW - barW) / 2 : 0, this.host.app.screen.height - TOOLBAR_HEIGHT - TURN_BAR_HEIGHT);
+    this.el.position.set(0, this.host.app.screen.height - TURN_BAR_HEIGHT);
   };
 
   private update(): void {
     if (!this.el || !this.text || !this.panel || !this.host) return;
     const s = useGameStore.getState();
     this.el.visible = s.screen === 'game';
-    let base = s.tutorial ? t('hud.turn.tutorial', { turn: s.turn }) : t('hud.turn.mode', { mode: t(s.mode === 'capture' ? 'mode.capture' : 'mode.turns30'), turn: s.turn });
+    let base = s.tutorial ? t('hud.turn.tutorial', { turn: s.turn }) : t('hud.turn.mode', {
+      mode: t(s.mode === 'capture' ? 'mode.capture' : 'mode.turns30'),
+      turn: s.turn
+    });
     let label = base;
     const current = s.players[s.currentPlayerIndex];
     if (s.aiActive && current) {
@@ -62,23 +63,9 @@ export class HudTurn implements Widget {
       }
     }
     this.text.text = label;
-    const wide = isWideScreen(this.host.app.screen.width);
-    const barW = wide ? ACTION_TOOLBAR_MAX_WIDTH : this.host.app.screen.width;
+    const barW = this.host.app.screen.width;
     this.panel.clear();
-    if (wide) {
-      const r = 6;
-      this.panel
-        .moveTo(0, TURN_BAR_HEIGHT)
-        .lineTo(0, r)
-        .arcTo(0, 0, r, 0, r)
-        .lineTo(barW - r, 0)
-        .arcTo(barW, 0, barW, r, r)
-        .lineTo(barW, TURN_BAR_HEIGHT)
-        .closePath()
-        .fill({ color: TURN_BAR_COLOR });
-    } else {
-      this.panel.rect(0, 0, barW, TURN_BAR_HEIGHT).fill({ color: TURN_BAR_COLOR });
-    }
+    this.panel.rect(0, 0, barW, TURN_BAR_HEIGHT).fill({ color: TURN_BAR_COLOR });
     this.text.position.set(barW / 2, TURN_BAR_HEIGHT / 2);
   }
 

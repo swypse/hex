@@ -4,30 +4,43 @@ Balance reference for all unit types. This document is a **proposal**: it scales
 damage rolls, defense) **×10** for finer balance, adds a new **defense** characteristic (not implemented yet), and
 adjusts a few costs/abilities. Movement, attack range and costs are **not** scaled.
 
-## Defense rule (to implement)
+## Defense rule
 
-- Every unit has `defense` (`Def`), an armour value. Defense is no longer limited to whole 0–2 points: with a ×10 damage
-  scale it can use steps of **5** (5 ≈ 0.5 in the old scale), so fragile units can carry light armour.
-- Incoming damage is reduced by the defender's defense and never drops below **10**:
-  `final = max(10, rolled − defender.Def)`.
-- A unit standing in **its own village** gains **+10 defense**.
-- The reduction applies to normal attacks, the catapult's 40–60 roll, and counter-attacks.
-- Attack damage still scales with the attacker's current HP (`round(baseAtk × hp / maxHp)`).
+Every unit has `defense` (`Def`), an armour value used by the Polytopia-style
+force-ratio combat formula (see GAME.md → Unit actions → Attack):
+
+- `attackForce = attack × hp / maxHp`
+- `defenseForce = defense × hp / maxHp × defenseBonus`
+- `totalDamage = attackForce + defenseForce`
+- damage to the target: `round(attackForce / totalDamage × attack × 1.5)`
+- counter damage: `round(defenseForce / totalDamage × defense × 1.5)`
+
+`defenseBonus` is `1 + tile reduction / 10`, where tile reduction is the
+existing metric (own village +5 → ×1.5, + village wall +3 → ×1.8, temple
+protections +10 → ×2.0).
+
+Notes:
+
+- A unit standing in **its own village** gains **+10 defense** (i.e. the
+  village +5 counts as 0.5 of its raw defense).
+- The counter is defense-driven: a unit's retaliation scales with its own
+  defense stat and the incoming force ratio (no minimum-damage floor).
+- Attack damage still scales with the attacker's current HP (`hp / maxHp`).
 
 ## Land units
 
 | Unit      | HP  | Atk   | Def | Move | Atk range | Cost            | Notes                                                          |
 |-----------|-----|-------|-----|------|-----------|-----------------|----------------------------------------------------------------|
-| Warrior   | 50  | 20    | 0   | 1    | 1         | 4               | Starting/cheap garrison                                        |
-| Rider     | 40  | 20    | 5   | 4    | 1         | 6               | Hit-and-run: may move after attacking                          |
-| Archer    | 30  | 20    | 5   | 1    | 2         | 6               | Ranged; never pursues a kill                                   |
-| Swordsman | 80  | 40    | 10  | 1    | 1         | 15 + 3⛏        | Heavy melee                                                    |
-| Shield    | 100 | 10    | 20  | 1    | 1         | 10 + 3⛏        | Counter-attacks for 50-based damage; can't attack after moving |
-| Catapult  | 30  | 40–60 | 0   | 1    | 4         | 30 + 20🪵 + 5⛏ | Siege; rolls 40–60; can't attack after moving                  |
+| Warrior   | 50  | 20    | 10  | 1    | 1         | 4               | Starting/cheap garrison                                        |
+| Rider     | 40  | 20    | 10  | 4    | 1         | 6               | Hit-and-run: may move after attacking                          |
+| Archer    | 30  | 20    | 10  | 1    | 2         | 6               | Ranged; never pursues a kill                                   |
+| Swordsman | 80  | 40    | 20  | 1    | 1         | 15 + 3⛏        | Heavy melee                                                    |
+| Shield    | 100 | 10    | 20  | 1    | 1         | 10 + 3⛏        | Defense-driven counter; can't attack after moving              |
+| Catapult  | 30  | 50    | 0   | 1    | 4         | 30 + 20🪵 + 5⛏ | Siege; fixed 50; can't attack after moving                     |
 | Knight    | 50  | 50    | 10  | 3    | 1         | 20 + 10⛏       | Extra attack after a kill                                      |
 
-All values here are **10× the previous doc / current build**, and the new `Def` values add light armour to Rider and
-Archer (5 each) that the old whole-point scale could not represent.
+All values here are **10× the previous doc / current build**, and the `Def` values give every melee/light unit armour
+(10 on warriors/riders/archers, 20 on melee elites/shields) that the old whole-point scale could not represent.
 
 **Resources legend:** 🪵 wood, ⛏ ore. Costs without a resource icon are money only.
 
@@ -37,7 +50,7 @@ Archer (5 each) that the old whole-point scale could not represent.
 |--------|-----|-----|-----|-----------|-----------|----------------|
 | Pirate | 80  | 15  | 5   | 5 (water) | 3         | — (AI-spawned) |
 
-Pirates are not spawnable and sit outside the player balance graph. Their Def 5 matches the light armour of riders/archers,
+Pirates are not spawnable and sit outside the player balance graph. Their Def 5 is lighter than player light armour (10),
 so their threat comes from HP and numbers rather than armour.
 
 ## Naval units (ships)
@@ -59,9 +72,10 @@ which ends the turn.
 
 ## How each type is countered
 
-Numbers below assume **full-HP damage and the flat-defense rule (min 10)**, and describe clean conditions on open
-ground. Real fights depend on terrain, villages, HP and numbers — treat the bullet as "this type is the reliable
-answer", not "always wins 1v1".
+Numbers below describe clean conditions on open ground under the current
+force-ratio combat (defense as a defense force, no minimum floor). Real fights
+depend on terrain, villages, HP and numbers — treat the bullet as "this type
+is the reliable answer", not "always wins 1v1".
 
 ### Warrior (50 HP, 0 Def)
 

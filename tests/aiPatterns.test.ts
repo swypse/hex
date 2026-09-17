@@ -5,7 +5,7 @@ import { Tribe } from '../src/game/tribes';
 import { Player } from '../src/game/players';
 import { Unit } from '../src/game/units';
 import { SeededRandom } from '../src/util/random';
-import { AI_PATTERNS, AiPatternContext, bestSpawnableUnitType, enemyCanAttackNext, enemyCanReach, nearestEnemyDistanceFrom } from '../src/game/aiPatterns';
+import { AI_PATTERNS, AiPatternContext, bestSpawnableUnitType, enemyCanAttackNext, enemyCanReach, guardGarrisonAttack, nearestEnemyDistanceFrom } from '../src/game/aiPatterns';
 import { AiPlannerState } from '../src/game/aiTypes';
 import { analyzeSituation } from '../src/game/aiSituation';
 import { AI_DIFFICULTY_PROFILES } from '../src/game/aiDifficulty';
@@ -22,15 +22,19 @@ function tile(
 }
 
 function warrior(id: string, owner: number, q: number, r: number, hp = 50): Unit {
-  return { id, owner, type: 'warrior', q, r, hasMoved: false, hasAttacked: false, hasHealed: false, hp, attack: 20, attackDistance: 1, defense: 0, spawnVillage: null };
+  return { id, owner, type: 'warrior', q, r, hasMoved: false, hasAttacked: false, hasHealed: false, hp, attack: 20, attackDistance: 1, defense: 10, spawnVillage: null };
 }
 
-function archer(id: string, owner: number, q: number, r: number): Unit {
-  return { id, owner, type: 'archer', q, r, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 30, attack: 20, attackDistance: 2, defense: 5, spawnVillage: null };
+function archer(id: string, owner: number, q: number, r: number, hp = 30): Unit {
+  return { id, owner, type: 'archer', q, r, hasMoved: false, hasAttacked: false, hasHealed: false, hp, attack: 20, attackDistance: 2, defense: 10, spawnVillage: null };
 }
 
 function rider(id: string, owner: number, q: number, r: number): Unit {
-  return { id, owner, type: 'rider', q, r, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 40, attack: 20, attackDistance: 1, defense: 5, spawnVillage: null };
+  return { id, owner, type: 'rider', q, r, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 40, attack: 20, attackDistance: 1, defense: 10, spawnVillage: null };
+}
+
+function knight(id: string, owner: number, q: number, r: number): Unit {
+  return { id, owner, type: 'knight', q, r, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 50, attack: 50, attackDistance: 1, defense: 10, spawnVillage: null };
 }
 
 function player(money: number, skills: Player['skills'] = []): Player {
@@ -497,5 +501,75 @@ describe('AI patterns', () => {
     const actions = findPattern('hunt-idle-enemy').evaluate(situCtx(map, player(100)));
     expect(actions).not.toBeNull();
     expect(actions!.some((a) => a.type === 'attack')).toBe(true);
+  });
+
+  it('guardGarrisonAttack holds a garrison that would die to the counter with no replacement funds', () => {
+    const map: GameMap = { radius: 4, tiles: [], spawns: [] };
+    const garrison = { ...archer('g', 1, 0, 0, 5), spawnVillage: { q: 0, r: 0 } };
+    map.tiles.push(
+      tile(0, 0, { owner: 1, level: 1, captureReady: false }, garrison, 1),
+      tile(1, 0, null, knight('enemy', 0, 1, 0)),
+    );
+    const result = guardGarrisonAttack(map, player(0), garrison, map.tiles[1]!);
+    expect(result.kind).toBe('hold');
+  });
+
+  it('guardGarrisonAttack allows the attack and demands a spawn when the AI can afford a replacement', () => {
+    const map: GameMap = { radius: 4, tiles: [], spawns: [] };
+    const garrison = { ...archer('g', 1, 0, 0, 5), spawnVillage: { q: 0, r: 0 } };
+    map.tiles.push(
+      tile(0, 0, { owner: 1, level: 1, captureReady: false }, garrison, 1),
+      tile(1, 0, null, knight('enemy', 0, 1, 0)),
+    );
+    const result = guardGarrisonAttack(map, player(100), garrison, map.tiles[1]!);
+    expect(result.kind).toBe('attack');
+    if (result.kind === 'attack') expect(result.guardType).toBe('archer');
+  });
+
+  it('guardGarrisonAttack leaves a garrison free to attack when the counter cannot kill it', () => {
+    const map: GameMap = { radius: 4, tiles: [], spawns: [] };
+    const garrison = { ...archer('g', 1, 0, 0), spawnVillage: { q: 0, r: 0 } };
+    map.tiles.push(
+      tile(0, 0, { owner: 1, level: 1, captureReady: false }, garrison, 1),
+      tile(1, 0, null, warrior('enemy', 0, 1, 0)),
+    );
+    const result = guardGarrisonAttack(map, player(0), garrison, map.tiles[1]!);
+    expect(result.kind).toBe('attack');
+    if (result.kind === 'attack') expect(result.guardType).toBeUndefined();
+  });
+
+  it('guardGarrisonAttack ignores units not standing on their own village', () => {
+    const map: GameMap = { radius: 4, tiles: [], spawns: [] };
+    const unit = archer('a', 1, 2, 0);
+    map.tiles.push(tile(0, 0, { owner: 1, level: 1, captureReady: false }, null, 1), tile(2, 0, null, unit), tile(1, 0, null, knight('enemy', 0, 1, 0)));
+    const result = guardGarrisonAttack(map, player(0), unit, map.tiles[2]!);
+    expect(result.kind).toBe('attack');
+  });
+
+  it('attack-enemy-in-village does not empty the defending units own village', () => {
+    // An enemy swordsman sits on the AI's village A. The only other AI unit is
+    // a wounded warrior parked on its own village B next to the swordsman: it can
+    // attack, but the swordsman's counter kills it and empties village B. With
+    // no money to respawn a guard, the AI must hold instead.
+    const map: GameMap = { radius: 4, tiles: [], spawns: [] };
+    const garrison = { ...warrior('g', 1, 1, 0, 5), spawnVillage: { q: 1, r: 0 } };
+    map.tiles.push(
+      tile(0, 0, { owner: 1, level: 1, captureReady: false }, knight('enemy', 0, 0, 0), 1),
+      tile(1, 0, { owner: 1, level: 1, captureReady: false }, garrison, 1),
+    );
+    const actions = findPattern('attack-enemy-in-village').evaluate(ctx(map, player(0), new SeededRandom(1)));
+    expect(actions === null || !actions.some((a) => a.type === 'attack' && a.unitId === 'g')).toBe(true);
+  });
+
+  it('attack-enemy-in-village lets a garrison attack when it can respawn a guard', () => {
+    const map: GameMap = { radius: 4, tiles: [], spawns: [] };
+    const garrison = { ...warrior('g', 1, 1, 0, 5), spawnVillage: { q: 1, r: 0 } };
+    map.tiles.push(
+      tile(0, 0, { owner: 1, level: 1, captureReady: false }, knight('enemy', 0, 0, 0), 1),
+      tile(1, 0, { owner: 1, level: 1, captureReady: false }, garrison, 1),
+    );
+    const actions = findPattern('attack-enemy-in-village').evaluate(ctx(map, player(100), new SeededRandom(1)));
+    expect(actions).not.toBeNull();
+    expect(actions!.some((a) => a.type === 'spawn' && a.q === 1 && a.r === 0)).toBe(true);
   });
 });

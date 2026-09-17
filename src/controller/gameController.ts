@@ -23,12 +23,13 @@ import { MapView, type OverlayItem } from '../render/mapRenderer';
 import { pickTileAt } from '../render/tilePick';
 import { createTextures } from '../render/textureFactory';
 import { useGameStore, confirmLeaveGame } from '../store/gameStore';
-import { TOOLBAR_HEIGHT, isWideScreen } from '../ui/layout';
 import { saveRepository } from '../storage/saveGame';
 import { sfx } from '../sound/sfx';
 import { SeededRandom } from '../util/random';
 import { setAiLogging, aiLoggingEnabled } from '../game/ai';
 import { CameraController } from './cameraController';
+import { damagePreviewVictim } from './damagePreview';
+import { HoldTimer } from './holdTimer';
 import { type Viewport } from '../render/tileSignature';
 import { EventPresenter } from './eventPresenter';
 import { NetworkController } from './networkController';
@@ -46,6 +47,9 @@ import {
 const HEX_SIZE = 40;
 const VILLAGE_START_OFFSET = 200;
 const SPECTATE_ROUND_DELAY_MS = 500;
+/** How long a press must be held (touch or mouse) before the damage preview
+ *  shows, in ms. */
+const DAMAGE_PREVIEW_HOLD_MS = 500;
 
 class GameController {
   private app: Application | null = null;
@@ -68,6 +72,12 @@ class GameController {
   private events: EventPresenter | null = null;
   private tutorial: TutorialDirector | null = null;
   private watchingLoopRunning = false;
+  private damagePreviewHold: HoldTimer | null = null;
+  private damagePreviewPress: { x: number; y: number } | null = null;
+  private damagePreviewShown = false;
+  private suppressNextTap = false;
+  private damagePreviewWindowUp: ((e: PointerEvent) => void) | null = null;
+  private damagePreviewWindowCancel: ((e: PointerEvent) => void) | null = null;
 
   init(app: Application, root: Container, edgeLayerTarget: Container | null = null): void {
     if (this.mapRoot) return;
@@ -100,6 +110,10 @@ class GameController {
   }
 
   shutdown(): void {
+    this.cancelDamagePreviewHold();
+    this.damagePreviewShown = false;
+    this.mapView?.hideDamagePreview();
+    this.suppressNextTap = false;
     this.camera?.destroy();
     this.camera = null;
     this.initToken++;
@@ -448,7 +462,16 @@ class GameController {
 
   private mapHeight(): number {
     if (!this.app) return 0;
-    return isWideScreen(this.app.screen.width) ? this.app.screen.height : this.app.screen.height - TOOLBAR_HEIGHT;
+    // The map always covers the full screen height (including under the
+    // toolbar), regardless of screen width.
+    return this.app.screen.height;
+  }
+
+  /** 0 at the default view (camera zoom 1), 1 at the farthest zoom-out
+   *  (camera zoom 0.5). Used to hide detail text when zoomed out. */
+  private zoomOut(): number {
+    if (!this.camera) return 0;
+    return Math.max(0, Math.min(1, (1 - this.camera.zoom) / 0.5));
   }
 
   private getCamera(): CameraController {
@@ -534,6 +557,9 @@ class GameController {
     this.mapView.container.hitArea = camera.viewportRect();
     this.mapView.markerLayer.scale.set(scale, scale);
     this.mapView.markerLayer.position.set(camera.pan.x, camera.pan.y);
+    this.mapView.badgeLayer.scale.set(scale, scale);
+    this.mapView.badgeLayer.position.set(camera.pan.x, camera.pan.y);
+    this.mapView.syncBadgePositions(camera.pan, scale);
     for (const item of this.overlayItems) {
       item.el.position.set(camera.pan.x + item.world.x * scale, camera.pan.y + item.world.y * scale);
     }
@@ -544,6 +570,7 @@ class GameController {
         scale,
         width: this.app.screen.width,
         height: this.mapHeight(),
+        zoomOut: this.zoomOut(),
       };
       this.mapView.setViewport(viewport);
       this.mapView.repositionEdgeMarkers(viewport);
@@ -638,6 +665,74 @@ class GameController {
       const u = tileAt(this.sim.map, next.q, next.r)?.unit;
       if (u && u.owner === store.localPlayerIndex) this.mapView?.bounceUnit(next.q, next.r);
     }
+    this.render();
+  }
+
+  /** Begins a long-press (touch hold / click-and-hold) on the map. If the
+   *  pointer stays still for `DAMAGE_PREVIEW_HOLD_MS`, an expected-damage
+   *  preview shows against the enemy under the press — even when it is not a
+   *  reachable attack target. A quick tap is unaffected: the preview only fires
+   *  after the hold delay, and any tap that follows a fired hold is swallowed so
+   *  it does not also select/attack. */
+  private beginDamagePreviewHold(e: { global: { x: number; y: number } }): void {
+    this.cancelDamagePreviewHold();
+    if (!this.mapView || !this.sim) return;
+    const store = useGameStore.getState();
+    if (store.aiActive || store.gameOver || store.paused) return;
+    if (store.currentPlayerIndex !== store.localPlayerIndex) return;
+    if (!this.textures) return;
+    const local = this.mapView.container.toLocal(e.global);
+    this.damagePreviewPress = { x: local.x, y: local.y };
+    this.suppressNextTap = false;
+    const hold = new HoldTimer(DAMAGE_PREVIEW_HOLD_MS);
+    this.damagePreviewHold = hold;
+    hold.start(() => this.fireDamagePreview());
+    this.damagePreviewWindowUp = () => this.hideDamagePreview();
+    this.damagePreviewWindowCancel = () => this.hideDamagePreview();
+    window.addEventListener('pointerup', this.damagePreviewWindowUp);
+    window.addEventListener('pointercancel', this.damagePreviewWindowCancel);
+  }
+
+  private fireDamagePreview(): void {
+    if (!this.sim || !this.mapView) return;
+    if (this.camera?.isDragging) return;
+    const store = useGameStore.getState();
+    if (store.aiActive || store.gameOver || store.paused) return;
+    const press = this.damagePreviewPress;
+    if (!press) return;
+    const tile = pickTileAt(press.x, press.y, HEX_SIZE, this.sim.map.tiles);
+    const victim = damagePreviewVictim(this.sim.map, store.selection, store.localPlayerIndex, tile);
+    if (!victim || !victim.unit) return;
+    const selection = store.selection!;
+    const attacker = tileAt(this.sim.map, selection.q, selection.r)?.unit;
+    if (!attacker) return;
+    this.suppressNextTap = true;
+    this.damagePreviewShown = true;
+    this.mapView.showDamagePreview(attacker, victim);
+    this.render();
+  }
+
+  private cancelDamagePreviewHold(): void {
+    if (this.damagePreviewHold) {
+      this.damagePreviewHold.cancel();
+      this.damagePreviewHold = null;
+    }
+    this.damagePreviewPress = null;
+    if (this.damagePreviewWindowUp) {
+      window.removeEventListener('pointerup', this.damagePreviewWindowUp);
+      this.damagePreviewWindowUp = null;
+    }
+    if (this.damagePreviewWindowCancel) {
+      window.removeEventListener('pointercancel', this.damagePreviewWindowCancel);
+      this.damagePreviewWindowCancel = null;
+    }
+  }
+
+  private hideDamagePreview(): void {
+    this.cancelDamagePreviewHold();
+    if (!this.damagePreviewShown) return;
+    this.damagePreviewShown = false;
+    this.mapView?.hideDamagePreview();
     this.render();
   }
 
@@ -1104,12 +1199,20 @@ class GameController {
       });
       this.mapView.container.on('pointermove', (e) => {
         camera.handlePointerMove(e.pointerId, { x: e.global.x, y: e.global.y });
+        if (camera.isDragging) this.hideDamagePreview();
       });
       this.mapView.container.on('pointerdown', (e) => {
         camera.handlePointerDown(e.pointerId, { x: e.global.x, y: e.global.y });
+        this.beginDamagePreviewHold(e);
       });
       this.mapView.container.on('pointertap', (e) => {
         if (!this.mapView || camera.isDragging) return;
+        // A hold that fired the damage preview swallows the tap that follows
+        // its release, so releasing the hold does not also select/attack.
+        if (this.suppressNextTap) {
+          this.suppressNextTap = false;
+          return;
+        }
         const local = this.mapView.container.toLocal(e.global);
         const tile = pickTileAt(local.x, local.y, HEX_SIZE, this.sim!.map.tiles);
         if (tile) {
@@ -1119,6 +1222,7 @@ class GameController {
       this.mapRoot!.addChild(this.mapView.container);
       this.mapRoot!.addChild(this.mapView.overlay);
       this.mapRoot!.addChild(this.mapView.markerLayer);
+      this.mapRoot!.addChild(this.mapView.badgeLayer);
       if (this.edgeLayerTarget) this.mapView.attachEdgeLayerTo(this.edgeLayerTarget);
     }
 
@@ -1153,6 +1257,7 @@ class GameController {
         scale: this.camera!.scale,
         width: this.app.screen.width,
         height: this.mapHeight(),
+        zoomOut: this.zoomOut(),
       },
       this.tutorialMarkerKeys(),
       isLocalTurn,

@@ -5,6 +5,9 @@ export interface Axial {
 
 export const HEX_TILT = 0.7; // projected Y squash — hexes wider than tall
 
+/** Distance from the top corners that the two border parts join (px). */
+export const HEX_BORDER_JOIN_OFFSET = 6;
+
 export function axialKey(h: Axial): string {
   return `${h.q},${h.r}`;
 }
@@ -136,15 +139,20 @@ export function hexCorners(h: Axial, hexSize: number): { x: number; y: number }[
 export function splitHexBorder(
   corners: { x: number; y: number }[],
 ): { top: { x: number; y: number }[]; bottom: { x: number; y: number }[] } {
-  const blend = (a: { x: number; y: number }, b: { x: number; y: number }, t: number): { x: number; y: number } => ({
-    x: a.x + (b.x - a.x) * t,
-    y: a.y + (b.y - a.y) * t,
-  });
-  const rightMid = blend(corners[0]!, corners[1]!, 0.1);
-  const leftMid = blend(corners[3]!, corners[4]!, 0.9);
+  const pointOnEdge = (
+    a: { x: number; y: number },
+    b: { x: number; y: number },
+    distance: number,
+  ): { x: number; y: number } => {
+    const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+    const t = distance / len;
+    return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
+  };
+  const right = pointOnEdge(corners[0]!, corners[5]!, HEX_BORDER_JOIN_OFFSET);
+  const left = pointOnEdge(corners[4]!, corners[5]!, HEX_BORDER_JOIN_OFFSET);
   return {
-    top: [rightMid, corners[0]!, corners[5]!, corners[4]!, leftMid],
-    bottom: [rightMid, corners[1]!, corners[2]!, corners[3]!, leftMid],
+    top: [right, corners[5]!, left],
+    bottom: [right, corners[0]!, corners[1]!, corners[2]!, corners[3]!, corners[4]!, left],
   };
 }
 

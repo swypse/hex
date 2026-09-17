@@ -8,9 +8,9 @@ interface IconButtonOpts {
   onClick: () => void;
   size?: number;
   disabled?: boolean;
-  color?: number;
-  hoverColor?: number;
-  pressedColor?: number;
+  color?: number | { color: number; alpha?: number };
+  hoverColor?: number | { color: number; alpha?: number };
+  pressedColor?: number | { color: number; alpha?: number };
   borderWidth?: number;
   disabledAlpha?: number;
   transparentDisabled?: boolean;
@@ -23,9 +23,9 @@ export class IconButton extends Container {
   private readonly bg: Graphics;
   private readonly sprite: Sprite;
   private readonly size: number;
-  private readonly baseColor: number;
-  private readonly hoverColor: number;
-  private readonly pressedColor: number;
+  private readonly baseColor: number | { color: number; alpha?: number };
+  private readonly hoverColor: number | { color: number; alpha?: number };
+  private readonly pressedColor: number | { color: number; alpha?: number };
   private readonly borderWidth: number;
   private readonly disabledAlpha: number;
   private readonly transparentDisabled: boolean;
@@ -63,7 +63,7 @@ export class IconButton extends Container {
     this.disabled = opts.disabled ?? false;
   }
 
-  private redraw(fill: number): void {
+  private redraw(fill: number | { color: number; alpha?: number }): void {
     this.bg.clear().circle(this.size / 2, this.size / 2, this.size / 2).fill(fill);
   }
 

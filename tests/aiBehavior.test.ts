@@ -102,4 +102,53 @@ describe('AI behavior scenarios', () => {
     const alwaysRollMistake = { next: () => 0 } as SeededRandom;
     expect(planAiActions(map, broke, alwaysRollMistake, 'capture')).toEqual([]);
   });
+
+  it('re-garrisons its village when the last defender attacks from it and dies', () => {
+    // The AI's only defender is an archer parked on its capital next to a
+    // knight it cannot one-shot. If it attacks it dies to the counter — the AI
+    // may take the trade only because it can afford to respawn a guard on the
+    // village right after, so the village is never left empty.
+    const map = makeTestMap(6);
+    const village = tileAt(map, 0, 0)!;
+    village.settlement = { owner: 1, level: 1, captureReady: false, capital: true };
+    village.ownedBy = 1;
+    const garrison = makeUnit('garrison', 1, 'archer', 0, 0);
+    garrison.spawnVillage = { q: 0, r: 0 };
+    village.unit = garrison;
+    // A second AI village so capture-mode has more than one owned settlement
+    // and the game does not end instantly when the AI owns everything.
+    const extra = tileAt(map, 2, 0)!;
+    extra.settlement = { owner: 0, level: 1, captureReady: false, capital: true };
+    extra.ownedBy = 0;
+    tileAt(map, 1, 0)!.unit = makeUnit('enemy', 0, 'knight', 1, 0);
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1), 'easy');
+    players[1]!.resources = { wood: 50, stone: 50, money: 100, ore: 10 };
+    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5, aiRng: () => new SeededRandom(2) });
+    sim.startGame();
+    sim.applyCommand({ type: 'endTurn' });
+    expect(village.unit).not.toBeNull();
+    expect(village.unit!.owner).toBe(1);
+  });
+
+  it('keeps a lone garrison that cannot be replaced from attacking to its death', () => {
+    const map = makeTestMap(6);
+    const village = tileAt(map, 0, 0)!;
+    village.settlement = { owner: 1, level: 1, captureReady: false, capital: true };
+    village.ownedBy = 1;
+    const garrison = makeUnit('broke', 1, 'archer', 0, 0);
+    garrison.spawnVillage = { q: 0, r: 0 };
+    village.unit = garrison;
+    const extra = tileAt(map, 2, 0)!;
+    extra.settlement = { owner: 0, level: 1, captureReady: false, capital: true };
+    extra.ownedBy = 0;
+    tileAt(map, 1, 0)!.unit = makeUnit('enemy', 0, 'knight', 1, 0);
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1), 'easy');
+    players[1]!.resources = { wood: 0, stone: 0, money: 0, ore: 0 };
+    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5, aiRng: () => new SeededRandom(2) });
+    sim.startGame();
+    sim.applyCommand({ type: 'endTurn' });
+    // The garrison held its ground instead of dying: the village keeps its unit.
+    expect(village.unit).not.toBeNull();
+    expect(village.unit!.id).toBe('broke');
+  });
 });

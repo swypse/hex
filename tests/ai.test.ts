@@ -20,11 +20,23 @@ function makeTile(
 }
 
 function makeWarrior(id: string, owner: number, q: number, r: number): Unit {
-  return { id, owner, type: 'warrior', q, r, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 50, attack: 20, attackDistance: 1, defense: 0, spawnVillage: null };
+  return { id, owner, type: 'warrior', q, r, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 50, attack: 20, attackDistance: 1, defense: 10, spawnVillage: null };
 }
 
 function makeRider(id: string, owner: number, q: number, r: number): Unit {
-  return { id, owner, type: 'rider', q, r, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 40, attack: 20, attackDistance: 1, defense: 5, spawnVillage: null };
+  return { id, owner, type: 'rider', q, r, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 40, attack: 20, attackDistance: 1, defense: 10, spawnVillage: null };
+}
+
+function makeArcher(id: string, owner: number, q: number, r: number, hp = 30): Unit {
+  return { id, owner, type: 'archer', q, r, hasMoved: false, hasAttacked: false, hasHealed: false, hp, attack: 20, attackDistance: 2, defense: 10, spawnVillage: { q, r } };
+}
+
+function makeSwordsman(id: string, owner: number, q: number, r: number): Unit {
+  return { id, owner, type: 'swordsman', q, r, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 80, attack: 40, attackDistance: 1, defense: 20, spawnVillage: null };
+}
+
+function makeKnight(id: string, owner: number, q: number, r: number): Unit {
+  return { id, owner, type: 'knight', q, r, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 50, attack: 50, attackDistance: 1, defense: 10, spawnVillage: null };
 }
 
 function aiPlayer(): import('../src/game/players').Player {
@@ -227,6 +239,40 @@ describe('planAiActions', () => {
     const moves = all.filter((a) => a.type === 'move');
     expect(moves.length).toBeGreaterThan(0);
     expect(moves.some((m) => m.type === 'move' && m.q > 0)).toBe(true);
+  });
+
+  it('keeps the last defender on its village instead of trading its life for a kill', () => {
+    // The wounded archer garrison on the AI's own village faces an adjacent
+    // knight it cannot one-shot; the knight's defense force counter would kill
+    // it and empty the village. With zero money the AI could not respawn a
+    // defender, so it must hold its ground rather than attack to its death.
+    const map: GameMap = { radius: 4, tiles: [], spawns: [] };
+    map.tiles.push(
+      makeTile(0, 0, 1, { owner: 1, level: 1, captureReady: false }, makeArcher('g', 1, 0, 0, 5)),
+      makeTile(1, 0, 0, null, makeKnight('enemy', 0, 1, 0)),
+    );
+    const player = { ...aiPlayer(), difficulty: 'easy' as const, resources: { wood: 5, stone: 5, money: 0, ore: 0 } };
+    const all = planSeeds(map, player, 20);
+    expect(all.some((a) => a.type === 'attack' && a.unitId === 'g')).toBe(false);
+  });
+
+  it('spawns a fresh defender on the village when the last defender attacks to its death', () => {
+    // Same position, but the AI now has the money to respawn a guard. The
+    // attack may proceed only if a spawn covers the village right after it, so
+    // the village is never left empty at the end of the AI turn.
+    const map: GameMap = { radius: 4, tiles: [], spawns: [] };
+    map.tiles.push(
+      makeTile(0, 0, 1, { owner: 1, level: 1, captureReady: false }, makeArcher('g', 1, 0, 0, 5)),
+      makeTile(1, 0, 0, null, makeKnight('enemy', 0, 1, 0)),
+    );
+    const player = { ...aiPlayer(), difficulty: 'easy' as const, resources: { wood: 5, stone: 5, money: 100, ore: 0 } };
+    const plans: AiAction[][] = [];
+    for (let seed = 1; seed <= 20; seed++) plans.push(planAiActions(map, player, new SeededRandom(seed)));
+    for (const plan of plans) {
+      if (plan.some((a) => a.type === 'attack' && a.unitId === 'g')) {
+        expect(plan.some((a) => a.type === 'spawn' && a.q === 0 && a.r === 0)).toBe(true);
+      }
+    }
   });
 });
 

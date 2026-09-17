@@ -4,6 +4,7 @@ import { readJoinCode, setPendingJoin } from './net/joinLink';
 import { ScreenManager } from './ui/ScreenManager';
 import { gameController } from './controller/gameController';
 import { loadBitmapFonts } from './ui/kit/bitmapFonts';
+import { preventCanvasContextMenu } from './preventCanvasContextMenu';
 
 function preventBrowserZoom(): void {
   window.addEventListener(
@@ -37,6 +38,9 @@ async function boot(): Promise<void> {
     autoDensity: true,
   });
   document.getElementById('root')!.appendChild(app.canvas);
+  // Long-press (mobile) and right-click (desktop) on the canvas would otherwise
+  // open the browser's "Save image as…" context menu.
+  preventCanvasContextMenu(app.canvas);
   // Mobile browsers drop the WebGL context while the tab is backgrounded, which
   // blanks every generateTexture() sprite. Pixi restores its own GL state, so
   // rebuild the generated textures once the context is usable again.

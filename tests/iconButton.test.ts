@@ -11,6 +11,10 @@ function fillOf(btn: IconButton): number {
   return (btn as unknown as { bg: { context: { fillStyle: { color: number } } } }).bg.context.fillStyle.color;
 }
 
+function fillAlphaOf(btn: IconButton): number {
+  return (btn as unknown as { bg: { context: { fillStyle: { alpha: number } } } }).bg.context.fillStyle.alpha;
+}
+
 describe('IconButton', () => {
   let btn: IconButton;
 
@@ -59,5 +63,22 @@ describe('IconButton', () => {
     btn.emit('pointerdown', {} as never);
     expect(btn.scale.x).toBe(1);
     expect(fillOf(btn)).toBe(THEME.button);
+  });
+
+  it('supports alpha-tinted fills for base, hover and pressed', () => {
+    const alpha = new IconButton({
+      icon: 'x.png',
+      onClick: () => {},
+      color: { color: 0x000000, alpha: 0.2 },
+      hoverColor: { color: 0x000000, alpha: 0.4 },
+      pressedColor: { color: 0x000000, alpha: 0.4 },
+    });
+    expect(fillOf(alpha)).toBe(0x000000);
+    expect(fillAlphaOf(alpha)).toBe(0.2);
+    alpha.emit('pointerover', {} as never);
+    expect(fillAlphaOf(alpha)).toBe(0.4);
+    alpha.emit('pointerdown', {} as never);
+    expect(fillAlphaOf(alpha)).toBe(0.4);
+    alpha.destroy({ children: true });
   });
 });

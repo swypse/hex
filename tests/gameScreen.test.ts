@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { Application, Container, BitmapText } from 'pixi.js';
+import { Application, Container, BitmapText, Graphics } from 'pixi.js';
 import { GameScreen } from '../src/ui/screens/GameScreen';
 import { gameController } from '../src/controller/gameController';
 import { useGameStore } from '../src/store/gameStore';
@@ -8,6 +8,19 @@ import { type UIHost } from '../src/ui/host';
 function makeHost(): UIHost {
   const app = {
     screen: { width: 1280, height: 800 },
+    stage: new Container(),
+    ticker: { add: (): void => {}, remove: (): void => {} },
+  } as unknown as Application;
+  return {
+    app,
+    screenLayer: new Container(),
+    overlayLayer: new Container(),
+  };
+}
+
+function makeNarrowHost(): UIHost {
+  const app = {
+    screen: { width: 400, height: 800 },
     stage: new Container(),
     ticker: { add: (): void => {}, remove: (): void => {} },
   } as unknown as Application;
@@ -75,6 +88,25 @@ describe('GameScreen lifecycle', () => {
     expect(content.visible).toBe(true);
     expect(loadingOwner!.visible).toBe(false);
 
+    screen.destroy();
+  });
+
+  it('renders the map full height under the toolbar on narrow screens', () => {
+    const host = makeNarrowHost();
+    const screen = new GameScreen();
+    screen.mount(host);
+    const root = host.screenLayer.children[0] as Container;
+    const mapLayer = root.children[0] as Container;
+    const mask = mapLayer.mask as Graphics;
+    const nested = mask.context.instructions.flatMap((i) => {
+      const path = (i.data as { path?: { instructions: Array<{ action: string; data: unknown }> } })?.path;
+      return path ? path.instructions : [];
+    });
+    const rect = nested.find((p) => p.action === 'rect') as { data: number[] } | undefined;
+    // On a 400px-wide screen the map still covers the full 800px height,
+    // extending beneath the toolbar exactly like wide screens.
+    expect(rect).toBeDefined();
+    expect(rect!.data[3]).toBe(800);
     screen.destroy();
   });
 });

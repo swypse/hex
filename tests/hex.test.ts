@@ -3,6 +3,7 @@ import {
   allTiles,
   axialKey,
   compareTileY,
+  HEX_BORDER_JOIN_OFFSET,
   HEX_TILT,
   hexCorners,
   hexDistance,
@@ -124,17 +125,18 @@ describe('hex math', () => {
     expect(hexToPixel({ q: 0, r: 1 }, 40).x).toBeCloseTo(Math.sqrt(3) / 2 * 40);
   });
 
-  it('splitHexBorder splits near the top of the hex on both edges and keeps the border continuous', () => {
+  it('splitHexBorder joins the parts on the top-left and top-right edges, 10px from the corners, and keeps the border continuous', () => {
     const corners = hexCorners({ q: 0, r: 0 }, 40);
-    const blend = (a: { x: number; y: number }, b: { x: number; y: number }, t: number): { x: number; y: number } => ({
-      x: a.x + (b.x - a.x) * t,
-      y: a.y + (b.y - a.y) * t,
-    });
-    const rightMid = blend(corners[0]!, corners[1]!, 0.1);
-    const leftMid = blend(corners[3]!, corners[4]!, 0.9);
+    const pointOnEdge = (a: { x: number; y: number }, b: { x: number; y: number }, distance: number): { x: number; y: number } => {
+      const len = Math.hypot(b.x - a.x, b.y - a.y);
+      const t = distance / len;
+      return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
+    };
+    const right = pointOnEdge(corners[0]!, corners[5]!, HEX_BORDER_JOIN_OFFSET);
+    const left = pointOnEdge(corners[4]!, corners[5]!, HEX_BORDER_JOIN_OFFSET);
     const { top, bottom } = splitHexBorder(corners);
-    expect(top).toEqual([rightMid, corners[0], corners[5], corners[4], leftMid]);
-    expect(bottom).toEqual([rightMid, corners[1], corners[2], corners[3], leftMid]);
+    expect(top).toEqual([right, corners[5], left]);
+    expect(bottom).toEqual([right, corners[0], corners[1], corners[2], corners[3], corners[4], left]);
     expect(top[0]).toEqual(bottom[0]);
     expect(top[top.length - 1]).toEqual(bottom[bottom.length - 1]);
   });
