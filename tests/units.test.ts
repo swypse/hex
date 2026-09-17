@@ -24,27 +24,27 @@ import {
 describe('UNIT_TYPES', () => {
   it('defines warrior, rider, archer, swordsman', () => {
     expect(UNIT_TYPES.warrior).toEqual({ movement: 1, attack: 20, attackDistance: 1, maxHp: 50, defense: 10, price: 4, priceWood: 0, priceOre: 0, shape: 'circle' });
-    expect(UNIT_TYPES.rider).toEqual({ movement: 4, attack: 20, attackDistance: 1, maxHp: 40, defense: 10, price: 6, priceWood: 0, priceOre: 0, shape: 'square' });
-    expect(UNIT_TYPES.archer).toEqual({ movement: 1, attack: 20, attackDistance: 2, maxHp: 30, defense: 10, price: 6, priceWood: 0, priceOre: 0, shape: 'triangle' });
-    expect(UNIT_TYPES.swordsman).toEqual({ movement: 1, attack: 40, attackDistance: 1, maxHp: 80, defense: 20, price: 15, priceWood: 0, priceOre: 3, shape: 'swordsman' });
+    expect(UNIT_TYPES.rider).toEqual({ movement: 4, attack: 20, attackDistance: 1, maxHp: 40, defense: 7, price: 6, priceWood: 0, priceOre: 0, shape: 'square' });
+    expect(UNIT_TYPES.archer).toEqual({ movement: 1, attack: 20, attackDistance: 2, maxHp: 40, defense: 7, price: 6, priceWood: 0, priceOre: 0, shape: 'triangle' });
+    expect(UNIT_TYPES.swordsman).toEqual({ movement: 1, attack: 40, attackDistance: 1, maxHp: 80, defense: 20, price: 10, priceWood: 0, priceOre: 2, shape: 'swordsman' });
   });
 
-  it('defines the shield unit with 80 hp, 1 movement and a 10 money + 3 ore price', () => {
-    expect(UNIT_TYPES.shield).toEqual({ movement: 1, attack: 10, attackDistance: 1, maxHp: 80, defense: 20, price: 10, priceWood: 0, priceOre: 3, shape: 'square' });
+  it('defines the shield unit with 80 hp, 1 movement and a 8 money + 2 ore price', () => {
+    expect(UNIT_TYPES.shield).toEqual({ movement: 1, attack: 7, attackDistance: 1, maxHp: 80, defense: 20, price: 8, priceWood: 0, priceOre: 2, shape: 'square' });
   });
 
   it('defines the catapult unit with siege stats and a wood cost', () => {
-    expect(UNIT_TYPES.catapult).toEqual({ movement: 1, attack: 50, attackDistance: 4, maxHp: 30, defense: 0, price: 30, priceWood: 20, priceOre: 5, shape: 'square' });
+    expect(UNIT_TYPES.catapult).toEqual({ movement: 1, attack: 50, attackDistance: 4, maxHp: 30, defense: 0, price: 15, priceWood: 10, priceOre: 3, shape: 'square' });
     expect(UNIT_MOVEMENT.catapult).toBe(1);
     expect(UNIT_ATTACK.catapult).toBe(50);
     expect(UNIT_ATTACK_DISTANCE.catapult).toBe(4);
     expect(UNIT_TYPE_NAMES.catapult).toBe('Catapult');
   });
 
-  it('defines the knight unit with 3 movement, 5 attack and an ore cost', () => {
-    expect(UNIT_TYPES.knight).toEqual({ movement: 3, attack: 50, attackDistance: 1, maxHp: 50, defense: 10, price: 20, priceWood: 0, priceOre: 10, shape: 'swordsman' });
+  it('defines the knight unit with 3 movement, 4 attack and an ore cost', () => {
+    expect(UNIT_TYPES.knight).toEqual({ movement: 3, attack: 40, attackDistance: 1, maxHp: 60, defense: 7, price: 14, priceWood: 0, priceOre: 5, shape: 'swordsman' });
     expect(UNIT_MOVEMENT.knight).toBe(3);
-    expect(UNIT_ATTACK.knight).toBe(50);
+    expect(UNIT_ATTACK.knight).toBe(40);
     expect(UNIT_ATTACK_DISTANCE.knight).toBe(1);
     expect(UNIT_TYPE_NAMES.knight).toBe('Knight');
   });
@@ -101,7 +101,7 @@ function makeShield(overrides: Partial<import('../src/game/units').Unit> = {}): 
     hasAttacked: false,
     hasHealed: false,
     hp: 100,
-    attack: 10,
+    attack: 7,
     attackDistance: 1,
     defense: 20,
     spawnVillage: null,
