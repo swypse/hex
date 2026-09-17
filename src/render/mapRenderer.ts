@@ -67,7 +67,7 @@ const CAPTURE_EDGE_PULSE_MS = 600;
 const MARKER_Y_SCALE = 0.72;
 /** World offset of the damage-preview badge above the unit's hp bar anchor. */
 /** `viewport.zoomOut` above which hp bars/text and village names are hidden. */
-const ZOOM_DETAIL_HIDE = 0.4;
+export const ZOOM_DETAIL_HIDE = 0.4;
 /** Font size of the damage-preview `-N` label. */
 const DAMAGE_BADGE_FONT_SIZE = 14;
 /** Corner radius of the damage-preview badge rect. */

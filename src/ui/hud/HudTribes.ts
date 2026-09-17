@@ -45,7 +45,8 @@ export class HudTribes implements Widget {
       return;
     }
     const known = new Set<number>([local.tribe, ...(local.knownTribes ?? [])]);
-    const enemies = s.players.filter((p) => p.index !== local.index);
+    // Defeated/forfeited players are gone: keep only active enemy tribes.
+    const enemies = s.players.filter((p) => p.index !== local.index && p.isActive);
     this.el.visible = enemies.length > 0;
     let x = -(((enemies.length - 1) * (CIRCLE_SIZE + GAP)) / 2);
     for (const p of enemies) {

@@ -19,7 +19,7 @@ import { isExploredFor, initialExplorationFor } from '../game/explore';
 import { exploreVillageSights } from '../game/village';
 import { RESOURCE_CHEAT_AMOUNT } from '../game/cheats';
 import { TRIBES, Tribe, tribeById } from '../game/tribes';
-import { MapView, type OverlayItem } from '../render/mapRenderer';
+import { MapView, ZOOM_DETAIL_HIDE, type OverlayItem } from '../render/mapRenderer';
 import { pickTileAt } from '../render/tilePick';
 import { createTextures } from '../render/textureFactory';
 import { useGameStore, confirmLeaveGame } from '../store/gameStore';
@@ -62,6 +62,9 @@ class GameController {
   private reachableKeys = new Set<string>();
   private attackableKeys = new Set<string>();
   private hiddenUnitIds = new Set<string>();
+  /** Whether the last render hid detail (hp bars/labels) for the current zoom;
+   *  kept so a zoom crossing the detail threshold forces a re-render. */
+  private detailHidden = false;
   private knownTribeIds = new Set<number>();
   private taskQueue: Promise<void> = Promise.resolve();
   private network: NetworkController | null = null;
@@ -574,6 +577,13 @@ class GameController {
       };
       this.mapView.setViewport(viewport);
       this.mapView.repositionEdgeMarkers(viewport);
+    }
+    // Zoom changes never re-render the overlay, so hp bars/labels stay stale
+    // until the detail threshold is crossed; force a render then.
+    const hidden = this.zoomOut() > ZOOM_DETAIL_HIDE;
+    if (hidden !== this.detailHidden) {
+      this.detailHidden = hidden;
+      this.render();
     }
   }
 
@@ -1263,6 +1273,7 @@ class GameController {
       isLocalTurn,
     );
     this.overlayItems = this.mapView.overlayItems;
+    this.detailHidden = this.zoomOut() > ZOOM_DETAIL_HIDE;
     this.applyTransform();
   }
 }

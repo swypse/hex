@@ -412,7 +412,13 @@ export class EventPresenter {
 
     if (mapView && !e.missed && attackerTile && targetTile && attackerVisible && e.attackerPre && e.targetPre) {
       try {
-        await this.presentStagedAttack(e, attackerTile, targetTile, targetVisible, attackerAdvanced, facing, impact, keep, attackerShot);
+        if (attackerAdvanced) {
+          // Kill-and-advance: skip the lunge/strike choreography and play the
+          // walk onto the vacated cell directly.
+          await this.presentKillAdvance(e, attackerTile, targetTile, targetVisible, facing, keep);
+        } else {
+          await this.presentStagedAttack(e, attackerTile, targetTile, targetVisible, attackerAdvanced, facing, impact, keep, attackerShot);
+        }
       } finally {
         mapView.setUnitOverrides(keep);
         this.host.render();
@@ -596,6 +602,38 @@ export class EventPresenter {
       this.host.render();
       await mapView.slideUnit(attackerKey, targetKey, COMBAT_ADVANCE_MS);
     }
+  }
+
+  /** Kill-and-advance combat presentation: a melee attacker that killed its
+   *  target and moves onto the vacated cell skips the lunge/strike animation
+   *  and goes straight to the walk onto the target tile (the victim's -N text
+   *  and death burst still play). */
+  private async presentKillAdvance(
+    e: Extract<GameEvent, { type: 'attack' }>,
+    attackerTile: MapTile,
+    targetTile: MapTile,
+    targetVisible: boolean,
+    facing: 'left' | 'right',
+    keep: Map<string, Unit>,
+  ): Promise<void> {
+    const mapView = this.host.mapView();
+    if (!mapView) return;
+    const attackerKey = axialKey(attackerTile);
+    const targetKey = axialKey(targetTile);
+    const attacker = this.stageUnit(e.attackerPre!, e.attackerId, attackerTile.q, attackerTile.r);
+    const staged = new Map<string, Unit | null>(keep);
+    staged.set(attackerKey, attacker);
+    staged.set(targetKey, null); // the victim is already dead in the final state
+    mapView.setUnitOverrides(staged);
+    mapView.faceUnitAtKey(attackerKey, facing);
+    this.host.render();
+
+    if (e.attackerDamage > 0 && targetVisible) this.spawnHpText(targetTile, `-${e.attackerDamage}`, 0xff4444);
+    if (targetVisible) this.spawnDeath(targetTile);
+    await sleep(COMBAT_DEATH_GAP_MS);
+
+    // The walk onto the killed unit's cell is the only animation played.
+    await mapView.slideUnit(attackerKey, targetKey, COMBAT_ADVANCE_MS);
   }
 
   private stageUnit(pre: AttackUnitPre, refId: string, q: number, r: number): Unit {

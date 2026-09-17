@@ -133,7 +133,7 @@ describe('HudTribes', () => {
     expect((q.style as { fill?: string | number }).fill).toBe(0xffffff);
   });
 
-  it('dims an eliminated player\'s chip to 0.3 alpha', () => {
+  it('removes an eliminated player from the tribe row', () => {
     setGame(
       player(0, Tribe.Cats, 'Cats', true, [Tribe.Cats, Tribe.Warriors, Tribe.Aqua]),
       [
@@ -143,9 +143,9 @@ describe('HudTribes', () => {
     );
     widget = new HudTribes();
     widget.mount(host, root);
-    const [warriors, aqua] = chips();
+    const [warriors] = chips();
+    expect(chips()).toHaveLength(1);
     expect(warriors!.alpha).toBe(1);
-    expect(aqua!.alpha).toBeCloseTo(0.3, 5);
   });
 
   it('centers the row under the resource panel', () => {

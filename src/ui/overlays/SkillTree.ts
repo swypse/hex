@@ -14,6 +14,7 @@ import { Popup } from '../kit/popup';
 import { HudMoney } from '../hud/HudMoney';
 import { HudScore } from '../hud/HudScore';
 import { makeSkillMedallion } from '../kit/skillMedallion';
+import { makeSkillIcon, SKILL_ICON_FILES } from '../kit/skillIcons';
 import { THEME } from '../kit/theme';
 
 const RING_SPACING = 110;
@@ -456,6 +457,14 @@ export class SkillTree {
 
     const content = popup.content;
     let y = 0;
+    // Skill icon pinned above the description, centred on the content area.
+    const iconFile = SKILL_ICON_FILES[id];
+    if (iconFile) {
+      const icon = makeSkillIcon(iconFile, 32);
+      icon.position.set(popup.contentWidth / 2, y);
+      content.addChild(icon);
+      y += icon.height + 8;
+    }
     const desc = makeLabel(info.description, {
       fontSize: 14,
       fill: 0xcccccc,

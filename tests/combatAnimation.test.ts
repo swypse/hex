@@ -210,7 +210,7 @@ describe('combat animation ordering', () => {
     h?.mapView.destroy();
   });
 
-  it('keeps the dying unit visible through the attack and removes it only after the death gap', async () => {
+  it('skips the attack animation for a kill-and-advance and walks the attacker onto the killed cell', async () => {
     const map = makeOpenMap();
     const players = [player(0, Tribe.Cats), player(1, Tribe.Barbarians)];
     h = setup(map, players);
@@ -234,23 +234,15 @@ describe('combat animation ordering', () => {
     };
     const p = h.gc.presentEvents([attack], h.gc.exploredKeysFor(0));
 
-    // The staged presentation must draw the attacker on its original tile and
-    // the dying defender back on its tile while combat animates.
+    // Kill-and-advance skips the lunge: the attacker is drawn on its original
+    // tile and the victim's tile is already cleared (not kept visible).
     await waitFor(() => {
       const a = h.tileViews().get(axialKey({ q: 0, r: 0 }))!;
       const t = h.tileViews().get(axialKey({ q: 1, r: 0 }))!;
-      return a?.unitSprite?.visible === true && t?.unitSprite?.visible === true;
+      return a?.unitSprite?.visible === true && t?.unitSprite === null;
     });
 
-    // Finish the lunge tick, then check the dying defender is STILL drawn while
-    // the death gap elapses (it must not disappear before the -hp step).
-    h.advanceTicks(500);
-    await waitFor(() => {
-      const t = h.tileViews().get(axialKey({ q: 1, r: 0 }))!;
-      return t?.unitSprite?.visible === true;
-    });
-
-    // The attacker-advance slide runs on the ticker too; step it until the
+    // The advance slide runs on the ticker too; step it until the
     // presentation settles.
     let settled = false;
     const pEnd = p.finally(() => { settled = true; });
@@ -260,8 +252,7 @@ describe('combat animation ordering', () => {
     }
     await pEnd;
 
-    // After the full sequence the attacker stands on the killed tile and the
-    // staged defender is gone.
+    // After the walk the attacker stands on the killed tile.
     const finalTile = h.tileViews().get(axialKey({ q: 1, r: 0 }))!;
     expect(finalTile?.unitSprite).not.toBeNull();
     expect(unitAt(map, 1, 0).unit?.id).toBe('att');
