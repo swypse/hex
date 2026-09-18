@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
+    "typecheck:worker": "tsc --noEmit -p worker/tsconfig.json",
     "pack:skills": "node tools/packSkills.mjs",
     "pack:achievements": "node tools/packAchievements.mjs",
     "pack:action-buttons": "node tools/packActionButtons.mjs",
@@ -18,7 +19,9 @@
     "pack:tribe-icons": "node tools/packTribeIcons.mjs",
     "pack:icons-16": "node tools/packIcons16.mjs",
     "pack:icons-32": "node tools/packIcons32.mjs",
-    "relay": "node server/relay.mjs"
+    "relay": "node server/relay.mjs",
+    "relay:dev": "wrangler dev -c worker/wrangler.jsonc",
+    "relay:deploy": "wrangler deploy -c worker/wrangler.jsonc"
   },
   "dependencies": {
     "pixi.js": "^8.19.0",
@@ -26,9 +29,11 @@
     "zustand": "^5.0.15"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260918.1",
     "pngquant-bin": "^9.0.0",
     "typescript": "^5.9.3",
     "vite": "^5.4.21",
-    "vitest": "^1.6.1"
+    "vitest": "^1.6.1",
+    "wrangler": "^4.134.0"
   }
 }

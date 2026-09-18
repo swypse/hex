@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Application, BitmapText, Container, Graphics, ImageSource, Sprite, Texture } from 'pixi.js';
-import { MapView, FIRE_SIZE_MIN, FIRE_SIZE_MAX, captureMarkerPoints } from '../src/render/mapRenderer';
+import { MapView } from '../src/render/mapRenderer';
+import { captureMarkerPoints } from '../src/render/captureMarker';
+import { FIRE_SIZE_MIN, FIRE_SIZE_MAX } from '../src/render/fire';
 import { GameMap, MapTile } from '../src/game/mapGen';
 import { TileType } from '../src/game/tileTypes';
 import { Player } from '../src/game/players';
@@ -9,6 +11,7 @@ import { Tribe, TRIBES } from '../src/game/tribes';
 import { Unit, UNIT_TYPES } from '../src/game/units';
 import { axialKey, hexToPixel } from '../src/game/hex';
 import { tileElevation } from '../src/render/elevation';
+import { WATER_WAVE_AMPLITUDE, WATER_WAVE_PERIOD } from '../src/render/waves';
 import { type TextureSet, type TileTexture } from '../src/render/textureFactory';
 import { villageTexturesForTest } from './helpers/villageTextures';
 
@@ -279,6 +282,55 @@ describe('MapView hp bar anchoring', () => {
       now = 1950; // three-quarter period -> -2.5px
       shipFn();
       expect(sprite.position.y).toBeCloseTo(y0 - 2.5, 5);
+    } finally {
+      (performance as { now: () => number }).now = origNow;
+      v.destroy();
+    }
+  });
+
+  it('bobs water tiles in opposite phases by q parity on the ticker', () => {
+    const callbacks: Array<() => void> = [];
+    const app = {
+      screen: { width: 800, height: 600 },
+      ticker: { add: (fn: () => void) => callbacks.push(fn), remove: (): void => {} },
+    } as unknown as Application;
+    const water = (q: number): MapTile => ({
+      q, r: 0, terrain: TileType.Water, height: 0.1, settlement: null,
+      building: null, roadOwner: null, unit: null, ownedBy: null, claimedByVillage: null, exploredBy: [0],
+    });
+    const m: GameMap = { radius: 2, spawns: [], tiles: [water(0), water(1), water(2)] };
+    const waveTextures = buildTextures(m);
+    const v = new MapView(app, waveTextures, HEX, SPRITE_SCALE, 2);
+    const origNow = performance.now;
+    let now = 0;
+    (performance as { now: () => number }).now = () => now;
+    try {
+      v.update(m, players, null, new Set(), new Set(), 0, new Set(), {
+        x: 400, y: 300, scale: 1, width: 800, height: 600,
+      });
+      const tvs = (v as unknown as { tileViews: Map<string, { terrainSprite: Sprite }> }).tileViews;
+      const s0 = tvs.get('0,0')!.terrainSprite;
+      const s1 = tvs.get('1,0')!.terrainSprite;
+      const s2 = tvs.get('2,0')!.terrainSprite;
+      // The wave ticker is the only callback that moves a water terrain sprite.
+      const waveFn = callbacks.find((fn) => {
+        const before = s0.position.y;
+        now = 0;
+        fn();
+        return s0.position.y !== before;
+      })!;
+      expect(waveFn).toBeDefined();
+
+      now = 0; // even-q crest, odd-q trough
+      waveFn();
+      expect(s0.position.y).toBeCloseTo(-WATER_WAVE_AMPLITUDE, 5);
+      expect(s1.position.y).toBeCloseTo(WATER_WAVE_AMPLITUDE, 5);
+      expect(s2.position.y).toBeCloseTo(-WATER_WAVE_AMPLITUDE, 5);
+
+      now = WATER_WAVE_PERIOD / 2; // half period later: phases flip
+      waveFn();
+      expect(s0.position.y).toBeCloseTo(WATER_WAVE_AMPLITUDE, 5);
+      expect(s1.position.y).toBeCloseTo(-WATER_WAVE_AMPLITUDE, 5);
     } finally {
       (performance as { now: () => number }).now = origNow;
       v.destroy();
@@ -1936,7 +1988,53 @@ describe('damage preview badges', () => {
     v.destroy();
   });
 
- it('omits the counter badge when the enemy is out of its counter range', () => {
+  it('keeps the target badge steady when the delayed counter badge appears', () => {
+    const callbacks: Array<() => void> = [];
+    const app = {
+      screen: { width: 800, height: 600 },
+      ticker: { add: (fn: () => void) => callbacks.push(fn), remove: (): void => {} },
+    } as unknown as Application;
+    const t00 = tileOf(0, 0, unit('mine', 0, 0, 0), 0);
+    const t10 = tileOf(1, 0, unit('them', 1, 1, 0), 1);
+    const m: GameMap = { radius: 1, spawns: [], tiles: [t00, t10] };
+    const v = new MapView(app, buildTextures(m), HEX, SPRITE_SCALE, 2);
+    const players = playersOf();
+    const origNow = performance.now;
+    let now = 0;
+    (performance as { now: () => number }).now = () => now;
+    try {
+      v.update(m, players, { kind: 'unit', q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
+      vi.useFakeTimers();
+      (performance as { now: () => number }).now = () => now;
+      v.showDamagePreview(t00.unit!, t10);
+      v.update(m, players, { kind: 'unit', q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
+      const targetEl = badgeEl(v, '-20');
+      now = 120; // past the badge fade-in
+      for (const fn of callbacks) fn();
+      expect(targetEl.alpha).toBe(1);
+
+      // The 100ms hold-delay fires, the counter badge becomes visible, and the
+      // preview re-renders (showDamagePreview's onRender does this in the app).
+      vi.advanceTimersByTime(100);
+      v.update(m, players, { kind: 'unit', q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
+      vi.useRealTimers();
+      (performance as { now: () => number }).now = () => now;
+
+      // The settled target badge is reused as-is instead of being torn down
+      // and faded again from 0: only the attacker counter badge fades in.
+      expect(targetEl.destroyed).toBe(false);
+      expect(badgeEl(v, '-20')).toBe(targetEl);
+      expect(targetEl.alpha).toBe(1);
+      const atkEl = badgeEl(v, '-5');
+      expect(atkEl).not.toBe(targetEl);
+      expect(atkEl.alpha).toBe(0);
+    } finally {
+      (performance as { now: () => number }).now = origNow;
+      v.destroy();
+    }
+  });
+
+  it('omits the counter badge when the enemy is out of its counter range', () => {
     const t00 = tileOf(0, 0, unit('mine', 0, 0, 0), 0);
     // A warrior enemy three hexes away: out of its own attack range, so no
     // real counter would occur (mirrors performAttack).
@@ -2188,7 +2286,7 @@ describe('damage preview badges', () => {
       now = 0;
       for (const fn of callbacks) fn();
       expect(el.alpha).toBeLessThan(1);
-      now = 150; // midpoint of the in-animation
+      now = 40; // midpoint of the in-animation (80ms)
       for (const fn of callbacks) fn();
       // Alpha-only fade: no scale bounce and no position dip.
       const midY = el.position.y;
@@ -2197,7 +2295,7 @@ describe('damage preview badges', () => {
       expect(el.scale.x).toBe(1);
       expect(el.scale.y).toBe(1);
       expect(midY).toBe(0);
-      now = 300; // past the in-animation (200ms)
+      now = 120; // past the in-animation
       for (const fn of callbacks) fn();
       expect(el.alpha).toBe(1);
       expect(el.scale.x).toBe(1);
@@ -2205,13 +2303,13 @@ describe('damage preview badges', () => {
       // hide -> out animation fades the badge back to 0 and removes it.
       v.hideDamagePreview();
       expect(el.alpha).toBe(1);
-      now = 400; // midpoint of the out-animation
+      now = 160; // midpoint of the out-animation
       for (const fn of callbacks) fn();
       expect(el.alpha).toBeGreaterThan(0);
       expect(el.alpha).toBeLessThan(1);
       expect(el.scale.x).toBe(1);
       expect(el.position.y).toBe(0);
-      now = 500; // past the out-animation (another 200ms)
+      now = 240; // past the out-animation (another 80ms)
       for (const fn of callbacks) fn();
       expect(el.alpha).toBe(0);
       expect(el.destroyed).toBe(true);
@@ -2237,6 +2335,39 @@ describe('damage preview badges', () => {
     v.hideDamagePreview();
     v.update(m, players, { kind: 'unit', q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
     expect(badgesOf(v)).toHaveLength(0);
+    v.destroy();
+  });
+
+  it('renders damage badges above the village name label on the same tile', () => {
+    const t00 = tileOf(0, 0, unit('mine', 0, 0, 0), 0);
+    const t10: MapTile = {
+      q: 1, r: 0, terrain: TileType.GrasslandLand, height: 0.1,
+      settlement: { owner: 1, level: 1, captureReady: false, name: 'Vil' },
+      building: null, roadOwner: null,
+      unit: unit('them', 1, 1, 0), ownedBy: 1, claimedByVillage: null, exploredBy: [0, 1],
+    };
+    const m: GameMap = { radius: 1, spawns: [], tiles: [t00, t10] };
+    const app = {
+      screen: { width: 800, height: 600 },
+      ticker: { add: (): void => {}, remove: (): void => {} },
+    } as unknown as Application;
+    const v = new MapView(app, buildTextures(m), HEX, SPRITE_SCALE, 2);
+    const players = playersOf();
+    v.update(m, players, { kind: 'unit', q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
+    v.showDamagePreview(t00.unit!, t10);
+    v.update(m, players, { kind: 'unit', q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
+
+    expect(v.overlay.sortableChildren).toBe(true);
+    // The badge's outer wrapper sorts above the village label container so the
+    // badge is never covered by a village name, even across preview re-renders.
+    const badgeEls_ = badgeEls(v);
+    expect(badgeEls_.length).toBeGreaterThan(0);
+    const badgeOuter = badgeEls_[0]!.parent;
+    const labelEl = v.overlay.children.find((c) =>
+      c instanceof Container && c.children.some((x) => x instanceof BitmapText && String((x as BitmapText).text).includes('Vil')),
+    );
+    expect(labelEl).toBeDefined();
+    expect((badgeOuter as Container).zIndex).toBeGreaterThan((labelEl as Container).zIndex);
     v.destroy();
   });
 });

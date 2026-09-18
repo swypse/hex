@@ -37,9 +37,9 @@ const ICON_ACTIONS: Record<string, string> = {
 const LAST_TURN_COLOR = 0x9cff55;
 const SIDE_PADDING = 12;
 const ACTION_BTN = {
-  color: 0xd0e3ff,
-  hoverColor: 0xffffff,
-  pressedColor: 0xffffff,
+  color: 0xffffff,
+  hoverColor: 0xd0e3ff,
+  pressedColor: 0xd0e3ff,
   borderWidth: 0,
   disabledAlpha: 0.6,
   transparentDisabled: true,
@@ -136,7 +136,13 @@ export class HudToolbar implements Widget {
       maybeHighlightAction(btn, key);
     };
     const addIcon = (icon: string, disabled: boolean, onClick: () => void, tooltipText: string, key: string): void => {
-      const btn = new IconButton({ icon, disabled, onClick, size: 48, iconFactory: makeActionButtonIcon, ...ACTION_BTN });
+      const btn = new IconButton({
+        icon,
+        disabled,
+        onClick,
+        size: 48,
+        iconFactory: makeActionButtonIcon, ...ACTION_BTN
+      });
       btn.position.set(x, 0);
       this.row!.addChild(btn);
       x += btn.width + GAP;

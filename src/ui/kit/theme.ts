@@ -20,7 +20,16 @@ export const THEME = {
     openedSkillStroke: 0xff8c00,
     closedSkillBg: 0x373748,
     closedSkillStroke: 0x333333,
-  }
+  },
+  /** Map-layer UI palette (selection highlights, route strokes). */
+  map: {
+    /** Selected/attackable or capture-adjacent border highlight. */
+    selected: 0xEB1F00,
+    /** Own road stroke. */
+    road: 0xff8c00,
+    /** Own auto water-route stroke. */
+    waterRoad: 0x7fd8f5,
+  },
 } as const;
 
 export const TEXT_BUTTON = {

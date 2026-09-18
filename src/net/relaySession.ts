@@ -33,16 +33,17 @@ interface RelayClientEvents {
   onError: (err: Error) => void;
 }
 
-const DEFAULT_RELAY_URL = 'wss://swypse-hex.bonto.run/ws';
+const DEFAULT_RELAY_URL = 'wss://hex-relay.swypse.workers.dev/ws';
 
 function relayUrl(): string {
-  const explicit = import.meta.env.VITE_RELAY_URL;
-  if (explicit) return explicit;
-  if (typeof window !== 'undefined' && window.location && /^localhost(:\d+)?$/.test(window.location.hostname)) {
-    const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
-    return `${proto}://${window.location.host}/ws`;
-  }
   return DEFAULT_RELAY_URL;
+}
+
+/** Appends the room code so Cloudflare can route to the per-room Durable Object. */
+function withRoomCode(base: string, code: string): string {
+  if (!code) return base;
+  const sep = base.includes('?') ? '&' : '?';
+  return `${base}${sep}code=${encodeURIComponent(code)}`;
 }
 
 type ServerMessage =
@@ -84,7 +85,7 @@ abstract class RelaySessionBase {
     if (this.closed) return;
     let socket: WebSocketLike;
     try {
-      socket = this.createSocket(this.url);
+      socket = this.createSocket(withRoomCode(this.url, this.code));
     } catch (err) {
       this.fail(err instanceof Error ? err : new Error(t('net.relayConnect')));
       return;

@@ -2,9 +2,10 @@ import {
   Application, BitmapText, Circle, Container, Graphics, Sprite, type TextStyleOptions, type Texture, type Ticker
 } from 'pixi.js';
 import { FONT_REGULAR } from '../ui/kit/bitmapFonts';
-import { axialKey, compareTileY, hexCorners, hexDistance, hexEdge, hexEdgeNeighbor, hexToPixel, splitHexBorder } from '../game/hex';
+import {
+  axialKey, compareTileY, hexCorners, hexDistance, hexEdge, hexEdgeNeighbor, hexToPixel, splitHexBorder
+} from '../game/hex';
 import { tileMapByKey, type GameMap, type MapTile } from '../game/mapGen';
-import { counterDamageTo, resolveCombat } from '../game/combat';
 import { bridgeCoastOffsets } from '../game/bridges';
 import { portDirection } from '../game/buildings';
 import { Player } from '../game/players';
@@ -18,12 +19,24 @@ import { villageCapacity, unitsInVillage } from '../game/village';
 import { isVillageRoadConnected } from '../game/roads';
 import { waterRouteEdges, portWaterClusterJumps } from '../game/waterRoads';
 import { tileElevation } from './elevation';
+import { waterWaveOffset } from './waves';
+import { DamageBadgeLayer } from './damageBadge';
+import { FireEffects } from './fire';
+import {
+  captureMarkerPoints,
+  CAPTURE_EDGE_MARKER_ALPHA,
+  CAPTURE_EDGE_MARKER_SIZE,
+  CAPTURE_EDGE_MARKER_SLIDE,
+  CAPTURE_EDGE_PULSE_MS,
+  type CaptureMarkerSide,
+} from './captureMarker';
+import { isWaterType } from '../game/tileTypes';
 import { type TextureSet, type TileTexture } from './textureFactory';
 import { villageTextureFor, villageOwnerTribe } from './villageTexture';
 import { tileSignature, tileInView, type Viewport } from './tileSignature';
 import { t } from '../i18n';
 import { Tooltip } from '../ui/kit/tooltip';
-import { makeIcon16 } from '../ui/kit/icons16';
+import { THEME } from '../ui/kit/theme';
 
 /** Diameter of a pirate-deal dot (screen px; the row does not scale with zoom). */
 const PIRATE_DEAL_DOT = 8;
@@ -39,126 +52,16 @@ export interface OverlayItem {
   world: { x: number; y: number };
 }
 
-const FIRE_PARTICLE_COUNT = 12;
-const FIRE_COLORS = [0xff5500, 0xff3300, 0xff2200, 0xff7700, 0xffaa00, 0xff8800];
-const FIRE_SPREAD_X = 16;
-const FIRE_RISE = 36;
-export const FIRE_SIZE_MIN = 6;
-export const FIRE_SIZE_MAX = 12;
-const FIRE_BASE_Y = 6;
-const SELECTED_BORDER_COLOR = 0xEB1F00;
 const SELECTED_BORDER_ALPHA = 1;
-const TUTORIAL_MARKER_COLOR = 0xffd700;
-/** White ground dot shown on every reachable tile, regardless of tribe. */
-const MOVE_MARKER_COLOR = 0xffffff;
-const ROAD_COLOR = 0xff8c00;
-/** Light-blue strokes tracing the shortest own-water path between a player's
- *  connected ports (auto water roads). */
-const WATER_ROAD_COLOR = 0x7fd8f5;
-const CAPTURE_EDGE_MARKER_COLOR = 0xEB1F00;
-const CAPTURE_EDGE_MARKER_ALPHA = 1;
-/** Side length of the capture triangle in screen px. */
-const CAPTURE_EDGE_MARKER_SIZE = 20;
-/** Distance (px) the capture triangle slides outward past the screen edge. */
-const CAPTURE_EDGE_MARKER_SLIDE = 10;
-const CAPTURE_EDGE_PULSE_MS = 600;
 /** Vertical squash applied to move/attack marker circles so they sit flat on
  *  the ground plane like the hexes. */
 const MARKER_Y_SCALE = 0.72;
-/** World offset of the damage-preview badge above the unit's hp bar anchor. */
 /** `viewport.zoomOut` above which hp bars/text and village names are hidden. */
 export const ZOOM_DETAIL_HIDE = 0.4;
-/** Font size of the damage-preview `-N` label. */
-const DAMAGE_BADGE_FONT_SIZE = 14;
-/** Corner radius of the damage-preview badge rect. */
-const DAMAGE_BADGE_RADIUS = 2;
-/** Vertical gap between the badge caret tip and the hp text (px). */
-const DAMAGE_BADGE_ABOVE_TEXT = 4;
-/** Pixels above the hp-bar anchor at which the hp label sits (its bottom). */
-const HP_LABEL_UP = 13;
-/** Fill color of the badge rect and caret. */
-const DAMAGE_BADGE_BG = 0x111111;
-/** Whitespace around the badge content (world px). */
-const DAMAGE_BADGE_PADDING = 5;
-/** Gap between the attack icon and the `-N hp` text. */
-const DAMAGE_BADGE_ICON_GAP = 3;
-/** Attack icon size inside the damage-preview badge. */
-const DAMAGE_BADGE_ICON_SIZE = 14;
-/** Height of the caret triangle under the badge. */
-const DAMAGE_BADGE_CARET = 5;
-/** Width of the caret triangle under the badge. */
-const DAMAGE_BADGE_CARET_W = 9;
-/** Duration of the badge in/out animation (ms). */
-const DAMAGE_BADGE_ANIM_MS = 200;
 /** Delay between consecutive reachable/attackable marker rings (ms). */
 const MARKER_STAGGER_DELAY_MS = 80;
 /** Duration of the marker fade-in once its delay elapses (ms). */
 const MARKER_STAGGER_FADE_MS = 120;
-
-type CaptureMarkerSide = 'l' | 'r' | 't' | 'b';
-
-/** The 6 polygon points of the off-screen capture marker triangle.
- *
- *  A red triangle of `size` px whose sharp vertex sits on the given screen
- *  edge pointing at the capturing village (off-screen beyond that edge). Its
- *  body extends `size` px INTO the screen so it is always visible. `slide` is
- *  the distance the marker has moved outward past the edge (0 = resting with
- *  the vertex on the edge, `CAPTURE_EDGE_MARKER_SLIDE` = fully extended with
- *  the vertex poking out that far).
- *
- *  - top edge (village above): vertex on the top edge aims up
- *  - bottom edge (village below): vertex on the bottom edge aims down
- *  - left edge (village left): vertex on the left edge aims left
- *  - right edge (village right): vertex on the right edge aims right
- */
-export function captureMarkerPoints(
-  side: CaptureMarkerSide,
-  along: number,
-  slide: number,
-  W: number,
-  H: number,
-  size = CAPTURE_EDGE_MARKER_SIZE,
-): [number, number, number, number, number, number] {
-  const half = size / 2;
-  const z = (v: number): number => (v === 0 ? 0 : v);
-  switch (side) {
-    case 't': {
-      const vertexY = z(-slide);
-      const baseY = size - slide;
-      return [along - half, baseY, along, vertexY, along + half, baseY];
-    }
-    case 'b': {
-      const vertexY = H + slide;
-      const baseY = H - size + slide;
-      return [along - half, baseY, along, vertexY, along + half, baseY];
-    }
-    case 'l': {
-      const vertexX = z(-slide);
-      const baseX = size - slide;
-      return [baseX, along - half, vertexX, along, baseX, along + half];
-    }
-    case 'r': {
-      const vertexX = W + slide;
-      const baseX = W - size + slide;
-      return [baseX, along - half, vertexX, along, baseX, along + half];
-    }
-  }
-}
-
-interface FireParticle {
-  g: Graphics;
-  x: number;
-  vy: number;
-  size: number;
-  color: number;
-  life: number;
-  rate: number;
-}
-
-interface FireEffect {
-  el: Container;
-  particles: FireParticle[];
-}
 
 interface TileView {
   el: Container;
@@ -207,8 +110,8 @@ export class MapView {
   private bonusAnimRemove: (() => void) | null = null;
   private bottleBobs: { sprite: Sprite; baseY: number }[] = [];
   private bottleAnimRemove: (() => void) | null = null;
-  private fireEffects: FireEffect[] = [];
-  private fireAnimRemove: (() => void) | null = null;
+  /** Fire particles over enemy-occupied villages (owned component). */
+  readonly fireEffects: FireEffects;
   private stopSelectedBorder: (() => void) | null = null;
   private stopTutorialMarkers: (() => void) | null = null;
   private tutorialMarkerParts: { g: Graphics; points: { x: number; y: number }[] }[] = [];
@@ -230,13 +133,16 @@ export class MapView {
   private shipBobs: { sprite: Sprite; key: string; baseY: number }[] = [];
   private shipBobRemove: (() => void) | null = null;
   private shipBusy = new Set<string>();
+  /** Water terrain sprites animated with the idle wave bob, one per water tile. */
+  private waveBobs: { sprite: Sprite; baseY: number; q: number }[] = [];
+  private waveRemove: (() => void) | null = null;
   private unitFacings = new Map<string, 'left' | 'right'>();
   private dealTooltip: Tooltip | null = null;
-  /** When set, an expected-damage preview is held: `attacker` is the local
-   *  selected unit and `target` is the enemy being long-pressed. */
-  private damagePreviewFor: { attacker: Unit; target: MapTile } | null = null;
   /** World anchor (hp bar point) + row width of each pirate-deal dot row. */
   private dealAnchors = new Map<string, { x: number; y: number; rowW: number }>();
+  /** Expected-damage preview badges (owned component; renders over hp bars
+   *  and village labels). */
+  readonly damageBadges: DamageBadgeLayer;
   private viewport: Viewport | null = null;
   private lastLocalIndex = 0;
   /** Screen-space layer for edge capture markers. Kept out of `overlay` so a
@@ -256,6 +162,23 @@ export class MapView {
     this.container = new Container();
     this.container.sortableChildren = true;
     this.overlay = new Container();
+    this.overlay.sortableChildren = true;
+    this.fireEffects = new FireEffects({
+      app,
+      overlay: this.overlay,
+      overlayItems: this.overlayItems,
+      takeGraphics: () => this.takeGraphics(),
+    });
+    this.damageBadges = new DamageBadgeLayer({
+      app,
+      overlay: this.overlay,
+      hexSize,
+      getMap: () => this.map,
+      getTileIndex: () => this.tileIndex,
+      getViewport: () => this.viewport,
+      getHpLabelHeight: () => this.hpLabelHeight,
+      unitTextureTop: (unit, players) => this.unitTextureTop(unit, players),
+    });
   }
 
   /** Adds the edge-marker layer on top of everything (as the first child of
@@ -268,6 +191,7 @@ export class MapView {
   destroy(): void {
     this.clearFireEffects();
     this.stopShipBob();
+    this.stopWaveAnimation();
     this.stopEdgePulse();
     this.unitFacings.clear();
     if (this.dealTooltip) {
@@ -310,7 +234,7 @@ export class MapView {
     this.tileViews.clear();
     this.dealAnchors.clear();
     this.overlayItems.length = 0;
-    this.damageBadgeAnchors.clear();
+    this.damageBadges.destroy();
     this.glowKey = '';
     this.map = null;
   }
@@ -346,7 +270,7 @@ export class MapView {
     const local = players[localPlayerIndex];
     const known = new Set<number>(local ? [local.tribe, ...(local.knownTribes ?? [])] : []);
     this.knownOwners = new Set(players.filter((p) => known.has(p.tribe)).map((p) => p.index));
-    const reachableColor = MOVE_MARKER_COLOR;
+    const reachableColor = THEME.white;
     this.clearFireEffects();
     this.releaseOverlay();
     this.clearHighlights();
@@ -455,13 +379,14 @@ export class MapView {
     this.drawHighlights(map, selection, reachableKeys, attackableKeys, reachableColor, localPlayerIndex, tutorialMarkerKeys, localTurn);
     this.shipBobs = shipBobs;
     this.startShipBob();
+    this.startWaveAnimation();
     this.startExclamationAnimation();
     this.startBonusAnimation();
     this.startFireAnimation();
     this.startBottleAnimation();
     this.updateSelectedBounce(selection);
     this.updateSelectedGlow(selection, hiddenUnitIds, localPlayerIndex, players);
-    this.drawDamageBadges(players, localPlayerIndex);
+    this.damageBadges.render(players, localPlayerIndex);
   }
 
   /** Arm an expected-damage preview from `attacker` (the local selected unit)
@@ -470,52 +395,20 @@ export class MapView {
    *  The counter-attack badge appears 100ms after the target badge.
    *  `onRender` is called after the delay to trigger the next render pass. */
   showDamagePreview(attacker: Unit, target: MapTile, onRender?: () => void): void {
-    this.damagePreviewFor = { attacker, target };
-    this.damagePreviewAttackerVisible = false;
-    if (this.damagePreviewAttackerTimer !== null) {
-      clearTimeout(this.damagePreviewAttackerTimer);
-      this.damagePreviewAttackerTimer = null;
-    }
-    this.damagePreviewAttackerTimer = setTimeout(() => {
-      this.damagePreviewAttackerVisible = true;
-      onRender?.();
-    }, 100);
+    this.damageBadges.show(attacker, target, onRender);
   }
 
   /** Drop the expected-damage preview. Cleared again on the next update. */
   hideDamagePreview(): void {
-    this.damagePreviewFor = null;
-    this.damagePreviewAttackerVisible = false;
-    if (this.damagePreviewAttackerTimer !== null) {
-      clearTimeout(this.damagePreviewAttackerTimer);
-      this.damagePreviewAttackerTimer = null;
-    }
-    this.animateDamageBadgesOut();
+    this.damageBadges.hide();
   }
 
   /** Update overlay badge positions to follow the camera. Called every frame
    *  from applyTransform so badges track world-anchored positions without
    *  being affected by zoom scaling. */
   syncBadgePositions(pan: { x: number; y: number }, scale: number): void {
-    for (const [outer, { worldX, worldY, screenOffsetY }] of this.damageBadgeAnchors) {
-      if (outer.destroyed) {
-        this.damageBadgeAnchors.delete(outer);
-        continue;
-      }
-      outer.position.set(pan.x + worldX * scale, pan.y + worldY * scale + screenOffsetY);
-    }
+    this.damageBadges.syncPositions(pan, scale);
   }
-
-  /** Badge elements currently on screen (settled or animating). */
-  private liveDamageBadges = new Set<Container>();
-  /** World anchors for damage badges in overlay (screen-space position tracking). */
-  private damageBadgeAnchors = new Map<Container, { worldX: number; worldY: number; screenOffsetY: number }>();
-  /** Whether the attacker counter-attack badge is visible (delayed 100ms). */
-  private damagePreviewAttackerVisible = false;
-  private damagePreviewAttackerTimer: ReturnType<typeof setTimeout> | null = null;
-  /** Badge elements in an active fade phase. */
-  private badgeAnim = new Map<Container, { phase: 'in' | 'out'; start: number }>();
-  private badgeAnimRemove: (() => void) | null = null;
 
   /** Stagger reveal state for move/attack markers: tile key -> reveal start
    *  time (performance.now when the marker's distance ring is due to fade in). */
@@ -572,173 +465,6 @@ export class MapView {
     this.markerRevealEls.set(key, g);
   }
 
-  private ensureBadgeTick(): void {
-    if (this.badgeAnimRemove) return;
-    const fn = (): void => {
-      const now = performance.now();
-      if (this.badgeAnim.size === 0) {
-        if (this.badgeAnimRemove === remover) this.stopBadgeTick();
-        return;
-      }
-      for (const [el, anim] of this.badgeAnim) {
-        if (el.destroyed || el.parent?.destroyed) {
-          this.badgeAnim.delete(el);
-          if (el.parent) this.liveDamageBadges.delete(el.parent as Container);
-          else this.liveDamageBadges.delete(el as Container);
-          continue;
-        }
-        const t = Math.min(1, (now - anim.start) / DAMAGE_BADGE_ANIM_MS);
-        if (anim.phase === 'in') {
-          el.alpha = t;
-          if (t >= 1) {
-            el.alpha = 1;
-            this.badgeAnim.delete(el);
-          }
-        } else {
-          el.alpha = 1 - t;
-          if (t >= 1) {
-            const outer = el.parent as Container | undefined;
-            if (outer) {
-              if (outer.parent) outer.parent.removeChild(outer);
-              this.damageBadgeAnchors.delete(outer);
-              outer.destroy({ children: true });
-            }
-            this.badgeAnim.delete(el);
-            this.liveDamageBadges.delete(outer!);
-          }
-        }
-      }
-      if (this.badgeAnim.size === 0) {
-        if (this.badgeAnimRemove === remover) this.stopBadgeTick();
-      }
-    };
-    const remover = (): void => {
-      this.app.ticker.remove(fn);
-    };
-    this.app.ticker.add(fn);
-    this.badgeAnimRemove = remover;
-  }
-
-  private stopBadgeTick(): void {
-    if (this.badgeAnimRemove) {
-      const fn = this.badgeAnimRemove;
-      this.badgeAnimRemove = null;
-      fn();
-    }
-  }
-
-  /** Starts the fade-out for every badge still on screen: flips its phase so the
-   *  shared ticker runs it to completion (releaseOverlay skips animating ones,
-   *  so a rebuild never kills the fade mid-flight). */
-  private animateDamageBadgesOut(): void {
-    const now = performance.now();
-    let changed = false;
-    for (const outer of this.liveDamageBadges) {
-      if (outer.destroyed) continue;
-      const el = outer.children[0] as Container;
-      changed = true;
-      this.badgeAnim.set(el, { phase: 'out', start: now });
-    }
-    if (!changed) return;
-    this.ensureBadgeTick();
-  }
-
-  /** Renders the `-N` badges over the attacker's and target's hp bars for the
-   *  armed damage preview. Pure (no mutation), so it can be redrawn on every
-   *  frame while the preview is held. */
-  private drawDamageBadges(players: Player[], localPlayerIndex: number): void {
-    const preview = this.damagePreviewFor;
-    if (!preview || !this.map) return;
-    const targetUnit = preview.target.unit;
-    if (!targetUnit) return;
-    const attackerTile = this.tileIndex.get(axialKey({ q: preview.attacker.q, r: preview.attacker.r }));
-    if (!attackerTile || attackerTile.unit !== preview.attacker) return;
-
-    const { attackerDamage } = resolveCombat(this.map, preview.attacker, preview.target);
-    // Badge over the long-pressed enemy: what the selected unit would deal.
-    // A lethal hit (damage >= target hp) shows the skull icon; 0 damage shows
-    // nothing.
-    if (attackerDamage > 0) {
-      this.addDamageBadge(preview.target, targetUnit, players, attackerDamage, localPlayerIndex, attackerDamage >= targetUnit.hp);
-    }
-    // Badge over the selected unit: the counter it would take, delayed 100ms
-    // so the player sees the target badge first. Mirrors a real attack: the
-    // counter only lands when the target survives, is in range, and can
-    // counter-attack — otherwise no retaliation badge is shown.
-    const counterDamage = counterDamageTo(this.map, preview.attacker, preview.target);
-    if (counterDamage > 0 && this.damagePreviewAttackerVisible) {
-      this.addDamageBadge(attackerTile, preview.attacker, players, counterDamage, localPlayerIndex, counterDamage >= preview.attacker.hp);
-    }
-  }
-
-  /** A tooltip-style damage badge: a `#111` rounded rect with no stroke, an
-   *  attack (or skull on a lethal hit) icon (14px) + white `-N` text, and a
-   *  small `#111` caret pointing down at the bottom — rendered in screen-space
-   *  overlay so it stays zoom-independent (just like unit HP bars). */
-  private addDamageBadge(tile: MapTile, unit: Unit, players: Player[], n: number, localPlayerIndex: number, kill = false): void {
-    const p = hexToPixel(tile, this.hexSize);
-    const y = p.y - tileElevation(tile, this.hexSize);
-    const center = this.unitTextureTop(unit, players);
-    const anchor = { x: p.x, y: y - center + HP_BAR_ANCHOR_OFFSET };
-
-    const label = this.takeText(`-${n}`, {
-      fontSize: DAMAGE_BADGE_FONT_SIZE,
-      fill: 0xffffff,
-      fontFamily: FONT_REGULAR,
-    });
-    label.anchor.set(0.5, 0.5);
-
-    const iconKey = kill ? 'skull' : 'attack';
-    const icon = makeIcon16(iconKey, DAMAGE_BADGE_ICON_SIZE);
-    icon.label = iconKey === 'skull' ? 'skull-16' : 'attack-16';
-    icon.anchor.set(0.5, 0.5);
-
-    const gap = DAMAGE_BADGE_ICON_GAP;
-    const contentW = label.width + gap + icon.width;
-    const contentH = Math.max(label.height, icon.height);
-    const pad = DAMAGE_BADGE_PADDING;
-    const bw = contentW + pad * 2;
-    const bh = contentH + pad * 2;
-
-    const g = this.takeGraphics();
-    g.roundRect(-bw / 2, -bh / 2, bw, bh, DAMAGE_BADGE_RADIUS)
-      .fill(DAMAGE_BADGE_BG);
-    // Caret at the bottom center, pointing down, its base flush with the rect
-    // bottom edge (zero spacing between the triangle and the rect).
-    g.poly([-DAMAGE_BADGE_CARET_W / 2, bh / 2, DAMAGE_BADGE_CARET_W / 2, bh / 2, 0, bh / 2 + DAMAGE_BADGE_CARET])
-      .fill(DAMAGE_BADGE_BG);
-
-    // Layout: [icon] gap [text] centered horizontally.
-    icon.position.set(-contentW / 2 + icon.width / 2, 0);
-    label.position.set(contentW / 2 - label.width / 2, 0);
-
-    // Screen-space offset from the anchor: caret tip sits DAMAGE_BADGE_ABOVE_TEXT
-    // px above the hp text top (= HP_LABEL_UP + hpLabelHeight above anchor).
-    const screenOffsetY = -(HP_LABEL_UP + this.hpLabelHeight + DAMAGE_BADGE_ABOVE_TEXT + bh / 2 + DAMAGE_BADGE_CARET);
-
-    const outer = new Container();
-    const el = new Container();
-    el.addChild(g, icon, label);
-    outer.addChild(el);
-    // Initial screen position from the current viewport; syncBadgePositions
-    // keeps it updated every frame after the camera moves.
-    if (this.viewport) {
-      outer.position.set(
-        this.viewport.x + anchor.x * this.viewport.scale,
-        this.viewport.y + anchor.y * this.viewport.scale + screenOffsetY,
-      );
-    }
-    // Render in the unscaled overlay (zoom-independent, like HP bars).
-    // Position is set every frame by syncBadgePositions.
-    this.overlay.addChild(outer);
-    this.damageBadgeAnchors.set(outer, { worldX: anchor.x, worldY: anchor.y, screenOffsetY });
-    this.liveDamageBadges.add(outer);
-    // Fade the badge in (alpha only; the outer tracks the world position via
-    // syncBadgePositions).
-    el.alpha = 0;
-    this.badgeAnim.set(el, { phase: 'in', start: performance.now() });
-    this.ensureBadgeTick();
-  }
 
   setViewport(viewport: Viewport): void {
     this.viewport = viewport;
@@ -763,6 +489,7 @@ export class MapView {
       terrainSprite.position.set(p.x, p.y);
       terrainSprite.zIndex = 0;
       el.addChild(terrainSprite);
+      if (isWaterType(tile.terrain)) this.waveBobs.push({ sprite: terrainSprite, baseY: p.y, q: tile.q });
 
       const fogTex = this.textures.fogTextures.get(axialKey(tile))!;
       const fogSprite = new Sprite(fogTex.texture);
@@ -1042,8 +769,8 @@ export class MapView {
     const g = tv.roadGraphics;
     g.clear();
     const cy = p.y - tileElevation(tile, this.hexSize);
-    for (const e of orangeEdges) g.moveTo(e.x, e.y).lineTo(p.x, cy).stroke({ width: 3, color: ROAD_COLOR });
-    for (const e of waterEdges) g.moveTo(e.x, e.y).lineTo(p.x, cy).stroke({ width: 3, color: WATER_ROAD_COLOR });
+    for (const e of orangeEdges) g.moveTo(e.x, e.y).lineTo(p.x, cy).stroke({ width: 3, color: THEME.map.road });
+    for (const e of waterEdges) g.moveTo(e.x, e.y).lineTo(p.x, cy).stroke({ width: 3, color: THEME.map.waterRoad });
   }
 
   private portTileTexture(tile: MapTile): TileTexture {
@@ -1128,7 +855,7 @@ export class MapView {
         x: c.x,
         y: c.y - tileElevation(tile, this.hexSize),
       }));
-      const parts = this.addPulseBorder(axialKey(tile), corners, TUTORIAL_MARKER_COLOR);
+      const parts = this.addPulseBorder(axialKey(tile), corners, THEME.highlight);
       for (const p of parts) this.tutorialMarkerParts.push(p);
     }
     this.startTutorialPulse();
@@ -1166,7 +893,7 @@ export class MapView {
       const isSelected = key === selectedKey;
       if (isSelected) {
         if (localTurn && isExploredFor(tile, localPlayerIndex)) {
-          const parts = this.addPulseBorder(key, corners, SELECTED_BORDER_COLOR);
+          const parts = this.addPulseBorder(key, corners, THEME.map.selected);
           this.animateSelectedBorder(parts);
         }
         continue;
@@ -1214,7 +941,7 @@ export class MapView {
 
   private startAttackPulse(): void {
     for (const part of this.attackPulseParts) {
-      this.drawMarkerShape(part.g, part.x, part.y, part.base, SELECTED_BORDER_COLOR);
+      this.drawMarkerShape(part.g, part.x, part.y, part.base, THEME.map.selected);
     }
   }
 
@@ -1616,7 +1343,7 @@ export class MapView {
     const parts = this.tutorialMarkerParts;
     if (parts.length === 0) return;
     const draw = (width: number): void => {
-      for (const p of parts) this.strokePolyline(p.g, p.points, width, TUTORIAL_MARKER_COLOR, 1);
+      for (const p of parts) this.strokePolyline(p.g, p.points, width, THEME.highlight, 1);
     };
     draw(4);
     const ticker = this.app.ticker;
@@ -1643,7 +1370,7 @@ export class MapView {
       for (const {
         g,
         points
-      } of parts) this.strokePolyline(g, points, width, SELECTED_BORDER_COLOR, SELECTED_BORDER_ALPHA);
+      } of parts) this.strokePolyline(g, points, width, THEME.map.selected, SELECTED_BORDER_ALPHA);
     };
     draw(4);
     const ticker = this.app.ticker;
@@ -1684,7 +1411,7 @@ export class MapView {
         this.bonusAnimRemove = null;
         return;
       }
-      const t = (performance.now() - start) / 500;
+      const t = (performance.now() - start) / 3000;
       const offset = Math.sin(t * Math.PI * 2) * 5;
       for (const b of this.bonusBobs) {
         b.sprite.position.y = b.baseY + offset;
@@ -1749,81 +1476,48 @@ export class MapView {
     this.shipBusy.clear();
   }
 
-  spawnBonusClaim(x: number, y: number): void {
-    this.addParticleBurst(x, y, 10, [0xc30505, 0xff6363]);
-    this.startFireAnimation();
-  }
-
-  private addParticleBurst(x: number, y: number, count: number, colors: number[]): void {
-    const el = new Container();
-    const particles: FireParticle[] = [];
-    for (let i = 0; i < count; i++) {
-      const g = this.takeGraphics();
-      const p: FireParticle = {
-        g,
-        x: (Math.random() - 0.5) * 2 * FIRE_SPREAD_X,
-        vy: 24 + Math.random() * 24,
-        size: FIRE_SIZE_MIN + Math.random() * (FIRE_SIZE_MAX - FIRE_SIZE_MIN),
-        color: colors[i % colors.length]!,
-        life: Math.random(),
-        rate: 0.4 + Math.random() * 0.3,
-      };
-      el.addChild(g);
-      particles.push(p);
-      this.placeFireParticle(p);
-    }
-    this.fireEffects.push({ el, particles });
-    this.overlay.addChild(el);
-    this.overlayItems.push({ el, world: { x, y } });
-  }
-
-  private addFireEffect(x: number, y: number): void {
-    this.addParticleBurst(x, y, FIRE_PARTICLE_COUNT, FIRE_COLORS);
-  }
-
-  private placeFireParticle(p: FireParticle): void {
-    const t01 = p.life;
-    const fadeIn = Math.min(1, t01 / 0.15);
-    const fadeOut = t01 > 0.7 ? Math.max(0, (1 - t01) / 0.3) : 1;
-    p.g.position.set(p.x + Math.sin(t01 * Math.PI * 3) * 3, FIRE_BASE_Y - t01 * FIRE_RISE);
-    p.g.alpha = fadeIn * fadeOut;
-    p.g.clear().rect(-p.size / 2, -p.size / 2, p.size, p.size).fill(p.color);
-  }
-
-  private clearFireEffects(): void {
-    if (this.fireAnimRemove) {
-      this.fireAnimRemove();
-      this.fireAnimRemove = null;
-    }
-    this.fireEffects = [];
-  }
-
-  private startFireAnimation(): void {
-    if (this.fireAnimRemove) return;
+  /** Permanent gentle up-down wave for water tile surfaces: even-q diagonals
+   *  ride the crest while odd-q diagonals ride the trough, opposite phases. */
+  private startWaveAnimation(): void {
+    if (this.waveRemove || this.waveBobs.length === 0) return;
     const ticker = this.app.ticker;
-    const fn = (t: Ticker): void => {
-      if (this.fireEffects.length === 0) {
-        ticker.remove(fn);
-        this.fireAnimRemove = null;
-        return;
-      }
-      const dt = Math.min(0.1, t.deltaMS / 1000);
-      for (const fx of this.fireEffects) {
-        for (const p of fx.particles) {
-          p.life += p.rate * dt;
-          if (p.life >= 1) {
-            p.life = 0;
-            p.x = (Math.random() - 0.5) * 2 * FIRE_SPREAD_X;
-            p.vy = 24 + Math.random() * 24;
-            p.size = FIRE_SIZE_MIN + Math.random() * (FIRE_SIZE_MAX - FIRE_SIZE_MIN);
-            p.color = FIRE_COLORS[Math.floor(Math.random() * FIRE_COLORS.length)]!;
-          }
-          this.placeFireParticle(p);
-        }
+    const fn = (): void => {
+      const now = performance.now();
+      for (const b of this.waveBobs) {
+        if (b.sprite.destroyed) continue;
+        b.sprite.position.y = b.baseY + waterWaveOffset(b.q, now);
       }
     };
     ticker.add(fn);
-    this.fireAnimRemove = () => ticker.remove(fn);
+    this.waveRemove = () => ticker.remove(fn);
+  }
+
+  private stopWaveAnimation(): void {
+    if (this.waveRemove) {
+      const remover = this.waveRemove;
+      this.waveRemove = null;
+      remover();
+    }
+    for (const b of this.waveBobs) {
+      if (!b.sprite.destroyed) b.sprite.position.y = b.baseY;
+    }
+    this.waveBobs = [];
+  }
+
+  spawnBonusClaim(x: number, y: number): void {
+    this.fireEffects.claimSparks(x, y);
+  }
+
+  private addFireEffect(x: number, y: number): void {
+    this.fireEffects.add(x, y);
+  }
+
+  private clearFireEffects(): void {
+    this.fireEffects.clear();
+  }
+
+  private startFireAnimation(): void {
+    this.fireEffects.startTick();
   }
 
   private takeGraphics(): Graphics {
@@ -1868,13 +1562,9 @@ export class MapView {
     }
     this.overlayItems.length = 0;
     // Drop damage badges that are not mid-animation (a fade-out keeps running
-    // across this rebuild via badgeAnim; drawDamageBadges re-adds live ones).
-    for (const [outer] of this.damageBadgeAnchors) {
-      if (this.badgeAnim.has(outer.children[0] as Container)) continue;
-      this.liveDamageBadges.delete(outer);
-      outer.destroy({ children: true });
-      this.damageBadgeAnchors.delete(outer);
-    }
+    // across this rebuild in the badge layer; a live preview's badges stay so a
+    // re-render does not blink them back to alpha 0).
+    this.damageBadges.dropSettled();
   }
 
   private clearHighlights(): void {
@@ -2022,7 +1712,7 @@ export class MapView {
     for (const part of this.edgeMarkerParts) {
       part.g.clear();
       const pts = captureMarkerPoints(part.side, part.along, slide, part.W, part.H, CAPTURE_EDGE_MARKER_SIZE);
-      part.g.poly(pts).fill(CAPTURE_EDGE_MARKER_COLOR).stroke({ width: 2, color: white, alignment: 0 });
+      part.g.poly(pts).fill(THEME.map.selected).stroke({ width: 2, color: white, alignment: 0 });
     }
   }
 

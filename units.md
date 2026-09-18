@@ -1,163 +1,155 @@
 # Units
 
-Balance reference for all unit types. This document is a **proposal**: it scales every damage-related value (HP, attack,
-damage rolls, defense) **×10** for finer balance, adds a new **defense** characteristic (not implemented yet), and
-adjusts a few costs/abilities. Movement, attack range and costs are **not** scaled.
-
-## Defense rule
-
-Every unit has `defense` (`Def`), an armour value used by the Polytopia-style
-force-ratio combat formula (see GAME.md → Unit actions → Attack):
-
-- `attackForce = attack × hp / maxHp`
-- `defenseForce = defense × hp / maxHp × defenseBonus`
-- `totalDamage = attackForce + defenseForce`
-- damage to the target: `round(attackForce / totalDamage × attack × 1.5)`
-- counter damage: `round(defenseForce / totalDamage × defense × 1.5)`
-
-`defenseBonus` is `1 + tile reduction / 10`, where tile reduction is the
-existing metric (own village +5 → ×1.5, + village wall +3 → ×1.8, temple
-protections +10 → ×2.0).
-
-Notes:
-
-- A unit standing in **its own village** gains **+10 defense** (i.e. the
-  village +5 counts as 0.5 of its raw defense).
-- The counter is defense-driven: a unit's retaliation scales with its own
-  defense stat and the incoming force ratio (no minimum-damage floor).
-- Attack damage still scales with the attacker's current HP (`hp / maxHp`).
-
-## Land units
-
-| Unit      | HP  | Atk   | Def | Move | Atk range | Cost            | Notes                                                          |
-|-----------|-----|-------|-----|------|-----------|-----------------|----------------------------------------------------------------|
-| Warrior   | 50  | 20    | 10  | 1    | 1         | 4               | Starting/cheap garrison                                        |
-| Rider     | 40  | 20    | 10  | 4    | 1         | 6               | Hit-and-run: may move after attacking                          |
-| Archer    | 30  | 20    | 10  | 1    | 2         | 6               | Ranged; never pursues a kill                                   |
-| Swordsman | 80  | 40    | 20  | 1    | 1         | 15 + 3⛏        | Heavy melee                                                    |
-| Shield    | 100 | 10    | 20  | 1    | 1         | 10 + 3⛏        | Defense-driven counter; can't attack after moving              |
-| Catapult  | 30  | 50    | 0   | 1    | 4         | 30 + 20🪵 + 5⛏ | Siege; fixed 50; can't attack after moving                     |
-| Knight    | 50  | 50    | 10  | 3    | 1         | 20 + 10⛏       | Extra attack after a kill                                      |
-
-All values here are **10× the previous doc / current build**, and the `Def` values give every melee/light unit armour
-(10 on warriors/riders/archers, 20 on melee elites/shields) that the old whole-point scale could not represent.
+Balance reference for all unit types. Values here match the live build: damage-related stats (HP, attack, defense)
+are on a ×10 scale for fine armour steps, and combat uses the Polytopia-style force-ratio formula described below.
+Numbers in the matchup notes are **full-HP, open-ground single trades** computed from that formula; villages,
+walled villages and temple protections shift them (see Defense rule). All values come from `src/game/units.ts`,
+`src/game/ship.ts` and `src/game/combat.ts`.
 
 **Resources legend:** 🪵 wood, ⛏ ore. Costs without a resource icon are money only.
 
+## Defense rule
+
+Every unit has `defense` (`Def`), an armour value used by the force-ratio combat formula:
+
+- `attackForce  = attack × hp / maxHp`
+- `defenseForce = defense × hp / maxHp × defenseBonus`
+- `totalDamage  = attackForce + defenseForce`
+- damage to the target: `round(attackForce / totalDamage × attack × 1.5)`
+- counter damage: `round(defenseForce / totalDamage × defense × 1.5)`
+
+`defenseBonus = 1 + tile reduction / 10` — the defender's terrain protections:
+
+- own village (+5) → ×1.5
+- walled own village (+3 more → +8) → ×1.8
+- temple protections (+10) → ×2.0
+
+A ship's armour is its crew's `Def`; the ship itself adds none.
+
+## Land units
+
+| Unit      | HP  | Atk | Def | Move | Atk range | Cost             | Notes                                            |
+|-----------|-----|-----|-----|------|-----------|------------------|--------------------------------------------------|
+| Warrior   | 50  | 20  | 10  | 1    | 1         | 4                | Cheapest garrison                                |
+| Rider     | 40  | 20  | 7   | 4    | 1         | 6                | Hit-and-run: may move after attacking            |
+| Archer    | 40  | 20  | 7   | 1    | 2         | 6                | Ranged; chips in from range 2                    |
+| Swordsman | 80  | 40  | 20  | 1    | 1         | 10 + 2⛏         | Heavy melee                                      |
+| Shield    | 80  | 7   | 20  | 1    | 1         | 8 + 2⛏          | Defense-driven counter; can't attack after moving |
+| Catapult  | 30  | 50  | 0   | 1    | 4         | 15 + 10🪵 + 3⛏  | Siege; can't attack after moving                 |
+| Knight    | 60  | 40  | 7   | 3    | 1         | 14 + 5⛏         | Extra attack after a kill                        |
+
 ### Neutral reference unit
 
-| Unit   | HP  | Atk | Def | Move      | Atk range | Cost           |
-|--------|-----|-----|-----|-----------|-----------|----------------|
-| Pirate | 80  | 15  | 5   | 5 (water) | 3         | — (AI-spawned) |
+| Unit   | HP | Atk | Def | Move      | Atk range | Cost           |
+|--------|----|-----|-----|-----------|-----------|----------------|
+| Pirate | 80 | 15  | 5   | 5 (water) | 3         | — (AI-spawned) |
 
-Pirates are not spawnable and sit outside the player balance graph. Their Def 5 is lighter than player light armour (10),
-so their threat comes from HP and numbers rather than armour.
+Pirates are not spawnable and sit outside the player balance graph. Their Def 5 is lighter than player light armour
+(7–10), so their threat comes from HP and numbers rather than armour.
 
 ## Naval units (ships)
 
-Ships carry a land unit as crew: **HP equals the crew's HP**, and damage scales with the crew's remaining HP. The level
-determines movement, attack and range.
+Ships carry a land unit as crew: **HP equals the crew's HP**, and damage scales with the crew's remaining HP. The
+level determines movement, attack and range.
 
-| Ship level | HP     | Atk | Def | Move | Atk range | Upgrade cost to next level |
-|------------|--------|-----|-----|------|-----------|----------------------------|
-| 1          | crew's | 10  | 0   | 2    | 2         | 8 + 4🪵 (→ lvl 2)          |
-| 2          | crew's | 20  | 0   | 3    | 2         | 16 + 8🪵 + 2⛏ (→ lvl 3)   |
-| 3          | crew's | 30  | 0   | 4    | 3         | —                          |
+| Ship level | HP     | Atk | Def     | Move | Atk range | Upgrade cost to next level |
+|------------|--------|-----|---------|------|-----------|----------------------------|
+| 1          | crew's | 10  | crew's  | 2    | 2         | 8 + 4🪵 (→ lvl 2)          |
+| 2          | crew's | 20  | crew's  | 3    | 2         | 16 + 8🪵 + 2⛏ (→ lvl 3)   |
+| 3          | crew's | 30  | crew's  | 4    | 3         | —                          |
 
-Ships have no armour of their own (`Def 0`); a ship's effective Def is its crew's, i.e. the original land unit's
-defense, mirroring how HP already works. A level-1 ship is created by moving a unit onto its own **port** (10🪵 + 30 + 2⛏),
-which ends the turn.
+Ships have no armour of their own: a ship's effective Def is its crew's, exactly as its HP is the crew's. Any unit
+that moves onto your **own port** embarks for free — the port is what costs 10🪵 + 30 + 2⛏ to build — and embarking
+uses the unit's action for the turn. Upgrading a ship costs wood and ore at an owned port.
 
 ---
 
 ## How each type is countered
 
-Numbers below describe clean conditions on open ground under the current
-force-ratio combat (defense as a defense force, no minimum floor). Real fights
-depend on terrain, villages, HP and numbers — treat the bullet as "this type
-is the reliable answer", not "always wins 1v1".
+Numbers below describe clean, full-HP, open-ground conditions under the current force-ratio combat. Real fights
+depend on terrain, villages, HP and numbers — treat the bullet as "this type is the reliable answer", not a
+guaranteed 1v1 outcome.
 
-### Warrior (50 HP, 0 Def)
+### Warrior (50 HP, 10 Def)
 
-- **Countered by:** any ranged or costlier melee. Archer kites it forever (20 dmg/shot at range 2; Warrior cannot
-  retaliate and cannot close a same-speed kiter; 3 shots kill it). Swordsman (40 → 2 hits) and Knight (50 → one-shot)
-  crush it in melee.
+- **Countered by:** any ranged or costlier melee. Archer kites it forever (20 dmg/shot at range 2; a Warrior can
+  never retaliate or out-trade that — 3 shots kill it). Swordsman (48 → 2 hits) and Knight crush it in melee; the
+  Knight even one-shots archers/riders on the same charge.
 - **Why:** it is the cheapest unit; its only virtues are price and availability. Never trade it evenly into
   swordsmen/shields.
 
-### Rider (40 HP, 5 Def)
+### Rider (40 HP, 7 Def)
 
-- **Countered by: Shield.** Rider deals 20 − Shield's Def 20 = **min 10** per hit, while the Shield's 50-based counter
-  strips ~40 (after Rider's Def 5) and kills the 40-HP Rider in one counter. Swordsman (40 − 5 = 35 → two hits) and
-  Catapult (35–55 → one volley, except a low roll) also punish it if caught; Rider escapes them by mobility.
-- **Why:** low HP (40) and only light armour (5) make it fragile the moment it cannot disengage.
+- **Countered by: Shield.** A Rider hitting a Shield deals 15 but takes a 15 counter; it dies to three counters
+  while the 80-HP Shield never buckles. If caught instead, Swordsman (51) and Knight (51) one-shot it, and Catapult
+  kills it from range on a guaranteed 66.
+- **Why:** fast, but 40 HP and only light armour (7) make it fragile the moment it cannot disengage.
 - **How to play against it:** wall approach lanes with a Shield; bait its hit-and-run into terrain where it must stay
   adjacent.
 
-### Archer (30 HP, 5 Def)
+### Archer (40 HP, 7 Def)
 
-- **Countered by:** **Knight** (50 − 5 = 45 → one-shot) and **Catapult** (range 4, 35–55 → one-shot), which cross or
-  out-range its 2-hex reach before it lands more than a volley. **Rider** (2 hits) runs it down if it cannot be
-  screened.
-- **Why:** 30 HP and armour 5 win only while the enemy is outside its own reach.
+- **Countered by:** **Knight** (51 → one-shot) and **Catapult** (66 → one-shot), which cross or out-range its 2-hex
+  reach before it lands more than a volley. **Rider** (22 → 2 hits) runs it down if it cannot be screened.
+- **Why:** 40 HP and armour 7 win only while the enemy is outside its reach.
 - **How to play against it:** close with cavalry rather than grinding through melee that it can kite.
 
-### Swordsman (80 HP, 10 Def)
+### Swordsman (80 HP, 20 Def)
 
-- **Countered by:** **Archer/Catapult** by out-ranging it (it has range 1, move 1, so it can never force an exchange on
-  its terms) and **Shield** in melee (see below). Swordsman's Def 10 makes archers deal only 10/shot — grinding one down
-  takes several archers, so treat it as "ranged focus-fire + walls".
-- **Why:** slow; strong only in a straight melee trade.
-- **How to play against it:** never duel it with equal melee; screen it or shoot it.
+- **Countered by:** ranged focus-fire. Archer volleys land 15/shot — one archer is a slow grind (six shots) but the
+  Swordsman can never force a close-range exchange on its terms. Catapult kills it in two volleys (54 each). On the
+  ground, hold it with a Shield screen (it takes a 10 counter every trade) until the range lands; never duel it with
+  equal melee.
+- **Why:** strong only in a straight melee trade.
+- **How to play against it:** screen it or shoot it.
 
-### Shield (100 HP, 20 Def)
+### Shield (80 HP, 20 Def)
 
-- **Countered by: Catapult.** A volley is 40–60 − Def 20 = 20–40, so a lone Shield falls to ~3–4 ranged volleys while it
-  crawls into range. Shields cannot counter what they cannot reach, which is why the catapult is the dedicated
-  anti-armour answer.
-- **Why:** Def 20 + 100 HP + a 50-based counter makes it unbeatable in melee and grinds down single archers; its
-  weakness is that it has no ranged answer.
-- **How to play against it:** siege it from range; do **not** feed it riders — its counter one-shots them.
+- **Countered by: Catapult.** A volley lands 54 and two are lethal (108). Shields cannot counter what they cannot
+  reach, which is why the catapult is the dedicated anti-armour answer.
+- **Why:** 20 Def + 80 HP + a counter that returns far more than its 7 attack makes it unassailable against light
+  units (a 15 counter strips Riders) and a superb lane wall — but it loses the 1v1 to elite melee (Swordsman and
+  Knight both land 40 per trade against only a 10 counter).
+- **How to play against it:** siege it from range; do **not** feed it riders — its counter strips them.
 
 ### Catapult (30 HP, 0 Def)
 
-- **Countered by:** **Rider/Knight** — flanking cavalry crosses its range in one or two turns while it is immobile
-  (Knight 50 → one-shot). A committed catapult still gets a volley off first (40–60; 35–55 vs a Rider kills it on all
-  but a low roll), so engage the same turn it fires or from outside its arc.
+- **Countered by:** anything that closes its range 4 — **Knight** (60 → one-shot) and **Rider** (30 → one-shot)
+  cross it in a turn while it cannot attack after moving. A committed catapult still gets a volley off first though:
+  those volleys one-shot riders/archers/knights (66) and 2-volley the walls, so engage the turn it fires, never
+  advance straight into its arc.
 - **Why:** 30 HP, no armour, and it cannot attack on a turn it moved.
-- **How to play against it:** attack the same turn it is committed to an immobile siege line; never advance straight
-  into its range arc.
+- **How to play against it:** attack the same turn it is committed to an immobile siege line, from two directions.
 
-### Knight (50 HP, 10 Def)
+### Knight (60 HP, 7 Def)
 
-- **Countered by: Shield.** Knight's 50 − Def 20 = 30 per hit, but the Shield answers every exchange with a counter
-  scaled to its own HP: 25, then 20, then 15 after Knight's Def 10. The Knight survives two counters, then dies — the
-  Shield ends the 1v1 with ~50 HP left. Any second attacker or archer volley tips it, so never send one Knight alone
-  into a Shield.
-- **Why:** elite stats, but modest HP (50) and Def 10 against a dedicated wall.
-- **How to play against it:** shields, ideally backed by a second unit; otherwise screen archers/catapults from its
-  3-move reach. Do not let it chain kills — every kill grants it another attack.
+- **Countered by:** ranged pressure it cannot close under. Catapult (66 → one-shot) ends it outright, and Archers
+  chip 22/shot — more than one archer in a screen is fatal, because a Knight can only chain kills through a single
+  target and any second attacker gets a free volley.
+- **Why:** elite offense, but moderate HP (60) and light armour (7) against dedicated ranged.
+- **How to play against it:** archers/catapults behind a Shield screen; do not feed it a kill-prone target it can
+  chain.
 
-### Pirate (reference, 100 HP, 5 Def)
+### Pirate (80 HP, 5 Def)
 
-- **Countered by:** coastal **catapults** (range 4, 35–55 per volley after Def 5) and concentrated **ships** — a
-  level-3 ship matches its range (3) and deals 25/volley, while level 1–2 ships are out-ranged by the Pirate's range 3
-  and should not duel it alone. Its 100 HP makes it a multi-volley target. Killing it scores 30.
+- **Countered by:** concentrated **ships** and coastal **catapults**. A level-3 ship matches its range (3) and lands
+  39/volley (three hits), while level 1–2 ships are out-ranged (2 vs 3) and should not duel it alone. A catapult
+  volley is 68 (two to kill). Its 80 HP makes it a multi-volley target, and killing it scores 30.
 
 ### Ships
 
-- **Countered by:** higher ship level (out-guns and out-ranges), **pirates** (capture attempts), and coastal
-  **catapults** while within range 4 of shore. A ship's weakness is its crew: sink the HP pool (crew HP, e.g. 30 for an
-  Archer crew) and the whole investment is lost, so hunting low-HP crews is cheap.
+- **Countered by:** a higher ship level (out-guns and out-ranges), **pirates** (which lurk in water lanes and out-gun
+  low-level ships), and coastal **catapults** while within range 4 of shore. A ship's weakness is its crew: sink the
+  crew HP pool and the whole investment is lost, so hunting low-HP crews (e.g. an archer crew at 40 HP) is cheap.
 
 ---
 
 ## Balance intent
 
-- **No super-strong unit:** every strong stat line has a cheap structural answer (Knight → Shield, Catapult → flanking
-  cavalry, Shield → siege, melee → ranged kiting). Costs already gate the top end: Swordsman/Catapult/Knight require ore
-  and skills.
-- **Every type has an effective counter type** (the "Countered by" bullets above), giving a counter web rather than one
-  dominant unit.
-- The ×10 scale exists to allow **fine armour steps**: light armour (5) on fragile units, medium (10) on elites, heavy
-  (20) on the wall, instead of the old all-or-nothing 0/1/2.
+- **No super-strong unit:** every strong stat line has a structural answer (Catapult → flanking cavalry, Knight →
+  ranged focus-fire, Shield → siege, Swordsman → ranged kiting). Costs already gate the top end: Swordsman,
+  Catapult and Knight require ore and skills.
+- **Every type has an effective counter type** (the "Countered by" bullets above), giving a counter web rather than
+  one dominant unit.
+- The ×10 scale exists to allow **fine armour steps**: light armour (7) on fragile units, medium (10) on warriors,
+  heavy (20) on melee elites/walls, instead of an all-or-nothing 0/1/2.

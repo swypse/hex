@@ -1,95 +1,7 @@
 import http from 'node:http';
-import crypto from 'node:crypto';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { WebSocketServer } from 'ws';
-
-const rooms = new Map();
-
-function send(ws, obj) {
-  if (ws.readyState === 1) ws.send(JSON.stringify(obj));
-}
-
-function clientId() {
-  return 'guest-' + crypto.randomBytes(6).toString('base64url');
-}
-
-function registerHost(conn, code) {
-  let room = rooms.get(code);
-  if (!room) {
-    room = { host: null, clients: new Map() };
-    rooms.set(code, room);
-  }
-  if (room.host && room.host !== conn) {
-    send(conn.ws, { type: 'error', message: 'This room code is already in use.' });
-    return;
-  }
-  conn.role = 'host';
-  conn.code = code;
-  room.host = conn;
-  send(conn.ws, { type: 'registered', id: 'host' });
-}
-
-function registerClient(conn, code) {
-  const room = rooms.get(code);
-  if (!room || !room.host) {
-    send(conn.ws, { type: 'room-not-found' });
-    return;
-  }
-  const id = clientId();
-  conn.role = 'client';
-  conn.code = code;
-  conn.id = id;
-  room.clients.set(id, conn);
-  send(conn.ws, { type: 'registered', id });
-  send(room.host.ws, { type: 'client-joined', clientId: id });
-}
-
-function relayData(conn, msg) {
-  const room = rooms.get(conn.code);
-  if (!room) return;
-  if (conn.role === 'host') {
-    if (msg.to === 'all') {
-      for (const client of room.clients.values()) {
-        send(client.ws, { type: 'data', from: 'host', data: msg.data });
-      }
-    } else {
-      const client = room.clients.get(msg.to);
-      if (client) send(client.ws, { type: 'data', from: 'host', data: msg.data });
-    }
-  } else if (conn.role === 'client') {
-    if (room.host) send(room.host.ws, { type: 'data', from: conn.id, data: msg.data });
-  }
-}
-
-function dropRoom(room) {
-  if (!room || room.host || room.clients.size !== 0) return;
-  for (const [code, r] of rooms) {
-    if (r === room) {
-      rooms.delete(code);
-      return;
-    }
-  }
-}
-
-function handleClose(conn) {
-  if (conn.role === 'host' && conn.code) {
-    const room = rooms.get(conn.code);
-    if (room && room.host === conn) {
-      room.host = null;
-      for (const client of room.clients.values()) {
-        send(client.ws, { type: 'host-left' });
-      }
-      dropRoom(room);
-    }
-  } else if (conn.role === 'client' && conn.code && conn.id) {
-    const room = rooms.get(conn.code);
-    if (room) {
-      room.clients.delete(conn.id);
-      if (room.host) send(room.host.ws, { type: 'client-left', clientId: conn.id });
-      dropRoom(room);
-    }
-  }
-}
+import { RelayCore } from './relay-core.mjs';
 
 function attachRelay(wss) {
   const interval = setInterval(() => {
@@ -106,13 +18,26 @@ function attachRelay(wss) {
   return () => clearInterval(interval);
 }
 
+function makeConn(ws) {
+  return {
+    ws,
+    role: null,
+    code: null,
+    id: null,
+    send(obj) {
+      if (ws.readyState === 1) ws.send(JSON.stringify(obj));
+    },
+  };
+}
+
 function wireConnections(wss) {
+  const core = new RelayCore();
   wss.on('connection', (ws) => {
     ws.isAlive = true;
     ws.on('pong', () => {
       ws.isAlive = true;
     });
-    const conn = { ws, role: null, code: null, id: null };
+    const conn = makeConn(ws);
     ws.on('message', (raw) => {
       let msg;
       try {
@@ -121,13 +46,13 @@ function wireConnections(wss) {
         return;
       }
       if (msg.type === 'register') {
-        if (msg.role === 'host') registerHost(conn, String(msg.code ?? '').toUpperCase());
-        else if (msg.role === 'client') registerClient(conn, String(msg.code ?? '').toUpperCase());
+        if (msg.role === 'host') core.registerHost(conn, String(msg.code ?? '').toUpperCase());
+        else if (msg.role === 'client') core.registerClient(conn, String(msg.code ?? '').toUpperCase());
       } else if (msg.type === 'data' && conn.role) {
-        relayData(conn, msg);
+        core.relayData(conn, msg);
       }
     });
-    ws.on('close', () => handleClose(conn));
+    ws.on('close', () => core.handleClose(conn));
   });
 }
 
