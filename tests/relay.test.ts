@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
 import { WebSocket as WsWebSocket } from 'ws';
 import { createRelayServer, type RelayServerHandle } from '../server/relay.mjs';
-import { RelayHostSession, RelayClientSession, type WebSocketLike } from '../src/net/relaySession';
-import type { HostMessage } from '../src/net/peerSession';
+import { RelayHostSession, RelayClientSession, type WebSocketLike } from '../src/net/relay-session';
+import type { HostMessage } from '../src/net/peer-session';
 
 let relay: RelayServerHandle;
 
@@ -254,3 +254,77 @@ describe('WebSocket relay', () => {
     host2.close();
   }, 15000);
 });
+
+it('a reloaded client re-joins the same room and receives host data again', async () => {
+    const hostReady = deferred();
+    const hostJoins: string[] = [];
+    const hostLeft: string[] = [];
+    const host = new RelayHostSession(
+      {
+        onReady: () => hostReady.resolve(),
+        onClientJoined: () => {},
+        onData: (clientId, msg) => {
+          if (msg.type === 'join') {
+            hostJoins.push(clientId);
+            host.sendTo(clientId, { type: 'state', state: {} as never, playerIndex: 1 });
+          }
+        },
+        onClientClosed: (clientId) => hostLeft.push(clientId),
+        onError: () => {},
+      },
+      relay.url,
+      socketFactory,
+    );
+    host.open('RELOAD1');
+    await withTimeout(hostReady.promise);
+
+    const firstRegistered = deferred<string>();
+    const firstGotState = deferred<string>();
+    const c1 = new RelayClientSession(
+      {
+        onRegistered: (id) => firstRegistered.resolve(id),
+        onJoined: () => {},
+        onData: (msg) => {
+          if (msg.type === 'state') firstGotState.resolve('state');
+        },
+        onClose: () => {},
+        onError: () => {},
+      },
+      relay.url,
+      socketFactory,
+    );
+    c1.join('RELOAD1', 'Guest');
+    const c1Id = await withTimeout(firstRegistered.promise);
+    await withTimeout(firstGotState.promise);
+
+    // The page "reloads": old socket closes, a brand new session joins with the
+    // same code and name.
+    c1.close();
+    await new Promise((r) => setTimeout(r, 150));
+
+    const c2Registered = deferred<string>();
+    const c2GotState = deferred<string>();
+    const c2 = new RelayClientSession(
+      {
+        onRegistered: (id) => c2Registered.resolve(id),
+        onJoined: () => {},
+        onData: (msg) => {
+          if (msg.type === 'state') c2GotState.resolve('state');
+        },
+        onClose: () => {},
+        onError: () => {},
+      },
+      relay.url,
+      socketFactory,
+    );
+    c2.join('RELOAD1', 'Guest');
+
+    const c2Id = await withTimeout(c2Registered.promise);
+    await withTimeout(c2GotState.promise);
+
+    expect(c2Id).not.toBe(c1Id);
+    expect(hostJoins).toEqual([c1Id, c2Id]);
+    expect(hostLeft).toEqual([c1Id]);
+    c2.close();
+    host.close();
+  }, 15000);

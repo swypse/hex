@@ -1,5 +1,5 @@
 import { hexDistance } from './hex';
-import { GameMap, MapTile } from './mapGen';
+import { GameMap, MapTile } from './map-gen';
 import { isShip, shipAttack, shipAttackDistance } from './ship';
 import { isExploredFor } from './explore';
 import { hasSkill } from './skills';

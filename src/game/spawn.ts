@@ -1,4 +1,4 @@
-import { GameMap, MapTile } from './mapGen';
+import { GameMap, MapTile } from './map-gen';
 import { Player } from './players';
 import { canAfford, pay } from './resources';
 import { hasSkill } from './skills';

@@ -1,4 +1,4 @@
-import { GameMap, MapTile } from './mapGen';
+import { GameMap, MapTile } from './map-gen';
 import { Unit, unitMaintenance } from './units';
 import { villageCapacity, unitsInVillage, exploreVillageSight } from './village';
 import { isVillageRoadConnected } from './roads';

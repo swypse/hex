@@ -8,6 +8,7 @@ export default {
   'start.multi': 'Multiplayer',
   'start.tutorial': 'Tutorial',
   'start.resume': 'Resume',
+  'start.rejoinMatch': 'Rejoin match',
   'start.about': 'About',
   'start.settings': 'Settings',
   'start.aboutTitle': 'About',
@@ -489,4 +490,5 @@ export default {
   'help.bridge.road': 'Acts as its owner\'s road and connects to neighbouring roads.',
   'help.bridge.build': 'Requires the Bridges skill to build; costs {wood} wood, {stone} stone and {money} money. Uses no village building slot.',
   'help.bridge.score': 'Worth {score} game-end score to its owner.',
+  'error.toast': 'Something went wrong (details in the console).',
 } as const;

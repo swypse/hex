@@ -7,7 +7,7 @@ import { decodePng, encodePng, finalizeAtlas } from './packSkills.mjs';
 
 export const SOURCE_DIR_URL = new URL('../src/assets/action-buttons/', import.meta.url);
 export const ATLAS_URL = new URL('../public/textures/action-buttons-atlas.png', import.meta.url);
-export const MANIFEST_URL = new URL('../src/game/actionButtonAtlasData.gen.ts', import.meta.url);
+export const MANIFEST_URL = new URL('../src/game/action-button-atlas-data.gen.ts', import.meta.url);
 
 export const ACTION_BUTTON_COLS = 5;
 export const ACTION_BUTTON_CELL = 120;

@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { generateMap, type GameMap } from '../src/game/mapGen';
-import { makeTestMap, tileAt, makeUnit } from './helpers/testMap';
+import { generateMap, type GameMap } from '../src/game/map-gen';
+import { makeTestMap, tileAt, makeUnit } from './helpers/test-map';
 import { Simulator } from '../src/game/simulator';
 import { buildPlayers } from '../src/game/players';
 import { Tribe } from '../src/game/tribes';
 import { SeededRandom } from '../src/util/random';
-import { isWaterType, TileType } from '../src/game/tileTypes';
+import { isWaterType, TileType } from '../src/game/tile-types';
 import { hexDistance, hexNeighbors } from '../src/game/hex';
 import {
   bonusEligibleFor,

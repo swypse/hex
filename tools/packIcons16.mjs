@@ -7,7 +7,7 @@ import { decodePng, encodePng, finalizeAtlas } from './packSkills.mjs';
 
 export const SOURCE_DIR_URL = new URL('../src/assets/16/', import.meta.url);
 export const ATLAS_URL = new URL('../public/textures/icons-16-atlas.png', import.meta.url);
-export const MANIFEST_URL = new URL('../src/game/icons16AtlasData.gen.ts', import.meta.url);
+export const MANIFEST_URL = new URL('../src/game/icons16-atlas-data.gen.ts', import.meta.url);
 
 export const ICONS16_COLS = 7;
 export const ICONS16_CELL = 16;

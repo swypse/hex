@@ -7,7 +7,7 @@ import { decodePng, encodePng, finalizeAtlas } from './packSkills.mjs';
 
 export const SOURCE_DIR_URL = new URL('../src/assets/achivements/', import.meta.url);
 export const ATLAS_URL = new URL('../public/textures/achievements-atlas.png', import.meta.url);
-export const MANIFEST_URL = new URL('../src/game/achievementAtlasData.gen.ts', import.meta.url);
+export const MANIFEST_URL = new URL('../src/game/achievement-atlas-data.gen.ts', import.meta.url);
 
 export const ACHIEVEMENT_COLS = 3;
 export const ACHIEVEMENT_CELL = 164;

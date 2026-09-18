@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { GameMap, MapTile, Settlement } from '../src/game/mapGen';
+import { GameMap, MapTile, Settlement } from '../src/game/map-gen';
 import { Player } from '../src/game/players';
-import { TileType } from '../src/game/tileTypes';
+import { TileType } from '../src/game/tile-types';
 import { villageCapacity, unitsInVillage } from '../src/game/village';
 import { spawnUnit } from '../src/game/spawn';
 

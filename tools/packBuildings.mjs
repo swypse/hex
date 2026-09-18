@@ -7,7 +7,7 @@ import { decodePng, encodePng, finalizeAtlas } from './packSkills.mjs';
 
 export const SOURCE_DIR_URL = new URL('../src/assets/buildings/', import.meta.url);
 export const ATLAS_URL = new URL('../public/textures/buildings-atlas.png', import.meta.url);
-export const MANIFEST_URL = new URL('../src/game/buildingsAtlasData.gen.ts', import.meta.url);
+export const MANIFEST_URL = new URL('../src/game/buildings-atlas-data.gen.ts', import.meta.url);
 
 export const BUILDINGS_COLS = 6;
 export const BUILDINGS_ATLAS_FILE = 'buildings-atlas.png';

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { Simulator } from '../src/game/simulator';
-import { makeTestMap, tileAt, makeUnit } from './helpers/testMap';
+import { makeTestMap, tileAt, makeUnit } from './helpers/test-map';
 import { buildPlayers } from '../src/game/players';
 import { Tribe } from '../src/game/tribes';
 import { SeededRandom } from '../src/util/random';

@@ -9,7 +9,7 @@ import pngquant from 'pngquant-bin';
 
 export const SOURCE_DIR_URL = new URL('../src/assets/skills/', import.meta.url);
 export const ATLAS_URL = new URL('../public/textures/skills-atlas.png', import.meta.url);
-export const MANIFEST_URL = new URL('../src/game/skillAtlasData.gen.ts', import.meta.url);
+export const MANIFEST_URL = new URL('../src/game/skill-atlas-data.gen.ts', import.meta.url);
 
 export const ATLAS_COLS = 5;
 export const ATLAS_CELL = 120;

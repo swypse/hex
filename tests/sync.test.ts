@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { generateMap } from '../src/game/mapGen';
+import { generateMap } from '../src/game/map-gen';
 import { buildMultiplayerPlayers } from '../src/game/players';
 import { Simulator } from '../src/game/simulator';
 import { SeededRandom } from '../src/util/random';

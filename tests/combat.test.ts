@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { GameMap, MapTile, Settlement } from '../src/game/mapGen';
+import { GameMap, MapTile, Settlement } from '../src/game/map-gen';
 import { attackDamage, attackableTargets, chooseBestAttack, resolveCombat, defenseBonusFor, MISS_CHANCE, missChanceFor, performAttack, tradeIsFavorable, COMBAT_SCALE } from '../src/game/combat';
 import type { Player } from '../src/game/players';
-import { TileType } from '../src/game/tileTypes';
+import { TileType } from '../src/game/tile-types';
 import { Unit, UNIT_TYPES, MAX_HP } from '../src/game/units';
 
 function makeTile(

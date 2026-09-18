@@ -1,14 +1,14 @@
 import { describe, it, expect } from 'vitest';
-import { makeTestMap, tileAt, makeUnit } from './helpers/testMap';
+import { makeTestMap, tileAt, makeUnit } from './helpers/test-map';
 import { Simulator } from '../src/game/simulator';
 import { buildPlayers } from '../src/game/players';
 import { Tribe } from '../src/game/tribes';
 import { SeededRandom } from '../src/util/random';
 import { canAttack, canHeal, canMove } from '../src/game/units';
-import { TileType } from '../src/game/tileTypes';
+import { TileType } from '../src/game/tile-types';
 import { isExploredFor } from '../src/game/explore';
 import { hexNeighbors } from '../src/game/hex';
-import { quickCaptureScore, quickCaptureTurnsCount } from '../src/game/gameMode';
+import { quickCaptureScore, quickCaptureTurnsCount } from '../src/game/game-mode';
 
 describe('Simulator commands', () => {
   it('move moves a unit, marks moved, emits unitMoved', () => {

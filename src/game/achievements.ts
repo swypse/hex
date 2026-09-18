@@ -1,5 +1,5 @@
 import { isExploredFor } from './explore';
-import { tileMapByKey, type GameMap, type MapTile } from './mapGen';
+import { tileMapByKey, type GameMap, type MapTile } from './map-gen';
 import type { Player } from './players';
 import { awardScore, EMPTY_STATS, type PlayerStats } from './score';
 import { SKILLS } from './skills';

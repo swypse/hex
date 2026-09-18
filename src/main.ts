@@ -1,10 +1,11 @@
 import { Application } from 'pixi.js';
-import { initNavigation, useGameStore } from './store/gameStore';
-import { readJoinCode, setPendingJoin } from './net/joinLink';
-import { ScreenManager } from './ui/ScreenManager';
-import { gameController } from './controller/gameController';
-import { loadBitmapFonts } from './ui/kit/bitmapFonts';
-import { preventCanvasContextMenu } from './preventCanvasContextMenu';
+import { initNavigation, useGameStore } from './store/game-store';
+import { readJoinCode, setPendingJoin } from './net/join-link';
+import { ScreenManager } from './ui/screen-manager';
+import { gameController } from './controller/game-controller';
+import { loadBitmapFonts } from './ui/kit/bitmap-fonts';
+import { preventCanvasContextMenu } from './prevent-canvas-context-menu';
+import { initErrorReporter } from './error-reporter';
 
 function preventBrowserZoom(): void {
   window.addEventListener(
@@ -36,8 +37,11 @@ async function boot(): Promise<void> {
     antialias: true,
     resolution: window.devicePixelRatio,
     autoDensity: true,
+    preference: 'webgpu',
   });
   document.getElementById('root')!.appendChild(app.canvas);
+  // Global error/unhandled-rejection reporting + in-game notice.
+  initErrorReporter(app);
   // Long-press (mobile) and right-click (desktop) on the canvas would otherwise
   // open the browser's "Save image as…" context menu.
   preventCanvasContextMenu(app.canvas);

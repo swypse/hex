@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { createSaveRepository } from '../src/storage/saveGame';
-import { type StorageService } from '../src/storage/storageService';
+import { createSaveRepository } from '../src/storage/save-game';
+import { type StorageService } from '../src/storage/storage-service';
 import { type GameStateSnapshot } from '../src/game/state';
-import { TileType } from '../src/game/tileTypes';
+import { TileType } from '../src/game/tile-types';
 
 class FakeStorage implements StorageService {
   private data = new Map<string, string>();

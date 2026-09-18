@@ -16,7 +16,6 @@ Base project information for AI agents.
 - Vite (dev/build: `npm run dev`, `npm run build`)
 - Vitest (tests: `npm test`), `npm run typecheck`
 
-## Codestyle
+## Codestyle and rules
 
-- Private member names of typescript classes starts with _
-- Files and dirs naming convention: kebab-case
+See [pixijs-typescript-game-development-rules.md](docs/pixijs-typescript-game-development-rules.md)

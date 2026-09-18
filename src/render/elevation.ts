@@ -1,5 +1,5 @@
-import { MapTile } from '../game/mapGen';
-import { isWaterType } from '../game/tileTypes';
+import { MapTile } from '../game/map-gen';
+import { isWaterType } from '../game/tile-types';
 
 const HEIGHT_SCALE = 1;
 // 8px step at hexSize 40, expressed as a fraction of tile.height (0..1)

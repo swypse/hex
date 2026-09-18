@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { makeTestMap, tileAt, makeUnit } from './helpers/testMap';
-import { GameMap } from '../src/game/mapGen';
-import { TileType } from '../src/game/tileTypes';
+import { makeTestMap, tileAt, makeUnit } from './helpers/test-map';
+import { GameMap } from '../src/game/map-gen';
+import { TileType } from '../src/game/tile-types';
 import { Player } from '../src/game/players';
 import { Tribe } from '../src/game/tribes';
 import { BRIDGE_COST, bridgeDirFor, buildBridge, canBuildBridge } from '../src/game/bridges';

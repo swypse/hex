@@ -1,6 +1,6 @@
 import { BitmapText, type TextStyleFontWeight, type TextStyleOptions } from 'pixi.js';
 import { THEME } from './theme';
-import { fontFamilyForWeight } from './bitmapFonts';
+import { fontFamilyForWeight } from './bitmap-fonts';
 
 export function makeLabel(
   text: string,

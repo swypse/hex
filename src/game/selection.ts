@@ -1,9 +1,9 @@
 import { Axial, axialKey, hexDistance, hexNeighbors } from './hex';
-import { GameMap, MapTile } from './mapGen';
-import { isMountainType, TileType, isWaterType } from './tileTypes';
+import { GameMap, MapTile } from './map-gen';
+import { isMountainType, TileType, isWaterType } from './tile-types';
 import { isExploredFor } from './explore';
 import { movePoints as unitMovePoints, Unit } from './units';
-import { tileMoveCost, waterRouteKeys } from './movementCost';
+import { tileMoveCost, waterRouteKeys } from './movement-cost';
 
 type SelectionKind = 'unit' | 'village' | 'terrain';
 

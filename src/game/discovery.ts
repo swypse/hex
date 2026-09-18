@@ -1,5 +1,5 @@
 import { isExploredFor } from './explore';
-import { GameMap } from './mapGen';
+import { GameMap } from './map-gen';
 import { Player } from './players';
 import { Tribe, TribeInfo } from './tribes';
 

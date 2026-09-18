@@ -1,6 +1,6 @@
 import { beforeEach, describe, it, expect, afterEach, vi } from 'vitest';
 import { Texture } from 'pixi.js';
-import { ICONS16_ATLAS_FRAMES, ICONS16_ATLAS_CELL } from '../src/game/icons16AtlasData.gen';
+import { ICONS16_ATLAS_FRAMES, ICONS16_ATLAS_CELL } from '../src/game/icons16-atlas-data.gen';
 import { ICONS16_FILES } from '../src/ui/kit/icons16';
 
 class FakeImage {

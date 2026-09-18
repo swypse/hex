@@ -1,6 +1,6 @@
 import { t } from '../i18n';
 import { isExploredFor } from './explore';
-import { GameMap } from './mapGen';
+import { GameMap } from './map-gen';
 import { Player } from './players';
 import { UnitType } from './units';
 

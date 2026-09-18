@@ -2,7 +2,7 @@ import { canBuildSawmill, canBuildForestTemple, canBuildMine, canBuildPort, canB
 import { hexDistance, hexNeighbors } from './hex';
 import { canBuildBridge, bridgeCoastOffsets, bridgeDirFor, BRIDGE_COST } from './bridges';
 import { canBuildRoad, villageConnectedNodes } from './roads';
-import { GameMap, MapTile } from './mapGen';
+import { GameMap, MapTile } from './map-gen';
 import { Player } from './players';
 import { canAfford, pay, villageUpgradeCost } from './resources';
 import { canOpenSkill, hasSkill, SkillId } from './skills';
@@ -10,17 +10,17 @@ import { reachableTargets, tileAt } from './selection';
 import { canHeal, UNIT_TYPES, Unit } from './units';
 import { SeededRandom } from '../util/random';
 import { buildingsInVillage, villageBuildingLimit } from './village';
-import { isMountainType } from './tileTypes';
+import { isMountainType } from './tile-types';
 import { TRIBES } from './tribes';
-import { AI_PATTERNS, AiPatternContext, bestSpawnableUnitType, enemyCanAttackNext, enemyCanReach, guardGarrisonAttack, isFrontierTile, landEnemyCanReach, nearestEnemyDistanceFrom, nearestFreeVillageDistanceFrom, nearestOwnUnitDistanceFrom, nearestVillageDistanceFrom } from './aiPatterns';
-import { AiAction, AiDirectives, AiPlannerState } from './aiTypes';
+import { AI_PATTERNS, AiPatternContext, bestSpawnableUnitType, enemyCanAttackNext, enemyCanReach, guardGarrisonAttack, isFrontierTile, landEnemyCanReach, nearestEnemyDistanceFrom, nearestFreeVillageDistanceFrom, nearestOwnUnitDistanceFrom, nearestVillageDistanceFrom } from './ai-patterns';
+import { AiAction, AiDirectives, AiPlannerState } from './ai-types';
 import { attackableTargets, chooseBestAttack, tradeIsFavorable } from './combat';
 import { isExploredFor } from './explore';
-import { GameMode } from './gameMode';
-import { AiSituation, analyzeSituation, coastExposedTile, isNavalEnemy } from './aiSituation';
-import { AiDifficultyProfile, profileFor } from './aiDifficulty';
+import { GameMode } from './game-mode';
+import { AiSituation, analyzeSituation, coastExposedTile, isNavalEnemy } from './ai-situation';
+import { AiDifficultyProfile, profileFor } from './ai-difficulty';
 import { isShip } from './ship';
-import { updateStrategy, deriveDirectives } from './aiStrategy';
+import { updateStrategy, deriveDirectives } from './ai-strategy';
 
 const MAX_PLAN_STEPS = 200;
 

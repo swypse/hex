@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { makeTestMap, tileAt, makeUnit } from './helpers/testMap';
+import { makeTestMap, tileAt, makeUnit } from './helpers/test-map';
 import { knownTribesFor, territoryColor, UNKNOWN_TRIBE_COLOR } from '../src/game/discovery';
 import { TRIBES, Tribe } from '../src/game/tribes';
 import { START_RESOURCES } from '../src/game/resources';
 import { Player } from '../src/game/players';
-import { gameController } from '../src/controller/gameController';
-import { useGameStore } from '../src/store/gameStore';
+import { gameController } from '../src/controller/game-controller';
+import { useGameStore } from '../src/store/game-store';
 import { buildPlayers } from '../src/game/players';
 import { Simulator } from '../src/game/simulator';
 import { SeededRandom } from '../src/util/random';

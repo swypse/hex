@@ -4,7 +4,7 @@ import { hexDistance } from './hex';
 import { canAfford, pay } from './resources';
 import { hasSkill } from './skills';
 import type { Player } from './players';
-import { GameMap, MapTile } from './mapGen';
+import { GameMap, MapTile } from './map-gen';
 
 export const WALL_COST = { money: 20, wood: 0, stone: 15, ore: 5 };
 

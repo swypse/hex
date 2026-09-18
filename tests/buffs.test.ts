@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { activeBuffs, damageReduction, BUFF_INFO, VILLAGE_DEFENSE } from '../src/game/buffs';
-import { GameMap, MapTile } from '../src/game/mapGen';
-import { TileType } from '../src/game/tileTypes';
+import { GameMap, MapTile } from '../src/game/map-gen';
+import { TileType } from '../src/game/tile-types';
 import { Unit } from '../src/game/units';
 
 function tile(q: number, r: number, terrain: TileType, ownedBy: number | null, building: MapTile['building'] = null): MapTile {

@@ -1,5 +1,5 @@
-import { GameMode } from './gameMode';
-import { GameMap } from './mapGen';
+import { GameMode } from './game-mode';
+import { GameMap } from './map-gen';
 import { Player } from './players';
 
 export interface GameStateSnapshot {

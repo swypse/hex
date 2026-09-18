@@ -8,7 +8,7 @@ import {
   biomeFor,
   generateTerrain,
 } from '../src/game/biomes';
-import { isForestType, isLandType, isMountainType, TileType } from '../src/game/tileTypes';
+import { isForestType, isLandType, isMountainType, TileType } from '../src/game/tile-types';
 import { TerrainTile } from '../src/game/biomes';
 
 describe('biomes', () => {

@@ -7,7 +7,7 @@ import { decodePng, encodePng, finalizeAtlas } from './packSkills.mjs';
 
 export const SOURCE_DIR_URL = new URL('../src/assets/terrain/', import.meta.url);
 export const ATLAS_URL = new URL('../public/textures/terrain-atlas.png', import.meta.url);
-export const MANIFEST_URL = new URL('../src/game/terrainAtlasData.gen.ts', import.meta.url);
+export const MANIFEST_URL = new URL('../src/game/terrain-atlas-data.gen.ts', import.meta.url);
 
 export const TERRAIN_COLS = 6;
 export const TERRAIN_ATLAS_FILE = 'terrain-atlas.png';

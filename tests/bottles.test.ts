@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { GameMap, MapTile } from '../src/game/mapGen';
-import { TileType } from '../src/game/tileTypes';
+import { GameMap, MapTile } from '../src/game/map-gen';
+import { TileType } from '../src/game/tile-types';
 import { makeUnit } from '../src/game/units';
 import { buildPlayers } from '../src/game/players';
 import { Simulator } from '../src/game/simulator';

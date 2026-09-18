@@ -1,5 +1,5 @@
 import { hexToPixel } from './hex';
-import { TileType } from './tileTypes';
+import { TileType } from './tile-types';
 import { createPerlin } from './perlin';
 
 export enum Biome {

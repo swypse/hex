@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { GameMap, MapTile, Building, Settlement } from '../src/game/mapGen';
-import { TileType } from '../src/game/tileTypes';
+import { GameMap, MapTile, Building, Settlement } from '../src/game/map-gen';
+import { TileType } from '../src/game/tile-types';
 import { Tribe } from '../src/game/tribes';
 import { Player } from '../src/game/players';
 import { Unit, UnitType } from '../src/game/units';

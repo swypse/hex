@@ -1,7 +1,7 @@
 import { hexDistance } from './hex';
-import { GameMap, MapTile } from './mapGen';
+import { GameMap, MapTile } from './map-gen';
 import { shipAttackDistance } from './ship';
-import { isMountainType } from './tileTypes';
+import { isMountainType } from './tile-types';
 import { Unit } from './units';
 
 export function isExploredFor(tile: MapTile, playerIndex: number): boolean {

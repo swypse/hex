@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { MapTile } from '../src/game/mapGen';
-import { TileType } from '../src/game/tileTypes';
+import { MapTile } from '../src/game/map-gen';
+import { TileType } from '../src/game/tile-types';
 import { claimTileForVillage } from '../src/game/claim';
 
 function tile(q: number, r: number, ownedBy: number | null, claimedByVillage: { q: number; r: number } | null): MapTile {

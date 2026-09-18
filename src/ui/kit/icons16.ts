@@ -1,5 +1,5 @@
 import { Rectangle, Sprite, Texture } from 'pixi.js';
-import { ICONS16_ATLAS_FILE, ICONS16_ATLAS_CELL, ICONS16_ATLAS_FRAMES } from '../../game/icons16AtlasData.gen';
+import { ICONS16_ATLAS_FILE, ICONS16_ATLAS_CELL, ICONS16_ATLAS_FRAMES } from '../../game/icons16-atlas-data.gen';
 
 const TEXTURE_BASE = `${import.meta.env.BASE_URL}textures/`;
 

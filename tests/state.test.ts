@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { generateMap, type GameMap } from '../src/game/mapGen';
+import { generateMap, type GameMap } from '../src/game/map-gen';
 import { stripUndefinedValues } from '../src/game/state';
 import { isShip } from '../src/game/ship';
 import type { Unit } from '../src/game/units';

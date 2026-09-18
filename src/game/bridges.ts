@@ -1,9 +1,9 @@
-import { GameMap, MapTile, type BridgeDir } from './mapGen';
+import { GameMap, MapTile, type BridgeDir } from './map-gen';
 import { Player } from './players';
 import { canAfford, pay, Resources } from './resources';
 import { tileAt } from './selection';
 import { hasSkill } from './skills';
-import { isWaterType } from './tileTypes';
+import { isWaterType } from './tile-types';
 
 export const BRIDGE_COST: Resources = { wood: 10, stone: 5, money: 15, ore: 0 };
 

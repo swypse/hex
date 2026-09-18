@@ -8,6 +8,7 @@ export default {
   'start.multi': 'Мультиплеер',
   'start.tutorial': 'Обучение',
   'start.resume': 'Продолжить',
+  'start.rejoinMatch': 'Вернуться в матч',
   'start.about': 'О игре',
   'start.settings': 'Настройки',
   'start.aboutTitle': 'О игре',
@@ -489,4 +490,5 @@ export default {
   'help.bridge.road': 'Действует как дорога владельца и соединяется с соседними дорогами.',
   'help.bridge.build': 'Требует навык «Мосты»; цена {wood} дерева, {stone} камня и {money} монет. Не занимает слот построек деревни.',
   'help.bridge.score': 'Даёт владельцу {score} очков в конце игры.',
+  'error.toast': 'Что-то пошло не так (подробности в консоли).',
 } as const;

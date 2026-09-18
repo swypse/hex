@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { storageService } from '../src/storage/storageService';
+import { storageService } from '../src/storage/storage-service';
 import {
   loadSettings,
   setAiDifficulty,

@@ -1,4 +1,4 @@
-import { MapTile } from './mapGen';
+import { MapTile } from './map-gen';
 
 export function claimTileForVillage(target: MapTile, claimingVillage: MapTile): void {
   const claimed = target.claimedByVillage;

@@ -1,5 +1,5 @@
-import { storageService } from './storageService';
-import { AiDifficulty, DEFAULT_AI_DIFFICULTY } from '../game/aiDifficulty';
+import { storageService } from './storage-service';
+import { AiDifficulty, DEFAULT_AI_DIFFICULTY } from '../game/ai-difficulty';
 
 const SETTINGS_KEY = 'hex-settings-v1';
 

@@ -1,11 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { makeTestMap, tileAt, makeUnit } from './helpers/testMap';
+import { makeTestMap, tileAt, makeUnit } from './helpers/test-map';
 import { Simulator } from '../src/game/simulator';
 import { buildPlayers } from '../src/game/players';
 import { Tribe } from '../src/game/tribes';
 import { SeededRandom } from '../src/util/random';
 import { hexDistance, hexNeighbors } from '../src/game/hex';
-import { TileType, isWaterType } from '../src/game/tileTypes';
+import { TileType, isWaterType } from '../src/game/tile-types';
 import { PIRATE_HP, PIRATE_OWNER, type Unit } from '../src/game/units';
 
 function makeWaterMap(radius = 2): ReturnType<typeof makeTestMap> {

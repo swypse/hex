@@ -1,6 +1,6 @@
 import { axialKey, hexDistance, hexNeighbors } from './hex';
-import { GameMap, MapTile } from './mapGen';
-import { isLandType, isWaterType } from './tileTypes';
+import { GameMap, MapTile } from './map-gen';
+import { isLandType, isWaterType } from './tile-types';
 import { SeededRandom } from '../util/random';
 import { exploreUnitPath, isExploredFor } from './explore';
 import { makeUnit, Unit } from './units';

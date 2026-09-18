@@ -1,15 +1,15 @@
 import { defineConfig } from 'vitest/config';
 
-export default defineConfig({
-  base: '/hex/',
+export default defineConfig(({ command }) => ({
+  base: command === 'build' ? '/hex/' : '/',
   resolve: {
     alias: {
-      'zustand/react': new URL('./src/ui/zustandReactStub.ts', import.meta.url).pathname,
+      'zustand/react': new URL('./src/ui/zustand-react-stub', import.meta.url).pathname,
     },
   },
   test: {
     environment: 'node',
     include: ['tests/**/*.test.{ts,mjs}'],
-    setupFiles: ['tests/browserGlobals.ts', 'tests/setup.ts'],
+    setupFiles: ['tests/browser-globals.ts', 'tests/setup.ts'],
   },
-});
+}));

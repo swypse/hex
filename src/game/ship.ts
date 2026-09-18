@@ -1,4 +1,4 @@
-import type { MapTile } from './mapGen';
+import type { MapTile } from './map-gen';
 import type { Player } from './players';
 import { canAfford, pay } from './resources';
 import type { Unit } from './units';

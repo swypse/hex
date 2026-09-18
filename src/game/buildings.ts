@@ -1,9 +1,9 @@
 import { axialKey, hexNeighbors } from './hex';
-import { GameMap, MapTile } from './mapGen';
+import { GameMap, MapTile } from './map-gen';
 import { Player } from './players';
 import { canAfford, moneyCost, pay, Resources } from './resources';
 import { hasSkill } from './skills';
-import { isForestType, isLandType, isMountainType, isWaterType } from './tileTypes';
+import { isForestType, isLandType, isMountainType, isWaterType } from './tile-types';
 import { buildingsInVillage, villageBuildingLimit } from './village';
 import { villageEnemyOccupied } from './capture';
 import type { BuildingKind } from './events';

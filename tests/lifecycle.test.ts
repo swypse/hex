@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { gameController } from '../src/controller/gameController';
-import { useGameStore } from '../src/store/gameStore';
+import { gameController } from '../src/controller/game-controller';
+import { useGameStore } from '../src/store/game-store';
 import { TRIBES } from '../src/game/tribes';
-import { NetworkController } from '../src/controller/networkController';
+import { NetworkController } from '../src/controller/network-controller';
 
 describe('GameController lifecycle', () => {
   beforeEach(() => {

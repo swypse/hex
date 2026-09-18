@@ -1,11 +1,11 @@
 import { axialKey, hexNeighbors } from './hex';
-import { GameMap, MapTile, tileMapByKey } from './mapGen';
+import { GameMap, MapTile, tileMapByKey } from './map-gen';
 import { Player } from './players';
 import { canAfford, pay, Resources } from './resources';
 import { tileAt } from './selection';
 import { hasSkill } from './skills';
-import { isWaterType } from './tileTypes';
-import { portWaterClusterJumps } from './waterRoads';
+import { isWaterType } from './tile-types';
+import { portWaterClusterJumps } from './water-roads';
 
 export const ROAD_COST: Resources = { wood: 5, stone: 2, money: 10, ore: 0 };
 

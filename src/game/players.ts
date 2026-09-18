@@ -5,8 +5,8 @@ import type { SkillId } from './skills';
 import { EMPTY_STATS, type PlayerStats } from './score';
 import type { AchievementId } from './achievements';
 import { Tribe, TRIBES, tribeById } from './tribes';
-import { AiDifficulty, DEFAULT_AI_DIFFICULTY } from './aiDifficulty';
-import type { AiStrategyState } from './aiTypes';
+import { AiDifficulty, DEFAULT_AI_DIFFICULTY } from './ai-difficulty';
+import type { AiStrategyState } from './ai-types';
 
 export interface Player {
   index: number;

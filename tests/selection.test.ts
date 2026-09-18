@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { GameMap, MapTile, Settlement } from '../src/game/mapGen';
+import { GameMap, MapTile, Settlement } from '../src/game/map-gen';
 import {
   contentLayers,
   cycleSelection,
@@ -8,7 +8,7 @@ import {
   reachableTargets,
   tileAt,
 } from '../src/game/selection';
-import { TileType } from '../src/game/tileTypes';
+import { TileType } from '../src/game/tile-types';
 import { Unit } from '../src/game/units';
 
 function makeTile(

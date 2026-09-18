@@ -1,0 +1,295 @@
+import { create } from 'zustand';
+import type { LobbyPlayer } from '../net/peer-session';
+import { Player } from '../game/players';
+import { Selection } from '../game/selection';
+import { GameStateSnapshot } from '../game/state';
+import { GameMode } from '../game/game-mode';
+import { Tribe } from '../game/tribes';
+import type { SkillId } from '../game/skills';
+import type { TutorialStepId } from '../game/tutorial/tutorial-steps';
+import { activeMatchStore } from '../storage/active-match';
+
+export type Screen = 'start' | 'setup' | 'lobby' | 'game';
+
+export type { LobbyPlayer };
+
+/** Optional styling for the icon chip shown above a center message. */
+interface IconChipStyle {
+  size: number;
+  bgColor: number;
+}
+
+type OverlayState =
+  | null
+  | { kind: 'spawn' }
+  | { kind: 'skill' }
+  | { kind: 'stats' }
+  | { kind: 'achievements' }
+  | { kind: 'welcome' }
+  | { kind: 'leave' }
+  | { kind: 'unitHelp' }
+  | { kind: 'settlementHelp' }
+  | { kind: 'buildingHelp' }
+  | { kind: 'buildingLimitHelp' }
+  | { kind: 'bridgeHelp' }
+  | { kind: 'shipLanding'; target: { q: number; r: number } }
+  | { kind: 'disband'; unitId: string }
+  | { kind: 'watchingPrompt' };
+
+interface LobbyState {
+  role: 'host' | 'client';
+  code: string;
+  mode: GameMode;
+  totalPlayers: number;
+  aiCount: number;
+  players: LobbyPlayer[];
+}
+
+interface GameStore {
+  screen: Screen;
+  players: Player[];
+  turn: number;
+  currentPlayerIndex: number;
+  aiActive: boolean;
+  selection: Selection | null;
+  overlay: OverlayState;
+  mode: GameMode;
+  gameOver: boolean;
+  winnerIndex: number | null;
+  watching: boolean;
+  expectedTurns: number;
+  bonusAwarded: boolean;
+  centerMessage: string | null;
+  centerMessageQueue: string[];
+  centerIconFile: string | null;
+  centerIconQueue: (string | null)[];
+  centerChipStyle: IconChipStyle | null;
+  centerChipQueue: (IconChipStyle | null)[];
+  localPlayerIndex: number;
+  netMode: 'single' | 'host' | 'client';
+  lobby: LobbyState | null;
+  connection: 'idle' | 'connecting' | 'connected' | 'error';
+  connectionMessage: string;
+  pendingSnapshot: GameStateSnapshot | null;
+  myPeerId: string;
+  playersOnline: boolean[];
+  texturesLoading: boolean;
+  paused: 'disconnect' | null;
+  pausedName: string;
+  tutorial: boolean;
+  tutorialStep: TutorialStepId | null;
+  tutorialHighlightSkills: SkillId[];
+  tutorialHighlightEndTurn: boolean;
+
+  setScreen: (screen: Screen) => void;
+  setPlayers: (players: Player[]) => void;
+  setTurn: (turn: number) => void;
+  setCurrentPlayerIndex: (index: number) => void;
+  setAiActive: (active: boolean) => void;
+  setSelection: (selection: Selection | null) => void;
+  setOverlay: (overlay: OverlayState) => void;
+  setMode: (mode: GameMode) => void;
+  setGameOver: (over: boolean) => void;
+  setWinnerIndex: (index: number | null) => void;
+  setWatching: (v: boolean) => void;
+  setExpectedTurns: (turns: number) => void;
+  setBonusAwarded: (awarded: boolean) => void;
+  setCenterMessage: (message: string | null, iconFile?: string | null, chipStyle?: IconChipStyle | null) => void;
+  setLocalPlayerIndex: (index: number) => void;
+  setNetMode: (mode: 'single' | 'host' | 'client') => void;
+  setLobby: (lobby: LobbyState | null) => void;
+  setConnection: (connection: 'idle' | 'connecting' | 'connected' | 'error') => void;
+  setConnectionMessage: (message: string) => void;
+  setPendingSnapshot: (snapshot: GameStateSnapshot | null) => void;
+  setMyPeerId: (peerId: string) => void;
+  setPlayersOnline: (online: boolean[]) => void;
+  setTexturesLoading: (loading: boolean) => void;
+  setPaused: (paused: 'disconnect' | null, name?: string) => void;
+  setTutorial: (v: boolean) => void;
+  setTutorialStep: (v: TutorialStepId | null) => void;
+  setTutorialHighlightSkills: (v: SkillId[]) => void;
+  setTutorialHighlightEndTurn: (v: boolean) => void;
+}
+
+export const useGameStore = create<GameStore>((set, get) => ({
+  screen: 'start',
+  players: [],
+  turn: 1,
+  currentPlayerIndex: 0,
+  aiActive: false,
+  selection: null,
+  overlay: null,
+  mode: 'capture',
+  gameOver: false,
+  winnerIndex: null,
+  watching: false,
+  expectedTurns: 0,
+  bonusAwarded: false,
+  centerMessage: null,
+  centerMessageQueue: [],
+  centerIconFile: null,
+  centerIconQueue: [],
+  centerChipStyle: null,
+  centerChipQueue: [],
+  localPlayerIndex: 0,
+  netMode: 'single',
+  lobby: null,
+  connection: 'idle',
+  connectionMessage: '',
+  pendingSnapshot: null,
+  myPeerId: '',
+  playersOnline: [],
+  texturesLoading: false,
+  paused: null,
+  pausedName: '',
+  tutorial: false,
+  tutorialStep: null,
+  tutorialHighlightSkills: [],
+  tutorialHighlightEndTurn: false,
+
+  setScreen: (screen) => {
+    if (!suppressPush && get().screen !== screen) {
+      if (screen === 'game') replaceHistory(screen);
+      else pushHistory(screen);
+    }
+    if (get().screen === 'game' && screen !== 'game') {
+      set({
+        centerMessage: null,
+        centerMessageQueue: [],
+        centerIconFile: null,
+        centerIconQueue: [],
+        centerChipStyle: null,
+        centerChipQueue: [],
+        paused: null,
+        pausedName: '',
+      });
+    }
+    set({ screen });
+  },
+  setPlayers: (players) => set({ players }),
+  setTurn: (turn) => set({ turn }),
+  setCurrentPlayerIndex: (index) => set({ currentPlayerIndex: index }),
+  setAiActive: (active) => set({ aiActive: active }),
+  setSelection: (selection) => set({ selection }),
+  setOverlay: (overlay) => set({ overlay }),
+  setMode: (mode) => set({ mode }),
+  setGameOver: (over) => set({ gameOver: over }),
+  setWinnerIndex: (index) => set({ winnerIndex: index }),
+  setWatching: (watching) => set({ watching }),
+  setExpectedTurns: (turns) => set({ expectedTurns: turns }),
+  setBonusAwarded: (awarded) => set({ bonusAwarded: awarded }),
+  setCenterMessage: (message, iconFile = null, chipStyle = null) =>
+    set((s) => {
+      if (message === null) {
+        const next = s.centerMessageQueue[0] ?? null;
+        const nextIcon = next === null ? null : (s.centerIconQueue[0] ?? null);
+        const nextStyle = next === null ? null : (s.centerChipQueue[0] ?? null);
+        return {
+          centerMessage: next,
+          centerMessageQueue: next === null ? [] : s.centerMessageQueue.slice(1),
+          centerIconFile: nextIcon,
+          centerIconQueue: next === null ? [] : s.centerIconQueue.slice(1),
+          centerChipStyle: nextStyle,
+          centerChipQueue: next === null ? [] : s.centerChipQueue.slice(1),
+        };
+      }
+      if (s.centerMessage !== null) {
+        return {
+          centerMessageQueue: [...s.centerMessageQueue, message],
+          centerIconQueue: [...s.centerIconQueue, iconFile],
+          centerChipQueue: [...s.centerChipQueue, chipStyle],
+        };
+      }
+      return { centerMessage: message, centerIconFile: iconFile ?? null, centerChipStyle: chipStyle };
+    }),
+  setLocalPlayerIndex: (index) => set({ localPlayerIndex: index }),
+  setNetMode: (netMode) => set({ netMode }),
+  setLobby: (lobby) => set({ lobby }),
+  setConnection: (connection) => set({ connection }),
+  setConnectionMessage: (connectionMessage) => set({ connectionMessage }),
+  setPendingSnapshot: (pendingSnapshot) => set({ pendingSnapshot }),
+  setMyPeerId: (myPeerId) => set({ myPeerId }),
+  setPlayersOnline: (playersOnline) => set({ playersOnline }),
+  setTexturesLoading: (texturesLoading) => set({ texturesLoading }),
+  setPaused: (paused, name) => set({ paused, pausedName: paused === null ? '' : (name ?? '') }),
+  setTutorial: (tutorial) => set({ tutorial }),
+  setTutorialStep: (tutorialStep) => set({ tutorialStep }),
+  setTutorialHighlightSkills: (tutorialHighlightSkills) => set({ tutorialHighlightSkills }),
+  setTutorialHighlightEndTurn: (tutorialHighlightEndTurn) => set({ tutorialHighlightEndTurn }),
+}));
+
+const SCREENS: Screen[] = ['start', 'setup', 'lobby', 'game'];
+
+let suppressPush = false;
+
+function pushHistory(screen: Screen): void {
+  if (typeof window === 'undefined' || typeof window.history?.pushState !== 'function') return;
+  try {
+    window.history.pushState({ screen }, '');
+  } catch {
+    // history API unavailable (e.g. sandboxed iframe); navigation still works
+  }
+}
+
+/** Replaces the current history entry instead of stacking a new one. Entering
+ *  the game replaces the launcher entry (setup/lobby) so that the browser Back
+ *  from the game returns to the main menu, never to the game-setup screen. */
+function replaceHistory(screen: Screen): void {
+  if (typeof window === 'undefined' || typeof window.history?.replaceState !== 'function') return;
+  try {
+    window.history.replaceState({ screen }, '');
+  } catch {
+    // history API unavailable; navigation still works
+  }
+}
+
+function applyScreenFromHistory(screen: Screen): void {
+  suppressPush = true;
+  try {
+    useGameStore.getState().setScreen(screen);
+  } finally {
+    suppressPush = false;
+  }
+}
+
+function onPopState(event: PopStateEvent): void {
+  const store = useGameStore.getState();
+  const current = store.screen;
+  const raw = event.state?.screen;
+  const target: Screen = SCREENS.includes(raw) ? raw : 'start';
+  if (target === current) return;
+  if (current === 'game' && !store.gameOver) {
+    store.setOverlay({ kind: 'leave' });
+    pushHistory(current);
+    return;
+  }
+  applyScreenFromHistory(target);
+}
+
+export function initNavigation(): void {
+  if (typeof window === 'undefined') return;
+  const current = useGameStore.getState().screen;
+  try {
+    window.history.replaceState({ screen: current }, '');
+  } catch {
+    // history API unavailable; back navigation is simply not wired up
+  }
+  window.addEventListener('popstate', onPopState);
+}
+
+export function confirmLeaveGame(): void {
+  if (useGameStore.getState().netMode === 'client') activeMatchStore.clear();
+  useGameStore.getState().setOverlay(null);
+  if (typeof window !== 'undefined' && typeof window.history?.replaceState === 'function') {
+    try {
+      window.history.replaceState({ screen: 'start' }, '');
+    } catch {
+      // ignore
+    }
+  }
+  applyScreenFromHistory('start');
+}
+
+export function cancelLeaveGame(): void {
+  useGameStore.getState().setOverlay(null);
+}

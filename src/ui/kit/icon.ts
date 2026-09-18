@@ -1,7 +1,7 @@
 import { Sprite, Texture } from 'pixi.js';
-import { TRIBE_ICONS_ATLAS_FRAMES } from '../../game/tribeIconsAtlasData.gen';
-import { ICONS32_ATLAS_FRAMES } from '../../game/icons32AtlasData.gen';
-import { makeTribeIcon } from './tribeIcons';
+import { TRIBE_ICONS_ATLAS_FRAMES } from '../../game/tribe-icons-atlas-data.gen';
+import { ICONS32_ATLAS_FRAMES } from '../../game/icons32-atlas-data.gen';
+import { makeTribeIcon } from './tribe-icons';
 import { makeIcon32 } from './icons32';
 
 const TEXTURE_BASE = `${import.meta.env.BASE_URL}textures/`;

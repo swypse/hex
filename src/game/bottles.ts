@@ -1,5 +1,5 @@
-import { GameMap, MapTile } from './mapGen';
-import { isWaterType } from './tileTypes';
+import { GameMap, MapTile } from './map-gen';
+import { isWaterType } from './tile-types';
 import { hasBridge } from './bridges';
 import { isShip } from './ship';
 import { canMove, canAttack } from './units';

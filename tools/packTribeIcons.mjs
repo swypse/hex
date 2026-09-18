@@ -7,7 +7,7 @@ import { decodePng, encodePng, finalizeAtlas } from './packSkills.mjs';
 
 export const SOURCE_DIR_URL = new URL('../src/assets/tribe-icons/', import.meta.url);
 export const ATLAS_URL = new URL('../public/textures/tribe-icons-atlas.png', import.meta.url);
-export const MANIFEST_URL = new URL('../src/game/tribeIconsAtlasData.gen.ts', import.meta.url);
+export const MANIFEST_URL = new URL('../src/game/tribe-icons-atlas-data.gen.ts', import.meta.url);
 
 export const TRIBE_ICON_COLS = 6;
 export const TRIBE_ICON_CELL = 120;

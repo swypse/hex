@@ -1,6 +1,6 @@
-import { GameMap, MapTile } from './mapGen';
+import { GameMap, MapTile } from './map-gen';
 import { isShip } from './ship';
-import { isForestType } from './tileTypes';
+import { isForestType } from './tile-types';
 import { Unit } from './units';
 import { t } from '../i18n';
 

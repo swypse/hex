@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Simulator } from '../src/game/simulator';
-import { gameController } from '../src/controller/gameController';
-import { useGameStore } from '../src/store/gameStore';
-import { makeTestMap } from './helpers/testMap';
+import { gameController } from '../src/controller/game-controller';
+import { useGameStore } from '../src/store/game-store';
+import { makeTestMap } from './helpers/test-map';
 import { buildPlayers } from '../src/game/players';
 import { Tribe } from '../src/game/tribes';
 import { SeededRandom } from '../src/util/random';
-import { NetworkController } from '../src/controller/networkController';
+import { NetworkController } from '../src/controller/network-controller';
 
 const controller = gameController as unknown as {
   getNetwork: () => NetworkController;
