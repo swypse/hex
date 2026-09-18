@@ -1,4 +1,5 @@
 import { isRoomCode } from './peerSession';
+import { relayQueryParam } from './relaySession';
 
 const JOIN_QUERY_PARAM = 'join';
 
@@ -24,15 +25,18 @@ export function readJoinCode(url = currentUrl()): string | null {
   }
 }
 
-/** Builds a shareable link that opens the join screen with the code prefilled. */
+/** Builds a shareable link that opens the join screen with the code prefilled
+ *  (keeping the relay override so both peers reach the same relay). */
 export function buildJoinLink(code: string, url = currentUrl()): string {
   const clean = code.trim().toUpperCase();
   if (url) {
     try {
       const u = new URL(url);
+      const relay = u.searchParams.get(relayQueryParam());
       u.search = '';
       u.hash = '';
       u.searchParams.set(JOIN_QUERY_PARAM, clean);
+      if (relay) u.searchParams.set(relayQueryParam(), relay);
       return u.toString();
     } catch {
       // fall through to the relative link

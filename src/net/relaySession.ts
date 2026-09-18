@@ -35,8 +35,46 @@ interface RelayClientEvents {
 
 const DEFAULT_RELAY_URL = 'wss://hex-relay.swypse.workers.dev/ws';
 
-function relayUrl(): string {
+const RELAY_QUERY_PARAM = 'relay';
+const RELAY_STORAGE_KEY = 'hex.relayUrl';
+
+function normalizeRelayUrl(value: string): string | null {
+  if (!value) return null;
+  try {
+    const u = new URL(value);
+    if (u.protocol !== 'ws:' && u.protocol !== 'wss:') return null;
+    return u.toString();
+  } catch {
+    return null;
+  }
+}
+
+/** Resolves the relay transport the sessions should use. Precedence:
+ *  `?relay=<ws|wss url>` query param > localStorage override > the
+ *  default Cloudflare worker. Lets rooms / installs route around a blocked
+ *  relay (e.g. a self-hosted `server/relay.mjs`) without a rebuild. */
+export function resolveRelayUrl(): string {
+  if (typeof window !== 'undefined') {
+    try {
+      const query = new URL(window.location.href).searchParams.get(RELAY_QUERY_PARAM);
+      if (query) {
+        const url = normalizeRelayUrl(query);
+        if (url) return url;
+      }
+      const stored = window.localStorage?.getItem(RELAY_STORAGE_KEY);
+      if (stored) {
+        const url = normalizeRelayUrl(stored);
+        if (url) return url;
+      }
+    } catch {
+      // ignore unobtainable browser state
+    }
+  }
   return DEFAULT_RELAY_URL;
+}
+
+export function relayQueryParam(): string {
+  return RELAY_QUERY_PARAM;
 }
 
 /** Appends the room code so Cloudflare can route to the per-room Durable Object. */
@@ -73,7 +111,7 @@ abstract class RelaySessionBase {
   protected retryDelayMs: number | undefined;
 
   constructor(
-    protected readonly url: string = relayUrl(),
+    protected readonly url: string = resolveRelayUrl(),
     protected readonly createSocket: (url: string) => WebSocketLike = defaultWebSocket,
     protected readonly opts: RelaySessionOptions = {},
   ) {

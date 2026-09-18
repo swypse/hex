@@ -7,6 +7,7 @@ import { buildPlayers } from '../src/game/players';
 import { Tribe } from '../src/game/tribes';
 import { SeededRandom } from '../src/util/random';
 import { NetworkController } from '../src/controller/networkController';
+import { DISCONNECT_GRACE_MS } from '../src/controller/networkController';
 
 const controller = gameController as unknown as {
   getNetwork: () => NetworkController;
@@ -47,7 +48,8 @@ describe('multiplayer disconnect handling', () => {
     return { session: { broadcast, sendTo } as never, broadcast, sendTo };
   }
 
-  it('pauses the game and notes the name when a client drops on their turn', () => {
+  it('pauses the game and notes the name when a client drops on their turn — after the grace window', () => {
+    vi.useFakeTimers();
     const map = makeTestMap();
     const players = buildPlayers(Tribe.Cats, 1, new SeededRandom(1));
     players[0]!.name = 'H';
@@ -63,11 +65,17 @@ describe('multiplayer disconnect handling', () => {
     ];
     useGameStore.setState({ screen: 'game', netMode: 'host', players, currentPlayerIndex: 1 });
     controller.handleClientClosed('guest-1');
+    // Grace window: offline dot updates, but no modal yet.
     const s = useGameStore.getState();
-    expect(s.paused).toBe('disconnect');
-    expect(s.pausedName).toBe('G');
+    expect(s.paused).toBeNull();
     expect(net().hostPlayers[0]!.online).toBe(false);
-    void broadcast; void sendTo;
+    vi.advanceTimersByTime(DISCONNECT_GRACE_MS);
+    const sNow = useGameStore.getState();
+    expect(sNow.paused).toBe('disconnect');
+    expect(sNow.pausedName).toBe('G');
+    expect(broadcast!).toHaveBeenCalled();
+    vi.useRealTimers();
+    void session; void sendTo;
   });
 
   it('does not pause when the dropped client is not on their turn', () => {
@@ -85,6 +93,32 @@ describe('multiplayer disconnect handling', () => {
     useGameStore.setState({ screen: 'game', netMode: 'host', players, currentPlayerIndex: 0 });
     controller.handleClientClosed('guest-1');
     expect(useGameStore.getState().paused).toBeNull();
+  });
+
+  it('never shows the modal when the dropped client rejoins within the grace window', () => {
+    vi.useFakeTimers();
+    const map = makeTestMap();
+    const players = buildPlayers(Tribe.Cats, 1, new SeededRandom(1));
+    players[1]!.name = 'G';
+    players[1]!.isHuman = true;
+    controller.sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    controller.sim.currentPlayerIndex = 1;
+    const { session } = hostSessionMock();
+    net().hostSession = session;
+    net().hostStarted = true;
+    net().hostPlayers = [
+      { peerId: 'old-id', name: 'G', tribeId: Tribe.Warriors, playerIndex: 1, ready: true, online: true },
+    ];
+    useGameStore.setState({ screen: 'game', netMode: 'host', players, currentPlayerIndex: 1 });
+    controller.handleClientClosed('old-id');
+    expect(useGameStore.getState().paused).toBeNull();
+    // The client re-joins before the grace window lapses.
+    (net() as unknown as { onHostData: (pid: string, msg: { type: 'join'; name: string }) => void })
+      .onHostData('new-id', { type: 'join', name: 'G' });
+    vi.advanceTimersByTime(DISCONNECT_GRACE_MS);
+    expect(useGameStore.getState().paused).toBeNull();
+    expect(net().hostPlayers.every((p) => p.online || p.playerIndex === null)).toBe(true);
+    vi.useRealTimers();
   });
 
   it('resumes when the dropped client rejoins and it is their turn again', () => {

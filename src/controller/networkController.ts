@@ -16,6 +16,11 @@ import { SeededRandom } from '../util/random';
 import { GameMode } from '../game/gameMode';
 import { createTextures, TextureSet } from '../render/textureFactory';
 
+/** How long a dropped player stays unmarked-by-modal before the host pause
+ *  modal fires: transient network flaps (or a fast refresh) that resolve within
+ *  the window never spam the host with "Player disconnected". */
+export const DISCONNECT_GRACE_MS = 4000;
+
 interface HostPlayerEntry {
   peerId: string;
   name: string;
@@ -59,6 +64,9 @@ export class NetworkController {
   private pendingClientEvents: GameEvent[] = [];
   private pendingPreExplored: Set<string> | null = null;
   private predictedPending = 0;
+  /** Per-player timers that fire the disconnect pause only after the drop
+   *  outlives the grace window (cancelled on rejoin). */
+  private disconnectPauseTimers = new Map<number, ReturnType<typeof setTimeout>>();
   /** Number of events batches to skip — one per optimistically predicted
    *  command answered by the host. A count, not a boolean: with two commands
    *  in flight (e.g. move then heal) two skip-requests are queued, and each
@@ -208,8 +216,8 @@ export class NetworkController {
       this.hostSession.broadcast({ type: 'events', events });
     }
     // The turn may have rotated to a player whose connection is still down:
-    // freeze the game so the host can resolve it.
-    this.pauseForDisconnect(sim.currentPlayerIndex);
+    // schedule the freeze so the host can resolve it (after the grace window).
+    this.schedulePauseForDisconnect(sim.currentPlayerIndex);
   }
 
   private bindInGameClient(peerId: string, name: string): void {
@@ -240,6 +248,7 @@ export class NetworkController {
     stripUndefinedValues(snap);
     this.hostSession?.sendTo(peerId, { type: 'state', state: snap, playerIndex: human.index });
     this.broadcastPlayersOnline();
+    this.cancelDisconnectTimer(human.index);
     useGameStore.getState().setPaused(null);
   }
 
@@ -255,23 +264,49 @@ export class NetworkController {
       if (!entry.online) return;
       entry.online = false;
       this.broadcastPlayersOnline();
-      this.pauseForDisconnect(entry.playerIndex);
+      this.schedulePauseForDisconnect(entry.playerIndex);
     }
   }
 
-  /** Freeze the game when it is a just-dropped human player's turn: play
-   *  cannot proceed anyway, and the host can decide to wait / hand the seat to
-   *  the AI / forfeit. */
-  private pauseForDisconnect(playerIndex: number): void {
+/** Freeze the game when a just-dropped (and still offline) human player's turn
+   *  arrives or was current — after a grace window, so transient network flaps /
+   *  fast refreshes that resolve within the window never pop the disconnect modal. */
+  private schedulePauseForDisconnect(playerIndex: number): void {
+    if (this.canceled) return;
     const sim = this.host.sim();
     const store = useGameStore.getState();
     if (!this.hostStarted || !sim || store.screen !== 'game') return;
     if (sim.currentPlayerIndex !== playerIndex) return;
+    if (sim.gameOver) return;
     const player = sim.players[playerIndex];
     if (!player || !player.isHuman) return;
-    store.setPaused('disconnect', player.name);
+    const entry = this.hostPlayers.find((h) => h.playerIndex === playerIndex);
+    if (!entry || entry.online) return;
+    if (store.paused === 'disconnect') return;
+    if (this.disconnectPauseTimers.has(playerIndex)) return;
+    this.disconnectPauseTimers.set(playerIndex, setTimeout(() => {
+      this.disconnectPauseTimers.delete(playerIndex);
+      const storeNow = useGameStore.getState();
+      const simNow = this.host.sim();
+      if (this.canceled || !this.hostStarted || !simNow || simNow.gameOver || storeNow.screen !== 'game') return;
+      if (simNow.currentPlayerIndex !== playerIndex) return;
+      const playerNow = simNow.players[playerIndex];
+      if (!playerNow || !playerNow.isHuman) return;
+      const entryNow = this.hostPlayers.find((h) => h.playerIndex === playerIndex);
+      if (!entryNow || entryNow.online) return;
+      if (storeNow.paused === 'disconnect') return;
+      storeNow.setPaused('disconnect', playerNow.name);
+    }, DISCONNECT_GRACE_MS));
   }
 
+  private cancelDisconnectTimer(playerIndex: number): void {
+    const timer = this.disconnectPauseTimers.get(playerIndex);
+    if (timer) {
+      clearTimeout(timer);
+      this.disconnectPauseTimers.delete(playerIndex);
+}
+  }
+ 
   /** Host decision: keep waiting — clear the modal but stay paused until the
    *  player rejoins or the host resolves it. */
   waitForDisconnected(): void {
@@ -469,6 +504,8 @@ export class NetworkController {
   cancelLobby(): void {
     this.canceled = true;
     this.hostStarted = false;
+    for (const t of this.disconnectPauseTimers.values()) clearTimeout(t);
+    this.disconnectPauseTimers.clear();
     this.hostSession?.close();
     this.hostSession = null;
     this.hostPlayers = [];

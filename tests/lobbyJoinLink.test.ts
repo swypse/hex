@@ -3,6 +3,7 @@ import { Container, Sprite, BitmapText } from 'pixi.js';
 import { LobbyScreen } from '../src/ui/screens/LobbyScreen';
 import { useGameStore } from '../src/store/gameStore';
 import { buildJoinLink, consumePendingJoin, readJoinCode, setPendingJoin } from '../src/net/joinLink';
+import { resolveRelayUrl } from '../src/net/relaySession';
 import { type UIHost } from '../src/ui/host';
 import { TRIBES, Tribe } from '../src/game/tribes';
 
@@ -33,6 +34,17 @@ describe('join link helpers', () => {
     expect(u.searchParams.get('join')).toBe('ABC234');
     expect(u.searchParams.has('other')).toBe(false);
     expect(u.hash).toBe('');
+  });
+
+  it('keeps the relay override in the join link', () => {
+    const link = buildJoinLink(
+      'abc234',
+      'https://example.com/hex/?relay=ws://relay.lan:8787/ws&other=1#frag',
+    );
+    const u = new URL(link);
+    expect(u.searchParams.get('join')).toBe('ABC234');
+    expect(u.searchParams.get('relay')).toBe('ws://relay.lan:8787/ws');
+    expect(u.searchParams.has('other')).toBe(false);
   });
 
   it('keeps a pending join code for the lobby screen to consume', () => {
@@ -96,6 +108,56 @@ function allContainers(c: Container): Container[] {
 function hasDirectText(c: Container, text: string): boolean {
   return c.children.some((ch) => ch instanceof BitmapText && String((ch as BitmapText).text).toUpperCase() === text.toUpperCase());
 }
+
+describe('relay url resolution', () => {
+  afterEach(() => {
+    delete (globalThis.window as { location?: unknown }).location;
+    delete (globalThis.window as { localStorage?: unknown }).localStorage;
+  });
+
+  function setWindow(href: string, storageGet?: (k: string) => string | null) {
+    Object.defineProperty(globalThis.window, 'location', {
+      configurable: true,
+      value: { href },
+    });
+    Object.defineProperty(globalThis.window, 'localStorage', {
+      configurable: true,
+      value: storageGet ? { getItem: storageGet } : undefined,
+    });
+  }
+
+  it('prefers the ?relay= query param', () => {
+    setWindow('https://app.example/?relay=wss://relay.example/ws');
+    expect(resolveRelayUrl()).toBe('wss://relay.example/ws');
+  });
+
+  it('falls back to localStorage then to the default relay', () => {
+    setWindow(
+      'https://app.example/',
+      (k) => (k === 'hex.relayUrl' ? 'ws://my-relay.lan:8787/ws' : null),
+    );
+    expect(resolveRelayUrl()).toBe('ws://my-relay.lan:8787/ws');
+
+    setWindow('https://app.example/');
+    expect(resolveRelayUrl()).toBe('wss://hex-relay.swypse.workers.dev/ws');
+  });
+
+  it('ignores non-websocket relay schemes', () => {
+    setWindow(
+      'https://app.example/?relay=https://blocked.example/x',
+      (k) => (k === 'hex.relayUrl' ? 'https://local.example/x' : null),
+    );
+    expect(resolveRelayUrl()).toBe('wss://hex-relay.swypse.workers.dev/ws');
+  });
+
+  it('query param wins over localStorage', () => {
+    setWindow(
+      'https://app.example/?relay=wss://query.example/ws',
+      (k) => (k === 'hex.relayUrl' ? 'ws://stored.example/ws' : null),
+    );
+    expect(resolveRelayUrl()).toBe('wss://query.example/ws');
+  });
+});
 
 describe('LobbyScreen join link prefill', () => {
   let screen: LobbyScreen;
