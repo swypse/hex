@@ -156,6 +156,36 @@ describe('RelayCore', () => {
     ]);
   });
 
+  it('does not re-notify the host when the same client close is delivered twice', () => {
+    const core = new RelayCore();
+    const host = makeConn();
+    const c1 = makeConn();
+    const c2 = makeConn();
+    core.registerHost(host, 'ABCDEF');
+    core.registerClient(c1, 'ABCDEF');
+    core.registerClient(c2, 'ABCDEF');
+
+    core.handleClose(c1);
+    core.handleClose(c1);
+
+    const lefts = host.sent.filter((m) => (m as { type: string }).type === 'client-left');
+    expect(lefts).toEqual([{ type: 'client-left', clientId: c1.id }]);
+  });
+
+  it('does not re-notify clients when the same host close is delivered twice', () => {
+    const core = new RelayCore();
+    const host = makeConn();
+    const c1 = makeConn();
+    core.registerHost(host, 'ABCDEF');
+    core.registerClient(c1, 'ABCDEF');
+
+    core.handleClose(host);
+    core.handleClose(host);
+
+    const lefts = c1.sent.filter((m) => (m as { type: string }).type === 'host-left');
+    expect(lefts).toEqual([{ type: 'host-left' }]);
+  });
+
   it('keeps the room alive for a new host while clients are still connected', () => {
     const core = new RelayCore();
     const host1 = makeConn();

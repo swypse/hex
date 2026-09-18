@@ -250,6 +250,9 @@ export class NetworkController {
       this.hostPlayers = this.hostPlayers.filter((p) => p.peerId !== peerId);
       this.broadcastLobby();
     } else {
+      // Already offline: a duplicate relay close must not re-broadcast the
+      // presence change or re-pause the game.
+      if (!entry.online) return;
       entry.online = false;
       this.broadcastPlayersOnline();
       this.pauseForDisconnect(entry.playerIndex);

@@ -84,7 +84,7 @@ export class RelayCore {
       }
     } else if (conn.role === 'client' && conn.code && conn.id) {
       const room = this.#rooms.get(conn.code);
-      if (room) {
+      if (room && room.clients.has(conn.id)) {
         room.clients.delete(conn.id);
         if (room.host) room.host.send({ type: 'client-left', clientId: conn.id });
         this.#dropRoom(room);

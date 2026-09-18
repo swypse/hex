@@ -47,6 +47,21 @@ describe('multiplayer presence', () => {
     expect(broadcast).toHaveBeenCalledWith({ type: 'playersOnline', online: [true, false] });
   });
 
+  it('does not re-broadcast presence when a duplicate close is delivered for an offline client', () => {
+    const map = makeTestMap();
+    const players = buildPlayers(Tribe.Cats, 1, new SeededRandom(1));
+    controller.sim = new Simulator(map, players, 'turns30', { rng: () => 0.5 });
+    useGameStore.setState({ players, playersOnline: players.map(() => true) });
+    net().hostPlayers = [
+      { peerId: 'guest-1', name: 'Guest', tribeId: Tribe.Warriors, playerIndex: 1, ready: true, online: false },
+    ];
+    const broadcast = vi.fn();
+    net().hostSession = { broadcast } as never;
+    controller.handleClientClosed('guest-1');
+    expect(broadcast).not.toHaveBeenCalled();
+    expect(net().hostPlayers[0]!.online).toBe(false);
+  });
+
   it('removes a disconnected player from the lobby list before the game starts', () => {
     useGameStore.setState({
       lobby: { role: 'host', code: 'ABC123', mode: 'capture', totalPlayers: 2, aiCount: 0, players: [] },
