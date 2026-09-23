@@ -1,0 +1,52 @@
+import type { Axial } from './hex';
+import { SkillId } from './skills';
+import { UnitType } from './units';
+import type { BonusKind } from './bonus';
+import type { AchievementId } from './achievements';
+import type { BottleEffect } from './bottles';
+
+export type BuildingKind = 'sawmill' | 'mine' | 'port' | 'temple' | 'forestTemple';
+
+/** Pre-attack visual info for a combatant so presenters can keep showing a
+ * unit (and its hp) after the sim has already applied the combat result. */
+export interface AttackUnitPre {
+  type: UnitType;
+  owner: number;
+  shipLevel?: 1 | 2 | 3;
+  hp: number;
+}
+
+export type GameEvent =
+  | { type: 'unitMoved'; unitId: string; from: Axial; path: Axial[]; to: Axial; shipLevel?: 1 | 2 | 3 }
+  | { type: 'attack'; attackerId: string; targetId: string; attackerIndex: number; targetIndex: number; attackerTile: Axial; targetTile: Axial; attackerDamage: number; targetDamage: number; missed: boolean; attackerDied: boolean; targetDied: boolean; attackerPre?: AttackUnitPre; targetPre?: AttackUnitPre }
+  | { type: 'siege'; attackerId: string; attackerIndex: number; targetIndex: number; targetTile: Axial; missed: boolean; destroyed: 'village' | 'wall' | 'building' | 'bridge' | null; buildingHp?: number }
+  | { type: 'spawned'; unitType: UnitType; q: number; r: number; playerIndex: number }
+  | { type: 'captured'; q: number; r: number; oldOwner: number | null; newOwner: number; ownerDied: boolean }
+  | { type: 'villageUpgraded'; q: number; r: number; level: number; playerIndex: number }
+  | { type: 'wallBuilt'; q: number; r: number; playerIndex: number }
+  | { type: 'built'; kind: BuildingKind; q: number; r: number; playerIndex: number }
+  | { type: 'buildingRepaired'; q: number; r: number; playerIndex: number }
+  | { type: 'buildingDestroyed'; q: number; r: number; playerIndex: number }
+  | { type: 'bridgeBuilt'; q: number; r: number; playerIndex: number }
+  | { type: 'templeGrown'; q: number; r: number; level: number; playerIndex: number }
+  | { type: 'roadBuilt'; q: number; r: number; playerIndex: number }
+  | { type: 'skillOpened'; playerIndex: number; skill: SkillId }
+  | { type: 'healed'; unitId: string; playerIndex: number }
+  | { type: 'shipUpgraded'; unitId: string; level: 1 | 2 | 3; playerIndex: number }
+  | { type: 'shipReverted'; unitId: string }
+  | { type: 'unitDisbanded'; unitId: string; q: number; r: number; playerIndex: number }
+  | { type: 'scoreFly'; playerIndex: number; amount: number; q: number; r: number }
+  | { type: 'knightCombo'; unitId: string; q: number; r: number; playerIndex: number }
+  | { type: 'bonusClaimed'; q: number; r: number; kind: BonusKind; playerIndex: number; skill?: SkillId }
+  | { type: 'bottleCollected'; q: number; r: number; kind: BottleEffect; playerIndex: number; skill?: SkillId }
+  | { type: 'explorer'; q: number; r: number; path: Axial[]; playerIndex: number }
+  | { type: 'pirateCapture'; q: number; r: number; playerIndex: number; success: boolean }
+  | { type: 'pirateSpawned'; q: number; r: number }
+  | { type: 'pirateDeal'; unitId: string; q: number; r: number; playerIndex: number }
+  | { type: 'pirateDealCanceled'; unitId: string; q: number; r: number; playerIndex: number }
+  | { type: 'achievementUnlocked'; playerIndex: number; achievement: AchievementId }
+  | { type: 'turnStarted'; playerIndex: number; turn: number }
+  | { type: 'aiTurn'; playerIndex: number }
+  | { type: 'aiTakeover'; playerIndex: number }
+  | { type: 'playerForfeited'; playerIndex: number }
+  | { type: 'gameOver'; winnerIndex: number; bonus: number };

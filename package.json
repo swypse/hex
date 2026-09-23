@@ -1,0 +1,46 @@
+{
+  "name": "hex",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "typecheck:worker": "tsc --noEmit -p worker/tsconfig.json",
+    "pack:skills": "node tools/packSkills.mjs",
+    "pack:achievements": "node tools/packAchievements.mjs",
+    "pack:action-buttons": "node tools/packActionButtons.mjs",
+    "pack:terrain": "node tools/packTerrain.mjs",
+    "pack:buildings": "node tools/packBuildings.mjs",
+    "pack:tribes": "node tools/packTribes.mjs",
+    "pack:tribe-icons": "node tools/packTribeIcons.mjs",
+    "pack:village-villagers": "node tools/packVillageVillagers.mjs",
+    "pack:village-warriors": "node tools/packVillageWarriors.mjs",
+    "pack:village-cats": "node tools/packVillageCats.mjs",
+    "pack:village-aqua": "node tools/packVillageAqua.mjs",
+    "pack:village-forest": "node tools/packVillageForest.mjs",
+    "pack:village-sand": "node tools/packVillageSand.mjs",
+    "pack:village-barbarians": "node tools/packVillageBarbarians.mjs",
+    "pack:icons-16": "node tools/packIcons16.mjs",
+    "pack:icons-32": "node tools/packIcons32.mjs",
+    "relay": "node server/relay.mjs",
+    "relay:dev": "wrangler dev -c worker/wrangler.jsonc",
+    "relay:deploy": "wrangler deploy -c worker/wrangler.jsonc"
+  },
+  "dependencies": {
+    "pixi.js": "^8.21.0",
+    "ws": "^8.18.0",
+    "zustand": "^5.0.15"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260918.1",
+    "pngquant-bin": "^9.0.0",
+    "typescript": "^5.9.3",
+    "vite": "^5.4.21",
+    "vitest": "^1.6.1",
+    "wrangler": "^4.134.0"
+  }
+}

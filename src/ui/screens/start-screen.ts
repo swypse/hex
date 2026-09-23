@@ -1,0 +1,437 @@
+import { Application, Container, FillGradient, Graphics, Sprite, BitmapText, Texture } from 'pixi.js';
+import { gameController } from '../../controller/game-controller';
+import { useGameStore } from '../../store/game-store';
+import { saveRepository } from '../../storage/save-game';
+import { activeMatchStore } from '../../storage/active-match';
+import { loadSettings, setAiDifficulty, setSoundEnabled, welcomeDismissed, setWelcomeDismissed } from '../../storage/settings';
+import { AiDifficulty } from '../../game/ai-difficulty';
+import { isTouchDevice } from '../touch';
+import { markDirty } from '../../render/render-gate';
+import { type ScreenController, type UIHost } from '../host';
+import { ScreenScroll } from '../vertical-scroll';
+
+/** Half the logo's display height (97px wide on the 194x170 source aspect).
+ *  Layout reserves it statically so the menu column never jumps when the logo
+ *  image finishes loading (the sprite's height is 0 until then). */
+const TITLE_HALF = (97 * 170) / 194 / 2;
+import { t } from '../../i18n';
+import { Button } from '../kit/button';
+import { ButtonGroup } from '../kit/button-group';
+import { makeLabel } from '../kit/label';
+import { makeCheckbox } from '../kit/checkbox';
+import { Modal } from '../kit/modal';
+import { Popup } from '../kit/popup';
+import { setLanguage, type Language } from '../../storage/settings';
+import { ensureCanvasResource } from '../../render/image-texture';
+
+const IMAGE_BASE = `${import.meta.env.BASE_URL}images/`;
+
+const MAIN_BG = {
+  file: 'main-bg.png',
+} as const;
+
+/** Popup-backed dialog the start screen can show (settings / about). */
+interface ModalView {
+  destroy(): void;
+
+  hide(onDone: () => void): void;
+}
+
+class SettingsPanel {
+  readonly el: Container;
+  private popup: Popup | null = null;
+
+  constructor(app: Application, onClose: () => void) {
+    const close = new Button({ label: t('common.close'), width: 140, onClick: onClose });
+    const popup = new Popup({
+      app,
+      title: t('settings.title'),
+      buttons: [close],
+      onClose,
+    });
+    this.popup = popup;
+    this.el = popup.el;
+
+    const content = popup.content;
+    const blockGap = 10;
+    let y = 0;
+
+    const difficultyLabel = makeLabel(t('settings.difficulty'), { fontSize: 14, fill: 0xeeeeee });
+    difficultyLabel.position.set(0, y);
+    content.addChild(difficultyLabel);
+    y += difficultyLabel.height + 8;
+
+    const difficultyOptions: AiDifficulty[] = ['easy', 'normal', 'hard'];
+    const difficultyKeys: Record<AiDifficulty, string> = {
+      easy: 'difficulty.easy',
+      normal: 'difficulty.normal',
+      hard: 'difficulty.hard',
+    };
+    const difficultyGroup = new ButtonGroup({
+      items: difficultyOptions.map((d) => ({
+        label: t(difficultyKeys[d]),
+        onClick: () => {
+          setAiDifficulty(d);
+          difficultyGroup.buttons.forEach((b, i) => {
+            b.selected = difficultyOptions[i] === d;
+          });
+        },
+      })),
+    });
+    const currentDifficulty = loadSettings().aiDifficulty;
+    difficultyGroup.buttons.forEach((b, i) => {
+      b.selected = difficultyOptions[i] === currentDifficulty;
+    });
+    difficultyGroup.position.set(0, y);
+    content.addChild(difficultyGroup);
+    y += difficultyGroup.buttonHeight + blockGap;
+
+    const soundLabel = makeLabel(t('settings.sound'), { fontSize: 14, fill: 0xeeeeee });
+    soundLabel.position.set(0, y);
+    content.addChild(soundLabel);
+    y += soundLabel.height + 8;
+
+    const soundGroup = new ButtonGroup({
+      items: [
+        {
+          label: t('common.on'),
+          onClick: () => {
+            setSoundEnabled(true);
+            soundGroup.buttons.forEach((b, i) => {
+              b.selected = i === 0;
+            });
+          },
+        },
+        {
+          label: t('common.off'),
+          onClick: () => {
+            setSoundEnabled(false);
+            soundGroup.buttons.forEach((b, i) => {
+              b.selected = i === 1;
+            });
+          },
+        },
+      ],
+    });
+    const soundOn = loadSettings().soundOn;
+    soundGroup.buttons.forEach((b, i) => {
+      b.selected = i === 0 ? soundOn : !soundOn;
+    });
+    soundGroup.position.set(0, y);
+    content.addChild(soundGroup);
+    y += soundGroup.buttonHeight + blockGap;
+
+    const langLabel = makeLabel(t('settings.language'), { fontSize: 14, fill: 0xeeeeee });
+    langLabel.position.set(0, y);
+    content.addChild(langLabel);
+    y += langLabel.height + 8;
+
+    const langOptions: { code: Language; key: string }[] = [
+      { code: 'en', key: 'lang.en' },
+      { code: 'ru', key: 'lang.ru' },
+    ];
+    const currentLang = loadSettings().lang;
+    const langGroup = new ButtonGroup({
+      items: langOptions.map((l) => ({
+        label: t(l.key),
+        onClick: () => {
+          if (l.code === currentLang) return;
+          setLanguage(l.code);
+          window.location.reload();
+        },
+      })),
+    });
+    langGroup.buttons.forEach((b, i) => {
+      b.selected = langOptions[i]!.code === currentLang;
+    });
+    langGroup.position.set(0, y);
+    content.addChild(langGroup);
+    y += langGroup.buttonHeight + blockGap;
+
+    const welcomeLabel = makeLabel(t('settings.dontShowWelcome'), { fontSize: 14, fill: 0xeeeeee });
+    welcomeLabel.position.set(0, y);
+    content.addChild(welcomeLabel);
+    y += welcomeLabel.height + 8;
+
+    const welcomeCheck = makeCheckbox(welcomeDismissed(), (checked) => setWelcomeDismissed(checked));
+    welcomeCheck.el.position.set(0, y);
+    content.addChild(welcomeCheck.el);
+  }
+
+  mount(container: Container): void {
+    container.addChild(this.el);
+    this.popup?.finish();
+  }
+
+  hide(onDone: () => void): void {
+    this.popup?.animateOut(onDone);
+  }
+
+  destroy(): void {
+    this.popup?.destroy();
+    this.popup = null;
+  }
+}
+
+export class StartScreen implements ScreenController {
+  private root: Container | null = null;
+  private host: UIHost | null = null;
+  private scroll: ScreenScroll | null = null;
+  private title: Sprite | null = null;
+  private hint: BitmapText | null = null;
+  private version: BitmapText | null = null;
+  private buttons: Button[] = [];
+  private index = 0;
+  private aboutBtn: Button | null = null;
+  private settingsBtn: Button | null = null;
+  private modal: ModalView | null = null;
+  private bgImg: Sprite | null = null;
+  private bg: Graphics | null = null;
+
+  mount(host: UIHost): void {
+    this.host = host;
+    this.root = new Container();
+    host.screenLayer.addChild(this.root);
+
+    this.addGradientBackground();
+    this.addBackgroundImage();
+    this.scroll = new ScreenScroll(host.app, this.root);
+
+    this.title = new Sprite();
+    this.title.anchor.set(0.5, 0.5);
+    // The 194x170 hex-terra.png is baked at 2x; display it at 97px wide and
+    // scale the height to keep the aspect ratio.
+    const TITLE_WIDTH = 97;
+    const img = new Image();
+    img.onload = () => {
+      if (!this.title || this.title.destroyed) return;
+      this.title.texture = Texture.from(img);
+      ensureCanvasResource(this.title.texture);
+      this.title.width = TITLE_WIDTH;
+      this.title.height = Math.round(TITLE_WIDTH * img.naturalHeight / img.naturalWidth);
+      this.layout();
+      // Async visual change outside any store/interaction: request a frame so
+      // the logo appears without a pointer event.
+      markDirty();
+    };
+    img.src = `${import.meta.env.BASE_URL}textures/hex-terra.png`;
+
+    const single = new Button({
+      label: t('start.single'),
+      width: 240,
+      onClick: () => useGameStore.getState().setScreen('setup'),
+    });
+    const multi = new Button({
+      label: t('start.multi'),
+      width: 240,
+      onClick: () => useGameStore.getState().setScreen('lobby'),
+    });
+    const tutorial = new Button({
+      label: t('start.tutorial'),
+      width: 240,
+      onClick: () => {
+        void gameController.startTutorial();
+      },
+    });
+    const buttons: Button[] = [single, multi, tutorial];
+    if (saveRepository.hasSave()) {
+      buttons.unshift(new Button({ label: t('start.resume'), width: 240, onClick: () => gameController.resumeGame() }));
+    }
+    // A reloaded client re-enters the running match (freshly saved match only).
+    if (activeMatchStore.loadFresh()) {
+      buttons.unshift(new Button({ label: t('start.rejoinMatch'), width: 240, onClick: () => gameController.rejoinGame() }));
+    }
+    this.buttons = buttons;
+    this.buttons[0]!.selected = true;
+
+    this.hint = makeLabel(t('start.hint'), { fontSize: 14, fill: 0xeeeeee });
+    this.hint.visible = !isTouchDevice();
+    this.hint.alpha = 0.7;
+    this.hint.anchor.set(0.5, 0.5);
+
+    this.version = makeLabel('alpha-version', { fontSize: 14, fill: 0xffffff });
+    this.version.anchor.set(0.5, 0.5);
+    this.version.alpha = 0.9;
+
+    this.aboutBtn = new Button({
+      label: t('start.about'),
+      width: 96,
+      fontSize: 14,
+      onClick: () => this.openModal('about')
+    });
+    this.settingsBtn = new Button({
+      label: t('start.settings'),
+      width: 110,
+      fontSize: 14,
+      onClick: () => this.openModal('settings')
+    });
+    this.root.addChild(this.aboutBtn, this.settingsBtn);
+    if (this.scroll) {
+      this.scroll.content.addChild(this.title, ...this.buttons, this.hint, this.version);
+    } else {
+      this.root.addChild(this.title, ...this.buttons, this.hint, this.version);
+    }
+
+    this.layout();
+    window.addEventListener('keydown', this.onKeyDown);
+    window.addEventListener('resize', this.onResize);
+  }
+
+  private onResize = (): void => this.layout();
+
+  private addGradientBackground(): void {
+    const g = new Graphics();
+    g.eventMode = 'none';
+    this.root!.addChild(g);
+    this.bg = g;
+  }
+
+  private paintGradient(): void {
+    if (!this.bg || !this.host) return;
+    const w = this.host.app.screen.width;
+    const h = this.host.app.screen.height;
+    const gradient = new FillGradient({
+      type: 'linear',
+      start: { x: 0, y: 0 },
+      end: { x: 0, y: h },
+      colorStops: [
+        { offset: 0, color: 0xff61e7 },
+        { offset: 0.58, color: 0x0a2c5a },
+        { offset: 1, color: 0x0a2c5a },
+      ],
+      textureSpace: 'global',
+    });
+    this.bg.clear().rect(0, 0, w, h).fill(gradient);
+  }
+
+  private addBackgroundImage(): void {
+    const sprite = new Sprite();
+    // Centre the image on its bottom edge so it hangs below the screen.
+    sprite.anchor.set(0.5, 1);
+    sprite.eventMode = 'none';
+    this.root!.addChild(sprite);
+    this.bgImg = sprite;
+    const img = new Image();
+    img.onload = () => {
+      if (sprite.destroyed) return;
+      sprite.texture = Texture.from(img);
+      ensureCanvasResource(sprite.texture);
+      this.layout();
+      // Async visual change outside any store/interaction: request a frame.
+      markDirty();
+    };
+    img.src = IMAGE_BASE + MAIN_BG.file;
+  }
+
+  private onKeyDown = (e: KeyboardEvent): void => {
+    if (this.modal) return;
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      this.move(-1);
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      this.move(1);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      this.buttons[this.index]!.trigger();
+    }
+  };
+
+  private layout(): void {
+    if (!this.root || !this.host) return;
+    const w = this.host.app.screen.width;
+    const h = this.host.app.screen.height;
+    const titleHalf = TITLE_HALF;
+    const btnH = this.buttons[0]?.height ?? 34;
+    const n = this.buttons.length;
+    const topPad = 24;
+    const bottomPad = 24;
+    // Offsets measured from the title glyph's top edge.
+    const firstBtnTop = titleHalf + 90;
+    const lastBtnTop = firstBtnTop + Math.max(0, n - 1) * 64;
+    const hintCenter = lastBtnTop + 70;
+    const versionHeight = 14;
+    const versionCenter = lastBtnTop + 130;
+    const columnBottom = versionCenter + versionHeight / 2;
+    let glyphTop = (h - columnBottom) / 2;
+    glyphTop = Math.max(topPad, Math.min(glyphTop, h - columnBottom - bottomPad));
+
+    this.title!.position.set(w / 2, glyphTop + titleHalf);
+    let y = glyphTop + firstBtnTop;
+    for (const b of this.buttons) {
+      b.position.set(w / 2 - 120, y);
+      y += 64;
+    }
+    if (this.hint) this.hint.position.set(w / 2, glyphTop + hintCenter);
+    if (this.version) this.version.position.set(w / 2, glyphTop + versionCenter);
+    if (this.aboutBtn) this.aboutBtn.position.set(12, h - this.aboutBtn.height - 12);
+    if (this.settingsBtn) this.settingsBtn.position.set(w - this.settingsBtn.width - 12, h - this.settingsBtn.height - 12);
+    this.paintGradient();
+    this.placeBackgroundImage();
+    this.scroll?.resize();
+    this.scroll?.refresh();
+  }
+
+  private placeBackgroundImage(): void {
+    const sprite = this.bgImg;
+    if (!sprite || sprite.texture === Texture.EMPTY || !this.host) return;
+    const texture = sprite.texture;
+    sprite.width = texture.width;
+    sprite.height = texture.height;
+    const screen = this.host.app.screen;
+    sprite.position.set(screen.width / 2, screen.height + 100);
+  }
+
+  private move(dir: number): void {
+    this.index = (this.index + dir + this.buttons.length) % this.buttons.length;
+    this.buttons.forEach((b, i) => {
+      b.selected = i === this.index;
+    });
+  }
+
+  private openModal(kind: 'about' | 'settings'): void {
+    if (this.modal || !this.host) return;
+    if (kind === 'settings') {
+      const panel = new SettingsPanel(this.host.app, () => this.closeModal());
+      panel.mount(this.root!);
+      this.modal = panel;
+      return;
+    }
+    const opts = kind === 'about'
+      ? { title: t('start.aboutTitle'), lines: [t('start.aboutText'), t('start.author', { name: 'swypse' })] }
+      : { title: t('settings.title'), lines: [] };
+    const modal = new Modal({ app: this.host.app, ...opts, onClose: () => this.closeModal() });
+    modal.mount(this.root!);
+    this.modal = modal;
+  }
+
+  private closeModal(): void {
+    const modal = this.modal;
+    if (!modal) return;
+    this.modal = null;
+    const done = (): void => modal.destroy();
+    modal.hide(done);
+  }
+
+  destroy(): void {
+    if (this.modal) {
+      this.modal.destroy();
+      this.modal = null;
+    }
+    window.removeEventListener('keydown', this.onKeyDown);
+    window.removeEventListener('resize', this.onResize);
+    this.scroll?.destroy();
+    this.scroll = null;
+    this.root?.destroy({ children: true });
+    this.root = null;
+    this.title = null;
+    this.hint = null;
+    this.version = null;
+    this.buttons = [];
+    this.aboutBtn = null;
+    this.settingsBtn = null;
+    this.bgImg = null;
+    this.bg = null;
+    this.host = null;
+  }
+}

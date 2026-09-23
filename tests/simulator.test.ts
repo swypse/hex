@@ -1,0 +1,740 @@
+import { describe, it, expect } from 'vitest';
+import { makeTestMap, tileAt, makeUnit } from './helpers/test-map';
+import { Simulator } from '../src/game/simulator';
+import { buildPlayers } from '../src/game/players';
+import { Tribe } from '../src/game/tribes';
+import { SeededRandom } from '../src/util/random';
+import { canAttack, canHeal, canMove } from '../src/game/units';
+import { TileType } from '../src/game/tile-types';
+import { isExploredFor } from '../src/game/explore';
+import { hexNeighbors } from '../src/game/hex';
+import { quickCaptureScore, quickCaptureTurnsCount } from '../src/game/game-mode';
+
+describe('Simulator commands', () => {
+  it('move moves a unit, marks moved, emits unitMoved', () => {
+    const map = makeTestMap();
+    tileAt(map, 0, 0)!.settlement = { owner: 0, level: 1, captureReady: false };
+    tileAt(map, 0, 0)!.unit = makeUnit('u1', 0, 'warrior', 0, 0);
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    sim.startGame();
+    sim.drainEvents();
+    const ok = sim.applyCommand({ type: 'move', unitId: 'u1', q: 0, r: 1 });
+    expect(ok).toBe(true);
+    expect(tileAt(map, 0, 1)!.unit?.id).toBe('u1');
+    expect(tileAt(map, 0, 0)!.unit).toBeNull();
+    expect(tileAt(map, 0, 1)!.unit!.hasMoved).toBe(true);
+    const events = sim.drainEvents();
+    expect(events[0]).toMatchObject({ type: 'unitMoved', unitId: 'u1', to: { q: 0, r: 1 } });
+  });
+
+  it('giveToAI flips a human player to AI so their turns auto-run', () => {
+    const map = makeTestMap();
+    tileAt(map, 0, 0)!.settlement = { owner: 0, level: 1, captureReady: false };
+    tileAt(map, 0, 1)!.settlement = { owner: 1, level: 1, captureReady: false };
+    tileAt(map, 0, 0)!.unit = makeUnit('u1', 0, 'warrior', 0, 0);
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    players[1]!.isHuman = true; // guest seat
+    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    sim.startGame();
+    sim.drainEvents();
+    expect(players[1]!.isHuman).toBe(true);
+    const ok = sim.applyCommand({ type: 'giveToAI', playerIndex: 1 });
+    expect(ok).toBe(true);
+    expect(players[1]!.isHuman).toBe(false);
+    expect(sim.applyCommand({ type: 'giveToAI', playerIndex: 1 })).toBe(false);
+  });
+
+  it('forfeit frees all villages and units of a player and marks them inactive', () => {
+    const map = makeTestMap();
+    tileAt(map, 0, 0)!.settlement = { owner: 0, level: 1, captureReady: false };
+    tileAt(map, 0, 1)!.settlement = { owner: 1, level: 1, captureReady: false };
+    tileAt(map, 1, 0)!.settlement = { owner: 1, level: 1, captureReady: false };
+    tileAt(map, 0, 0)!.unit = makeUnit('u1', 0, 'warrior', 0, 0);
+    tileAt(map, 0, 1)!.unit = makeUnit('u2', 1, 'warrior', 0, 1);
+    tileAt(map, 1, 0)!.ownedBy = 1;
+    tileAt(map, 1, 0)!.claimedByVillage = { q: 0, r: 1 };
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    players[1]!.isHuman = true;
+    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    sim.startGame();
+    sim.drainEvents();
+
+    const ok = sim.applyCommand({ type: 'forfeit', playerIndex: 1 });
+    expect(ok).toBe(true);
+    expect(players[1]!.isActive).toBe(false);
+    expect(tileAt(map, 0, 1)!.settlement?.owner).toBeNull();
+    expect(tileAt(map, 1, 0)!.settlement?.owner).toBeNull();
+    expect(tileAt(map, 0, 1)!.unit).toBeNull();
+    expect(tileAt(map, 1, 0)!.ownedBy).toBeNull();
+    expect(tileAt(map, 1, 0)!.claimedByVillage).toBeNull();
+    // Player 0's stuff is untouched.
+    expect(tileAt(map, 0, 0)!.settlement?.owner).toBe(0);
+    expect(tileAt(map, 0, 0)!.unit?.id).toBe('u1');
+    // Forfeiting an already-inactive player is a no-op.
+    expect(sim.applyCommand({ type: 'forfeit', playerIndex: 1 })).toBe(false);
+  });
+
+  it('eliminatePlayer frees a player but does not end the game (win cheat)', () => {
+    const map = makeTestMap();
+    tileAt(map, 0, 0)!.settlement = { owner: 0, level: 1, captureReady: false };
+    tileAt(map, 0, 1)!.settlement = { owner: 1, level: 1, captureReady: false };
+    tileAt(map, 0, 0)!.unit = makeUnit('u1', 0, 'warrior', 0, 0);
+    tileAt(map, 0, 1)!.unit = makeUnit('u2', 1, 'warrior', 0, 1);
+    tileAt(map, 1, 0)!.ownedBy = 1;
+    tileAt(map, 1, 0)!.claimedByVillage = { q: 0, r: 1 };
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    sim.startGame();
+    sim.drainEvents();
+
+    const ok = sim.eliminatePlayer(1);
+    expect(ok).toBe(true);
+    expect(players[1]!.isActive).toBe(false);
+    expect(tileAt(map, 0, 1)!.settlement?.owner).toBeNull();
+    expect(tileAt(map, 0, 1)!.unit).toBeNull();
+    expect(tileAt(map, 1, 0)!.ownedBy).toBeNull();
+    expect(tileAt(map, 1, 0)!.claimedByVillage).toBeNull();
+    // Player 0's stuff is untouched.
+    expect(tileAt(map, 0, 0)!.unit?.id).toBe('u1');
+    // Unlike forfeit, the win cheat must not end the game immediately; the
+    // local player's next End Turn resolves the victory.
+    expect(sim.gameOver).toBe(false);
+    // Eliminating an already-inactive player is a no-op.
+    expect(sim.eliminatePlayer(1)).toBe(false);
+  });
+
+  it('forfeit releases a touched bonus claimer and the capture-ready of occupied enemy villages', () => {
+    const map = makeTestMap();
+    tileAt(map, 0, 0)!.settlement = { owner: 0, level: 1, captureReady: false };
+    tileAt(map, 0, 1)!.settlement = { owner: 1, level: 1, captureReady: false };
+    tileAt(map, 0, 0)!.unit = makeUnit('u1', 0, 'warrior', 0, 0);
+    // Player 1 stands on an enemy village that was marked capture-ready by their
+    // turn start, and has claimed a bonus that has not been collected yet.
+    tileAt(map, 0, 1)!.settlement!.captureReady = true;
+    tileAt(map, 0, 1)!.unit = makeUnit('u2', 1, 'warrior', 0, 1);
+    tileAt(map, 1, 0)!.bonus = { kind: 'money', claimer: 1, arrivalTurn: 0 };
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    players[1]!.isHuman = true;
+    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    sim.startGame();
+    sim.drainEvents();
+
+    expect(sim.applyCommand({ type: 'forfeit', playerIndex: 1 })).toBe(true);
+    expect(tileAt(map, 0, 1)!.settlement!.captureReady).toBe(false);
+    expect(tileAt(map, 1, 0)!.bonus!.claimer).toBeNull();
+  });
+
+  it('rejects a move to an unreachable tile', () => {
+    const map = makeTestMap();
+    tileAt(map, 0, 0)!.unit = makeUnit('u1', 0, 'warrior', 0, 0);
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    sim.startGame();
+    sim.drainEvents();
+    const ok = sim.applyCommand({ type: 'move', unitId: 'u1', q: 0, r: 2 });
+    expect(ok).toBe(false);
+  });
+
+  it('a warrior leaving an expensive tile still reveals the destination ring', () => {
+    const map = makeTestMap(3);
+    tileAt(map, 0, 0)!.unit = makeUnit('u1', 0, 'warrior', 0, 0);
+    tileAt(map, 0, 0)!.terrain = TileType.GrasslandForest;
+    // Fog for the local player except the warrior's origin and destination.
+    for (const t of map.tiles) t.exploredBy = [];
+    tileAt(map, 0, 0)!.exploredBy = [0];
+    tileAt(map, 0, 1)!.exploredBy = [0];
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    sim.startGame();
+    sim.drainEvents();
+    // Leaving the forest costs 14 > the warrior's 10 move points, yet the move
+    // is legal (always-move-one) and must still explore the destination ring.
+    expect(sim.applyCommand({ type: 'move', unitId: 'u1', q: 0, r: 1 })).toBe(true);
+    for (const n of hexNeighbors({ q: 0, r: 1 })) {
+      expect(isExploredFor(tileAt(map, n.q, n.r)!, 0), `ring cell (${n.q},${n.r}) explored`).toBe(true);
+    }
+  });
+
+  it('a rider reaches one tile farther over its own road network', () => {
+    const map = makeTestMap(5);
+    tileAt(map, 0, 0)!.unit = makeUnit('u1', 0, 'rider', 0, 0);
+    tileAt(map, 0, 1)!.roadOwner = 0;
+    tileAt(map, 0, 2)!.roadOwner = 0;
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    const sim = new Simulator(map, players, 'turns30', { rng: () => 0.5 });
+    sim.startGame();
+    sim.drainEvents();
+    // 5 land tiles would cost 50 > 40 move points; the two own roads on the
+    // route (leaving them costs 5 each) bring the trip down to 40.
+    expect(sim.applyCommand({ type: 'move', unitId: 'u1', q: 0, r: 5 })).toBe(true);
+
+    // Negative control: without the roads the same 5-tile hop is out of reach.
+    const plain = makeTestMap(5);
+    tileAt(plain, 0, 0)!.unit = makeUnit('u2', 0, 'rider', 0, 0);
+    const p2 = buildPlayers(Tribe.Villagers, 1, new SeededRandom(7));
+    const sim2 = new Simulator(plain, p2, 'turns30', { rng: () => 0.5 });
+    sim2.startGame();
+    sim2.drainEvents();
+    expect(sim2.applyCommand({ type: 'move', unitId: 'u2', q: 0, r: 5 })).toBe(false);
+  });
+
+  it('rejects the +1 move when the unit does not start on its own road', () => {
+    const map = makeTestMap();
+    tileAt(map, 0, 0)!.unit = makeUnit('u1', 0, 'warrior', 0, 0);
+    tileAt(map, 0, 0)!.roadOwner = 1;
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    sim.startGame();
+    sim.drainEvents();
+    expect(sim.applyCommand({ type: 'move', unitId: 'u1', q: 0, r: 2 })).toBe(false);
+  });
+
+  it('a rider that attacked can still move its full range', () => {
+    const map = makeTestMap(3);
+    const rider = makeUnit('u1', 0, 'rider', 0, 0);
+    rider.hasAttacked = true;
+    tileAt(map, 0, 0)!.unit = rider;
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    sim.startGame();
+    sim.drainEvents();
+    expect(sim.applyCommand({ type: 'move', unitId: 'u1', q: 0, r: 2 })).toBe(true);
+    tileAt(map, 0, 2)!.unit = null;
+    const second = makeUnit('u2', 0, 'rider', 0, 0);
+    second.hasAttacked = true;
+    tileAt(map, 0, 0)!.unit = second;
+    expect(sim.applyCommand({ type: 'move', unitId: 'u2', q: 0, r: 3 })).toBe(true);
+  });
+
+  it('a rider that moved then attacked can move again (additional move)', () => {
+    const map = makeTestMap(4);
+    const rider = makeUnit('r1', 0, 'rider', 0, 0);
+    rider.hasMoved = true;
+    tileAt(map, 0, 0)!.unit = rider;
+    tileAt(map, 1, 0)!.unit = makeUnit('e1', 1, 'warrior', 1, 0);
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    const sim = new Simulator(map, players, 'turns30', { rng: () => 0.5 });
+    sim.startGame();
+    sim.drainEvents();
+    expect(sim.applyCommand({ type: 'attack', unitId: 'r1', q: 1, r: 0 })).toBe(true);
+    expect(rider.hasAttacked).toBe(true);
+    expect(rider.hasMoved).toBe(false);
+    expect(sim.applyCommand({ type: 'move', unitId: 'r1', q: -1, r: 0 })).toBe(true);
+  });
+
+  it('builds a temple, stamps bornTurn, and grows it every 2 turns to level 4', () => {    const map = makeTestMap(3);
+    const water = tileAt(map, 1, 0)!;
+    water.terrain = TileType.Water;
+    water.ownedBy = 0;
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    players[0]!.skills = ['waterTemples'];
+    players[0]!.resources = { wood: 0, stone: 10, money: 30, ore: 0 };
+    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    sim.startGame();
+    sim.drainEvents();
+    expect(sim.applyCommand({ type: 'build', q: 1, r: 0, kind: 'temple' })).toBe(true);
+    expect(tileAt(map, 1, 0)!.building).toEqual({ kind: 'temple', level: 1, bornTurn: 1 });
+
+    const grown: number[] = [];
+    const endRound = (): void => {
+      expect(sim.applyCommand({ type: 'endTurn' })).toBe(true);
+      for (const e of sim.drainEvents()) {
+        if (e.type === 'templeGrown') grown.push(e.level);
+      }
+    };
+    endRound(); // turn 2
+    expect(tileAt(map, 1, 0)!.building!.level).toBe(1);
+    endRound(); // turn 3
+    expect(tileAt(map, 1, 0)!.building!.level).toBe(2);
+    endRound(); // turn 4
+    expect(tileAt(map, 1, 0)!.building!.level).toBe(2);
+    endRound(); // turn 5
+    expect(tileAt(map, 1, 0)!.building!.level).toBe(3);
+    endRound(); // turn 6
+    endRound(); // turn 7
+    expect(tileAt(map, 1, 0)!.building!.level).toBe(4);
+    endRound(); // turn 8
+    endRound(); // turn 9
+    expect(tileAt(map, 1, 0)!.building!.level).toBe(4);
+    expect(grown).toEqual([2, 3, 4]);
+  });
+
+  it('grows a forest temple to level 4', () => {    const map = makeTestMap(3);
+    const forest = tileAt(map, 1, 0)!;
+    forest.terrain = TileType.GrasslandForest;
+    forest.ownedBy = 0;
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    players[0]!.skills = ['forestTemple'];
+    players[0]!.resources = { wood: 0, stone: 10, money: 30, ore: 0 };
+    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    sim.startGame();
+    sim.drainEvents();
+    expect(sim.applyCommand({ type: 'build', q: 1, r: 0, kind: 'forestTemple' })).toBe(true);
+    expect(tileAt(map, 1, 0)!.building).toEqual({ kind: 'forestTemple', level: 1, bornTurn: 1 });
+    for (let i = 0; i < 3; i++) {
+      sim.applyCommand({ type: 'endTurn' });
+      sim.drainEvents();
+    }
+    expect(tileAt(map, 1, 0)!.building!.level).toBe(2);
+  });
+
+  it('tracks kills, lost units, captures, and upgrades in player stats', () => {
+    const map = makeTestMap(3);
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    tileAt(map, 0, 0)!.unit = makeUnit('me', 0, 'warrior', 0, 0);
+    tileAt(map, 1, 0)!.ownedBy = 1;
+    tileAt(map, 1, 0)!.unit = makeUnit('enemy', 1, 'warrior', 1, 0);
+    tileAt(map, 1, 0)!.unit!.hp = 2;
+    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    sim.startGame();
+    sim.drainEvents();
+    sim.applyCommand({ type: 'attack', unitId: 'me', q: 1, r: 0 });
+    expect(players[1]!.stats!.killedUnits).toBe(1);
+    expect(players[0]!.kills).toBe(1);
+    expect(players[0]!.stats!.pirateKills).toBe(0);
+  });
+
+  it('a shield that moved cannot attack, a shield that did not move can', () => {
+    const map = makeTestMap();
+    const defender = makeUnit('def', 1, 'warrior', 0, 1);
+    tileAt(map, 0, 1)!.unit = defender;
+    const shield = makeUnit('sh', 0, 'shield', 0, 0);
+    tileAt(map, 0, 0)!.unit = shield;
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    sim.startGame();
+    sim.drainEvents();
+    expect(sim.applyCommand({ type: 'attack', unitId: 'sh', q: 0, r: 1 })).toBe(true);
+    sim.drainEvents();
+    const moved = makeUnit('sh2', 0, 'shield', 0, 0);
+    moved.hasMoved = true;
+    tileAt(map, 0, 0)!.unit = moved;
+    expect(sim.applyCommand({ type: 'attack', unitId: 'sh2', q: 0, r: 1 })).toBe(false);
+  });
+
+  it('attack applies damage, emits attack', () => {
+    const map = makeTestMap();
+    tileAt(map, 0, 0)!.unit = makeUnit('att', 0, 'warrior', 0, 0);
+    tileAt(map, 0, 1)!.unit = makeUnit('def', 1, 'warrior', 0, 1);
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    sim.startGame();
+    sim.drainEvents();
+    const ok = sim.applyCommand({ type: 'attack', unitId: 'att', q: 0, r: 1 });
+    expect(ok).toBe(true);
+    const events = sim.drainEvents();
+    const attack = events.find((e) => e.type === 'attack');
+    expect(attack).toBeDefined();
+    expect((attack as { attackerDamage: number }).attackerDamage).toBeGreaterThan(0);
+    expect(tileAt(map, 0, 1)!.unit!.hp).toBeLessThan(50);
+  });
+
+  it('a catapult can siege an unoccupied enemy village via the attack command', () => {
+    const map = makeTestMap();
+    tileAt(map, 0, 0)!.unit = makeUnit('cat', 0, 'catapult', 0, 0);
+    tileAt(map, 0, 1)!.settlement = { owner: 1, level: 2, captureReady: false };
+    tileAt(map, 0, 1)!.ownedBy = 1;
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    sim.startGame();
+    sim.drainEvents();
+    const ok = sim.applyCommand({ type: 'attack', unitId: 'cat', q: 0, r: 1 });
+    expect(ok).toBe(true);
+    expect(tileAt(map, 0, 1)!.settlement!.level).toBe(1);
+    const events = sim.drainEvents();
+    const siege = events.find((e) => e.type === 'siege') as { destroyed: string } | undefined;
+    expect(siege?.destroyed).toBe('village');
+  });
+
+  it('siege damages then removes an enemy mine (hp 2 -> 1 -> gone)', () => {
+    const map = makeTestMap();
+    tileAt(map, 0, 0)!.unit = makeUnit('cat2', 0, 'catapult', 0, 0);
+    tileAt(map, 1, 0)!.unit = makeUnit('cat2b', 0, 'catapult', 1, 0);
+    tileAt(map, 0, 1)!.building = { kind: 'mine', level: 1 };
+    tileAt(map, 0, 1)!.ownedBy = 1;
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    sim.startGame();
+    sim.drainEvents();
+
+    // First hit: hp 2 -> 1 (damaged, not destroyed).
+    sim.applyCommand({ type: 'attack', unitId: 'cat2', q: 0, r: 1 });
+    expect(tileAt(map, 0, 1)!.building).not.toBeNull();
+    expect(tileAt(map, 0, 1)!.building!.hp).toBe(1);
+    let siege = sim.drainEvents().find((e) => e.type === 'siege') as { destroyed: string; buildingHp?: number } | undefined;
+    expect(siege?.destroyed).toBeNull();
+    expect(siege?.buildingHp).toBe(1);
+
+    // Second catapult (a unit attacks once per turn): hp 1 -> 0, removed.
+    sim.applyCommand({ type: 'attack', unitId: 'cat2b', q: 0, r: 1 });
+    expect(tileAt(map, 0, 1)!.building).toBeNull();
+    siege = sim.drainEvents().find((e) => e.type === 'siege') as { destroyed: string; buildingHp?: number } | undefined;
+    expect(siege?.destroyed).toBe('building');
+    expect(siege?.buildingHp).toBe(0);
+  });
+
+  it('spawn creates a unit owned by the current player and emits spawned', () => {
+    const map = makeTestMap();
+    tileAt(map, 0, 0)!.settlement = { owner: 0, level: 1, captureReady: false };
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    players[0]!.resources.money = 20;
+    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    sim.startGame();
+    sim.drainEvents();
+    const ok = sim.applyCommand({ type: 'spawn', q: 0, r: 0, unitType: 'warrior' });
+    expect(ok).toBe(true);
+    expect(tileAt(map, 0, 0)!.unit?.owner).toBe(0);
+    expect(players[0]!.resources.money).toBe(16);
+    expect(sim.drainEvents()).toEqual([
+      expect.objectContaining({ type: 'spawned', unitType: 'warrior', q: 0, r: 0, playerIndex: 0 }),
+    ]);
+  });
+
+  it('capture changes village ownership and emits captured', () => {
+    const map = makeTestMap();
+    tileAt(map, 0, 0)!.settlement = { owner: 0, level: 1, captureReady: false };
+    tileAt(map, 0, 1)!.settlement = { owner: 1, level: 1, captureReady: true };
+    tileAt(map, 0, 1)!.ownedBy = 1;
+    tileAt(map, 0, 2)!.settlement = { owner: 1, level: 1, captureReady: false };
+    tileAt(map, 0, 2)!.ownedBy = 1;
+    const cap = makeUnit('cap', 0, 'warrior', 0, 1);
+    tileAt(map, 0, 1)!.unit = cap;
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    sim.startGame();
+    sim.drainEvents();
+    const ok = sim.applyCommand({ type: 'capture', q: 0, r: 1, unitId: 'cap' });
+    expect(ok).toBe(true);
+    expect(tileAt(map, 0, 1)!.settlement!.owner).toBe(0);
+    expect(sim.drainEvents()).toEqual([
+      expect.objectContaining({ type: 'scoreFly', playerIndex: 0, amount: 50 }),
+      expect.objectContaining({ type: 'captured', q: 0, r: 1, oldOwner: 1, newOwner: 0, ownerDied: false }),
+    ]);
+  });
+
+  it('counts a tribe eliminated when its last village is captured', () => {
+    const map = makeTestMap();
+    tileAt(map, 0, 0)!.settlement = { owner: 0, level: 1, captureReady: false };
+    tileAt(map, 0, 1)!.settlement = { owner: 1, level: 1, captureReady: true };
+    tileAt(map, 0, 1)!.ownedBy = 1;
+    const cap = makeUnit('cap', 0, 'warrior', 0, 1);
+    tileAt(map, 0, 1)!.unit = cap;
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    sim.startGame();
+    sim.drainEvents();
+    expect(sim.applyCommand({ type: 'capture', q: 0, r: 1, unitId: 'cap' })).toBe(true);
+    expect(players[0]!.stats!.tribesEliminated).toBe(1);
+    expect(players[1]!.isActive).toBe(false);
+  });
+
+  it('a unit can dock only on its own port', () => {
+    const map = makeTestMap();
+    tileAt(map, 1, 0)!.terrain = TileType.Water;
+    tileAt(map, 1, 0)!.building = { kind: 'port', level: 1 };
+    tileAt(map, 0, 0)!.unit = makeUnit('u1', 0, 'warrior', 0, 0);
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    players[0]!.skills = ['navigation'];
+    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    sim.startGame();
+    sim.drainEvents();
+    expect(sim.applyCommand({ type: 'move', unitId: 'u1', q: 1, r: 0 })).toBe(false);
+    tileAt(map, 1, 0)!.ownedBy = 1;
+    expect(sim.applyCommand({ type: 'move', unitId: 'u1', q: 1, r: 0 })).toBe(false);
+    tileAt(map, 1, 0)!.ownedBy = 0;
+    expect(sim.applyCommand({ type: 'move', unitId: 'u1', q: 1, r: 0 })).toBe(true);
+    const unit = tileAt(map, 1, 0)!.unit!;
+    expect(unit.shipLevel).toBe(1);
+  });
+
+  it('a unit that turns into a ship cannot move or attack this turn', () => {
+    const map = makeTestMap();
+    tileAt(map, 1, 0)!.terrain = TileType.Water;
+    tileAt(map, 1, 0)!.ownedBy = 0;
+    tileAt(map, 1, 0)!.building = { kind: 'port', level: 1 };
+    tileAt(map, 0, 0)!.unit = makeUnit('u1', 0, 'warrior', 0, 0);
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    players[0]!.skills = ['navigation'];
+    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    sim.startGame();
+    sim.drainEvents();
+    expect(sim.applyCommand({ type: 'move', unitId: 'u1', q: 1, r: 0 })).toBe(true);
+    const unit = tileAt(map, 1, 0)!.unit!;
+    expect(unit.hasMoved).toBe(true);
+    expect(unit.hasAttacked).toBe(true);
+    expect(canMove(unit)).toBe(false);
+    expect(canAttack(unit)).toBe(false);
+  });
+
+  it('a ship that lands consumes its whole turn: it cannot move, attack, or heal', () => {
+    const map = makeTestMap();
+    tileAt(map, 0, 0)!.terrain = TileType.Water;
+    const unit = makeUnit('u1', 0, 'warrior', 0, 0);
+    unit.shipLevel = 1;
+    tileAt(map, 0, 0)!.unit = unit;
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    sim.startGame();
+    sim.drainEvents();
+    expect(sim.applyCommand({ type: 'shipLanding', unitId: 'u1', q: 0, r: 1 })).toBe(true);
+    const landed = tileAt(map, 0, 1)!.unit!;
+    expect(landed.shipLevel).toBeUndefined();
+    expect(landed.hasLanded).toBe(true);
+    expect(canMove(landed)).toBe(false);
+    expect(canAttack(landed)).toBe(false);
+    expect(canHeal(landed)).toBe(false);
+    expect(sim.applyCommand({ type: 'move', unitId: 'u1', q: 0, r: 2 })).toBe(false);
+  });
+
+  it('an upgraded ship that sails off its port and docks back keeps its level', () => {
+    const map = makeTestMap(3);
+    for (const t of map.tiles) t.terrain = TileType.Water;
+    const port = tileAt(map, 0, 0)!;
+    port.building = { kind: 'port', level: 1 };
+    port.ownedBy = 0;
+    const ship = makeUnit('ship', 0, 'warrior', 0, 0);
+    ship.shipLevel = 2;
+    port.unit = ship;
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    sim.startGame();
+    sim.drainEvents();
+    // Sail away from the port; the level must be preserved.
+    expect(sim.applyCommand({ type: 'move', unitId: 'ship', q: 1, r: 0 })).toBe(true);
+    expect(ship.shipLevel).toBe(2);
+    // New turn: sail back and dock on the very same port.
+    sim.applyCommand({ type: 'endTurn' });
+    sim.drainEvents();
+    expect(sim.applyCommand({ type: 'move', unitId: 'ship', q: 0, r: 0 })).toBe(true);
+    expect(ship.shipLevel).toBe(2);
+  });
+
+  it('a shield ship may attack after moving, and a rider ship may not move after attacking', () => {
+    const map = makeTestMap();
+    for (const t of map.tiles) t.terrain = TileType.Water;
+    tileAt(map, 0, 0)!.terrain = TileType.Water;
+    tileAt(map, 1, 0)!.terrain = TileType.Water;
+    tileAt(map, 2, 0)!.terrain = TileType.Water;
+
+    // Shield ship sails and attacks in the same turn.
+    const shield = makeUnit('sh', 0, 'shield', 0, 0);
+    shield.shipLevel = 1;
+    tileAt(map, 0, 0)!.unit = shield;
+    tileAt(map, 2, 0)!.unit = makeUnit('e1', 1, 'warrior', 2, 0);
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    const sim = new Simulator(map, players, 'capture', { rng: () => 0.99 });
+    sim.startGame();
+    sim.drainEvents();
+    expect(sim.applyCommand({ type: 'move', unitId: 'sh', q: 1, r: 0 })).toBe(true);
+    expect(sim.applyCommand({ type: 'attack', unitId: 'sh', q: 2, r: 0 })).toBe(true);
+    expect(shield.hasAttacked).toBe(true);
+    expect(canMove(shield)).toBe(false);
+
+    // A rider ship that attacked cannot move again.
+    tileAt(map, 1, 0)!.unit = null;
+    tileAt(map, 0, 0)!.unit = null;
+    const rider = makeUnit('rd', 0, 'rider', 0, 0);
+    rider.shipLevel = 1;
+    rider.attackDistance = 2;
+    tileAt(map, 0, 0)!.unit = rider;
+    const sim2 = new Simulator(map, players, 'capture', { rng: () => 0.99 });
+    sim2.startGame();
+    sim2.drainEvents();
+    expect(sim2.applyCommand({ type: 'attack', unitId: 'rd', q: 2, r: 0 })).toBe(true);
+    expect(canMove(rider)).toBe(false);
+    expect(sim2.applyCommand({ type: 'move', unitId: 'rd', q: 1, r: 0 })).toBe(false);
+  });
+});
+
+describe('knight bloodlust and combos', () => {
+  function setup(enemies: { q: number; r: number; type: 'warrior' | 'swordsman'; hp?: number }[]) {
+    const map = makeTestMap(4);
+    for (const t of map.tiles) t.unit = null;
+    const knight = makeUnit('k1', 0, 'knight', 0, 0);
+    tileAt(map, 0, 0)!.unit = knight;
+    for (const e of enemies) {
+      const enemy = makeUnit(`e${e.q}${e.r}`, 1, e.type, e.q, e.r);
+      if (e.hp !== undefined) enemy.hp = e.hp;
+      tileAt(map, e.q, e.r)!.unit = enemy;
+    }
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    const sim = new Simulator(map, players, 'turns30', { rng: () => 0.5 });
+    sim.startGame();
+    sim.drainEvents();
+    return { map, sim, knight };
+  }
+
+  it('may attack again after each kill, and stops after a non-kill attack', () => {
+    const { map, sim, knight } = setup([
+      { q: 1, r: 0, type: 'warrior', hp: 1 },
+      { q: 2, r: 0, type: 'swordsman' },
+    ]);
+    expect(sim.applyCommand({ type: 'attack', unitId: 'k1', q: 1, r: 0 })).toBe(true);
+    expect(knight.hasAttacked).toBe(true);
+    expect(canAttack(knight)).toBe(true); // next enemy is in range after the advance
+    expect(sim.applyCommand({ type: 'attack', unitId: 'k1', q: 2, r: 0 })).toBe(true);
+    // Swordsman survived (knight deals 40 on its 80 hp): no extra attack remains.
+    expect(knight.canExtraAttack).toBe(false);
+    expect(canAttack(knight)).toBe(false);
+    expect(sim.applyCommand({ type: 'attack', unitId: 'k1', q: 2, r: 0 })).toBe(false);
+  });
+
+  it('awards a 30-point combo bonus at the third kill in one turn', () => {
+    const { map, sim, knight } = setup([
+      { q: 1, r: 0, type: 'warrior', hp: 1 },
+      { q: 2, r: 0, type: 'warrior', hp: 1 },
+      { q: 3, r: 0, type: 'warrior', hp: 1 },
+    ]);
+    sim.applyCommand({ type: 'attack', unitId: 'k1', q: 1, r: 0 });
+    sim.applyCommand({ type: 'attack', unitId: 'k1', q: 2, r: 0 });
+    expect(knight.killsThisTurn).toBe(2);
+    expect(sim.applyCommand({ type: 'attack', unitId: 'k1', q: 3, r: 0 })).toBe(true);
+    expect(knight.killsThisTurn).toBe(3);
+    const events = sim.drainEvents();
+    const combo = events.find((e) => e.type === 'knightCombo');
+    expect(combo).toMatchObject({ type: 'knightCombo', unitId: 'k1', q: 3, r: 0, playerIndex: 0 });
+    expect(sim.players[0]!.score).toBe(3 * 25 + 30);
+  });
+
+  it('a knight aboard a ship does not chain attacks', () => {
+    const map = makeTestMap(4);
+    for (const t of map.tiles) t.unit = null;
+    const knight = makeUnit('k1', 0, 'knight', 0, 0);
+    knight.shipLevel = 1;
+    knight.hp = 5;
+    tileAt(map, 0, 0)!.unit = knight;
+    const enemy = makeUnit('e1', 1, 'warrior', 2, 0);
+    enemy.hp = 1;
+    tileAt(map, 2, 0)!.unit = enemy;
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    const sim = new Simulator(map, players, 'turns30', { rng: () => 0.5 });
+    sim.startGame();
+    sim.drainEvents();
+    expect(sim.applyCommand({ type: 'attack', unitId: 'k1', q: 2, r: 0 })).toBe(true);
+    expect(knight.canExtraAttack).toBeFalsy();
+    expect(canAttack(knight)).toBe(false);
+  });
+});
+
+describe('science miss chance in the simulator', () => {
+  function setup(hasScience: boolean): { sim: Simulator; map: ReturnType<typeof makeTestMap> } {
+    const map = makeTestMap();
+    tileAt(map, 0, 0)!.unit = makeUnit('att', 0, 'warrior', 0, 0);
+    tileAt(map, 0, 1)!.unit = makeUnit('def', 1, 'warrior', 0, 1);
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    if (hasScience) players[0]!.skills.push('science');
+    const sim = new Simulator(map, players, 'capture', { rng: () => 0.08 });
+    sim.startGame();
+    sim.drainEvents();
+    return { sim, map };
+  }
+
+  it('without science a 0.08 attack roll misses', () => {
+    const { sim } = setup(false);
+    expect(sim.applyCommand({ type: 'attack', unitId: 'att', q: 0, r: 1 })).toBe(true);
+    const attack = sim.drainEvents().find((e) => e.type === 'attack');
+    expect((attack as { missed: boolean }).missed).toBe(true);
+  });
+
+  it('with science the same 0.08 attack roll hits', () => {
+    const { sim, map } = setup(true);
+    expect(sim.applyCommand({ type: 'attack', unitId: 'att', q: 0, r: 1 })).toBe(true);
+    const attack = sim.drainEvents().find((e) => e.type === 'attack');
+    expect((attack as { missed: boolean }).missed).toBe(false);
+    expect(tileAt(map, 0, 1)!.unit!.hp).toBe(30);
+  });
+});
+
+describe('build bridge command', () => {
+  it('builds a bridge over a water gap and emits bridgeBuilt', () => {
+    const map = makeTestMap();
+    tileAt(map, 1, 0)!.terrain = TileType.Water;
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    players[0]!.skills.push('bridges');
+    players[0]!.resources = { wood: 100, stone: 100, money: 100, ore: 0 };
+    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    sim.startGame();
+    sim.drainEvents();
+    expect(sim.applyCommand({ type: 'buildBridge', q: 1, r: 0 })).toBe(true);
+    expect(tileAt(map, 1, 0)!.bridge).toEqual({ owner: 0, dir: 'we' });
+    expect(tileAt(map, 1, 0)!.roadOwner).toBe(0);
+    expect(sim.drainEvents()).toEqual([
+      expect.objectContaining({ type: 'bridgeBuilt', q: 1, r: 0, playerIndex: 0 }),
+    ]);
+  });
+
+  it('rejects a bridge command without the skill', () => {
+    const map = makeTestMap();
+    tileAt(map, 1, 0)!.terrain = TileType.Water;
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    players[0]!.resources = { wood: 100, stone: 100, money: 100, ore: 0 };
+    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    sim.startGame();
+    sim.drainEvents();
+    expect(sim.applyCommand({ type: 'buildBridge', q: 1, r: 0 })).toBe(false);
+  });
+});
+
+describe('Quick capture bonus', () => {
+  function captureMap(): { map: ReturnType<typeof makeTestMap>; players: ReturnType<typeof buildPlayers> } {
+    const map = makeTestMap(2);
+    tileAt(map, 0, 0)!.settlement = { owner: 0, level: 1, captureReady: false };
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    players[0]!.score = 100; // disambiguate the winner tie-break
+    return { map, players };
+  }
+
+  it('awards players×20 to a capture-mode win within the turns budget', () => {
+    const { map, players } = captureMap();
+    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    sim.startGame();
+    expect(sim.expectedTurns).toBe(quickCaptureTurnsCount(players.length));
+    const before = players[0]!.score;
+    sim.endNow();
+    expect(sim.winnerIndex).toBe(0);
+    expect(sim.bonusAwarded).toBe(true);
+    expect(players[0]!.score).toBe(before + quickCaptureScore(players.length));
+  });
+
+  it('gives no bonus when the win overshoots the turns budget', () => {
+    const { map, players } = captureMap();
+    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    sim.startGame();
+    sim.turn = quickCaptureTurnsCount(players.length) + 1;
+    const before = players[0]!.score;
+    sim.endNow();
+    expect(sim.bonusAwarded).toBe(false);
+    expect(players[0]!.score).toBe(before);
+  });
+
+  it('never awards the bonus in turns30 mode', () => {
+    const { map, players } = captureMap();
+    const sim = new Simulator(map, players, 'turns30', { rng: () => 0.5 });
+    sim.startGame();
+    sim.turn = 1;
+    const before = players[0]!.score;
+    sim.endNow();
+    expect(sim.bonusAwarded).toBe(false);
+    expect(players[0]!.score).toBe(before);
+  });
+});
+
+it('destroying an own building charges 5 money and emits buildingDestroyed', () => {
+  const map = makeTestMap();
+  tileAt(map, 0, 1)!.building = { kind: 'mine', level: 1 };
+  tileAt(map, 0, 1)!.ownedBy = 0;
+  const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+  players[0]!.resources.money = 5;
+  const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+  sim.startGame();
+  sim.drainEvents();
+
+  const ok = sim.applyCommand({ type: 'destroyBuilding', q: 0, r: 1 });
+  expect(ok).toBe(true);
+  expect(tileAt(map, 0, 1)!.building).toBeNull();
+  expect(players[0]!.resources.money).toBe(0);
+  expect(sim.drainEvents()).toEqual([
+    expect.objectContaining({ type: 'buildingDestroyed', q: 0, r: 1, playerIndex: 0 }),
+  ]);
+});
