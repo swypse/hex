@@ -1,6 +1,7 @@
 import { Rectangle, Sprite, Texture } from 'pixi.js';
 import { ACTION_BUTTON_ATLAS_FILE, ACTION_BUTTON_ATLAS_CELL, ACTION_BUTTON_ATLAS_FRAMES } from '../../game/action-button-atlas-data.gen';
 import { ensureCanvasResource } from '../../render/image-texture';
+import { markDirty } from '../../render/render-gate';
 
 const TEXTURE_BASE = `${import.meta.env.BASE_URL}textures/`;
 
@@ -108,6 +109,7 @@ export function makeActionButtonIcon(key: string, size: number, onReady?: () => 
       sprite.texture = tex;
       sprite.width = size;
       sprite.height = size;
+      markDirty();
     }
     onReady?.();
   };

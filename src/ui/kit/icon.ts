@@ -4,6 +4,7 @@ import { ICONS32_ATLAS_FRAMES } from '../../game/icons32-atlas-data.gen';
 import { ensureCanvasResource } from '../../render/image-texture';
 import { makeTribeIcon } from './tribe-icons';
 import { makeIcon32 } from './icons32';
+import { markDirty } from '../../render/render-gate';
 
 const TEXTURE_BASE = `${import.meta.env.BASE_URL}textures/`;
 const cache = new Map<string, Texture>();
@@ -41,6 +42,7 @@ export function makeIcon(name: string, size: number, onReady?: () => void): Spri
     sprite.texture = tex;
     sprite.width = size;
     sprite.height = size;
+    markDirty();
     onReady?.();
   };
   img.src = TEXTURE_BASE + name;

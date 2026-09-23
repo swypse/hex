@@ -2,6 +2,7 @@ import { beforeEach, describe, it, expect, afterEach, vi } from 'vitest';
 import { Texture } from 'pixi.js';
 import { TRIBE_ICONS_ATLAS_FRAMES, TRIBE_ICONS_ATLAS_CELL } from '../src/game/tribe-icons-atlas-data.gen';
 import { TRIBES } from '../src/game/tribes';
+import type { RenderGateApp } from '../src/render/render-gate';
 
 class FakeImage {
   src = '';
@@ -66,5 +67,44 @@ describe('tribe icons atlas loader', () => {
     const sprite = icons.makeTribeIcon('cats-icon', 40);
     sprite.destroy();
     expect(() => FakeImage.instances[0]!.onload!.call(FakeImage.instances[0]!)).not.toThrow();
+  });
+
+  it('requests a render when the atlas arrives, so textures appear without interaction', async () => {
+    // The render gate skips frames while the scene is static. A sprite created
+    // before its atlas Image resolves only gains its texture asynchronously;
+    // that assignment must request a frame or the icon stays invisible until
+    // a pointer/keyboard interaction.
+    const cbs: Array<(t: { deltaMS: number }) => void> = [];
+    const renders: number[] = [];
+    const app = {
+      ticker: {
+        add: (fn: (t: { deltaMS: number }) => void): unknown => { cbs.push(fn); return fn; },
+        remove: (fn: (t: { deltaMS: number }) => void): void => {
+          const i = cbs.indexOf(fn);
+          if (i >= 0) cbs.splice(i, 1);
+        },
+      },
+      canvas: { addEventListener: (): void => {} },
+      render: (): void => { renders.push(renders.length + 1); },
+    } as unknown as RenderGateApp;
+    // Imported dynamically so it shares the fresh render-gate module instance
+    // that tribe-icons' markDirty references (after the beforeEach module reset).
+    const { installRenderGate } = await import('../src/render/render-gate');
+    const gate = installRenderGate(app);
+
+    // Flush the gate's initial dirty frame and establish a clean baseline.
+    cbs.forEach((cb) => cb({ deltaMS: 16 }));
+    renders.length = 0;
+
+    const sprite = icons.makeTribeIcon('cats-icon', 40);
+    FakeImage.instances[0]!.onload!.call(FakeImage.instances[0]!);
+    await Promise.resolve();
+
+    try {
+      cbs.forEach((cb) => cb({ deltaMS: 16 }));
+      expect(renders.length).toBeGreaterThan(0);
+    } finally {
+      gate.destroy();
+    }
   });
 });

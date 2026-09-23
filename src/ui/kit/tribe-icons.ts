@@ -1,6 +1,7 @@
 import { Rectangle, Sprite, Texture } from 'pixi.js';
 import { TRIBE_ICONS_ATLAS_FILE, TRIBE_ICONS_ATLAS_CELL, TRIBE_ICONS_ATLAS_FRAMES } from '../../game/tribe-icons-atlas-data.gen';
 import { ensureCanvasResource } from '../../render/image-texture';
+import { markDirty } from '../../render/render-gate';
 
 const TEXTURE_BASE = `${import.meta.env.BASE_URL}textures/`;
 
@@ -65,6 +66,9 @@ export function makeTribeIcon(key: string, size: number): Sprite {
       sprite.texture = tex;
       sprite.width = size;
       sprite.height = size;
+      // The atlas arrived asynchronously outside any store/interaction: ask
+      // for a frame so the icon appears without a pointer event.
+      markDirty();
     }
   });
   return sprite;

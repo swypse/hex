@@ -1,6 +1,7 @@
 import { Rectangle, Sprite, Texture } from 'pixi.js';
 import { ICONS16_ATLAS_FILE, ICONS16_ATLAS_CELL, ICONS16_ATLAS_FRAMES } from '../../game/icons16-atlas-data.gen';
 import { ensureCanvasResource } from '../../render/image-texture';
+import { markDirty } from '../../render/render-gate';
 
 const TEXTURE_BASE = `${import.meta.env.BASE_URL}textures/`;
 
@@ -60,6 +61,7 @@ export function makeIcon16(key: string, size: number, onReady?: () => void): Spr
       sprite.texture = tex;
       sprite.width = size;
       sprite.height = size;
+      markDirty();
     }
     onReady?.();
   };

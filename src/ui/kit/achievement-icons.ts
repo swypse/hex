@@ -3,6 +3,7 @@ import type { AchievementId } from '../../game/achievements';
 import { ACHIEVEMENT_ATLAS_FILE, ACHIEVEMENT_ATLAS_CELL, ACHIEVEMENT_ATLAS_FRAMES } from '../../game/achievement-atlas-data.gen';
 import { ensureCanvasResource } from '../../render/image-texture';
 import { makeCircleChip } from './tribe-chip';
+import { markDirty } from '../../render/render-gate';
 
 const TEXTURE_BASE = `${import.meta.env.BASE_URL}textures/`;
 
@@ -61,6 +62,7 @@ export function makeAchievementIcon(key: string, size: number, onReady?: () => v
       sprite.texture = tex;
       sprite.width = size;
       sprite.height = size;
+      markDirty();
     }
     onReady?.();
   };

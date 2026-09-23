@@ -1,4 +1,4 @@
-import { Container, BitmapText } from 'pixi.js';
+import { Container, BitmapText, FillGradient, Graphics } from 'pixi.js';
 import { gameController } from '../../controller/game-controller';
 import { useGameStore } from '../../store/game-store';
 import { TRIBES, type Tribe, tribeById } from '../../game/tribes';
@@ -15,6 +15,14 @@ import { makeLabel } from '../kit/label';
 import { makeTribeOption, type TribeOption } from '../kit/tribe-option';
 import { TRIBE_GAP, TRIBE_ROW_STEP, tribeSlots } from '../kit/tribe-layout';
 import { TITLE_TO_CONTENT, BLOCK_GAP } from '../kit/screen-layout';
+import { THEME } from '../kit/theme';
+import { mixColor } from '../../util/color';
+
+/** How far down the screen the tribe color has fully faded into the screen bg
+ *  (fraction of the screen height; below this the bg is solid). */
+const TRIBE_TINT_DEPTH = 0.2;
+/** Cross-fade duration for the tribe-coloured background (ms). */
+const BG_FADE_MS = 200;
 
 const ENEMY_OPTIONS = [1, 2, 3, 4, 5, 6];
 const MODE_OPTIONS: GameMode[] = ['capture', 'turns30'];
@@ -47,12 +55,18 @@ export class SetupScreen implements ScreenController {
   private startBtn: Button | null = null;
   private backBtn: Button | null = null;
   private hint: BitmapText | null = null;
+  private bg: Graphics | null = null;
+  private bgGradient: FillGradient | null = null;
+  private bgTweenRemove: (() => void) | null = null;
+  private bgColor: number | null = null;
 
   mount(host: UIHost): void {
     this.host = host;
     this.root = new Container();
     host.screenLayer.addChild(this.root);
     this.scroll = new ScreenScroll(host.app, this.root);
+
+    this.paintBackground();
 
     this.tribeTitle = makeLabel(t('common.chooseTribe'), { fontSize: 16, fill: 0xffffff });
     this.tribeTitle.anchor.set(0.5, 0.5);
@@ -68,7 +82,7 @@ export class SetupScreen implements ScreenController {
         tr.name,
         `${tr.code}-icon.png`,
         () => {
-          this.tribe = tr.id;
+          this.setTribe(tr.id);
           this.refresh();
         },
         tr.id === this.tribe,
@@ -145,7 +159,12 @@ export class SetupScreen implements ScreenController {
     window.addEventListener('resize', this.onResize);
   }
 
-  private onResize = (): void => this.layout();
+  private onResize = (): void => {
+    this.layout();
+    // The gradient is painted in absolute pixel coords, so refresh it to the
+    // new screen size (without a transition).
+    this.paintBackground();
+  };
 
   private onKeyDown = (e: KeyboardEvent): void => {
     const store = useGameStore.getState();
@@ -176,11 +195,91 @@ export class SetupScreen implements ScreenController {
     }
   };
 
+  /** Sets the selected tribe and cross-fades the screen background to its tint
+   *  when it actually changed (no-op when re-selecting the same tribe). */
+  private setTribe(id: Tribe): void {
+    if (id === this.tribe) return;
+    this.tribe = id;
+    const color = tribeById(id)?.color ?? THEME.bg;
+    if (color !== this.bgColor) this.changeBackground(color);
+  }
+
+  /** First background paint: no transition, just draw the current tribe tint. */
+  private paintBackground(): void {
+    const host = this.host;
+    if (!host) return;
+    const w = host.app.screen.width;
+    const h = host.app.screen.height;
+    const color = tribeById(this.tribe)?.color ?? THEME.bg;
+    this.bgColor = color;
+    const gradient = this.makeGradient(color, w, h);
+    this.bgGradient?.destroy();
+    this.bgGradient = gradient;
+    const bg = this.bg ?? new Graphics();
+    bg.eventMode = 'none';
+    bg.clear().rect(0, 0, w, h).fill(gradient);
+    if (!this.bg) {
+      this.bg = bg;
+      // Insert behind the scroll pad/content (mount adds it after ScreenScroll).
+      this.root!.addChildAt(bg, 0);
+    }
+  }
+
+  private makeGradient(color: number, w: number, h: number): FillGradient {
+    return new FillGradient({
+      type: 'linear',
+      start: { x: 0, y: 0 },
+      end: { x: 0, y: h },
+      colorStops: [
+        { offset: 0, color },
+        { offset: TRIBE_TINT_DEPTH, color: THEME.bg },
+        { offset: 1, color: THEME.bg },
+      ],
+      textureSpace: 'global',
+    });
+  }
+
+  /** Cross-fades the full-screen background from the current tribe tint to the
+   *  new one over `BG_FADE_MS`. Driven on the app ticker so the render gate
+   *  keeps drawing frames while the tint animates. */
+  private changeBackground(color: number): void {
+    const host = this.host;
+    if (!this.bg || !this.bgGradient || !host) return;
+    if (this.bgTweenRemove) this.bgTweenRemove();
+
+    const w = host.app.screen.width;
+    const h = host.app.screen.height;
+    const from = this.bgColor ?? color;
+    const to = color;
+    const start = performance.now();
+    const ticker = host.app.ticker;
+
+    const repaint = (mixed: number): void => {
+      const gradient = this.makeGradient(mixed, w, h);
+      this.bgGradient!.destroy();
+      this.bgGradient = gradient;
+      this.bg!.clear().rect(0, 0, w, h).fill(gradient);
+      this.bgColor = mixed;
+    };
+
+    repaint(from);
+    const fn = (): void => {
+      const t = Math.min(1, (performance.now() - start) / BG_FADE_MS);
+      repaint(mixColor(from, to, t));
+      if (t >= 1) {
+        this.bgTweenRemove = null;
+        ticker.remove(fn);
+      }
+    };
+    ticker.add(fn);
+    this.bgTweenRemove = () => ticker.remove(fn);
+  }
+
   private change(dir: number): void {
     if (this.selector === SELECTOR_COUNT - 1) return;
     if (this.selector === 0) {
       const i = TRIBES.findIndex((t) => t.id === this.tribe);
-      this.tribe = TRIBES[(i + dir + TRIBES.length) % TRIBES.length]!.id;
+      this.setTribe(TRIBES[(i + dir + TRIBES.length) % TRIBES.length]!.id);
     } else if (this.selector === 1) {
       const i = ENEMY_OPTIONS.indexOf(this.enemies);
       this.enemies = ENEMY_OPTIONS[(i + dir + ENEMY_OPTIONS.length) % ENEMY_OPTIONS.length]!;
@@ -323,6 +422,10 @@ export class SetupScreen implements ScreenController {
   destroy(): void {
     window.removeEventListener('keydown', this.onKeyDown);
     window.removeEventListener('resize', this.onResize);
+    if (this.bgTweenRemove) this.bgTweenRemove();
+    this.bgTweenRemove = null;
+    this.bgGradient?.destroy();
+    this.bgGradient = null;
     this.scroll?.destroy();
     this.scroll = null;
     this.root?.destroy({ children: true });
@@ -341,5 +444,6 @@ export class SetupScreen implements ScreenController {
     this.startBtn = null;
     this.backBtn = null;
     this.hint = null;
+    this.bg = null;
   }
 }
