@@ -70,13 +70,20 @@ describe('SetupScreen', () => {
     expect(useGameStore.getState().screen).toBe('start');
   });
 
-  it('paints a full-screen tribe-tinted background at mount', () => {
-    const state = (screen as unknown as { bg: unknown; bgGradient: unknown; bgColor: number | null }).bgColor;
-    expect(state).not.toBeNull();
-    const bg = (screen as unknown as { bg: Graphics | null }).bg!;
+  it('paints a full-screen tribe-tinted shader background at mount', () => {
+    const s = screen as unknown as {
+      bg: Graphics | null;
+      bgShader: unknown;
+      bgColor: number | null;
+    };
+    expect(s.bgColor).not.toBeNull();
+    const bg = s.bg!;
     const bounds = bg.getLocalBounds();
     expect(bounds.width).toBe(1280);
     expect(bounds.height).toBe(800);
+    // The custom gradient shader is attached to the background Graphics.
+    expect(bg.context.customShader).not.toBeNull();
+    expect(s.bgShader).not.toBeNull();
   });
 
   it('starts a background cross-fade when the tribe changes by arrow keys', () => {
@@ -84,10 +91,14 @@ describe('SetupScreen', () => {
       setTribe: (id: unknown) => void;
       bgTweenRemove: (() => void) | null;
       tribe: unknown;
+      bgShader: { shader: { resources: { gradient: { uniforms: { uTopColor: Float32Array } } } }; setTop: (c: number) => void } | null;
     };
+    const before = s.bgShader!.shader.resources.gradient.uniforms.uTopColor[0];
     s.setTribe('warriors');
     // A tween listener is registered while the fade runs.
     expect(s.bgTweenRemove).not.toBeNull();
     expect(s.tribe).toBe('warriors');
+    // The tween immediately repaints the uniform from the previous tribe color.
+    expect(s.bgShader!.shader.resources.gradient.uniforms.uTopColor[0]).toBe(before);
   });
 });
