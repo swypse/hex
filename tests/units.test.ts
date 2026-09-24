@@ -58,19 +58,16 @@ describe('UNIT_TYPES', () => {
 
 describe('UNIT_IMAGE_FILES', () => {
   it('maps every tribe and unit type to its texture file', () => {
-    const sp = ':', t = (prefix: string) => ({
-      warrior: `${prefix}-warrior.png`, rider: `${prefix}-rider.png`, archer: `${prefix}-archer.png`, swordsman: `${prefix}-swordsman.png`, shield: `${prefix}-shield.png`, catapult: `${prefix}-catapult.png`, knight: `${prefix}-knight.png`,
-      stalker: `${prefix}-warrior.png`, builder: `${prefix}-warrior.png`, banner: `${prefix}-warrior.png`, berserker: `${prefix}-warrior.png`, trapper: `${prefix}-warrior.png`, stormcaller: `${prefix}-warrior.png`, stunner: `${prefix}-warrior.png`,
-    });
-    void sp;
+    const warrior = (prefix: string) => ({ warrior: `${prefix}-warrior.png`, rider: `${prefix}-rider.png`, archer: `${prefix}-archer.png`, swordsman: `${prefix}-swordsman.png`, shield: `${prefix}-shield.png`, catapult: `${prefix}-catapult.png`, knight: `${prefix}-knight.png` });
+    const sp = (prefix: string, special: Record<string, string>) => ({ ...warrior(prefix), ...special, trapper: `${prefix}-warrior.png`, stormcaller: `${prefix}-warrior.png`, stunner: `${prefix}-warrior.png` });
     expect(UNIT_IMAGE_FILES).toEqual({
-      [Tribe.Cats]: t('cats'),
-      [Tribe.Warriors]: t('warriors'),
-      [Tribe.Villagers]: t('villagers'),
-      [Tribe.Barbarians]: t('barbarians'),
-      [Tribe.Forest]: t('forest'),
-      [Tribe.Aqua]: t('aqua'),
-      [Tribe.Sand]: t('sand'),
+      [Tribe.Cats]: sp('cats', { stalker: 'cats-stalker.png', builder: 'cats-warrior.png', banner: 'cats-warrior.png', berserker: 'cats-warrior.png' }),
+      [Tribe.Warriors]: sp('warriors', { stalker: 'warriors-warrior.png', builder: 'warriors-warrior.png', banner: 'warriors-banner-bearer.png', berserker: 'warriors-warrior.png' }),
+      [Tribe.Villagers]: sp('villagers', { stalker: 'villagers-warrior.png', builder: 'villagers-builder.png', banner: 'villagers-warrior.png', berserker: 'villagers-warrior.png' }),
+      [Tribe.Barbarians]: sp('barbarians', { stalker: 'barbarians-warrior.png', builder: 'barbarians-warrior.png', banner: 'barbarians-warrior.png', berserker: 'barbarians-berserker.png' }),
+      [Tribe.Forest]: sp('forest', { stalker: 'forest-warrior.png', builder: 'forest-warrior.png', banner: 'forest-warrior.png', berserker: 'forest-warrior.png' }),
+      [Tribe.Aqua]: sp('aqua', { stalker: 'aqua-warrior.png', builder: 'aqua-warrior.png', banner: 'aqua-warrior.png', berserker: 'aqua-warrior.png' }),
+      [Tribe.Sand]: sp('sand', { stalker: 'sand-warrior.png', builder: 'sand-warrior.png', banner: 'sand-warrior.png', berserker: 'sand-warrior.png' }),
     });
   });
 });

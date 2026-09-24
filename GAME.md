@@ -51,8 +51,9 @@ freshly spawned unit must wait until the next turn.
 
 ### Special units
 
-Each tribe has one special unit it alone can spawn (no skill required; the tribe is the gate). They currently reuse the
-tribe's warrior artwork and the generic `action-spawn-warrior` popup icon until dedicated art arrives.
+Each tribe has one special unit it alone can spawn (no skill required; the tribe is the gate). Stalker, builder,
+banner-bearer, and berserker have their own artwork; trapper, stormcaller, and stunner still reuse the tribe's warrior
+texture (and all special units use the generic `action-spawn-warrior` popup icon) until dedicated art arrives.
 
 | Unit        | Tribe       | Move | Attack | Range | HP | Defense | Cost |
 |-------------|-------------|------|--------|-------|-----|---------|------|
