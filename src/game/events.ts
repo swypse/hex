@@ -49,6 +49,7 @@ export type GameEvent =
   | { type: 'trapPlaced'; q: number; r: number; playerIndex: number }
   | { type: 'trapTriggered'; q: number; r: number; targetId: string; damage: number; attackerIndex: number }
   | { type: 'storm'; unitId: string; q: number; r: number; targets: { q: number; r: number; damage: number }[] }
+  | { type: 'stunShot'; attackerId: string; targetId: string; attackerTile: Axial; targetTile: Axial; missed: boolean; stunned: boolean }
   | { type: 'achievementUnlocked'; playerIndex: number; achievement: AchievementId }
   | { type: 'turnStarted'; playerIndex: number; turn: number }
   | { type: 'aiTurn'; playerIndex: number }

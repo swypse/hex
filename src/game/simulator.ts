@@ -52,6 +52,7 @@ export type Command =
   | { type: 'enableStealth'; unitId: string }
   | { type: 'trap'; unitId: string; q: number; r: number }
   | { type: 'storm'; unitId: string }
+  | { type: 'stun'; unitId: string; q: number; r: number }
   | { type: 'endTurn' }
   | { type: 'giveToAI'; playerIndex: number }
   | { type: 'forfeit'; playerIndex: number };
@@ -228,6 +229,9 @@ export class Simulator {
         break;
       case 'storm':
         ok = this.doStorm(cmd.unitId);
+        break;
+      case 'stun':
+        ok = this.doStun(cmd.unitId, cmd.q, cmd.r);
         break;
       case 'endTurn':
         this.doEndTurn();
@@ -489,6 +493,48 @@ export class Simulator {
     this.consumeUnitTurn(unit);
     this.emit({ type: 'storm', unitId, q: unit.q, r: unit.r, targets: report });
     return true;
+  }
+
+  /** Stunner's ranged stun: no damage, no counter-attack; the target cannot
+   *  act this turn (if it has not acted yet) or next turn (if it already has). */
+  private doStun(unitId: string, q: number, r: number): boolean {
+    const attacker = this.findUnit(unitId);
+    if (!attacker || attacker.owner !== this.currentPlayerIndex) return false;
+    if (attacker.type !== 'stunner') return false;
+    if (!canAttack(attacker)) return false;
+    const target = tileAt(this.map, q, r);
+    if (!target) return false;
+    if (!target.unit || target.unit.owner === attacker.owner) return false;
+    const dist = hexDistance(attacker, target);
+    if (dist < 1 || dist > 2) return false;
+    const player = this.players[attacker.owner]!;
+    const attackerTile = { q: attacker.q, r: attacker.r };
+    const targetTile = { q: target.q, r: target.r };
+    const targetUnit = target.unit;
+    if (this.rng() < missChanceFor(player)) {
+      attacker.hasAttacked = true;
+      this.emit({ type: 'stunShot', attackerId: unitId, targetId: targetUnit.id, attackerTile, targetTile, missed: true, stunned: false });
+      return true;
+    }
+    const alreadyActed = targetUnit.hasMoved || targetUnit.hasAttacked || targetUnit.hasHealed;
+    // Not yet acted => blocked this round (=2, decremented to 1 at that turn's
+    // start -> stunned through it). Already acted => blocked next round.
+    targetUnit.stunTurns = 2;
+    const stunned = (targetUnit.stunTurns ?? 0) >= 1;
+    attacker.hasAttacked = true;
+    this.emit({ type: 'stunShot', attackerId: unitId, targetId: targetUnit.id, attackerTile, targetTile, missed: false, stunned });
+    return true;
+  }
+
+  /** A stunned unit's counter ticks down once per round, at its owner's turn
+   *  start: stunTurns 2 -> 1 -> 0, so it skips exactly its next acting turn. */
+  private decrementStunsFor(playerIndex: number): void {
+    for (const t of this.map.tiles) {
+      const u = t.unit;
+      if (u && u.owner === playerIndex && (u.stunTurns ?? 0) > 0) {
+        u.stunTurns = (u.stunTurns ?? 0) - 1;
+      }
+    }
   }
 
   private doAttack(unitId: string, q: number, r: number): boolean {
@@ -1061,6 +1107,7 @@ export class Simulator {
         continue;
       }
       this.markCaptureReadyFor(next);
+      this.decrementStunsFor(next);
       this.emit({ type: 'turnStarted', playerIndex: next, turn: this.turn });
       return;
     }
@@ -1072,6 +1119,7 @@ export class Simulator {
     this.doClaimBonus();
     this.collectAiBottles(playerIndex);
     this.markCaptureReadyFor(playerIndex);
+    this.decrementStunsFor(playerIndex);
     this.emit({ type: 'aiTurn', playerIndex });
     const markers: AiActionMarker[] = [];
     const actions = planAiActions(this.map, ai, this.aiRng(), this.mode, markers, this.turn);
