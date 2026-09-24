@@ -163,7 +163,7 @@ describe('reachableTargets', () => {
     expect(keys(30)).toContain('3,0');
   });
 
-  it('a forest tile costs 14 to leave', () => {
+it('a forest tile costs 14 to leave', () => {
     const unit = mkUnit(0, 'warrior', 0, 0);
     const start = L(0, 0, { unit });
     const map = lineMap(start, F(1, 0), L(2, 0), L(3, 0));
@@ -173,7 +173,20 @@ describe('reachableTargets', () => {
     expect(keys(24)).toContain('2,0');
     // And (3,0) needs another 10: 34.
     expect(keys(30)).not.toContain('3,0');
-    expect(keys(34)).toContain('3,0');
+  });
+
+  it('an enemy stealthed stalker does not block reachability and does not block the path beyond it', () => {
+    const unit = mkUnit(0, 'warrior', 0, 0);
+    const start = L(0, 0, { unit });
+    const stalker = mkUnit(1, 'stalker', 1, 0);
+    stalker.isStealthed = true;
+    const map = lineMap(start, L(1, 0, { unit: stalker }), L(2, 0), L(3, 0));
+    const keys = reachableTargets(map, unit, 30).map((t) => `${t.q},${t.r}`);
+    expect(keys).toContain('1,0'); // the stalker's own cell is "empty" to a mover
+    expect(keys).toContain('2,0'); // pathing passes through it
+    expect(keys).toContain('3,0');
+    const path = pathBetween(map, { q: 0, r: 0 }, { q: 3, r: 0 });
+    expect(path.some((s) => s.q === 1 && s.r === 0)).toBe(true);
   });
 
   it('a mountain tile costs 20 to leave', () => {

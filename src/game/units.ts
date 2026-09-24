@@ -213,6 +213,9 @@ interface UnitOptions {
   hp?: number;
   spawnVillage?: { q: number; r: number } | null;
   shipLevel?: 1 | 2 | 3;
+  isStealthed?: boolean;
+  firstMoveStealthDone?: boolean;
+  stunTurns?: number;
 }
 
 export function makeUnit(
@@ -238,6 +241,9 @@ export function makeUnit(
     defense: UNIT_TYPES[type].defense,
     spawnVillage: opts.spawnVillage ?? null,
     shipLevel: opts.shipLevel,
+    isStealthed: opts.isStealthed,
+    firstMoveStealthDone: opts.firstMoveStealthDone,
+    stunTurns: opts.stunTurns,
   };
 }
 

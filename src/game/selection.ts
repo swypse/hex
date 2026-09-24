@@ -45,6 +45,15 @@ export function cycleSelection(current: Selection | null, tile: MapTile): Select
   return { kind: layers[0]!, q: tile.q, r: tile.r };
 }
 
+/** A tile with no visible unit for `playerIndex`: a real empty tile, or an
+ *  enemy stealthed stalker (invisible to everyone but its owner). Stealthed
+ *  units never block pathing for anyone else. */
+function isEffectivelyEmpty(tile: MapTile, playerIndex: number): boolean {
+  if (!tile.unit) return true;
+  if (tile.unit.owner !== playerIndex && tile.unit.isStealthed === true) return true;
+  return false;
+}
+
 /** A tile the moving unit may step onto: explored, unoccupied, and allowed by
  *  the terrain/move-type rules. Ships see land tiles as terminal (coast). */
 function isEnterable(
@@ -56,7 +65,7 @@ function isEnterable(
   playerIndex: number,
 ): boolean {
   if (!isExploredFor(tile, playerIndex)) return false;
-  if (tile.unit) return false;
+  if (!isEffectivelyEmpty(tile, playerIndex)) return false;
   if (isWaterType(tile.terrain)) {
     if (canSail) return true;
     if (tile.bridge) return true;
@@ -76,7 +85,7 @@ function isOwnDock(tile: MapTile, canDock: boolean, playerIndex: number): boolea
 function isAdjacentToEnemy(map: GameMap, tile: MapTile, playerIndex: number): boolean {
   return hexNeighbors(tile).some((n) => {
     const t = tileAt(map, n.q, n.r);
-    return t !== undefined && t.unit != null && t.unit.owner !== playerIndex;
+    return t !== undefined && t.unit != null && t.unit.isStealthed !== true && t.unit.owner !== playerIndex;
   });
 }
 
@@ -196,7 +205,7 @@ function pathBetweenSteps(
         continue;
       }
       if (!canClimb && isMountainType(tile.terrain)) continue;
-      if (tile.unit) continue;
+      if (!isEffectivelyEmpty(tile, playerIndex)) continue;
       cameFrom.set(nk, key(cur));
       if (n.q === to.q && n.r === to.r) {
         const path: Axial[] = [];
