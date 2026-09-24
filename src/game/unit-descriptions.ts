@@ -12,6 +12,13 @@ const LAND_KEYS: Record<UnitType, string[]> = {
   catapult: ['help.catapult.base', 'help.catapult.damage', 'help.catapult.siege', 'help.shield.moveLock', 'help.catapult.noAdvance', 'help.catapult.noCounter', 'help.catapult.skill'],
   knight: ['help.knight.base', 'help.knight.rekill', 'help.knight.combo', 'help.warrior.advance', 'help.knight.skill'],
   pirate: ['help.pirate.base', 'help.pirate.spawn', 'help.pirate.act', 'help.pirate.capture', 'help.pirate.steal', 'help.pirate.reward'],
+  stalker: ['help.stalker.base', 'help.stalker.stealth', 'help.stalker.button', 'help.stalker.bump', 'help.stalker.attack'],
+  builder: ['help.builder.base', 'help.builder.abuild'],
+  banner: ['help.banner.base', 'help.banner.aura', 'help.banner.nostack'],
+  berserker: ['help.berserker.base', 'help.berserker.rage'],
+  trapper: ['help.trapper.base', 'help.trapper.trap', 'help.trapper.cost', 'help.trapper.lifetime'],
+  stormcaller: ['help.stormcaller.base', 'help.stormcaller.storm', 'help.stormcaller.eligibility'],
+  stunner: ['help.stunner.base', 'help.stunner.range', 'help.stunner.stun'],
 };
 
 /** i18n key for the one-line unit description shown atop the info popup. */
@@ -24,6 +31,13 @@ const DESC_KEYS: Record<UnitType, string> = {
   catapult: 'help.catapult.desc',
   knight: 'help.knight.desc',
   pirate: 'help.pirate.desc',
+  stalker: 'help.stalker.desc',
+  builder: 'help.builder.desc',
+  banner: 'help.banner.desc',
+  berserker: 'help.berserker.desc',
+  trapper: 'help.trapper.desc',
+  stormcaller: 'help.stormcaller.desc',
+  stunner: 'help.stunner.desc',
 };
 
 export function unitHelpTitle(unit: Unit): string {

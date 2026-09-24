@@ -10,6 +10,7 @@ import { buildPlayers } from '../src/game/players';
 import { Tribe } from '../src/game/tribes';
 import { SeededRandom } from '../src/util/random';
 import { axialKey } from '../src/game/hex';
+import { UNIT_TYPES, type UnitType } from '../src/game/units';
 
 type KeyboardEventLike = { key: string; preventDefault: () => void };
 
@@ -110,12 +111,14 @@ describe('SpawnDialog', () => {
     dialog.mount(host, root);
     const popup = (dialog as unknown as { popup: { content: Container; contentWidth: number } }).popup;
     const items = popup.content.children.filter((c) => c instanceof Container && c.cursor === 'pointer');
-    // 7 unit types, 3 per row -> 3 rows (3+3+1).
-    expect(items.length).toBe(7);
+    // One icon per playable unit type (pirate excluded), 3 per row.
+    const playable = (Object.keys(UNIT_TYPES) as UnitType[]).filter((t) => t !== 'pirate').length;
+    expect(items.length).toBe(playable);
+    const expectedRows = Math.ceil(playable / 3);
     const ys = items.map((c) => c.position.y);
     const xs = items.map((c) => c.position.x);
     const rowY = [...new Set(ys)].sort();
-    expect(rowY.length).toBe(3);
+    expect(rowY.length).toBe(expectedRows);
     // First row exactly 3 icons with 4px gaps.
     const firstRow = items.filter((c) => c.position.y === rowY[0]!);
     expect(firstRow).toHaveLength(3);

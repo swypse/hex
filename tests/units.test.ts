@@ -22,9 +22,9 @@ import {
 describe('UNIT_TYPES', () => {
   it('defines warrior, rider, archer, swordsman', () => {
     expect(UNIT_TYPES.warrior).toEqual({ movePoints: 10, attack: 20, attackDistance: 1, maxHp: 50, defense: 10, price: 4, priceWood: 0, priceOre: 0, shape: 'circle' });
-    expect(UNIT_TYPES.rider).toEqual({ movePoints: 40, attack: 20, attackDistance: 1, maxHp: 40, defense: 7, price: 6, priceWood: 0, priceOre: 0, shape: 'square' });
-    expect(UNIT_TYPES.archer).toEqual({ movePoints: 10, attack: 20, attackDistance: 2, maxHp: 40, defense: 7, price: 6, priceWood: 0, priceOre: 0, shape: 'triangle' });
-    expect(UNIT_TYPES.swordsman).toEqual({ movePoints: 10, attack: 40, attackDistance: 1, maxHp: 80, defense: 20, price: 10, priceWood: 0, priceOre: 2, shape: 'swordsman' });
+    expect(UNIT_TYPES.rider).toEqual({ movePoints: 40, attack: 22, attackDistance: 1, maxHp: 45, defense: 8, price: 6, priceWood: 0, priceOre: 0, shape: 'square' });
+    expect(UNIT_TYPES.archer).toEqual({ movePoints: 10, attack: 26, attackDistance: 2, maxHp: 40, defense: 7, price: 6, priceWood: 0, priceOre: 0, shape: 'triangle' });
+    expect(UNIT_TYPES.swordsman).toEqual({ movePoints: 10, attack: 40, attackDistance: 1, maxHp: 80, defense: 16, price: 10, priceWood: 0, priceOre: 2, shape: 'swordsman' });
   });
 
   it('defines the shield unit with 80 hp, 10 move points and a 8 money + 2 ore price', () => {
@@ -39,10 +39,10 @@ describe('UNIT_TYPES', () => {
     expect(UNIT_TYPE_NAMES.catapult).toBe('Catapult');
   });
 
-  it('defines the knight unit with 30 move points, 4 attack and an ore cost', () => {
-    expect(UNIT_TYPES.knight).toEqual({ movePoints: 30, attack: 40, attackDistance: 1, maxHp: 60, defense: 7, price: 14, priceWood: 0, priceOre: 5, shape: 'swordsman' });
+  it('defines the knight unit with 30 move points, 4.6 attack and an ore cost', () => {
+    expect(UNIT_TYPES.knight).toEqual({ movePoints: 30, attack: 46, attackDistance: 1, maxHp: 70, defense: 12, price: 14, priceWood: 0, priceOre: 5, shape: 'swordsman' });
     expect(UNIT_MOVE_POINTS.knight).toBe(30);
-    expect(UNIT_ATTACK.knight).toBe(40);
+    expect(UNIT_ATTACK.knight).toBe(46);
     expect(UNIT_ATTACK_DISTANCE.knight).toBe(1);
     expect(UNIT_TYPE_NAMES.knight).toBe('Knight');
   });
@@ -58,14 +58,19 @@ describe('UNIT_TYPES', () => {
 
 describe('UNIT_IMAGE_FILES', () => {
   it('maps every tribe and unit type to its texture file', () => {
+    const sp = ':', t = (prefix: string) => ({
+      warrior: `${prefix}-warrior.png`, rider: `${prefix}-rider.png`, archer: `${prefix}-archer.png`, swordsman: `${prefix}-swordsman.png`, shield: `${prefix}-shield.png`, catapult: `${prefix}-catapult.png`, knight: `${prefix}-knight.png`,
+      stalker: `${prefix}-warrior.png`, builder: `${prefix}-warrior.png`, banner: `${prefix}-warrior.png`, berserker: `${prefix}-warrior.png`, trapper: `${prefix}-warrior.png`, stormcaller: `${prefix}-warrior.png`, stunner: `${prefix}-warrior.png`,
+    });
+    void sp;
     expect(UNIT_IMAGE_FILES).toEqual({
-      [Tribe.Cats]: { warrior: 'cats-warrior.png', rider: 'cats-rider.png', archer: 'cats-archer.png', swordsman: 'cats-swordsman.png', shield: 'cats-shield.png', catapult: 'cats-catapult.png', knight: 'cats-knight.png' },
-      [Tribe.Warriors]: { warrior: 'warriors-warrior.png', rider: 'warriors-rider.png', archer: 'warriors-archer.png', swordsman: 'warriors-swordsman.png', shield: 'warriors-shield.png', catapult: 'warriors-catapult.png', knight: 'warriors-knight.png' },
-      [Tribe.Villagers]: { warrior: 'villagers-warrior.png', rider: 'villagers-rider.png', archer: 'villagers-archer.png', swordsman: 'villagers-swordsman.png', shield: 'villagers-shield.png', catapult: 'villagers-catapult.png', knight: 'villagers-knight.png' },
-      [Tribe.Barbarians]: { warrior: 'barbarians-warrior.png', rider: 'barbarians-rider.png', archer: 'barbarians-archer.png', swordsman: 'barbarians-swordsman.png', shield: 'barbarians-shield.png', catapult: 'barbarians-catapult.png', knight: 'barbarians-knight.png' },
-      [Tribe.Forest]: { warrior: 'forest-warrior.png', rider: 'forest-rider.png', archer: 'forest-archer.png', swordsman: 'forest-swordsman.png', shield: 'forest-shield.png', catapult: 'forest-catapult.png', knight: 'forest-knight.png' },
-      [Tribe.Aqua]: { warrior: 'aqua-warrior.png', rider: 'aqua-rider.png', archer: 'aqua-archer.png', swordsman: 'aqua-swordsman.png', shield: 'aqua-shield.png', catapult: 'aqua-catapult.png', knight: 'aqua-knight.png' },
-      [Tribe.Sand]: { warrior: 'sand-warrior.png', rider: 'sand-rider.png', archer: 'sand-archer.png', swordsman: 'sand-swordsman.png', shield: 'sand-shield.png', catapult: 'sand-catapult.png', knight: 'sand-knight.png' },
+      [Tribe.Cats]: t('cats'),
+      [Tribe.Warriors]: t('warriors'),
+      [Tribe.Villagers]: t('villagers'),
+      [Tribe.Barbarians]: t('barbarians'),
+      [Tribe.Forest]: t('forest'),
+      [Tribe.Aqua]: t('aqua'),
+      [Tribe.Sand]: t('sand'),
     });
   });
 });
@@ -260,4 +265,23 @@ describe('unitMaintenance', () => {
     expect(unitMaintenance(makeUnit(0, 'catapult', 0, 0, { shipLevel: 2 }))).toBe(3);
     expect(unitMaintenance(makeUnit(0, 'warrior', 0, 0, { shipLevel: 3 }))).toBe(4);
   });
+});
+
+describe('special units', () => {
+  const cases: Array<[UnitType, number, number, number, number, number, number, number, number]> = [
+    ['stalker', 12, 30, 1, 60, 0, 9, 2, 0],
+    ['builder', 8, 10, 1, 50, 0, 7, 0, 0],
+    ['banner', 8, 20, 1, 60, 8, 10, 0, 0],
+    ['berserker', 10, 50, 1, 70, 12, 11, 0, 3],
+    ['trapper', 10, 20, 1, 50, 8, 9, 2, 0],
+    ['stormcaller', 20, 20, 1, 50, 8, 9, 0, 2],
+    ['stunner', 8, 40, 2, 40, 10, 7, 0, 0],
+  ];
+  for (const [type, move, atk, range, hp, def, price, wood, ore] of cases) {
+    it(`defines the ${type} unit`, () => {
+      expect(UNIT_TYPES[type]).toEqual({ movePoints: move, attack: atk, attackDistance: range, maxHp: hp, defense: def, price, priceWood: wood, priceOre: ore, shape: 'circle' });
+      expect(UNIT_TYPE_NAMES[type]).toBeTruthy();
+      expect(unitMaintenance(makeUnit(0, type, 0, 0))).toBeGreaterThanOrEqual(2);
+    });
+  }
 });

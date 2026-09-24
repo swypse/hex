@@ -2,7 +2,7 @@ import { t } from '../i18n';
 import { shipMovePoints } from './ship';
 import { Tribe } from './tribes';
 
-export type UnitType = 'warrior' | 'rider' | 'archer' | 'swordsman' | 'shield' | 'catapult' | 'knight' | 'pirate';
+export type UnitType = 'warrior' | 'rider' | 'archer' | 'swordsman' | 'shield' | 'catapult' | 'knight' | 'pirate' | 'stalker' | 'builder' | 'banner' | 'berserker' | 'trapper' | 'stormcaller' | 'stunner';
 type PlayableUnitType = Exclude<UnitType, 'pirate'>;
 
 export const PIRATE_OWNER = -1;
@@ -28,23 +28,30 @@ interface UnitTypeInfo {
 
 export const UNIT_TYPES: Record<UnitType, UnitTypeInfo> = {
   warrior: { movePoints: 10, attack: 20, attackDistance: 1, maxHp: 50, defense: 10, price: 4, priceWood: 0, priceOre: 0, shape: 'circle' },
-  rider: { movePoints: 40, attack: 20, attackDistance: 1, maxHp: 40, defense: 7, price: 6, priceWood: 0, priceOre: 0, shape: 'square' },
-  archer: { movePoints: 10, attack: 20, attackDistance: 2, maxHp: 40, defense: 7, price: 6, priceWood: 0, priceOre: 0, shape: 'triangle' },
-  swordsman: { movePoints: 10, attack: 40, attackDistance: 1, maxHp: 80, defense: 20, price: 10, priceWood: 0, priceOre: 2, shape: 'swordsman' },
+  rider: { movePoints: 40, attack: 22, attackDistance: 1, maxHp: 45, defense: 8, price: 6, priceWood: 0, priceOre: 0, shape: 'square' },
+  archer: { movePoints: 10, attack: 26, attackDistance: 2, maxHp: 40, defense: 7, price: 6, priceWood: 0, priceOre: 0, shape: 'triangle' },
+  swordsman: { movePoints: 10, attack: 40, attackDistance: 1, maxHp: 80, defense: 16, price: 10, priceWood: 0, priceOre: 2, shape: 'swordsman' },
   shield: { movePoints: 10, attack: 7, attackDistance: 1, maxHp: 80, defense: 20, price: 8, priceWood: 0, priceOre: 2, shape: 'square' },
   catapult: { movePoints: 10, attack: 50, attackDistance: 4, maxHp: 30, defense: 0, price: 15, priceWood: 10, priceOre: 3, shape: 'square' },
-  knight: { movePoints: 30, attack: 40, attackDistance: 1, maxHp: 60, defense: 7, price: 14, priceWood: 0, priceOre: 5, shape: 'swordsman' },
+  knight: { movePoints: 30, attack: 46, attackDistance: 1, maxHp: 70, defense: 12, price: 14, priceWood: 0, priceOre: 5, shape: 'swordsman' },
   pirate: { movePoints: 50, attack: 15, attackDistance: 3, maxHp: PIRATE_HP, defense: 5, price: 0, priceWood: 0, priceOre: 0, shape: 'square' },
+  stalker: { movePoints: 12, attack: 30, attackDistance: 1, maxHp: 60, defense: 0, price: 9, priceWood: 2, priceOre: 0, shape: 'circle' },
+  builder: { movePoints: 8, attack: 10, attackDistance: 1, maxHp: 50, defense: 0, price: 7, priceWood: 0, priceOre: 0, shape: 'circle' },
+  banner: { movePoints: 8, attack: 20, attackDistance: 1, maxHp: 60, defense: 8, price: 10, priceWood: 0, priceOre: 0, shape: 'circle' },
+  berserker: { movePoints: 10, attack: 50, attackDistance: 1, maxHp: 70, defense: 12, price: 11, priceWood: 0, priceOre: 3, shape: 'circle' },
+  trapper: { movePoints: 10, attack: 20, attackDistance: 1, maxHp: 50, defense: 8, price: 9, priceWood: 2, priceOre: 0, shape: 'circle' },
+  stormcaller: { movePoints: 20, attack: 20, attackDistance: 1, maxHp: 50, defense: 8, price: 9, priceWood: 0, priceOre: 2, shape: 'circle' },
+  stunner: { movePoints: 8, attack: 40, attackDistance: 2, maxHp: 40, defense: 10, price: 7, priceWood: 0, priceOre: 0, shape: 'circle' },
 };
 
 export const UNIT_IMAGE_FILES: Record<Tribe, Record<PlayableUnitType, string>> = {
-  [Tribe.Cats]: { warrior: 'cats-warrior.png', rider: 'cats-rider.png', archer: 'cats-archer.png', swordsman: 'cats-swordsman.png', shield: 'cats-shield.png', catapult: 'cats-catapult.png', knight: 'cats-knight.png' },
-  [Tribe.Warriors]: { warrior: 'warriors-warrior.png', rider: 'warriors-rider.png', archer: 'warriors-archer.png', swordsman: 'warriors-swordsman.png', shield: 'warriors-shield.png', catapult: 'warriors-catapult.png', knight: 'warriors-knight.png' },
-  [Tribe.Villagers]: { warrior: 'villagers-warrior.png', rider: 'villagers-rider.png', archer: 'villagers-archer.png', swordsman: 'villagers-swordsman.png', shield: 'villagers-shield.png', catapult: 'villagers-catapult.png', knight: 'villagers-knight.png' },
-  [Tribe.Barbarians]: { warrior: 'barbarians-warrior.png', rider: 'barbarians-rider.png', archer: 'barbarians-archer.png', swordsman: 'barbarians-swordsman.png', shield: 'barbarians-shield.png', catapult: 'barbarians-catapult.png', knight: 'barbarians-knight.png' },
-  [Tribe.Forest]: { warrior: 'forest-warrior.png', rider: 'forest-rider.png', archer: 'forest-archer.png', swordsman: 'forest-swordsman.png', shield: 'forest-shield.png', catapult: 'forest-catapult.png', knight: 'forest-knight.png' },
-  [Tribe.Aqua]: { warrior: 'aqua-warrior.png', rider: 'aqua-rider.png', archer: 'aqua-archer.png', swordsman: 'aqua-swordsman.png', shield: 'aqua-shield.png', catapult: 'aqua-catapult.png', knight: 'aqua-knight.png' },
-  [Tribe.Sand]: { warrior: 'sand-warrior.png', rider: 'sand-rider.png', archer: 'sand-archer.png', swordsman: 'sand-swordsman.png', shield: 'sand-shield.png', catapult: 'sand-catapult.png', knight: 'sand-knight.png' },
+  [Tribe.Cats]: { warrior: 'cats-warrior.png', rider: 'cats-rider.png', archer: 'cats-archer.png', swordsman: 'cats-swordsman.png', shield: 'cats-shield.png', catapult: 'cats-catapult.png', knight: 'cats-knight.png', stalker: 'cats-warrior.png', builder: 'cats-warrior.png', banner: 'cats-warrior.png', berserker: 'cats-warrior.png', trapper: 'cats-warrior.png', stormcaller: 'cats-warrior.png', stunner: 'cats-warrior.png' },
+  [Tribe.Warriors]: { warrior: 'warriors-warrior.png', rider: 'warriors-rider.png', archer: 'warriors-archer.png', swordsman: 'warriors-swordsman.png', shield: 'warriors-shield.png', catapult: 'warriors-catapult.png', knight: 'warriors-knight.png', stalker: 'warriors-warrior.png', builder: 'warriors-warrior.png', banner: 'warriors-warrior.png', berserker: 'warriors-warrior.png', trapper: 'warriors-warrior.png', stormcaller: 'warriors-warrior.png', stunner: 'warriors-warrior.png' },
+  [Tribe.Villagers]: { warrior: 'villagers-warrior.png', rider: 'villagers-rider.png', archer: 'villagers-archer.png', swordsman: 'villagers-swordsman.png', shield: 'villagers-shield.png', catapult: 'villagers-catapult.png', knight: 'villagers-knight.png', stalker: 'villagers-warrior.png', builder: 'villagers-warrior.png', banner: 'villagers-warrior.png', berserker: 'villagers-warrior.png', trapper: 'villagers-warrior.png', stormcaller: 'villagers-warrior.png', stunner: 'villagers-warrior.png' },
+  [Tribe.Barbarians]: { warrior: 'barbarians-warrior.png', rider: 'barbarians-rider.png', archer: 'barbarians-archer.png', swordsman: 'barbarians-swordsman.png', shield: 'barbarians-shield.png', catapult: 'barbarians-catapult.png', knight: 'barbarians-knight.png', stalker: 'barbarians-warrior.png', builder: 'barbarians-warrior.png', banner: 'barbarians-warrior.png', berserker: 'barbarians-warrior.png', trapper: 'barbarians-warrior.png', stormcaller: 'barbarians-warrior.png', stunner: 'barbarians-warrior.png' },
+  [Tribe.Forest]: { warrior: 'forest-warrior.png', rider: 'forest-rider.png', archer: 'forest-archer.png', swordsman: 'forest-swordsman.png', shield: 'forest-shield.png', catapult: 'forest-catapult.png', knight: 'forest-knight.png', stalker: 'forest-warrior.png', builder: 'forest-warrior.png', banner: 'forest-warrior.png', berserker: 'forest-warrior.png', trapper: 'forest-warrior.png', stormcaller: 'forest-warrior.png', stunner: 'forest-warrior.png' },
+  [Tribe.Aqua]: { warrior: 'aqua-warrior.png', rider: 'aqua-rider.png', archer: 'aqua-archer.png', swordsman: 'aqua-swordsman.png', shield: 'aqua-shield.png', catapult: 'aqua-catapult.png', knight: 'aqua-knight.png', stalker: 'aqua-warrior.png', builder: 'aqua-warrior.png', banner: 'aqua-warrior.png', berserker: 'aqua-warrior.png', trapper: 'aqua-warrior.png', stormcaller: 'aqua-warrior.png', stunner: 'aqua-warrior.png' },
+  [Tribe.Sand]: { warrior: 'sand-warrior.png', rider: 'sand-rider.png', archer: 'sand-archer.png', swordsman: 'sand-swordsman.png', shield: 'sand-shield.png', catapult: 'sand-catapult.png', knight: 'sand-knight.png', stalker: 'sand-warrior.png', builder: 'sand-warrior.png', banner: 'sand-warrior.png', berserker: 'sand-warrior.png', trapper: 'sand-warrior.png', stormcaller: 'sand-warrior.png', stunner: 'sand-warrior.png' },
 };
 
 export interface Unit {
@@ -69,6 +76,12 @@ export interface Unit {
   killsThisTurn?: number;
   /** Player indices that paid this pirate; it will not attack their units. */
   paidBy?: number[];
+  /** Stalker: hidden from everyone but the owner while true. */
+  isStealthed?: boolean;
+  /** Stalker: set once the spawn first-move auto-stealth was consumed. */
+  firstMoveStealthDone?: boolean;
+  /** Turns the unit is stunned; >= 1 means it cannot act. */
+  stunTurns?: number;
 }
 
 export const UNIT_MOVE_POINTS: Record<UnitType, number> = {
@@ -80,6 +93,13 @@ export const UNIT_MOVE_POINTS: Record<UnitType, number> = {
   catapult: UNIT_TYPES.catapult.movePoints,
   knight: UNIT_TYPES.knight.movePoints,
   pirate: UNIT_TYPES.pirate.movePoints,
+  stalker: UNIT_TYPES.stalker.movePoints,
+  builder: UNIT_TYPES.builder.movePoints,
+  banner: UNIT_TYPES.banner.movePoints,
+  berserker: UNIT_TYPES.berserker.movePoints,
+  trapper: UNIT_TYPES.trapper.movePoints,
+  stormcaller: UNIT_TYPES.stormcaller.movePoints,
+  stunner: UNIT_TYPES.stunner.movePoints,
 };
 
 export const UNIT_ATTACK: Record<UnitType, number> = {
@@ -91,6 +111,13 @@ export const UNIT_ATTACK: Record<UnitType, number> = {
   catapult: UNIT_TYPES.catapult.attack,
   knight: UNIT_TYPES.knight.attack,
   pirate: UNIT_TYPES.pirate.attack,
+  stalker: UNIT_TYPES.stalker.attack,
+  builder: UNIT_TYPES.builder.attack,
+  banner: UNIT_TYPES.banner.attack,
+  berserker: UNIT_TYPES.berserker.attack,
+  trapper: UNIT_TYPES.trapper.attack,
+  stormcaller: UNIT_TYPES.stormcaller.attack,
+  stunner: UNIT_TYPES.stunner.attack,
 };
 
 export const UNIT_ATTACK_DISTANCE: Record<UnitType, number> = {
@@ -102,6 +129,13 @@ export const UNIT_ATTACK_DISTANCE: Record<UnitType, number> = {
   catapult: UNIT_TYPES.catapult.attackDistance,
   knight: UNIT_TYPES.knight.attackDistance,
   pirate: UNIT_TYPES.pirate.attackDistance,
+  stalker: UNIT_TYPES.stalker.attackDistance,
+  builder: UNIT_TYPES.builder.attackDistance,
+  banner: UNIT_TYPES.banner.attackDistance,
+  berserker: UNIT_TYPES.berserker.attackDistance,
+  trapper: UNIT_TYPES.trapper.attackDistance,
+  stormcaller: UNIT_TYPES.stormcaller.attackDistance,
+  stunner: UNIT_TYPES.stunner.attackDistance,
 };
 
 export const MAX_HP = UNIT_TYPES.warrior.maxHp;
@@ -116,6 +150,13 @@ const UNIT_MAINTENANCE: Record<UnitType, number> = {
   catapult: 5,
   shield: 2,
   pirate: 0,
+  stalker: 3,
+  builder: 2,
+  banner: 3,
+  berserker: 4,
+  trapper: 3,
+  stormcaller: 4,
+  stunner: 2,
 };
 
 /** Money upkeep a ship costs its home village each turn, by ship level. */
@@ -152,6 +193,13 @@ export const UNIT_TYPE_NAMES: Record<UnitType, string> = {
   catapult: t('unitType.catapult'),
   knight: t('unitType.knight'),
   pirate: t('unitType.pirate'),
+  stalker: t('unitType.stalker'),
+  builder: t('unitType.builder'),
+  banner: t('unitType.banner'),
+  berserker: t('unitType.berserker'),
+  trapper: t('unitType.trapper'),
+  stormcaller: t('unitType.stormcaller'),
+  stunner: t('unitType.stunner'),
 };
 
 export const HEAL_AMOUNT = 15;
