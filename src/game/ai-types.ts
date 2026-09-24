@@ -31,6 +31,7 @@ export type AiAction =
   | { type: 'upgrade'; q: number; r: number }
   | { type: 'move'; unitId: string; q: number; r: number }
   | { type: 'attack'; unitId: string; q: number; r: number }
+  | { type: 'stun'; unitId: string; q: number; r: number }
   | { type: 'spawn'; q: number; r: number; unitType: UnitType }
   | { type: 'capture'; q: number; r: number; unitId: string }
   | { type: 'heal'; unitId: string; q: number; r: number }
@@ -38,6 +39,8 @@ export type AiAction =
   | { type: 'buildRoad'; q: number; r: number }
   | { type: 'buildBridge'; q: number; r: number }
   | { type: 'upgradeShip'; unitId: string }
+  | { type: 'enableStealth'; unitId: string }
+  | { type: 'storm'; unitId: string }
   | { type: 'openSkill'; skill: SkillId };
 
 export interface AiPlannerState {

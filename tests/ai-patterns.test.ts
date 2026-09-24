@@ -587,4 +587,43 @@ describe('AI patterns', () => {
     }
     expect(TRIBE_SPECIAL_UNIT[Tribe.Cats]).toBe('stalker');
   });
+
+  it('special-unit-abilities hides an idle visible stalker', () => {
+    const map: GameMap = { radius: 4, tiles: [], spawns: [] };
+    const stalker = tile(0, 0, null, {
+      id: 'st', owner: 1, type: 'stalker', q: 0, r: 0,
+      hasMoved: false, hasAttacked: false, hasHealed: false,
+      hp: 60, attack: 30, attackDistance: 1, spawnVillage: null,
+    });
+    map.tiles.push(stalker);
+    const actions = findPattern('special-unit-abilities').evaluate(ctx(map, player(100), new SeededRandom(1)));
+    expect(actions).toEqual([{ type: 'enableStealth', unitId: 'st' }]);
+  });
+
+  it('special-unit-abilities does not stealth an already hidden stalker', () => {
+    const map: GameMap = { radius: 4, tiles: [], spawns: [] };
+    map.tiles.push(tile(0, 0, null, {
+      id: 'st', owner: 1, type: 'stalker', q: 0, r: 0,
+      hasMoved: false, hasAttacked: false, hasHealed: false,
+      hp: 60, attack: 30, attackDistance: 1, spawnVillage: null, isStealthed: true,
+    }));
+    expect(findPattern('special-unit-abilities').evaluate(ctx(map, player(100), new SeededRandom(1)))).toBeNull();
+  });
+
+  it('special-unit-abilities storms a stormcaller with an enemy ship on village waters', () => {
+    const map: GameMap = { radius: 4, tiles: [], spawns: [] };
+    map.tiles.push(
+      tile(-1, 0, { owner: 1, level: 1, captureReady: false }, null, 1), // village claim
+      tile(0, 0, null, { id: 'sc', owner: 1, type: 'stormcaller', q: 0, r: 0, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 50, attack: 20, attackDistance: 1, spawnVillage: null }, 1),
+      tile(1, 0, null, { id: 'enemy', owner: 0, type: 'warrior', q: 1, r: 0, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 50, attack: 20, attackDistance: 1, spawnVillage: null, shipLevel: 1 }, 1),
+    );
+    // (1,0) claimed by village at (-1,0)? No — a village claims its own claim
+    // circle; mark the two tiles as claimed by (-1,0) so stormTargetShips binds.
+    map.tiles[1]!.claimedByVillage = { q: -1, r: 0 };
+    map.tiles[2]!.claimedByVillage = { q: -1, r: 0 };
+    map.tiles[1]!.terrain = TileType.GrasslandLand;
+    map.tiles[2]!.terrain = TileType.Water;
+    const actions = findPattern('special-unit-abilities').evaluate(ctx(map, player(100), new SeededRandom(1)));
+    expect(actions).toEqual([{ type: 'storm', unitId: 'sc' }]);
+  });
 });

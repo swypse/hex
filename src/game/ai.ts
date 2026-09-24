@@ -100,6 +100,12 @@ export function formatAiAction(a: AiAction): string {
       return `buildBridge (${a.q},${a.r})`;
     case 'openSkill':
       return `openSkill ${a.skill}`;
+    case 'stun':
+      return `stun ${a.unitId} -> (${a.q},${a.r})`;
+    case 'enableStealth':
+      return `enableStealth ${a.unitId}`;
+    case 'storm':
+      return `storm ${a.unitId}`;
   }
 }
 

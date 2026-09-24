@@ -16,6 +16,7 @@ import { AiDifficultyProfile } from './ai-difficulty';
 import { AiSituation, coastExposedTile, isMelee, isNavalEnemy } from './ai-situation';
 import { isShip, shipAttackDistance, shipMovePoints, canUpgradeShip } from './ship';
 import { TRIBE_SPECIAL_UNIT } from './tribes';
+import { stormTargetShips } from './storm';
 
 export interface AiPatternContext {
   map: GameMap;
@@ -1078,6 +1079,36 @@ export const AI_PATTERNS: AiPattern[] = [
         }
         if (canBuildSawmill(map, tile, player) && canAfford(player.resources, BUILDING_COSTS.sawmill)) {
           return [{ type: 'build', q: tile.q, r: tile.r, kind: 'sawmill' }];
+        }
+      }
+      return null;
+    },
+  },
+  {
+    id: 'special-unit-abilities',
+    priority: 20,
+    evaluate({ map, player }): AiAction[] | null {
+      // Light use of the tribe special abilities: hide idle visible stalkers,
+      // storm when enemy/pirate ships sit on a stormcaller's village waters,
+      // and stun-ranged targets from a stunner at full reach.
+      for (const t of map.tiles) {
+        const u = t.unit;
+        if (!u || u.owner !== player.index) continue;
+        const idle = !u.hasMoved && !u.hasAttacked && !u.hasHealed;
+        if (u.type === 'stalker' && idle && !u.isStealthed && u.shipLevel === undefined) {
+          return [{ type: 'enableStealth', unitId: u.id }];
+        }
+        if (u.type === 'stormcaller' && idle && stormTargetShips(map, u).length > 0) {
+          return [{ type: 'storm', unitId: u.id }];
+        }
+        if (u.type === 'stunner' && idle) {
+          const reach2 = attackableTargets(map, u, player.index).filter(
+            (x) => hexDistance({ q: u.q, r: u.r }, x) === 2,
+          );
+          if (reach2.length > 0) {
+            const x = reach2[0]!;
+            return [{ type: 'stun', unitId: u.id, q: x.q, r: x.r }];
+          }
         }
       }
       return null;

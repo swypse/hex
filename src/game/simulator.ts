@@ -1161,6 +1161,15 @@ export class Simulator {
         case 'openSkill':
           ok = this.doOpenSkill(a.skill);
           break;
+        case 'enableStealth':
+          ok = this.doEnableStealth(a.unitId);
+          break;
+        case 'storm':
+          ok = this.doStorm(a.unitId);
+          break;
+        case 'stun':
+          ok = this.doStun(a.unitId, a.q, a.r);
+          break;
       }
       if (aiLoggingEnabled()) {
         const marker = actionNo - 1 < markers.length ? markers[actionNo - 1]! : undefined;
