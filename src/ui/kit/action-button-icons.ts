@@ -26,7 +26,7 @@ export const ACTION_BUTTON_ICON_FILES: Record<string, string> = {
   bottle: 'action-get-bottle',
   deal: 'action-deal-with-pirates',
   stats: 'action-stats',
-  skills: 'action-brain',
+  skills: 'action-skills',
   achievements: 'action-cup',
   'end-turn': 'action-end-turn',
 };
