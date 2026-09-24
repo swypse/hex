@@ -4,6 +4,7 @@ import { canAfford, pay } from './resources';
 import { hasSkill } from './skills';
 import { makeUnit, UNIT_TYPES, UnitType } from './units';
 import { unitsInVillage, villageCapacity } from './village';
+import { TRIBE_SPECIAL_UNIT } from './tribes';
 
 let spawnSeq = 0;
 
@@ -22,6 +23,13 @@ export function spawnUnit(
   if (type === 'swordsman' && !hasSkill(player, 'swordsman')) return false;
   if (type === 'shield' && !hasSkill(player, 'shields')) return false;
   if (type === 'catapult' && !hasSkill(player, 'catapult')) return false;
+  // Special units: a tribe's own special is allowed with no skill; another
+  // tribe's special is never allowed.
+  if (TRIBE_SPECIAL_UNIT[player.tribe] === type) {
+    // tribe-gated: OK
+  } else if (Object.values(TRIBE_SPECIAL_UNIT).includes(type)) {
+    return false;
+  }
   const cost = { wood: UNIT_TYPES[type].priceWood, stone: 0, money: UNIT_TYPES[type].price, ore: UNIT_TYPES[type].priceOre };
   if (!canAfford(player.resources, cost)) return false;
 

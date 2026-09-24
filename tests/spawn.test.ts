@@ -4,6 +4,7 @@ import { Player } from '../src/game/players';
 import { TileType } from '../src/game/tile-types';
 import { villageCapacity, unitsInVillage } from '../src/game/village';
 import { spawnUnit } from '../src/game/spawn';
+import { Tribe, TRIBE_SPECIAL_UNIT } from '../src/game/tribes';
 
 function makeTile(
   q: number,
@@ -200,5 +201,35 @@ describe('spawnUnit', () => {
     spawnUnit(map, a, 'warrior', player);
     const idB = a.unit!.id;
     expect(idA).not.toBe(idB);
+  });
+
+  it('spawns a special unit only for its tribe, without a skill', () => {
+    const map = makeMap();
+    const village = map.tiles[0]!;
+    const cats = makePlayer(0, 100);
+    cats.tribe = Tribe.Cats;
+    cats.resources.wood = 50;
+    expect(spawnUnit(map, village, 'stalker', cats)).toBe(true);
+    expect(village.unit!.type).toBe('stalker');
+  });
+
+  it('refuses a special unit for a foreign tribe', () => {
+    const map = makeMap();
+    const village = map.tiles[0]!;
+    const cats = makePlayer(0, 100);
+    cats.tribe = Tribe.Cats;
+    cats.resources.wood = 50;
+    expect(spawnUnit(map, village, 'banner', cats)).toBe(false);
+    expect(village.unit).toBeNull();
+  });
+
+  it('refuses a special unit even for a tribe that cannot spawn its own', () => {
+    const map = makeMap();
+    const village = map.tiles[0]!;
+    const warriors = makePlayer(0, 100);
+    warriors.tribe = Tribe.Warriors;
+    warriors.resources.ore = 50;
+    expect(spawnUnit(map, village, 'berserker', warriors)).toBe(false);
+    expect(village.unit).toBeNull();
   });
 });

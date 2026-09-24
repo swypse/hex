@@ -15,6 +15,7 @@ import { AiAction, AiDirectives, AiPlannerState, SpawnPreference } from './ai-ty
 import { AiDifficultyProfile } from './ai-difficulty';
 import { AiSituation, coastExposedTile, isMelee, isNavalEnemy } from './ai-situation';
 import { isShip, shipAttackDistance, shipMovePoints, canUpgradeShip } from './ship';
+import { TRIBE_SPECIAL_UNIT } from './tribes';
 
 export interface AiPatternContext {
   map: GameMap;
@@ -78,10 +79,10 @@ export function enemyCanAttackNext(map: GameMap, tile: MapTile, playerIndex: num
 }
 
 const SPAWN_ORDER: Record<SpawnPreference, UnitType[]> = {
-  offense: ['knight', 'swordsman', 'catapult', 'warrior', 'rider', 'archer', 'shield'],
-  defense: ['shield', 'knight', 'catapult', 'archer', 'swordsman', 'warrior', 'rider'],
-  scout: ['rider', 'knight', 'swordsman', 'warrior', 'archer', 'shield', 'catapult'],
-  naval: ['catapult', 'archer', 'shield', 'warrior', 'rider', 'swordsman', 'knight'],
+  offense: ['knight', 'swordsman', 'catapult', 'warrior', 'rider', 'archer', 'shield', 'stalker', 'builder', 'banner', 'berserker', 'trapper', 'stormcaller', 'stunner'],
+  defense: ['shield', 'knight', 'catapult', 'archer', 'swordsman', 'warrior', 'rider', 'stalker', 'builder', 'banner', 'berserker', 'trapper', 'stormcaller', 'stunner'],
+  scout: ['rider', 'knight', 'swordsman', 'warrior', 'archer', 'shield', 'catapult', 'stalker', 'builder', 'banner', 'berserker', 'trapper', 'stormcaller', 'stunner'],
+  naval: ['catapult', 'archer', 'shield', 'warrior', 'rider', 'swordsman', 'knight', 'stalker', 'builder', 'banner', 'berserker', 'trapper', 'stormcaller', 'stunner'],
 };
 
 export function bestSpawnableUnitType(
@@ -89,6 +90,7 @@ export function bestSpawnableUnitType(
   prefer: SpawnPreference = 'offense',
 ): UnitType | null {
   for (const type of SPAWN_ORDER[prefer]) {
+    if (TRIBE_SPECIAL_UNIT[player.tribe] !== type && Object.values(TRIBE_SPECIAL_UNIT).includes(type)) continue;
     if (type === 'rider' && !hasSkill(player, 'riding')) continue;
     if (type === 'knight' && !hasSkill(player, 'knights')) continue;
     if (type === 'swordsman' && !hasSkill(player, 'swordsman')) continue;

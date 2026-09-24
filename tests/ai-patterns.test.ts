@@ -10,6 +10,7 @@ import { AiPlannerState } from '../src/game/ai-types';
 import { analyzeSituation } from '../src/game/ai-situation';
 import { AI_DIFFICULTY_PROFILES } from '../src/game/ai-difficulty';
 import { GameMode } from '../src/game/game-mode';
+import { TRIBE_SPECIAL_UNIT } from '../src/game/tribes';
 
 function tile(
   q: number,
@@ -571,5 +572,19 @@ describe('AI patterns', () => {
     const actions = findPattern('attack-enemy-in-village').evaluate(ctx(map, player(100), new SeededRandom(1)));
     expect(actions).not.toBeNull();
     expect(actions!.some((a) => a.type === 'spawn' && a.q === 1 && a.r === 0)).toBe(true);
+  });
+
+  it('bestSpawnableUnitType never returns another tribe\'s special unit', () => {
+    const cats = { ...player(100), tribe: Tribe.Cats };
+    for (const prefer of ['offense', 'defense', 'scout', 'naval'] as const) {
+      const type = bestSpawnableUnitType(cats, prefer);
+      expect(type).not.toBe('builder');
+      expect(type).not.toBe('banner');
+      expect(type).not.toBe('berserker');
+      expect(type).not.toBe('trapper');
+      expect(type).not.toBe('stormcaller');
+      expect(type).not.toBe('stunner');
+    }
+    expect(TRIBE_SPECIAL_UNIT[Tribe.Cats]).toBe('stalker');
   });
 });

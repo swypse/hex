@@ -1,6 +1,7 @@
 import { t } from '../i18n';
 import { TRIBE_COLORS } from '../config';
 import { SkillId } from './skills';
+import type { UnitType } from './units';
 
 export enum Tribe {
   Villagers,
@@ -33,4 +34,20 @@ export const TRIBES: TribeInfo[] = [
 
 export function tribeById(id: number): TribeInfo | undefined {
   return TRIBES.find((t) => t.id === id);
+}
+
+/** The single tribe-gate: each tribe's special unit, spawnable only by it.
+ *  Special units have no skill requirement — the tribe itself is the gate. */
+export const TRIBE_SPECIAL_UNIT: Record<Tribe, UnitType> = {
+  [Tribe.Villagers]: 'builder',
+  [Tribe.Warriors]: 'banner',
+  [Tribe.Barbarians]: 'berserker',
+  [Tribe.Cats]: 'stalker',
+  [Tribe.Forest]: 'trapper',
+  [Tribe.Aqua]: 'stormcaller',
+  [Tribe.Sand]: 'stunner',
+};
+
+export function specialUnitFor(tribe: Tribe): UnitType {
+  return TRIBE_SPECIAL_UNIT[tribe];
 }
