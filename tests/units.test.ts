@@ -202,6 +202,17 @@ describe('action availability', () => {
     healUnit(full);
     expect(full.hp).toBe(50);
   });
+
+  it('a stunned unit cannot move, attack or heal', () => {
+    const u = mkUnit({ hp: 30, stunTurns: 1 });
+    expect(canMove(u)).toBe(false);
+    expect(canAttack(u)).toBe(false);
+    expect(canHeal(u)).toBe(false);
+    const rider = mkUnit({ type: 'rider', hasAttacked: true, stunTurns: 1 });
+    expect(canMove(rider)).toBe(false);
+    const shieldShip = makeShield({ shipLevel: 1, hasMoved: true, stunTurns: 1 });
+    expect(canAttack(shieldShip)).toBe(false);
+  });
 });
 
 describe('makeUnit', () => {

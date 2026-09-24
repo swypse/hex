@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { GameMap, MapTile, Settlement } from '../src/game/map-gen';
-import { attackDamage, attackableTargets, chooseBestAttack, resolveCombat, defenseBonusFor, MISS_CHANCE, missChanceFor, performAttack, performSiege, isEnemySiegeTarget, tradeIsFavorable, COMBAT_SCALE } from '../src/game/combat';
+import { attackDamage, attackableTargets, chooseBestAttack, resolveCombat, defenseBonusFor, MISS_CHANCE, missChanceFor, performAttack, performSiege, isEnemySiegeTarget, tradeIsFavorable, canCounterAttack, COMBAT_SCALE } from '../src/game/combat';
 import type { Player } from '../src/game/players';
 import { TileType } from '../src/game/tile-types';
 import { Unit, UNIT_TYPES, MAX_HP } from '../src/game/units';
@@ -708,5 +708,57 @@ describe('tradeIsFavorable', () => {
     const a = unitOf('a', 'warrior', 0, 0, 0);
     const b = unitOf('b', 'warrior', 1, 1, 0);
     expect(tradeIsFavorable(a, tileWith(1, 0, b))).toBe(true);
+  });
+});
+
+describe('special-unit combat hooks', () => {
+  function unitOf(id: string, type: keyof typeof UNIT_TYPES, owner: number, q: number, r: number): Unit {
+    return { id, owner, type, q, r, hasMoved: false, hasAttacked: false, hasHealed: false, hp: UNIT_TYPES[type].maxHp, attack: UNIT_TYPES[type].attack, attackDistance: UNIT_TYPES[type].attackDistance, defense: UNIT_TYPES[type].defense, spawnVillage: null };
+  }
+  function tileWith(q: number, r: number, u: Unit): MapTile {
+    return { q, r, terrain: TileType.GrasslandLand, settlement: null, building: null, unit: u, ownedBy: null, claimedByVillage: null, exploredBy: [0, 1] };
+  }
+
+  it('a stealthed stalker ignores the target defense entirely', () => {
+    const map = makeMap();
+    const stalker = unitOf('s', 'stalker', 0, 0, 0);
+    stalker.isStealthed = true;
+    map.tiles[0]!.unit = stalker;
+    const target = map.tiles[1]!;
+    target.unit = unitOf('t', 'swordsman', 1, 1, 0); // defense 16, full hp
+    const { attackerDamage, counterDamage } = resolveCombat(map, stalker, target);
+    expect(attackerDamage).toBe(Math.round(30 * COMBAT_SCALE));
+    expect(counterDamage).toBe(0);
+  });
+
+  it('a raging berserker never counter-attacks', () => {
+    const berserker = unitOf('b', 'berserker', 0, 0, 0);
+    berserker.hp = 20; // <= 50% of 70
+    expect(canCounterAttack(berserker)).toBe(false);
+    berserker.hp = 70;
+    expect(canCounterAttack(berserker)).toBe(true);
+  });
+
+  it('a banner aura raises the attacker damage', () => {
+    const map = makeMap();
+    const bannerTile = tileWith(1, 0, unitOf('bn', 'banner', 0, 1, 0));
+    map.tiles.push(bannerTile);
+    const fighter = unitOf('f', 'warrior', 0, 0, 0);
+    map.tiles[0]!.unit = fighter;
+    const target = map.tiles[1]!;
+    target.unit = unitOf('t', 'warrior', 1, 1, 0);
+    const withAura = resolveCombat(map, fighter, target);
+    bannerTile.unit = null; // drop the banner: aura gone
+    const withoutAura = resolveCombat(map, map.tiles[0]!.unit!, target);
+    expect(withAura.attackerDamage).toBeGreaterThan(withoutAura.attackerDamage);
+  });
+
+  it('attackableTargets excludes an invisible stealthed enemy', () => {
+    const map = makeMap();
+    const stalker = unitOf('s', 'stalker', 1, 1, 0);
+    stalker.isStealthed = true;
+    map.tiles[1]!.unit = stalker;
+    const targets = attackableTargets(map, map.tiles[0]!.unit!, 0);
+    expect(targets.some((t) => t.unit?.id === 's')).toBe(false);
   });
 });

@@ -29,9 +29,10 @@ export function bannerAttackBonus(map: GameMap | null, unit: Unit): number {
   return 0;
 }
 
-/** Base attack before any bonus: SHIP_ATTACK at sea, else the unit's type value. */
+/** Base attack before any bonus: SHIP_ATTACK at sea, else the unit's own
+ *  attack snapshot (shipAttack() already does both). */
 export function baseAttack(unit: Unit): number {
-  return isShip(unit) ? shipAttack(unit) : UNIT_TYPES[unit.type].attack;
+  return shipAttack(unit);
 }
 
 /** Any current atk bonus (banner +10 / rage +20); ships get none. Used for the

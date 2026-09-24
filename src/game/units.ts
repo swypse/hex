@@ -242,6 +242,7 @@ export function makeUnit(
 }
 
 export function canMove(unit: Unit): boolean {
+  if (isStunnedLocal(unit)) return false;
   if (unit.hasMoved || unit.hasHealed) return false;
   // A ship can never move again in the turn it has attacked.
   if (unit.shipLevel !== undefined) return !unit.hasAttacked;
@@ -255,6 +256,7 @@ export function movePoints(unit: Unit): number {
 }
 
 export function canAttack(unit: Unit): boolean {
+  if (isStunnedLocal(unit)) return false;
   if (unit.hasHealed || unit.hasLanded) return false;
   if (unit.hasAttacked) return unit.shipLevel === undefined && unit.type === 'knight' && unit.canExtraAttack === true;
   // A ship may always attack after moving this turn; the shield/catapult
@@ -265,11 +267,16 @@ export function canAttack(unit: Unit): boolean {
 
 export function canHeal(unit: Unit): boolean {
   return (
+    !isStunnedLocal(unit) &&
     !unit.hasMoved &&
     !unit.hasAttacked &&
     !unit.hasHealed &&
     unit.hp < UNIT_TYPES[unit.type].maxHp
   );
+}
+
+function isStunnedLocal(unit: Unit): boolean {
+  return (unit.stunTurns ?? 0) >= 1;
 }
 
 export function healUnit(unit: Unit): void {

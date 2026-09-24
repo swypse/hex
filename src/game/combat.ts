@@ -5,6 +5,7 @@ import { isExploredFor } from './explore';
 import { hasSkill } from './skills';
 import type { Player } from './players';
 import { UNIT_TYPES, Unit } from './units';
+import { attackBonus, effectiveAttack, berserkerRage } from './abilities';
 import { damageReduction } from './buffs';
 import { BUILDING_MAX_HP } from './buildings';
 
@@ -29,9 +30,10 @@ export function missChanceFor(player: Player): number {
   return hasSkill(player, 'science') ? SCIENCE_MISS_CHANCE : MISS_CHANCE;
 }
 
-/** Raw attack force: attack × current hp ratio (no defense applied). */
+/** Raw attack force: attack × current hp ratio (no defense applied). The
+ *  attack value includes banner-aura (+10) and berserker-rage (+20) bonuses. */
 export function attackDamage(attacker: Unit): number {
-  return Math.round((shipAttack(attacker) * attacker.hp) / UNIT_TYPES[attacker.type].maxHp);
+  return Math.round((effectiveAttack(attacker) * attacker.hp) / UNIT_TYPES[attacker.type].maxHp);
 }
 
 /** Terrain/protection bonus applied to the defender's defense force.
@@ -56,20 +58,30 @@ export interface CombatResolution {
  */
 export function resolveCombat(map: GameMap | null, attacker: Unit, target: MapTile): CombatResolution {
   const defender = target.unit!;
-  const attackForce = (shipAttack(attacker) * attacker.hp) / UNIT_TYPES[attacker.type].maxHp;
+  // A stealthed stalker's strike ignores the defender's armor entirely.
+  const def = attacker.isStealthed === true ? 0 : (defender.defense ?? 0);
+  // Banner aura / berserker rage raise the attack power. Ships receive no
+  // bonuses (attackBonus returns 0 at sea), so their numbers stay unchanged.
+  const bonus = attackBonus(attacker, map);
+  const attackForce = ((shipAttack(attacker) + bonus) * attacker.hp) / UNIT_TYPES[attacker.type].maxHp;
   const defenseForce =
-    ((defender.defense ?? 0) * defender.hp) / UNIT_TYPES[defender.type].maxHp *
+    (def * defender.hp) / UNIT_TYPES[defender.type].maxHp *
     defenseBonusFor(map, defender, target);
   const total = attackForce + defenseForce;
   if (total <= 0) return { attackerDamage: 0, counterDamage: 0 };
-  const attackerDamage = Math.round((attackForce / total) * attacker.attack * COMBAT_SCALE);
-  const counterDamage = Math.round((defenseForce / total) * (defender.defense ?? 0) * COMBAT_SCALE);
+  // The damage scale keeps the legacy "crew attack" term (attacker.attack)
+  // so a ship's counter math is unchanged, while bonuses apply on top.
+  const scaleAttack = attacker.attack + bonus;
+  const attackerDamage = Math.round((attackForce / total) * scaleAttack * COMBAT_SCALE);
+  const counterDamage = Math.round((defenseForce / total) * def * COMBAT_SCALE);
   return { attackerDamage, counterDamage };
 }
 
 /** Whether a unit retaliates when it survives an attack. Land catapults never
- *  counter-attack; aboard a ship the crew fights back with the ship's cannon. */
+ *  counter-attack; a raging berserker takes no counter-attacks; aboard a ship
+ *  the crew fights back with the ship's cannon. */
 export function canCounterAttack(unit: Unit): boolean {
+  if (berserkerRage(unit) > 0) return false;
   return !(unit.type === 'catapult' && !isShip(unit));
 }
 
@@ -155,6 +167,7 @@ export function performSiege(catapult: Unit, target: MapTile, rng: () => number 
 export function attackableTargets(map: GameMap, unit: Unit, playerIndex = 0): MapTile[] {
   const result = map.tiles.filter((t) => {
     if (!t.unit) return false;
+    if (t.unit.isStealthed === true) return false;
     if (t.unit.owner === unit.owner) return false;
     if (hexDistance({ q: unit.q, r: unit.r }, t) > shipAttackDistance(unit)) return false;
     if (!isExploredFor(t, playerIndex)) return false;

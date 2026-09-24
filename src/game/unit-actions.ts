@@ -6,6 +6,7 @@ import { hasSkill } from './skills';
 import { canAttack, canHeal, canMove, movePoints, Unit } from './units';
 
 export function unitCanAct(map: GameMap, tile: MapTile, unit: Unit, player: Player): boolean {
+  if ((unit.stunTurns ?? 0) >= 1) return false;
   const canClimb = hasSkill(player, 'climbing');
   const canDock = hasSkill(player, 'navigation');
   const canMoveAnywhere =
