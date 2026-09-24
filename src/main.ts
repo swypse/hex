@@ -70,9 +70,21 @@ async function boot(): Promise<void> {
   // Mobile browsers drop the WebGL context while the tab is backgrounded, which
   // blanks every generateTexture() sprite. Pixi restores its own GL state, so
   // rebuild the generated textures once the context is usable again.
+  app.canvas.addEventListener('webglcontextlost', () => {
+    gameController.noteContextLost();
+  });
   app.canvas.addEventListener('webglcontextrestored', () => {
     void gameController.recoverFromContextLoss();
   });
+  // Some mobile browsers (notably iOS Safari) drop the context during a long
+  // background without reliably firing `webglcontextrestored` on return. Rebuild
+  // the generated textures whenever the page becomes visible and the context
+  // was lost. Recovery is idempotent and refuses to run twice.
+  const recoverOnForeground = (): void => {
+    if (document.visibilityState === 'visible') gameController.recoverOnForeground();
+  };
+  document.addEventListener('visibilitychange', recoverOnForeground);
+  window.addEventListener('pageshow', recoverOnForeground);
   // A ?join=<code> link opens straight into the multiplayer join screen.
   const joinCode = readJoinCode();
   if (joinCode) {

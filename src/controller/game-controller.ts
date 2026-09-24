@@ -83,6 +83,8 @@ class GameController {
   private events: EventPresenter | null = null;
   private tutorial: TutorialDirector | null = null;
   private watchingLoopRunning = false;
+  /** Set when the WebGL context has been lost but not yet recovered. */
+  private contextLost = false;
   private damagePreviewHold: HoldTimer | null = null;
   private damagePreviewPress: { x: number; y: number } | null = null;
   private damagePreviewShown = false;
@@ -116,6 +118,15 @@ class GameController {
         this.render();
         this.presentPendingClientEvents();
         if (startIntro) this.centerOnStartVillage();
+      }).catch((e) => {
+        // A bake that fails (e.g. the tab was backgrounded and the GL context
+        // dropped mid-load) must not leave texturesLoading stuck, or recovery
+        // would never be able to run.
+        console.error('[init] texture bake failed', e);
+        if (token === this.initToken) {
+          useGameStore.getState().setTexturesLoading(false);
+          if (this.sim) this.contextLost = true;
+        }
       });
     }
   }
@@ -313,27 +324,65 @@ class GameController {
     this.syncKnownTribes(false);
   }
 
+  /** Marks that the WebGL context was lost. Kept so a later foreground event can
+   *  rebuild even if the browser never fires `webglcontextrestored`. */
+  noteContextLost(): void {
+    this.contextLost = true;
+    markDirty();
+  }
+
+  /** Whether the GL context is currently reported as lost by Pixi. */
+  private glContextLost(): boolean {
+    const r = this.app?.renderer as
+      | { context?: { isLost?: boolean }; gl?: { isContextLost?: () => boolean } }
+      | undefined;
+    if (!r) return false;
+    if (r.context?.isLost) return r.context.isLost;
+    if (r.gl && typeof r.gl.isContextLost === 'function') return r.gl.isContextLost();
+    return false;
+  }
+
+  /** Called when the page comes back to the foreground. Some mobile browsers
+   *  drop the WebGL context while backgrounded without delivering
+   *  `webglcontextrestored` afterwards, so retrigger recovery whenever the
+   *  context was lost. */
+  recoverOnForeground(): void {
+    if (this.contextLost || this.glContextLost()) {
+      void this.recoverFromContextLoss();
+    }
+  }
+
   /** Mobile browsers drop the WebGL context while the tab is backgrounded.
    * Pixi restores its GL state on `webglcontextrestored`, and image/canvas
    * backed textures re-upload automatically, but textures made by
    * `renderer.generateTexture()` (every terrain/unit/building sprite) are
    * RenderTextures that live only on the GPU, so they come back blank. Rebuild
    * the TextureSet from the sim and recreate the MapView on top of it. */
-  async recoverFromContextLoss(): Promise<void> {
+  async recoverFromContextLoss(retries = 8): Promise<void> {
     if (this.recovering) return;
     if (!this.app || !this.sim || !this.textures || !this.mapView) return;
-    if (useGameStore.getState().texturesLoading) return;
     this.recovering = true;
     const store = useGameStore.getState();
     store.setTexturesLoading(true);
     const token = this.initToken;
     try {
+      // The callback may beat the browser actually handing the context back
+      // (especially on the foreground fallback); wait until GL is usable.
+      for (let i = 0; i < retries && this.glContextLost(); i++) {
+        await new Promise((r) => setTimeout(r, 250));
+      }
+      if (this.glContextLost()) return;
       const hexSize = HEX_SIZE * this.getCamera().qualityFactor;
       const textures = await createTextures(this.app, this.sim.map, hexSize, new Set(this.sim.players.map((p) => p.tribe)));
       if (token !== this.initToken || !this.app || !this.mapRoot) return;
       this.overlayItems = [];
       this.replaceTextures(textures);
+      this.contextLost = false;
       this.render();
+    } catch (e) {
+      // Keep the loss flag set so the next restore/foreground event retries
+      // instead of leaving the map blank forever.
+      console.error('[recover] texture rebuild failed', e);
     } finally {
       if (token === this.initToken) useGameStore.getState().setTexturesLoading(false);
       this.recovering = false;

@@ -79,6 +79,8 @@ const controller = gameController as unknown as {
     destroy(): void;
   } | null;
   recoverFromContextLoss(): Promise<void>;
+  recoverOnForeground(): void;
+  noteContextLost(): void;
   shutdown(): void;
 };
 
@@ -162,5 +164,44 @@ describe('WebGL context loss recovery', () => {
 
     expect(controller.mapView).toBeNull();
     expect(useGameStore.getState().texturesLoading).toBe(false);
+  });
+
+  it('rebuilds the map when the page returns to the foreground after a noted context loss', async () => {
+    await gameController.startGame(TRIBES[0]!.id, 1, 'capture');
+    const host = makeHost(makeApp());
+    const screen = new GameScreen();
+    screen.mount(host);
+    await new Promise((r) => setTimeout(r, 50));
+
+    expect(controller.mapView).not.toBeNull();
+    const before = controller.mapView!;
+    const texturesBefore = controller.textures!;
+
+    controller.noteContextLost();
+    controller.recoverOnForeground();
+    await new Promise((r) => setTimeout(r, 50));
+
+    expect(controller.mapView).not.toBe(before);
+    expect(controller.textures).not.toBe(texturesBefore);
+    expect(useGameStore.getState().texturesLoading).toBe(false);
+
+    screen.destroy();
+  });
+
+  it('does not rebuild on foreground when the context was never lost', async () => {
+    await gameController.startGame(TRIBES[0]!.id, 1, 'capture');
+    const host = makeHost(makeApp());
+    const screen = new GameScreen();
+    screen.mount(host);
+    await new Promise((r) => setTimeout(r, 50));
+
+    const before = controller.mapView!;
+
+    controller.recoverOnForeground();
+    await new Promise((r) => setTimeout(r, 50));
+
+    expect(controller.mapView).toBe(before);
+
+    screen.destroy();
   });
 });
