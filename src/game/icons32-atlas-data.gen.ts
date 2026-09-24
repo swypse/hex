@@ -5,13 +5,14 @@ export const ICONS32_ATLAS_FILE = 'icons-32-atlas.png';
 export const ICONS32_ATLAS_CELL = 32;
 export const ICONS32_ATLAS_COLS = 4;
 export const ICONS32_ATLAS_FRAMES: Record<string, { x: number; y: number }> = {
-  'close-32': { x: 0, y: 0 },
-  'dots-32': { x: 32, y: 0 },
-  'forest-protection-32': { x: 64, y: 0 },
-  'gold-32': { x: 96, y: 0 },
-  'ore-32': { x: 0, y: 32 },
-  'stone-32': { x: 32, y: 32 },
-  'village-connected-32': { x: 64, y: 32 },
-  'water-protection-32': { x: 96, y: 32 },
-  'wood-32': { x: 0, y: 64 },
+  'cannonbal-32': { x: 0, y: 0 },
+  'close-32': { x: 32, y: 0 },
+  'dots-32': { x: 64, y: 0 },
+  'forest-protection-32': { x: 96, y: 0 },
+  'gold-32': { x: 0, y: 32 },
+  'ore-32': { x: 32, y: 32 },
+  'stone-32': { x: 64, y: 32 },
+  'village-connected-32': { x: 96, y: 32 },
+  'water-protection-32': { x: 0, y: 64 },
+  'wood-32': { x: 32, y: 64 },
 };

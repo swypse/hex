@@ -39,15 +39,54 @@ Tribes currently differ by color, a starting money bonus, or an opened starting 
 Units belong to a tribe's player. Spawned in owned villages (see Spawning). A unit can perform one action per turn; a
 freshly spawned unit must wait until the next turn.
 
-| Unit      | Move points | Attack | Attack range | HP | Spawn cost                 |
-|-----------|-------------|--------|--------------|----|----------------------------|
-| Warrior   | 10          | 2      | 1            | 5  | 4 money                    |
-| Rider     | 40          | 2      | 1            | 4  | 6 money                    |
-| Archer    | 10          | 2      | 2            | 4  | 6 money                    |
-| Swordsman | 10          | 4      | 1            | 8  | 10 money + 2 ore           |
-| Shield    | 10          | 0.7    | 1            | 8  | 8 money + 2 ore            |
-| Catapult  | 10          | 5      | 4            | 3  | 15 money + 10 wood + 3 ore |
-| Knight    | 30          | 4      | 1            | 6  | 14 money + 5 ore           |
+| Unit      | Move points | Attack | Defense | Attack range | HP  | Spawn cost                 |
+|-----------|-------------|--------|---------|--------------|-----|----------------------------|
+| Warrior   | 10          | 20     | 10      | 1            | 50  | 4 money                    |
+| Rider     | 40          | 22     | 8       | 1            | 45  | 6 money                    |
+| Archer    | 10          | 26     | 7       | 2            | 40  | 6 money                    |
+| Swordsman | 10          | 40     | 16      | 1            | 80  | 10 money + 2 ore           |
+| Shield    | 10          | 7      | 20      | 1            | 80  | 8 money + 2 ore            |
+| Catapult  | 10          | 50     | 0       | 4            | 30  | 15 money + 10 wood + 3 ore |
+| Knight    | 30          | 46     | 12      | 1            | 70  | 14 money + 5 ore           |
+
+### Special units
+
+Each tribe has one special unit it alone can spawn (no skill required; the tribe is the gate). They currently reuse the
+tribe's warrior artwork and the generic `action-spawn-warrior` popup icon until dedicated art arrives.
+
+| Unit        | Tribe       | Move | Attack | Range | HP | Defense | Cost |
+|-------------|-------------|------|--------|-------|-----|---------|------|
+| Stalker     | Cats        | 12   | 30     | 1     | 60  | 0       | 9 money + 2 wood |
+| Builder     | Villagers   | 8    | 10     | 1     | 50  | 0       | 7 money |
+| Banner      | Warriors    | 8    | 20     | 1     | 60  | 8       | 10 money |
+| Berserker   | Barbarians  | 10   | 50     | 1     | 70  | 12      | 11 money + 3 ore |
+| Trapper     | Forest      | 10   | 20     | 1     | 50  | 8       | 9 money + 2 wood |
+| Stormcaller | Aqua        | 20   | 20     | 1     | 50  | 8       | 9 money + 2 ore |
+| Stunner     | Sand        | 8    | 40     | 2     | 40  | 10      | 7 money |
+
+- **Stalker (stealth)** — Spawned visible. Its first move after spawning enables stealth: it becomes invisible to every
+  other player before the walk starts (the owner still sees it, slightly dimmed). A visible stalker can use the
+  "Enable stealth" action to hide in place, consuming its whole turn. Attacking from stealth ignores the target's
+  defense and reveals the stalker. An enemy whose move would step onto a hidden stalker stops one cell short and
+  reveals it; if the stalker was the very first cell of the path, the enemy keeps its move. Hidden stalkers are never
+  shown as attackable, never block enemy pathing, and are invisible to the AI.
+- **Builder (building)** — Consumes its turn to build a sawmill, mine, port or bridge on its own or an adjacent owned
+  cell — no building skill required, costs unchanged. Cannot build while aboard a ship.
+- **Banner (war cry)** — Allies within 2 hexes (never the banner itself) gain +10 attack; bonuses from several banners
+  do not stack, and the bonus disappears when the banner dies. Recipients show an `attack-16` icon with `+10` next to
+  their HP bar.
+- **Berserker (rage)** — At 50% HP or less it gains +20 attack and takes no counter-attack damage. Shows an
+  `attack-16` icon with `+20` while raging.
+- **Trapper (thorn trap)** — Consumes its turn to place a trap on an owned non-water cell it stands on or adjacent to
+  (cost 5 money + 3 ore). Traps are visible only to the trapper's owner, last 5 turns, and vanish when triggered. An
+  enemy unit that moves onto a trap stops there and takes ~90 damage (attack 60 at full HP vs. defense 0); the trap
+  disappears.
+- **Stormcaller (storm)** — While standing on an owned cell of its own village that has water tiles (including aboard
+  a ship on an owned village water tile), the "Storm" action is available. It consumes the whole turn and strikes every
+  enemy or pirate ship on that village's water tiles for ~90 damage each. Own ships are untouched.
+- **Stunner (stun)** — A range-2 target is always stunned; a range-1 target lets you pick a regular attack or a stun.
+  A stun deals no damage but the target cannot act this turn (if it has not acted yet) or next turn (if it already
+  has); it provokes no counter-attack. Stunned units show a `stunned` tag on their HP text.
 
 - **Rider** additionally requires the *Riding* skill.
 - **Knight** additionally requires the *Knights* skill. After killing an enemy it may attack again in the same turn;
@@ -69,12 +108,13 @@ freshly spawned unit must wait until the next turn.
   step. A ship may always attack in the same turn it has moved (the shield/catapult "cannot attack after moving" limit
   does not apply once a unit is on a ship), but a ship can never move again in the turn it has attacked. A ship reveals
   the map with its own ship-level attack distance, regardless of the original unit type it carries. Ship attack: level
-  1 = 1 at range 2, level 2 = 2 at range 2, level 3 = 3 at range 3. Upgrade costs: to level 2 = 8 money + 4 wood, to
+  1 = 10 at range 2, level 2 = 20 at range 2, level 3 = 30 at range 3. Upgrade costs: to level 2 = 8 money + 4 wood, to
   level 3 = 16 money + 8 wood + 2 ore; a ship can be upgraded only while standing on an owned cell. Landing on land
   converts the ship back into a normal unit and consumes the whole turn: the unit may neither move, attack, nor heal
   again until the next turn.
 - **Pirates:** neutral units that belong to no tribe. From turn 7 onward, on every odd turn, there is a 15% chance a
-  pirate spawns on an edge water cell. Pirates have 50 move points on sea only, have attack 3 at range 1 and 15 HP. If
+  pirate spawns on an edge water cell. Pirates have 50 move points on sea only, attack 15 at range 3, defense 5 and
+  80 HP. If
   any pirate is on the map, they take their turn after all players, attacking the nearest player unit (ship or land) or
   moving toward it. A pirate adjacent to a ship tries to **capture** it with a 25% success chance: on success the ship
   becomes a pirate ship (keeping its HP and damage); on failure the pirate loses 2 HP and the ship loses 1 HP. Killing a
@@ -109,7 +149,7 @@ freshly spawned unit must wait until the next turn.
   (aboard a ship the crew still fights back with the ship's cannon). A shield cannot attack in a turn in which it has
   already moved (as a ship this limit does not apply). On a kill, the attacker moves onto the target's tile (unless the
   attacker is an archer or a pirate, is a ship, or the target was a pirate or a ship).
-- **Heal** — if the unit hasn't moved/attacked this turn, restore +2 HP (once per turn).
+- **Heal** — if the unit hasn't moved/attacked this turn, restore +15 HP (once per turn).
 - **Capture village** — a unit standing on an enemy or free village marked capturable (red triangle) captures it.
 - **Upgrade village** — costs 2 wood + 1 stone + 2 money at level 1, scaling by level (×2 wood, ×1 stone, ×2 money per
   level). Raises the village level, its claim radius, income and unit capacity.

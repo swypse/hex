@@ -37,6 +37,8 @@ export const ACTION_BUTTON_ATLAS_FRAMES: Record<string, { x: number; y: number }
   'action-star': { x: 480, y: 600 },
   'action-star-empty': { x: 0, y: 720 },
   'action-stats': { x: 120, y: 720 },
-  'action-upgrade': { x: 240, y: 720 },
-  'action-water-temple': { x: 360, y: 720 },
+  'action-stealth': { x: 240, y: 720 },
+  'action-stormcaller': { x: 360, y: 720 },
+  'action-upgrade': { x: 480, y: 720 },
+  'action-water-temple': { x: 0, y: 840 },
 };
