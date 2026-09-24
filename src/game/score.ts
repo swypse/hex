@@ -23,6 +23,13 @@ const UNIT_SCORE: Partial<Record<UnitType, number>> = {
   warrior: WARRIOR_SCORE,
   rider: RIDER_SCORE,
   archer: ARCHER_SCORE,
+  stalker: 9,
+  builder: 7,
+  banner: 8,
+  berserker: 10,
+  trapper: 8,
+  stormcaller: 9,
+  stunner: 7,
 };
 
 export function boardScore(map: GameMap, playerIndex: number): number {

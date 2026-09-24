@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import type { Unit, UnitType } from '../src/game/units';
 import { unitHelpLines, unitHelpTitle, unitHelpDescription, unitHelpStats } from '../src/game/unit-descriptions';
 
-const ALL_TYPES: UnitType[] = ['warrior', 'rider', 'archer', 'swordsman', 'shield', 'catapult', 'knight', 'pirate'];
+const ALL_TYPES: UnitType[] = ['warrior', 'rider', 'archer', 'swordsman', 'shield', 'catapult', 'knight', 'pirate', 'stalker', 'builder', 'banner', 'berserker', 'trapper', 'stormcaller', 'stunner'];
 
 function unit(type: UnitType, shipLevel?: 1 | 2 | 3): Unit {
   return {
