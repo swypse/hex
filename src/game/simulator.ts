@@ -24,6 +24,7 @@ import { knownTribesFor } from './discovery';
 import { isWaterType, TileType } from './tile-types';
 import { BOTTLE_HEAL, BOTTLE_MONEY, bottleCollectableFor, collectExpiredBottles, randomBottleEffectKind, touchBottle, trySpawnBottle } from './bottles';
 import { canPlaceTrapOn, trapAlive, trapDamage, TRAP_COST } from './traps';
+import { stormDamage, stormEligible, stormTargetShips } from './storm';
 import { upgradeVillage, buildWall as applyWall, canBuildWall, WALL_COST } from './village';
 import { SeededRandom } from '../util/random';
 import type { GameStateSnapshot } from './state';
@@ -50,6 +51,7 @@ export type Command =
   | { type: 'getBottle' }
   | { type: 'enableStealth'; unitId: string }
   | { type: 'trap'; unitId: string; q: number; r: number }
+  | { type: 'storm'; unitId: string }
   | { type: 'endTurn' }
   | { type: 'giveToAI'; playerIndex: number }
   | { type: 'forfeit'; playerIndex: number };
@@ -75,6 +77,7 @@ export const PREDICTABLE_COMMAND_TYPES: ReadonlySet<Command['type']> = new Set([
   'shipLanding',
   'enableStealth',
   'trap',
+  'storm',
 ]);
 
 export class Simulator {
@@ -222,6 +225,9 @@ export class Simulator {
         break;
       case 'trap':
         ok = this.doBuildTrap(cmd.unitId, cmd.q, cmd.r);
+        break;
+      case 'storm':
+        ok = this.doStorm(cmd.unitId);
         break;
       case 'endTurn':
         this.doEndTurn();
@@ -449,6 +455,39 @@ export class Simulator {
     target.trap = { owner: unit.owner, placedTurn: this.turn };
     this.consumeUnitTurn(unit);
     this.emit({ type: 'trapPlaced', q, r, playerIndex: player.index });
+    return true;
+  }
+
+  /** Stormcaller storms its village's water tiles: every enemy or pirate ship
+   *  on them takes ~90 damage (no miss, no counter). Consumes the whole turn. */
+  private doStorm(unitId: string): boolean {
+    const unit = this.findUnit(unitId);
+    if (!unit || unit.owner !== this.currentPlayerIndex) return false;
+    if (unit.type !== 'stormcaller') return false;
+    if (unit.hasMoved || unit.hasAttacked || unit.hasHealed) return false;
+    if ((unit.stunTurns ?? 0) >= 1) return false;
+    if (!stormEligible(this.map, unit)) return false;
+    const damage = stormDamage();
+    const targets = stormTargetShips(this.map, unit);
+    const report: { q: number; r: number; damage: number }[] = [];
+    const killer = this.players[unit.owner]!;
+    for (const t of targets) {
+      const ship = t.unit!;
+      ship.hp = Math.max(0, ship.hp - damage);
+      report.push({ q: t.q, r: t.r, damage });
+      if (ship.hp <= 0) {
+        killer.kills += 1;
+        const pts = ship.owner < 0 ? PIRATE_KILL_SCORE : KILL_SCORE;
+        awardScore(killer, pts);
+        this.emitScoreFly(killer.index, pts, t);
+        const victim = ship.owner >= 0 ? this.players[ship.owner] : null;
+        if (victim) this.statsOf(victim).killedUnits += 1;
+        this.statsOf(killer).enemyShipsKilled += 1;
+        t.unit = null;
+      }
+    }
+    this.consumeUnitTurn(unit);
+    this.emit({ type: 'storm', unitId, q: unit.q, r: unit.r, targets: report });
     return true;
   }
 
