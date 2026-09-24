@@ -54,6 +54,17 @@ export function canBuildBridgeHere(map: GameMap, tile: MapTile): boolean {
 
 export function buildBridge(map: GameMap, tile: MapTile, player: Player): boolean {
   if (!canBuildBridge(map, tile, player)) return false;
+  return payAndPlaceBridge(map, tile, player);
+}
+
+/** Places a bridge at its cost without re-validating the Bridges skill — used
+ *  by the Villagers builder, whose eligibility was already checked by
+ *  `canBuildBridgeHere` in `builderBuildable`. */
+export function buildBridgeIgnoringSkill(map: GameMap, tile: MapTile, player: Player): boolean {
+  return canBuildBridgeHere(map, tile) && payAndPlaceBridge(map, tile, player);
+}
+
+function payAndPlaceBridge(map: GameMap, tile: MapTile, player: Player): boolean {
   if (!canAfford(player.resources, BRIDGE_COST)) return false;
   const dir = bridgeDirFor(map, tile)!;
   player.resources = pay(player.resources, BRIDGE_COST);

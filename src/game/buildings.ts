@@ -8,6 +8,10 @@ import { buildingsInVillage, villageBuildingLimit } from './village';
 import { villageEnemyOccupied } from './capture';
 import type { BuildingKind } from './events';
 import { t } from '../i18n';
+import { canBuildBridgeHere } from './bridges';
+
+export type BuilderBuildKind = BuildingKind | 'bridge';
+export const BUILDER_KINDS: BuilderBuildKind[] = ['sawmill', 'mine', 'port', 'bridge'];
 
 export const SAWMILL_COST = 10;
 export const MINE_COST = 15;
@@ -112,6 +116,55 @@ export function canBuildForestTemple(map: GameMap, tile: MapTile, player: Player
   return isForestType(tile.terrain);
 }
 
+/** Placement rule for a building kind with the skill check skipped — exactly
+ *  what the Villagers builder uses: terrain/territory/slot rules unchanged,
+ *  no skill required. */
+export function canBuildKindIgnoringSkill(
+  kind: BuildingKind,
+  map: GameMap,
+  tile: MapTile,
+  player: Player,
+): boolean {
+  if (kind === 'temple' || kind === 'forestTemple') return false;
+  if (tile.ownedBy !== player.index) return false;
+  if (tile.settlement || tile.building) return false;
+  if (!villageHasBuildingSlot(map, tile, player)) return false;
+  if (kind === 'mine') {
+    return isMountainType(tile.terrain);
+  }
+  if (kind === 'port') {
+    if (tile.bridge !== undefined && tile.bridge !== null) return false;
+    if (!isWaterType(tile.terrain)) return false;
+    return hexNeighbors(tile).some((n) => {
+      const t = neighborTile(map, n);
+      return t !== undefined && t.ownedBy === player.index && !isWaterType(t.terrain);
+    });
+  }
+  // sawmill
+  if (!isLandType(tile.terrain)) return false;
+  return hexNeighbors(tile).some((n) => {
+    const t = neighborTile(map, n);
+    return t !== undefined && isForestType(t.terrain);
+  });
+}
+
+/** Cells the builder standing on `tile` may build `kind` on: its own tile and
+ *  adjacent tiles, owned by the player and passing the kind's placement rules
+ *  with the skill requirement waived. */
+export function builderBuildable(map: GameMap, tile: MapTile, kind: BuilderBuildKind, player: Player): MapTile[] {
+  const out: MapTile[] = [];
+  const consider = (t: MapTile | undefined): void => {
+    if (!t) return;
+    const ok = kind === 'bridge'
+      ? t.ownedBy === player.index && canBuildBridgeHere(map, t)
+      : canBuildKindIgnoringSkill(kind as BuildingKind, map, t, player);
+    if (ok) out.push(t);
+  };
+  consider(tile);
+  for (const n of hexNeighbors(tile)) consider(neighborTile(map, n));
+  return out;
+}
+
 /** Whether this player's own building on `tile` is damaged (not full hp). */
 export function canRepairBuilding(map: GameMap, tile: MapTile, player: Player): boolean {
   if (!tile.building) return false;
@@ -199,6 +252,17 @@ export function buildBuilding(
             ? canBuildTemple(map, tile, player)
             : canBuildForestTemple(map, tile, player);
   if (!allowed) return false;
+  return payAndPlaceBuilding(tile, kind, player);
+}
+
+/** Places a building at its cost without re-validating the skill — used by the
+ *  Villagers builder, whose eligibility (terrain/territory/slot) was already
+ *  checked by `builderBuildable`. */
+export function buildBuildingIgnoringSkill(map: GameMap, tile: MapTile, kind: BuildingKind, player: Player): boolean {
+  return payAndPlaceBuilding(tile, kind, player);
+}
+
+function payAndPlaceBuilding(tile: MapTile, kind: BuildingKind, player: Player): boolean {
   const cost = BUILDING_COSTS[kind];
   if (!canAfford(player.resources, cost)) return false;
   player.resources = pay(player.resources, cost);

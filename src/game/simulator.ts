@@ -1,8 +1,8 @@
 import { planAiActions, logAiTurnStart, aiLoggingEnabled, formatAiAction, type AiActionMarker } from './ai';
-import { buildingIncome, buildBuilding, canUsePort, repairBuilding, destroyBuilding } from './buildings';
+import { buildingIncome, buildBuilding, buildBuildingIgnoringSkill, canUsePort, repairBuilding, destroyBuilding, builderBuildable, type BuilderBuildKind } from './buildings';
 import { captureVillage, setCaptureReady, villageIncomeTotal } from './capture';
 import { attackableTargets, missChanceFor, performAttack, performSiege } from './combat';
-import { buildBridge } from './bridges';
+import { buildBridge, buildBridgeIgnoringSkill } from './bridges';
 import { buildRoad } from './roads';
 import { GameEvent, BuildingKind } from './events';
 import { bonusEligibleFor, explorerPath, findClosestVillage, revealExplorerPath, type BonusKind } from './bonus';
@@ -32,7 +32,7 @@ export type Command =
   | { type: 'attack'; unitId: string; q: number; r: number }
   | { type: 'capture'; q: number; r: number; unitId: string }
   | { type: 'spawn'; q: number; r: number; unitType: UnitType }
-  | { type: 'build'; q: number; r: number; kind: BuildingKind }
+  | { type: 'build'; q: number; r: number; kind: BuildingKind | 'bridge'; unitId?: string }
   | { type: 'repair'; q: number; r: number }
   | { type: 'destroyBuilding'; q: number; r: number }
   | { type: 'buildWall'; q: number; r: number }
@@ -168,7 +168,9 @@ export class Simulator {
         ok = this.doSpawn(cmd.q, cmd.r, cmd.unitType);
         break;
       case 'build':
-        ok = this.doBuild(cmd.q, cmd.r, cmd.kind);
+        ok = cmd.unitId !== undefined
+          ? this.doBuildWithUnit(cmd.unitId, cmd.q, cmd.r, cmd.kind)
+          : this.doBuild(cmd.q, cmd.r, cmd.kind as BuildingKind);
         break;
       case 'repair':
         ok = this.doRepair(cmd.q, cmd.r);
@@ -552,6 +554,39 @@ export class Simulator {
       return true;
     }
     return false;
+  }
+
+  /** Builder special: the Villagers' builder raises sawmills/mines/ports/
+   *  bridges on its own or an adjacent owned tile, no skill required, and
+   *  consumes its whole turn. */
+  private doBuildWithUnit(unitId: string, q: number, r: number, kind: BuilderBuildKind): boolean {
+    const unit = this.findUnit(unitId);
+    if (!unit || unit.owner !== this.currentPlayerIndex) return false;
+    if (unit.type !== 'builder') return false;
+    if (unit.shipLevel !== undefined) return false;
+    if (unit.hasMoved || unit.hasAttacked || unit.hasHealed) return false;
+    if ((unit.stunTurns ?? 0) >= 1) return false;
+    const player = this.players[unit.owner]!;
+    const tile = tileAt(this.map, unit.q, unit.r)!;
+    const target = tileAt(this.map, q, r);
+    if (!target) return false;
+    if (!builderBuildable(this.map, tile, kind, player).some((t) => t.q === q && t.r === r)) return false;
+    if (kind === 'bridge') {
+      if (!buildBridgeIgnoringSkill(this.map, target, player)) return false;
+      this.consumeUnitTurn(unit);
+      this.emit({ type: 'bridgeBuilt', q, r, playerIndex: player.index });
+      return true;
+    }
+    if (!buildBuildingIgnoringSkill(this.map, target, kind, player)) return false;
+    this.consumeUnitTurn(unit);
+    this.emit({ type: 'built', kind, q, r, playerIndex: player.index });
+    return true;
+  }
+
+  private consumeUnitTurn(unit: Unit): void {
+    unit.hasMoved = true;
+    unit.hasAttacked = true;
+    unit.hasHealed = true;
   }
 
   private doRepair(q: number, r: number): boolean {
