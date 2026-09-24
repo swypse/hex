@@ -3,7 +3,7 @@ import {
 } from 'pixi.js';
 import { FONT_REGULAR } from '../ui/kit/bitmap-fonts';
 import {
-  axialKey, compareTileY, hexCorners, hexDistance, hexEdge, hexEdgeNeighbor, hexToPixel, splitHexBorder
+  axialKey, compareTileY, hexCorners, hexEdge, hexEdgeNeighbor, hexToPixel, splitHexBorder
 } from '../game/hex';
 import { tileMapByKey, type GameMap, type MapTile } from '../game/map-gen';
 import { bridgeCoastOffsets } from '../game/bridges';
@@ -62,10 +62,6 @@ const SELECTED_BORDER_WIDTH = 6;
 const MARKER_Y_SCALE = 0.72;
 /** `viewport.zoomOut` above which hp bars/text and village names are hidden. */
 export const ZOOM_DETAIL_HIDE = 0.4;
-/** Delay between consecutive reachable/attackable marker rings (ms). */
-const MARKER_STAGGER_DELAY_MS = 80;
-/** Duration of the marker fade-in once its delay elapses (ms). */
-const MARKER_STAGGER_FADE_MS = 120;
 
 interface TileView {
   el: Container;
@@ -425,38 +421,37 @@ export class MapView {
     this.damageBadges.syncPositions(pan, scale);
   }
 
-  /** Stagger reveal state for move/attack markers: tile key -> reveal start
-   *  time (performance.now when the marker's distance ring is due to fade in). */
+  /** Reveal state for move/attack markers: tile key -> start time at which the
+   *  marker may appear (now, or the end of a running move animation). */
   private markerRevealTimes = new Map<string, number>();
   /** Anim-clock time before which newly-drawn move/attack markers stay hidden
    *  (set while a unit's move animation is running, so post-move markers wait
-   *  for the mover to arrive before fading in). 0 = no deferral. */
+   *  for the mover to arrive before appearing). 0 = no deferral. */
   private markerDeferUntil = 0;
-  /** Live marker graphics currently staged for a fade-in, keyed by tile key. */
+  /** Deferred marker graphics still waiting to flip on, keyed by tile key. */
   private markerRevealEls = new Map<string, Graphics>();
   private markerRevealRemove: (() => void) | null = null;
   /** Signature of the marker key set that the current reveal times belong to;
-   *  when the selection changes we reset the stagger clock. */
+   *  when the selection changes we reset the reveal times. */
   private markerRevealSig = '';
 
-  /** Starts (or reuses) a ticker that fades in any marker whose reveal time
-   *  has passed. Stops itself once no marker is still fading. */
+  /** Starts (or reuses) a ticker that flips on any deferred marker once its
+   *  reveal time passes. Stops itself once no marker is still waiting. */
   private ensureMarkerRevealTick(): void {
     if (this.markerRevealRemove) return;
     if (this.markerRevealEls.size === 0) return;
     const fn = (): void => {
       if (this.cameraBusy) return;
       const now = this.animNow();
-      let allDone = true;
       for (const [key, g] of this.markerRevealEls) {
         if (g.destroyed) continue;
         const start = this.markerRevealTimes.get(key);
-        if (start === undefined) continue;
-        const t = (now - start) / MARKER_STAGGER_FADE_MS;
-        g.alpha = Math.max(0, Math.min(1, t));
-        if (t < 1) allDone = false;
+        if (start !== undefined && now >= start) {
+          g.alpha = 1;
+          this.markerRevealEls.delete(key);
+        }
       }
-      if (allDone) this.stopMarkerRevealTick();
+      if (this.markerRevealEls.size === 0) this.stopMarkerRevealTick();
     };
     const remover = (): void => {
       this.app.ticker.remove(fn);
@@ -473,24 +468,25 @@ export class MapView {
     }
   }
 
-  /** Fades a marker in with a per-distance delay: the reveal for a tile at
-   *  distance d from the selection starts at (d - 1) * MARKER_STAGGER_DELAY.
-   *  While a move animation is running (`markerDeferUntil` in the future) the
-   *  reveal additionally waits for it to finish. */
-  private revealMarker(key: string, dist: number, g: Graphics): void {
+  /** Reveals a marker all at once: full opacity immediately when due, hidden
+   *  while a move animation is running (`markerDeferUntil` in the future) and
+   *  flipped on by the reveal tick once the mover arrives. */
+  private revealMarker(key: string, g: Graphics): void {
     if (!this.markerRevealTimes.has(key)) {
-      const base = Math.max(this.animNow(), this.markerDeferUntil) + (dist - 1) * MARKER_STAGGER_DELAY_MS;
-      this.markerRevealTimes.set(key, base);
+      this.markerRevealTimes.set(key, Math.max(this.animNow(), this.markerDeferUntil));
     }
     const start = this.markerRevealTimes.get(key)!;
-    const t = (this.animNow() - start) / MARKER_STAGGER_FADE_MS;
-    g.alpha = Math.max(0, Math.min(1, t));
-    this.markerRevealEls.set(key, g);
+    if (this.animNow() >= start) {
+      g.alpha = 1;
+    } else {
+      g.alpha = 0;
+      this.markerRevealEls.set(key, g);
+    }
   }
 
   /** Defer any marker revealed from now for `ms` (a unit move animation runs
    *  for that long), so attackable/reachable markers that only exist after the
-   *  mover arrives wait for the animation to complete before fading in. */
+   *  mover arrives wait for the animation to complete before appearing. */
   deferNewMarkers(ms: number): void {
     this.markerDeferUntil = Math.max(this.markerDeferUntil, this.animNow() + ms);
   }
@@ -972,7 +968,7 @@ export class MapView {
     this.startTutorialPulse();
     const selectedKey = selection ? axialKey(selection) : '';
     // When the reachable/attackable key set changes (new selection), reset the
-    // marker stagger clock so the new ring fades in from the start.
+    // marker reveal times so the new set appears from the start.
     const markerKeys = [...reachableKeys.values()].sort().join(',') + '|' + [...attackableKeys.values()].sort().join(',') + '|' + selectedKey;
     if (markerKeys !== this.markerRevealSig) {
       this.markerRevealSig = markerKeys;
@@ -989,8 +985,7 @@ export class MapView {
         this.markerLayer.addChild(dot);
         this.highlights.push(dot);
         this.movePulseParts.push({ g: dot, x: p.x, y, base: dotRadius, color: reachableColor });
-        const dist = selection ? hexDistance({ q: selection.q, r: selection.r }, tile) : 1;
-        this.revealMarker(key, dist, dot);
+        this.revealMarker(key, dot);
         continue;
       }
       if (key === selectedKey && selection && selection.kind === 'unit' && tile.unit) {
@@ -1012,8 +1007,7 @@ export class MapView {
       const p = hexToPixel(tile, this.hexSize);
       const attackDot = this.takeGraphics();
       this.attackPulseParts.push({ g: attackDot, x: p.x, y, base: dotRadius });
-      const dist = selection ? hexDistance({ q: selection.q, r: selection.r }, tile) : 1;
-      this.revealMarker(key, dist, attackDot);
+      this.revealMarker(key, attackDot);
       this.markerLayer.addChild(attackDot);
       this.highlights.push(attackDot);
     }

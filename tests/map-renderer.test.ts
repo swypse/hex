@@ -747,7 +747,7 @@ describe('MapView hp bar anchoring', () => {
     v.destroy();
   });
 
-  it('reveals move markers staggeringly: dist 2 starts fading only after dist 1', () => {
+  it('reveals move markers all at once at full alpha with no stagger', () => {
     const callbacks: Array<() => void> = [];
     const app = {
       screen: { width: 800, height: 600 },
@@ -768,26 +768,13 @@ describe('MapView hp bar anchoring', () => {
         x: 400, y: 300, scale: 1, width: 800, height: 600,
       });
       const dots = v.markerLayer.children as Graphics[];
-      // children order follows map.tiles: [1,0] then [2,0].
-      const dist1 = dots[0]!;
-      const dist2 = dots[1]!;
+      // Both distance rings appear immediately and at full opacity together.
       expect(dots.length).toBe(2);
-      now = 0;
-      for (const fn of callbacks) fn();
-      expect(dist1.alpha).toBe(0);
-      expect(dist2.alpha).toBe(0);
-      now = 50; // dist1 is fading, dist2 (reveal at 80ms) is not yet
-      for (const fn of callbacks) fn();
-      expect(dist1.alpha).toBeGreaterThan(0);
-      expect(dist1.alpha).toBeLessThan(1);
-      expect(dist2.alpha).toBe(0);
-      now = 100; // dist2 fade now started
-      for (const fn of callbacks) fn();
-      expect(dist2.alpha).toBeGreaterThan(0);
-      now = 320; // both fully revealed
-      for (const fn of callbacks) fn();
-      expect(dist1.alpha).toBe(1);
-      expect(dist2.alpha).toBe(1);
+      expect(dots.every((d) => d.alpha === 1)).toBe(true);
+      // Nothing is deferred, so no reveal tick is scheduled.
+      expect(
+        (v as unknown as { markerRevealEls: Map<string, Graphics> }).markerRevealEls.size,
+      ).toBe(0);
     } finally {
       (performance as { now: () => number }).now = origNow;
       v.destroy();
@@ -2465,10 +2452,10 @@ describe('MapView marker reveal deferral', () => {
       expect(marker).toBeDefined();
       expect(marker!.alpha).toBe(0);
 
-      // Once the move window passes, the same marker fades in.
+      // Once the move window passes, the same marker appears at full alpha.
       now = 500;
       v.update(map, players, selected, new Set(), attackable, 0, new Set(), viewport);
-      expect(marker!.alpha).toBeGreaterThan(0);
+      expect(marker!.alpha).toBe(1);
     } finally {
       (performance as { now: () => number }).now = origNow;
       v.destroy();
