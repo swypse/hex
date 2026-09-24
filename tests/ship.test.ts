@@ -118,10 +118,10 @@ describe('ship', () => {
 
   it('keeps the crew defense when a unit becomes a ship', () => {
     const u = makeUnit(0, 'swordsman', 0, 0);
-    expect(u.defense).toBe(20);
+    expect(u.defense).toBe(16);
     gainShipAbility(u);
     expect(u.shipLevel).toBe(1);
-    expect(u.defense).toBe(20);
+    expect(u.defense).toBe(16);
 
     const shield = makeUnit(0, 'shield', 0, 0);
     gainShipAbility(shield);

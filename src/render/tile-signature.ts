@@ -25,7 +25,7 @@ export function tileSignature(
   const explored = isExploredFor(tile, localPlayerIndex);
   const s = tile.settlement;
   const u = tile.unit;
-  const hidden = u ? hiddenUnitIds.has(u.id) : false;
+  const hidden = u ? hiddenUnitIds.has(u.id) || (u.owner !== localPlayerIndex && u.isStealthed === true) : false;
   const neighborOf = (n: Axial): MapTile | undefined =>
     tileIndex ? tileIndex.get(axialKey(n)) : map.tiles.find((x) => x.q === n.q && x.r === n.r);
   const neighborOwners = hexNeighbors(tile).map((n) => {

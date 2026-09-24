@@ -285,6 +285,39 @@ export class EventPresenter {
           case 'explorer':
             await this.presentExplorer(e);
             break;
+          case 'stealthEnabled':
+            this.host.render();
+            break;
+          case 'stealthRevealed':
+            this.host.render();
+            break;
+          case 'trapPlaced':
+            this.host.render();
+            break;
+          case 'trapTriggered': {
+            this.host.render();
+            const t = tileAt(sim.map, e.q, e.r);
+            if (t) this.spawnHpText(t, `-${e.damage}`, 0xff6666);
+            break;
+          }
+          case 'storm': {
+            for (const target of e.targets) {
+              const t = tileAt(sim.map, target.q, target.r);
+              if (t) this.spawnHpText(t, `-${target.damage}`, 0x88ccff);
+            }
+            this.host.render();
+            break;
+          }
+          case 'stunShot': {
+            const from = tileAt(sim.map, e.attackerTile.q, e.attackerTile.r);
+            const to = tileAt(sim.map, e.targetTile.q, e.targetTile.r);
+            const tex = this.host.textures()?.cannonbalTexture;
+            if (from && to && tex) {
+              await this.spawnProjectile(from, to, tex, 26);
+            }
+            if (!e.missed) this.host.render();
+            break;
+          }
           case 'turnStarted':
             this.presentTurnStarted(e.playerIndex, e.turn);
             break;
@@ -775,6 +808,9 @@ export class EventPresenter {
     const local = useGameStore.getState().localPlayerIndex;
     const map = sim.map;
     let steps = e.path;
+    // A stealthed enemy stalker's move is never shown to anyone but its owner:
+    // hide it entirely and just let the fog reveal happen.
+    if (unit.owner !== local && unit.isStealthed) return;
     if (unit.owner !== local && unit.owner !== PIRATE_OWNER) {
       steps = steps.filter((s) => {
         const t = tileAt(map, s.q, s.r);

@@ -124,7 +124,7 @@ export class HudSelected implements Widget {
       unitRow = {
         name: t('hud.selected.unit', { name: UNIT_TYPE_NAMES[unit.type] }),
         pairs: [
-          { icon: '16/hp-16.png', value: `${unit.hp}/${maxHp}${canAct ? ' •' : ''}` },
+          { icon: '16/hp-16.png', value: `${unit.hp}/${maxHp}${(unit.stunTurns ?? 0) >= 1 ? ` ${t('hud.selected.stunned')}` : ''}${canAct ? ' •' : ''}` },
           { icon: '16/attack-16.png', value: String(attackDamage(unit)) },
           { icon: '16/def-16.png', value: String(unit.defense ?? 0) },
           { icon: '16/gold-16.png', value: String(unitMaintenance(unit)) },

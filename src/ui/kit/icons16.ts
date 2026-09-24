@@ -23,7 +23,39 @@ export function icons16FrameForIconPath(path: string): string {
 }
 
 let atlasTexture: Texture | null = null;
+let atlasPromise: Promise<void> | null = null;
 const frameCache = new Map<string, Texture>();
+
+/** Loads the single packed 16px icons atlas once and shares the same load
+ *  promise with every caller. */
+export function ensureIcons16Atlas(): Promise<void> {
+  if (atlasPromise) return atlasPromise;
+  atlasPromise = new Promise<void>((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      try {
+        atlasTexture = Texture.from(img);
+        ensureCanvasResource(atlasTexture);
+      } catch {
+        console.error('[icons16] Texture.from failed for', TEXTURE_BASE + ICONS16_ATLAS_FILE);
+      }
+      resolve();
+    };
+    img.onerror = () => {
+      console.error('[icons16] onerror for', TEXTURE_BASE + ICONS16_ATLAS_FILE);
+      resolve();
+    };
+    img.src = TEXTURE_BASE + ICONS16_ATLAS_FILE;
+  });
+  return atlasPromise;
+}
+
+/** Directly returns the atlas texture for a frame key (no sprite). Use after
+ *  `ensureIcons16Atlas`; null when the atlas is unavailable. */
+export function icons16FrameTexture(key: string): Texture | null {
+  if (!atlasTexture) return null;
+  return sliceFrame(key, atlasTexture);
+}
 
 function sliceFrame(key: string, atlas: Texture): Texture | null {
   const frame = ICONS16_ATLAS_FRAMES[key];

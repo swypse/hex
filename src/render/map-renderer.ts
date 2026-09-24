@@ -13,6 +13,7 @@ import { Selection } from '../game/selection';
 import { TRIBES, tribeById } from '../game/tribes';
 import { UNIT_TYPES, PIRATE_COLOR, Unit } from '../game/units';
 import { unitCanAct } from '../game/unit-actions';
+import { attackBonus } from '../game/abilities';
 import { isExploredFor } from '../game/explore';
 import { territoryColor } from '../game/discovery';
 import { villageCapacity, unitsInVillage } from '../game/village';
@@ -286,7 +287,7 @@ export class MapView {
     // When zoomed out far enough the hp bars, hp text and village names are too
     // small to read; drop them to keep the map clean.
     const detailHidden = (viewport.zoomOut ?? 0) > ZOOM_DETAIL_HIDE;
-    const hpBars: { unit: Unit; position: { x: number; y: number }; canAct: boolean; color: number; hp: number }[] = [];
+    const hpBars: { unit: Unit; position: { x: number; y: number }; canAct: boolean; color: number; hp: number; bonus: number }[] = [];
     const buildingHpBars: { position: { x: number; y: number }; hp: number }[] = [];
     const labels: { tile: MapTile; owner: number; el: Container; world: { x: number; y: number } }[] = [];
     const exclamations: { el: Container; world: { x: number; y: number } }[] = [];
@@ -304,7 +305,7 @@ export class MapView {
       const y = p.y - tileElevation(tile, this.hexSize);
       const explored = isExploredFor(tile, localPlayerIndex);
 
-      if (tile.unit && !hiddenUnitIds.has(tile.unit.id) && explored) {
+      if (tile.unit && !hiddenUnitIds.has(tile.unit.id) && explored && !(tile.unit.owner !== localPlayerIndex && tile.unit.isStealthed === true)) {
         const unit = tile.unit;
         const color = unit.type === 'pirate'
           ? PIRATE_COLOR
@@ -317,6 +318,7 @@ export class MapView {
             canAct: unit.type === 'pirate' ? false : unitCanAct(map, tile, unit, players[unit.owner]!),
             color,
             hp: this.hpOverrides.get(unit.id) ?? unit.hp,
+            bonus: attackBonus(unit, map),
           });
         }
         if (unit.type === 'pirate' || unit.shipLevel !== undefined) {
@@ -331,6 +333,13 @@ export class MapView {
           position: { x: p.x, y: y - this.hexSize * 0.6 },
           hp: buildingHp(building),
         });
+      }
+      // Thorn traps are visible only to their owner.
+      if (tile.trap && tile.trap.owner === localPlayerIndex && explored && !detailHidden) {
+        const c = this.takeGraphics();
+        c.circle(p.x, y, 8).fill(0xff2222);
+        this.overlay.addChild(c);
+        this.overlayItems.push({ el: c, world: { x: p.x, y } });
       }
       if (tile.settlement && tile.settlement.owner !== null && explored && !detailHidden) {
         labels.push({
@@ -376,7 +385,7 @@ export class MapView {
     for (const l of labels) this.addVillageLabel(l.tile, l.owner, l.el, l.world, players);
     // HP bars come after village labels so a unit's bar + text always render on
     // top of a village name label on the same tile.
-    for (const hp of hpBars) this.addHpBar(hp.unit, hp.position, hp.canAct, hp.color, localPlayerIndex, hp.hp, localTurn);
+    for (const hp of hpBars) this.addHpBar(hp.unit, hp.position, hp.canAct, hp.color, localPlayerIndex, hp.hp, localTurn, hp.bonus);
     for (const b of buildingHpBars) this.addBuildingHpBar(b.position, b.hp);
     // Capture markers come last so the icon renders above the unit's hp bar and
     // its hp text.
@@ -624,7 +633,8 @@ export class MapView {
     const unitAnchorY = unitTex?.anchorY ?? 0.5;
     this.syncSprite(tv, 'unitSprite', unitTexture, p.x, y, unitAnchorY);
     if (tv.unitSprite) {
-      tv.unitSprite.visible = explored && !(tile.unit && hiddenUnitIds.has(tile.unit.id));
+      const hiddenStealth = tile.unit !== null && tile.unit.owner !== localPlayerIndex && tile.unit.isStealthed === true;
+      tv.unitSprite.visible = explored && !(tile.unit && hiddenUnitIds.has(tile.unit.id)) && !hiddenStealth;
       if (tile.unit) {
         this.faceUnitSprite(tv.unitSprite, this.unitFacings.get(tile.unit.id) ?? 'right');
       }
@@ -1674,7 +1684,7 @@ export class MapView {
   private addHpBar(unit: Unit, position: {
     x: number;
     y: number
-  }, canAct: boolean, tribeColor: number, localPlayerIndex: number, hp: number, localTurn: boolean): void {
+  }, canAct: boolean, tribeColor: number, localPlayerIndex: number, hp: number, localTurn: boolean, bonus = 0): void {
     const el = new Container();
     el.position.set(position.x, position.y);
     const barWidth = this.hexSize * 0.6;
@@ -1697,7 +1707,8 @@ export class MapView {
       el.addChild(fill);
     }
 
-    const label = this.takeText(`${hp}/${maxHp}`, {
+    const stunned = (unit.stunTurns ?? 0) >= 1;
+    const label = this.takeText(`${hp}/${maxHp}${stunned ? ' stunned' : ''}`, {
       fontSize: 13,
       fill: 0xffffff,
       fontFamily: FONT_REGULAR
@@ -1715,6 +1726,26 @@ export class MapView {
       .fill({ color: 0x000000, alpha: dim ? 0.3 : 1 });
     el.addChild(labelBg);
     el.addChild(label);
+
+    // Aura/rage attack bonus chip: attack-16 icon + "+10"/"+20" after the hp text.
+    if (bonus > 0 && this.textures.attack16Texture) {
+      const icon = new Sprite(this.textures.attack16Texture);
+      icon.anchor.set(0.5, 1);
+      icon.width = 16;
+      icon.height = 16;
+      icon.position.set(label.x + label.width / 2 + 12, label.y);
+      icon.zIndex = 1;
+      el.addChild(icon);
+      const bonusText = this.takeText(`+${bonus}`, {
+        fontSize: 13,
+        fill: 0xffcc00,
+        fontFamily: FONT_REGULAR,
+      });
+      bonusText.anchor.set(0, 1);
+      bonusText.position.set(label.x + label.width / 2 + 24, label.y);
+      bonusText.zIndex = 1;
+      el.addChild(bonusText);
+    }
 
     this.overlay.addChild(el);
     this.overlayItems.push({ el, world: position });

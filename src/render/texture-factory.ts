@@ -15,6 +15,7 @@ import { buildingTileTexture, ensureBuildingsAtlas } from './buildings-atlas';
 import { ensureTribeAtlas, tribeTileTexture } from './tribe-atlas';
 import { ensureActionButtonAtlas, actionButtonFrameTexture } from '../ui/kit/action-button-icons';
 import { ensureIcons32Atlas, icons32FrameTexture } from '../ui/kit/icons32';
+import { ensureIcons16Atlas, icons16FrameTexture } from '../ui/kit/icons16';
 import { VillageBuildTextureService } from './village-build-texture';
 
 const TEXTURE_BASE = `${import.meta.env.BASE_URL}textures/`;
@@ -110,6 +111,10 @@ export interface TextureSet {
   arrowTexture: Texture | null;
   /** cannonball.png projectile texture used by ship attacks */
   cannonballTexture: Texture | null;
+  /** 16px attack icon sliced from the icons-16 atlas (aura/rage hp-bar chip). */
+  attack16Texture: Texture | null;
+  /** cannonbal-32 icon sliced from the icons-32 atlas (stun projectile). */
+  cannonbalTexture: Texture | null;
 }
 
 function hexagonPoints(size: number): number[] {
@@ -445,6 +450,9 @@ export async function createTextures(
   const captureTexture = actionButtonFrameTexture('action-capture-map');
   const arrowTexture = await loadImageTexture(TEXTURE_BASE + 'arrow.png');
   const cannonballTexture = await loadImageTexture(TEXTURE_BASE + 'cannonball.png');
+  ensureIcons32Atlas();
+  const cannonbalTexture = icons32FrameTexture('cannonbal-32');
+  const attack16Texture = icons16FrameTexture('attack-16');
   const wallImg = buildingTileTexture('wall');
   // Bake the wall at the same hex image-scale as villages/units so its on-map
   // footprint always matches the tile, regardless of the camera quality factor.
@@ -486,6 +494,8 @@ export async function createTextures(
     wallTexture,
     arrowTexture,
     cannonballTexture,
+    attack16Texture,
+    cannonbalTexture,
   };
 }
 

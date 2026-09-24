@@ -72,7 +72,9 @@ function buildTextures(map: GameMap): TextureSet {
     wallTexture: null,
     arrowTexture: tex(67, 13),
     glowFor: new Map([[unitTex.texture, tileTex(TEX_H + 8, TEX_H + 8)]]),
-    cannonballTexture: tex(35, 15),
+    cannonballTexture: tex(35, 15), 
+    attack16Texture: null,
+    cannonbalTexture: null,  
   };
 }
 
