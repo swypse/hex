@@ -12,6 +12,8 @@ import { canBuildBridge, BRIDGE_COST } from '../../game/bridges';
 import { BuildingKind } from '../../game/events';
 import { bonusEligibleFor } from '../../game/bonus';
 import { bottleCollectableFor } from '../../game/bottles';
+import { trapCells, TRAP_COST } from '../../game/traps';
+import { stormEligible } from '../../game/storm';
 
 export interface ToolbarSpec {
   key: string;
@@ -124,6 +126,19 @@ export function toolbarSpecs(): ToolbarSpec[] {
         disabled: !canAfford(player.resources, moneyCost(disbandCostMoney)),
         onClick: () => gameController.disbandSelectedUnit(),
       });
+    }
+    const idle = !unit.hasMoved && !unit.hasAttacked && !unit.hasHealed && (unit.stunTurns ?? 0) < 1;
+    if (unit.type === 'stalker' && !unit.isStealthed && unit.shipLevel === undefined && idle) {
+      out.push({ key: 'stealth', label: t('action.enableStealth'), disabled: false, onClick: () => gameController.enableStealthSelected() });
+    }
+    if (unit.type === 'builder' && unit.shipLevel === undefined) {
+      out.push({ key: 'build', label: t('action.build'), disabled: !idle, onClick: () => useGameStore.getState().setOverlay({ kind: 'builderBuild' }) });
+    }
+    if (unit.type === 'trapper' && unit.shipLevel === undefined && trapCells(map, tile, player).length > 0) {
+      out.push({ key: 'thorn-trap', label: t('action.buildTrap'), disabled: !idle || !canAfford(player.resources, TRAP_COST), onClick: () => gameController.placeTrap() });
+    }
+    if (unit.type === 'stormcaller' && stormEligible(map, unit)) {
+      out.push({ key: 'storm', label: t('action.storm'), disabled: !idle, onClick: () => gameController.stormSelected() });
     }
   }
 

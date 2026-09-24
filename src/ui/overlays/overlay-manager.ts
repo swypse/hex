@@ -16,6 +16,8 @@ import { WelcomeDialog } from './welcome-dialog';
 import { TutorialOverlay } from './tutorial-overlay';
 import { DisconnectDialog } from './disconnect-dialog';
 import { WatchPromptDialog } from './watch-prompt-dialog';
+import { StunChoiceDialog } from './stun-choice-dialog';
+import { BuilderBuildDialog } from './builder-build-dialog';
 
 interface Overlay {
   mount(host: UIHost, root: Container): void;
@@ -53,6 +55,8 @@ export class OverlayManager {
     tutorial: { make: () => new TutorialOverlay(), mounted: null, hiding: false },
     disconnect: { make: () => new DisconnectDialog(), mounted: null, hiding: false },
     watchingprompt: { make: () => new WatchPromptDialog(), mounted: null, hiding: false },
+    stunchoice: { make: () => new StunChoiceDialog(), mounted: null, hiding: false },
+    builderbuild: { make: () => new BuilderBuildDialog(), mounted: null, hiding: false },
   };
   private unsub: (() => void) | null = null;
   private refreshing = false;
@@ -119,6 +123,12 @@ export class OverlayManager {
           break;
         case 'watchingPrompt':
           active.add('watchingprompt');
+          break;
+        case 'stunChoice':
+          active.add('stunchoice');
+          break;
+        case 'builderBuild':
+          active.add('builderbuild');
           break;
       }
     }

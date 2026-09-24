@@ -255,6 +255,7 @@ export class MapView {
     viewport: Viewport,
     tutorialMarkerKeys: Set<string> = new Set<string>(),
     localTurn = true,
+    placementKeys?: Set<string>,
   ): void {
     if (this.tileViews.size === 0) this.buildTiles(map);
     this.map = map;
@@ -384,7 +385,7 @@ export class MapView {
       this.overlay.addChild(ex.el);
       this.overlayItems.push({ el: ex.el, world: ex.world });
     }
-    this.drawHighlights(map, selection, reachableKeys, attackableKeys, reachableColor, localPlayerIndex, tutorialMarkerKeys, localTurn);
+    this.drawHighlights(map, selection, reachableKeys, attackableKeys, reachableColor, localPlayerIndex, tutorialMarkerKeys, localTurn, placementKeys);
     this.shipBobs = shipBobs;
     this.startShipBob();
     this.startExclamationAnimation();
@@ -944,6 +945,7 @@ export class MapView {
     localPlayerIndex: number,
     tutorialMarkerKeys: Set<string> = new Set<string>(),
     localTurn = true,
+    placementKeys?: Set<string>,
   ): void {
     this.tutorialMarkerParts = [];
     this.attackPulseParts = [];
@@ -1008,6 +1010,18 @@ export class MapView {
     this.startAttackPulse();
     this.startMovePulse();
     this.ensureMarkerRevealTick();
+    if (placementKeys) {
+      for (const tile of map.tiles) {
+        const key = axialKey(tile);
+        if (!placementKeys.has(key)) continue;
+        const p = hexToPixel(tile, this.hexSize);
+        const y = p.y - tileElevation(tile, this.hexSize);
+        const dot = this.takeGraphics();
+        this.drawMarkerShape(dot, p.x, y, this.hexSize * 0.16, 0xffd54a);
+        this.markerLayer.addChild(dot);
+        this.highlights.push(dot);
+      }
+    }
   }
 
   /** Draws the ground marker a move/attack target sits on: a filled hexagon

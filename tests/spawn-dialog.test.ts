@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Container, Sprite, Text } from 'pixi.js';
-import { SpawnDialog } from '../src/ui/overlays/spawn-dialog';
+import { SpawnDialog, spawnableTypesFor } from '../src/ui/overlays/spawn-dialog';
 import { gameController } from '../src/controller/game-controller';
 import { useGameStore } from '../src/store/game-store';
 import { type UIHost } from '../src/ui/host';
@@ -111,8 +111,8 @@ describe('SpawnDialog', () => {
     dialog.mount(host, root);
     const popup = (dialog as unknown as { popup: { content: Container; contentWidth: number } }).popup;
     const items = popup.content.children.filter((c) => c instanceof Container && c.cursor === 'pointer');
-    // One icon per playable unit type (pirate excluded), 3 per row.
-    const playable = (Object.keys(UNIT_TYPES) as UnitType[]).filter((t) => t !== 'pirate').length;
+    // One icon per type the player's tribe can spawn (base + tribe special), 3 per row.
+    const playable = useGameStore.getState().players[0] ? spawnableTypesFor(useGameStore.getState().players[0]!).length : 0;
     expect(items.length).toBe(playable);
     const expectedRows = Math.ceil(playable / 3);
     const ys = items.map((c) => c.position.y);
@@ -148,5 +148,30 @@ describe('SpawnDialog', () => {
       expect(size).toBeGreaterThanOrEqual(16);
     }
     dialog.destroy();
+  });
+});
+
+describe('spawnableTypesFor', () => {
+  function playerOf(tribe: Tribe, index = 0): import('../src/game/players').Player {
+    return {
+      index, tribe, isHuman: true, name: 'p',
+      resources: { wood: 100, stone: 100, money: 100, ore: 100 },
+      score: 0, kills: 0, skills: [], isActive: true,
+    };
+  }
+
+  it('lists the base units plus the player\'s own tribe special', () => {
+    expect(spawnableTypesFor(playerOf(Tribe.Cats))).toContain('stalker');
+    expect(spawnableTypesFor(playerOf(Tribe.Cats))).toHaveLength(8);
+  });
+
+  it('does not list other tribes special units', () => {
+    const cats = spawnableTypesFor(playerOf(Tribe.Cats));
+    expect(cats).not.toContain('banner');
+    expect(cats).not.toContain('berserker');
+    expect(cats).not.toContain('builder');
+    expect(spawnableTypesFor(playerOf(Tribe.Warriors))).not.toContain('stalker');
+    const warriors = spawnableTypesFor(playerOf(Tribe.Villagers));
+    expect(warriors).toContain('builder');
   });
 });

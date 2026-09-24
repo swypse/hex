@@ -7,7 +7,9 @@ import { gameController } from '../src/controller/game-controller';
 import { useGameStore } from '../src/store/game-store';
 import { toolbarSpecs } from '../src/ui/hud/toolbar-specs';
 import { TileType } from '../src/game/tile-types';
+import { hexNeighbors } from '../src/game/hex';
 import { UNIT_TYPES } from '../src/game/units';
+import { Tribe } from '../src/game/tribes';
 import { sfx } from '../src/sound/sfx';
 
 describe('toolbarSpecs', () => {
@@ -339,5 +341,68 @@ describe('toolbarSpecs', () => {
     tile.building = { kind: 'mine', level: 1 };
     selectCell(tile);
     expect(toolbarSpecs().some((a) => a.key === 'repair')).toBe(false);
+  });
+
+  it('offers enable stealth only for a visible idle stalker', () => {
+    const players = useGameStore.getState().players;
+    players[0]!.tribe = Tribe.Cats;
+    players[0]!.resources = { wood: 100, stone: 100, money: 100, ore: 100 };
+    useGameStore.getState().setPlayers(players);
+    const tile = map.tiles.find((t) => t.unit === null)!;
+    tile.ownedBy = 0;
+    tile.unit = {
+      id: 's', owner: 0, type: 'stalker', q: tile.q, r: tile.r,
+      hasMoved: false, hasAttacked: false, hasHealed: false,
+      hp: UNIT_TYPES.stalker.maxHp, attack: 30, attackDistance: 1, spawnVillage: null,
+    };
+    select(tile);
+    expect(toolbarSpecs().some((a) => a.key === 'stealth')).toBe(true);
+    tile.unit = { ...tile.unit, isStealthed: true };
+    expect(toolbarSpecs().some((a) => a.key === 'stealth')).toBe(false);
+  });
+
+  it('offers build only for a builder, and thorn-trap only for a trapper', () => {
+    const players = useGameStore.getState().players;
+    players[0]!.resources = { wood: 100, stone: 100, money: 100, ore: 100 };
+    useGameStore.getState().setPlayers(players);
+    const tile = map.tiles.find((t) => t.unit === null)!;
+    tile.ownedBy = 0;
+    tile.terrain = TileType.GrasslandLand;
+    // an owned empty land neighbor so the trapper has a trap candidate
+    const nb = hexNeighbors(tile).map((n) => map.tiles.find((x) => x.q === n.q && x.r === n.r)).find((t) => t !== undefined)!;
+    nb.terrain = TileType.GrasslandLand;
+    nb.ownedBy = 0;
+    tile.unit = {
+      id: 'b', owner: 0, type: 'builder', q: tile.q, r: tile.r,
+      hasMoved: false, hasAttacked: false, hasHealed: false,
+      hp: UNIT_TYPES.builder.maxHp, attack: 10, attackDistance: 1, spawnVillage: null,
+    };
+    select(tile);
+    expect(toolbarSpecs().some((a) => a.key === 'build')).toBe(true);
+    expect(toolbarSpecs().some((a) => a.key === 'thorn-trap')).toBe(false);
+
+    tile.unit = {
+      id: 'tr', owner: 0, type: 'trapper', q: tile.q, r: tile.r,
+      hasMoved: false, hasAttacked: false, hasHealed: false,
+      hp: UNIT_TYPES.trapper.maxHp, attack: 20, attackDistance: 1, spawnVillage: null,
+    };
+    expect(toolbarSpecs().some((a) => a.key === 'build')).toBe(false);
+    expect(toolbarSpecs().some((a) => a.key === 'thorn-trap')).toBe(true);
+  });
+
+  it('does not offer storm when the stormcaller village has no water', () => {
+    const players = useGameStore.getState().players;
+    players[0]!.tribe = Tribe.Aqua;
+    players[0]!.resources = { wood: 100, stone: 100, money: 100, ore: 100 };
+    useGameStore.getState().setPlayers(players);
+    const tile = map.tiles.find((t) => t.unit === null)!;
+    tile.ownedBy = 0;
+    tile.unit = {
+      id: 'st', owner: 0, type: 'stormcaller', q: tile.q, r: tile.r,
+      hasMoved: false, hasAttacked: false, hasHealed: false,
+      hp: UNIT_TYPES.stormcaller.maxHp, attack: 20, attackDistance: 1, spawnVillage: null,
+    };
+    select(tile);
+    expect(toolbarSpecs().some((a) => a.key === 'storm')).toBe(false);
   });
 });

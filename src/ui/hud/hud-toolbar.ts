@@ -33,6 +33,10 @@ const ICON_ACTIONS: Record<string, string> = {
   bottle: 'bottle',
   deal: 'deal',
   repair: 'build',
+  stealth: 'stealth',
+  build: 'build',
+  'thorn-trap': 'build',
+  storm: 'stormcaller',
 };
 
 const LAST_TURN_COLOR = 0x9cff55;

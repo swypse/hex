@@ -4,6 +4,8 @@ import { gameController } from '../../controller/game-controller';
 import { hasSkill } from '../../game/skills';
 import { tileAt } from '../../game/selection';
 import { UNIT_TYPES, UNIT_TYPE_NAMES, type UnitType } from '../../game/units';
+import { TRIBE_SPECIAL_UNIT, TRIBES } from '../../game/tribes';
+import type { Player } from '../../game/players';
 import { useGameStore } from '../../store/game-store';
 import { type UIHost } from '../host';
 import { Button } from '../kit/button';
@@ -18,6 +20,27 @@ const CELL_W = 92;
 const CELL_H = 112;
 const ITEM_PAD = 4;
 const RESOURCE_ICON_SIZE = 16;
+
+/** The special unit types (one per tribe). */
+const SPECIAL_TYPES = Object.values(TRIBE_SPECIAL_UNIT) as UnitType[];
+
+function isSpecialType(type: UnitType): boolean {
+  return SPECIAL_TYPES.includes(type);
+}
+
+function tribeCodeFor(type: UnitType): string {
+  return TRIBES.find((tr) => TRIBE_SPECIAL_UNIT[tr.id] === type)?.code ?? 'cats';
+}
+
+/** The 7 base playable units every tribe can spawn. */
+const BASE_PLAYABLE: Exclude<UnitType, 'pirate'>[] = ['warrior', 'rider', 'archer', 'swordsman', 'shield', 'catapult', 'knight'];
+
+/** Types shown in the spawn popup for a player: the 7 base units plus that
+ *  player's tribe special unit. */
+export function spawnableTypesFor(player: Player): Exclude<UnitType, 'pirate'>[] {
+  const special = TRIBE_SPECIAL_UNIT[player.tribe] as Exclude<UnitType, 'pirate'>;
+  return [...BASE_PLAYABLE, ...(BASE_PLAYABLE.includes(special) ? [] : [special])];
+}
 
 export class SpawnDialog {
   private el: Container | null = null;
@@ -51,7 +74,10 @@ export class SpawnDialog {
   }
 
   private types(): Exclude<UnitType, 'pirate'>[] {
-    return (Object.keys(UNIT_TYPES) as UnitType[]).filter((t) => t !== 'pirate') as Exclude<UnitType, 'pirate'>[];
+    const s = useGameStore.getState();
+    const player = s.players[s.localPlayerIndex];
+    if (!player) return BASE_PLAYABLE;
+    return spawnableTypesFor(player);
   }
 
   private reasons(type: UnitType): string[] {
@@ -60,6 +86,9 @@ export class SpawnDialog {
     const info = UNIT_TYPES[type];
     const out: string[] = [];
     if (!player) return out;
+    if (TRIBE_SPECIAL_UNIT[player.tribe] !== type && isSpecialType(type)) {
+      out.push(t('spawn.reasonTribe', { tribe: t(`tribe.${tribeCodeFor(type)}`) }));
+    }
     if (player.resources.money < info.price) out.push(t('spawn.reasonMoney', {
       need: info.price,
       have: player.resources.money
@@ -105,7 +134,7 @@ export class SpawnDialog {
       circle.circle(CELL_W / 2, 30, 30).fill(0x333333).stroke({ width: 2, color: 0x888888 });
       item.addChild(circle);
 
-      const icon = makeActionButtonIcon(`action-spawn-${type}`, 56);
+      const icon = makeActionButtonIcon(`action-spawn-${isSpecialType(type) ? 'warrior' : type}`, 56);
       icon.position.set(CELL_W / 2, 30);
       item.addChild(icon);
 

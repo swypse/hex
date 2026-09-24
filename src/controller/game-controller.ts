@@ -12,6 +12,9 @@ import { buildPlayers } from '../game/players';
 import { AiDifficulty, DEFAULT_AI_DIFFICULTY } from '../game/ai-difficulty';
 import { hasSkill, SKILLS, SkillId } from '../game/skills';
 import { attackableTargets } from '../game/combat';
+import { builderBuildable, type BuilderBuildKind } from '../game/buildings';
+import { trapCells } from '../game/traps';
+import { stormEligible } from '../game/storm';
 import { movePoints, canMove, canAttack, canDisband, makeUnit, PIRATE_OWNER, type Unit, type UnitType } from '../game/units';
 import { cycleSelection, reachableTargets, tileAt } from '../game/selection';
 import { shouldPromptWatch, type GameMode } from '../game/game-mode';
@@ -69,6 +72,10 @@ class GameController {
   private reachableKeys = new Set<string>();
   private attackableKeys = new Set<string>();
   private hiddenUnitIds = new Set<string>();
+  /** Builder placement in progress: highlight candidate cells, wait for a tap. */
+  private placementKeys = new Set<string>();
+  private pendingPlacement: { unitId: string; kind: BuilderBuildKind } | null = null;
+  private pendingTrap: { unitId: string } | null = null;
   /** Whether the last render hid detail (hp bars/labels) for the current zoom;
    *  kept so a zoom crossing the detail threshold forces a re-render. */
   private detailHidden = false;
@@ -717,6 +724,19 @@ class GameController {
     const canAct = !store.aiActive;
     const tile = tileAt(this.sim.map, q, r);
     if (!tile) return;
+    // Placement modes (builder / trapper): a tap on a highlighted cell commits
+    // the build/trap; any other tap cancels the placement.
+    if (this.pendingPlacement || this.pendingTrap) {
+      if (this.placementKeys.has(axialKey(tile))) {
+        if (this.pendingPlacement) this.buildAsBuilder(this.pendingPlacement.kind, q, r);
+        else this.placeTrapOn(q, r);
+        store.setSelection(null);
+      } else {
+        this.cancelPlacement();
+      }
+      this.render();
+      return;
+    }
     if (!isExploredFor(tile, store.localPlayerIndex)) {
       if (store.selection) {
         store.setSelection(null);
@@ -728,6 +748,17 @@ class GameController {
     const selection = store.selection;
     if (selection && selection.kind === 'unit' && canAct) {
       const unit = tileAt(this.sim.map, selection.q, selection.r)?.unit;
+      if (unit && unit.type === 'stunner' && this.attackableKeys.has(axialKey(tile))) {
+        const dist = hexDistance({ q: selection.q, r: selection.r }, tile);
+        if (dist === 2) {
+          // Range-2 targets are always stunned.
+          store.setSelection(null);
+          this.sendCommand({ type: 'stun', unitId: unit.id, q, r });
+          return;
+        }
+        store.setOverlay({ kind: 'stunChoice', target: { q: tile.q, r: tile.r } });
+        return;
+      }
       if (
         unit &&
         unit.owner === store.localPlayerIndex &&
@@ -894,6 +925,110 @@ class GameController {
   }
 
   cancelDisband(): void {
+    useGameStore.getState().setOverlay(null);
+  }
+
+  enableStealthSelected(): void {
+    const store = useGameStore.getState();
+    if (store.aiActive) return;
+    const selection = store.selection;
+    if (!selection || !this.sim) return;
+    const unit = tileAt(this.sim.map, selection.q, selection.r)?.unit;
+    if (!unit || unit.owner !== store.localPlayerIndex) return;
+    this.sendCommand({ type: 'enableStealth', unitId: unit.id });
+    store.setSelection(null);
+  }
+
+  /** Builder: enter placement mode for `kind` once the kind was picked in the
+   *  building popup. Highlighted cells are tapped to build. */
+  beginBuilderPlacement(kind: BuilderBuildKind): void {
+    const store = useGameStore.getState();
+    if (store.aiActive) return;
+    const selection = store.selection;
+    if (!selection || !this.sim) return;
+    const unit = tileAt(this.sim.map, selection.q, selection.r)?.unit;
+    if (!unit || unit.owner !== store.localPlayerIndex || unit.type !== 'builder') return;
+    this.pendingPlacement = { unitId: unit.id, kind };
+    this.pendingTrap = null;
+    store.setOverlay(null);
+    this.render();
+  }
+
+  buildAsBuilder(kind: BuilderBuildKind, q: number, r: number): void {
+    const pending = this.pendingPlacement;
+    this.pendingPlacement = null;
+    this.placementKeys.clear();
+    if (!pending || !this.sim) return;
+    this.sendCommand({ type: 'build', unitId: pending.unitId, q, r, kind });
+  }
+
+  cancelPlacement(): void {
+    this.pendingPlacement = null;
+    this.pendingTrap = null;
+    this.placementKeys.clear();
+    useGameStore.getState().setSelection(null);
+    this.render();
+  }
+
+  /** Trapper: enter trap placement mode. */
+  placeTrap(): void {
+    const store = useGameStore.getState();
+    if (store.aiActive) return;
+    const selection = store.selection;
+    if (!selection || !this.sim) return;
+    const unit = tileAt(this.sim.map, selection.q, selection.r)?.unit;
+    if (!unit || unit.owner !== store.localPlayerIndex || unit.type !== 'trapper') return;
+    this.pendingTrap = { unitId: unit.id };
+    this.pendingPlacement = null;
+    this.render();
+  }
+
+  placeTrapOn(q: number, r: number): void {
+    const pending = this.pendingTrap;
+    this.pendingTrap = null;
+    this.placementKeys.clear();
+    if (!pending || !this.sim) return;
+    this.sendCommand({ type: 'trap', unitId: pending.unitId, q, r });
+  }
+
+  stormSelected(): void {
+    const store = useGameStore.getState();
+    if (store.aiActive) return;
+    const selection = store.selection;
+    if (!selection || !this.sim) return;
+    const unit = tileAt(this.sim.map, selection.q, selection.r)?.unit;
+    if (!unit || unit.owner !== store.localPlayerIndex || !stormEligible(this.sim.map, unit)) return;
+    this.sendCommand({ type: 'storm', unitId: unit.id });
+    store.setSelection(null);
+  }
+
+  chooseStunFromDialog(): void {
+    const store = useGameStore.getState();
+    const pending = store.overlay?.kind === 'stunChoice' ? store.overlay.target : null;
+    store.setOverlay(null);
+    if (!pending) return;
+    const selection = store.selection;
+    if (!selection || selection.kind !== 'unit' || !this.sim) return;
+    const unit = tileAt(this.sim.map, selection.q, selection.r)?.unit;
+    if (!unit) return;
+    store.setSelection(null);
+    this.sendCommand({ type: 'stun', unitId: unit.id, q: pending.q, r: pending.r });
+  }
+
+  chooseRegularAttackFromStunDialog(): void {
+    const store = useGameStore.getState();
+    const pending = store.overlay?.kind === 'stunChoice' ? store.overlay.target : null;
+    store.setOverlay(null);
+    if (!pending) return;
+    const selection = store.selection;
+    if (!selection || selection.kind !== 'unit' || !this.sim) return;
+    const unit = tileAt(this.sim.map, selection.q, selection.r)?.unit;
+    if (!unit) return;
+    store.setSelection(null);
+    this.sendCommand({ type: 'attack', unitId: unit.id, q: pending.q, r: pending.r });
+  }
+
+  cancelStun(): void {
     useGameStore.getState().setOverlay(null);
   }
 
@@ -1384,6 +1519,22 @@ class GameController {
 
     this.reachableKeys = new Set<string>();
     this.attackableKeys = new Set<string>();
+    this.placementKeys = new Set<string>();
+    if (this.pendingPlacement && store.selection) {
+      const tile = tileAt(this.sim.map, store.selection.q, store.selection.r);
+      const unit = tile?.unit;
+      if (unit && unit.owner === store.localPlayerIndex) {
+        const p = store.players[store.localPlayerIndex]!;
+        this.placementKeys = new Set(builderBuildable(this.sim.map, tile!, this.pendingPlacement.kind, p).map((t) => axialKey(t)));
+      }
+    } else if (this.pendingTrap && store.selection) {
+      const tile = tileAt(this.sim.map, store.selection.q, store.selection.r);
+      const unit = tile?.unit;
+      if (unit && unit.owner === store.localPlayerIndex) {
+        const p = store.players[store.localPlayerIndex]!;
+        this.placementKeys = new Set(trapCells(this.sim.map, tile!, p).map((t) => axialKey(t)));
+      }
+    }
     const isLocalTurn = store.currentPlayerIndex === store.localPlayerIndex && !store.aiActive;
     const selection = store.selection;
     if (isLocalTurn && selection && selection.kind === 'unit') {
@@ -1417,6 +1568,7 @@ class GameController {
       },
       this.tutorialMarkerKeys(),
       isLocalTurn,
+      this.placementKeys.size > 0 ? this.placementKeys : undefined,
     );
     this.overlayItems = this.mapView.overlayItems;
     this.detailHidden = this.zoomOut() > ZOOM_DETAIL_HIDE;
