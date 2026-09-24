@@ -81,6 +81,8 @@ export interface MapTile {
   claimedByVillage: { q: number; r: number } | null;
   exploredBy?: number[];
   bonus?: Bonus | null;
+  /** Trapper thorn trap: visible only to its owner. */
+  trap?: { owner: number; placedTurn: number } | null;
 }
 
 export interface Spawn {

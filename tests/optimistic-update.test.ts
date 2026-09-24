@@ -36,6 +36,7 @@ describe('predictable command types', () => {
       'deal',
       'destroyBuilding',
       'disband',
+      'enableStealth',
       'heal',
       'move',
       'openSkill',

@@ -47,6 +47,7 @@ export type Command =
   | { type: 'shipLanding'; unitId: string; q: number; r: number }
   | { type: 'claimBonus' }
   | { type: 'getBottle' }
+  | { type: 'enableStealth'; unitId: string }
   | { type: 'endTurn' }
   | { type: 'giveToAI'; playerIndex: number }
   | { type: 'forfeit'; playerIndex: number };
@@ -70,6 +71,7 @@ export const PREDICTABLE_COMMAND_TYPES: ReadonlySet<Command['type']> = new Set([
   'disband',
   'deal',
   'shipLanding',
+  'enableStealth',
 ]);
 
 export class Simulator {
@@ -210,6 +212,9 @@ export class Simulator {
       case 'getBottle':
         ok = this.doGetBottle();
         break;
+      case 'enableStealth':
+        ok = this.doEnableStealth(cmd.unitId);
+        break;
       case 'endTurn':
         this.doEndTurn();
         ok = true;
@@ -313,20 +318,82 @@ export class Simulator {
     if (unit.shipLevel !== undefined && target.terrain !== TileType.Water) return false;
     const reachable = reachableTargets(this.map, unit, movePoints(unit), canClimb, canDock, unit.owner);
     if (!reachable.some((t) => t.q === q && t.r === r)) return false;
+    // A stalker's first move after spawning enables stealth before the walk
+    // starts, so no one but its owner ever sees it move. The owner still sees
+    // its own stalker moving normally.
+    if (unit.type === 'stalker' && !unit.isStealthed && !unit.firstMoveStealthDone && unit.shipLevel === undefined) {
+      unit.isStealthed = true;
+      unit.firstMoveStealthDone = true;
+    }
     const from = { q: unit.q, r: unit.r };
     const path = pathBetween(this.map, from, { q, r }, canClimb, unit.shipLevel !== undefined, canDock, unit.owner, movePoints(unit));
     const shipLevel = unit.shipLevel;
     const fromTile = tileAt(this.map, from.q, from.r);
-    moveUnit(this.map, unit, target);
-    exploreUnitPath(this.map, path, unit, unit.owner);
+    // Walk the path one step at a time: an enemy that steps onto an invisible
+    // stalker's cell (pathing does not see them) stops one cell short and
+    // reveals it; a trap (Task 9) stops the mover on its own cell.
+    let steps = [...path];
+    let resolveTarget = target;
+    let emitPath = path;
+    let bump: Unit | null = null;
+    let bumpCell: { q: number; r: number } | null = null;
+    for (let i = 0; i < steps.length; i++) {
+      const st = tileAt(this.map, steps[i]!.q, steps[i]!.r)!;
+      const occ = st.unit;
+      if (occ && occ.owner !== unit.owner && occ.isStealthed === true && occ.shipLevel === undefined && unit.shipLevel === undefined) {
+        bump = occ;
+        if (i === 0) {
+          // The stalker sits on the very first cell of the path: the move does
+          // not happen at all and the mover keeps its move action.
+          this.revealStalker(bump);
+          return true;
+        }
+        bumpCell = steps[i - 1]!;
+        resolveTarget = tileAt(this.map, bumpCell.q, bumpCell.r)!;
+        emitPath = steps.slice(0, i);
+        break;
+      }
+      if (st.trap && st.trap.owner !== unit.owner) {
+        // Trap handling is added in the thorn-trap task; keep the structure stable.
+        break;
+      }
+    }
+    moveUnit(this.map, unit, resolveTarget);
+    exploreUnitPath(this.map, emitPath, unit, unit.owner);
     this.clearAbandonedReady(fromTile, unit.owner);
-    this.touchBonus(target, unit);
-    touchBottle(target, this.turn);
-    if (canUsePort(target, player) && unit.shipLevel === undefined) {
+    this.touchBonus(resolveTarget, unit);
+    touchBottle(resolveTarget, this.turn);
+    const docked = !bump && canUsePort(resolveTarget, player) && unit.shipLevel === undefined;
+    if (docked) {
       gainShipAbility(unit);
       unit.hasAttacked = true;
     }
-    this.emit({ type: 'unitMoved', unitId, from, path, to: { q, r }, shipLevel });
+    this.emit({ type: 'unitMoved', unitId, from, path: emitPath, to: { q: resolveTarget.q, r: resolveTarget.r }, shipLevel });
+    if (bump) this.revealStalker(bump);
+    return true;
+  }
+
+  /** A stalker revealed by an enemy colliding with it or by attacking. */
+  private revealStalker(unit: Unit): void {
+    if (!unit.isStealthed) return;
+    unit.isStealthed = false;
+    this.emit({ type: 'stealthRevealed', unitId: unit.id, q: unit.q, r: unit.r });
+  }
+
+  private doEnableStealth(unitId: string): boolean {
+    const unit = this.findUnit(unitId);
+    if (!unit || unit.owner !== this.currentPlayerIndex) return false;
+    if (unit.type !== 'stalker') return false;
+    if (unit.shipLevel !== undefined) return false;
+    if (unit.isStealthed) return false;
+    if (unit.hasMoved || unit.hasAttacked || unit.hasHealed) return false;
+    if ((unit.stunTurns ?? 0) >= 1) return false;
+    unit.isStealthed = true;
+    unit.firstMoveStealthDone = true;
+    unit.hasMoved = true;
+    unit.hasAttacked = true;
+    unit.hasHealed = true;
+    this.emit({ type: 'stealthEnabled', unitId });
     return true;
   }
 
@@ -377,6 +444,9 @@ export class Simulator {
     const attackerPre = { type: attacker.type, owner: attacker.owner, shipLevel: attacker.shipLevel, hp: attacker.hp };
     const targetPre = { type: target.unit.type, owner: target.unit.owner, shipLevel: target.unit.shipLevel, hp: target.unit.hp };
     const result = performAttack(this.map, attacker, target, this.rng, missChanceFor(attackerPlayer));
+    // Attacking always reveals a stealthed stalker (resolved with defense 0 in
+    // resolveCombat, which reads isStealthed before this clears it).
+    if (attacker.isStealthed) this.revealStalker(attacker);
     // A melee kill makes the attacker advance off its own tile; if that tile
     // was a capture-ready enemy/free village, leaving it resets readiness.
     const originTile = tileAt(this.map, attackerTilePos.q, attackerTilePos.r);

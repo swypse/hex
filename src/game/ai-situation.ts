@@ -121,6 +121,7 @@ export function visibleEnemies(map: GameMap, playerIndex: number): EnemyUnit[] {
   const out: EnemyUnit[] = [];
   for (const t of map.tiles) {
     if (!t.unit || t.unit.owner === playerIndex) continue;
+    if (t.unit.isStealthed === true) continue;
     if (!isExploredFor(t, playerIndex)) continue;
     out.push({ tile: t, unit: t.unit });
   }
@@ -131,6 +132,7 @@ function enemyPower(map: GameMap, playerIndex: number): number {
   let total = 0;
   for (const t of map.tiles) {
     if (!t.unit || t.unit.owner === playerIndex || !isExploredFor(t, playerIndex)) continue;
+    if (t.unit.isStealthed === true) continue;
     total += attackDamage(t.unit);
   }
   return total;

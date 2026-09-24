@@ -52,6 +52,7 @@ export function enemyCanReach(map: GameMap, tile: MapTile, playerIndex: number):
     (t) =>
       t.unit &&
       t.unit.owner !== playerIndex &&
+      t.unit.isStealthed !== true &&
       isExploredFor(t, playerIndex) &&
       hexDistance(tile, t) <= enemyReach(t.unit).move,
   );
@@ -65,6 +66,7 @@ export function landEnemyCanReach(map: GameMap, tile: MapTile, playerIndex: numb
       t.unit &&
       t.unit.owner >= 0 &&
       t.unit.owner !== playerIndex &&
+      t.unit.isStealthed !== true &&
       isExploredFor(t, playerIndex) &&
       hexDistance(tile, t) <= enemyReach(t.unit).move,
   );
@@ -73,6 +75,7 @@ export function landEnemyCanReach(map: GameMap, tile: MapTile, playerIndex: numb
 export function enemyCanAttackNext(map: GameMap, tile: MapTile, playerIndex: number): boolean {
   return map.tiles.some((t) => {
     if (!t.unit || t.unit.owner === playerIndex || !isExploredFor(t, playerIndex)) return false;
+    if (t.unit.isStealthed === true) return false;
     const reach = enemyReach(t.unit);
     return hexDistance(tile, t) <= reach.move + reach.attack;
   });
