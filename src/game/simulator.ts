@@ -23,6 +23,7 @@ import { exploreUnitPath } from './explore';
 import { knownTribesFor } from './discovery';
 import { isWaterType, TileType } from './tile-types';
 import { BOTTLE_HEAL, BOTTLE_MONEY, bottleCollectableFor, collectExpiredBottles, randomBottleEffectKind, touchBottle, trySpawnBottle } from './bottles';
+import { canPlaceTrapOn, trapAlive, trapDamage, TRAP_COST } from './traps';
 import { upgradeVillage, buildWall as applyWall, canBuildWall, WALL_COST } from './village';
 import { SeededRandom } from '../util/random';
 import type { GameStateSnapshot } from './state';
@@ -48,6 +49,7 @@ export type Command =
   | { type: 'claimBonus' }
   | { type: 'getBottle' }
   | { type: 'enableStealth'; unitId: string }
+  | { type: 'trap'; unitId: string; q: number; r: number }
   | { type: 'endTurn' }
   | { type: 'giveToAI'; playerIndex: number }
   | { type: 'forfeit'; playerIndex: number };
@@ -72,6 +74,7 @@ export const PREDICTABLE_COMMAND_TYPES: ReadonlySet<Command['type']> = new Set([
   'deal',
   'shipLanding',
   'enableStealth',
+  'trap',
 ]);
 
 export class Simulator {
@@ -217,6 +220,9 @@ export class Simulator {
       case 'enableStealth':
         ok = this.doEnableStealth(cmd.unitId);
         break;
+      case 'trap':
+        ok = this.doBuildTrap(cmd.unitId, cmd.q, cmd.r);
+        break;
       case 'endTurn':
         this.doEndTurn();
         ok = true;
@@ -338,7 +344,8 @@ export class Simulator {
     let resolveTarget = target;
     let emitPath = path;
     let bump: Unit | null = null;
-    let bumpCell: { q: number; r: number } | null = null;
+    let bumpedCell: { q: number; r: number } | null = null;
+    let trap: MapTile | null = null;
     for (let i = 0; i < steps.length; i++) {
       const st = tileAt(this.map, steps[i]!.q, steps[i]!.r)!;
       const occ = st.unit;
@@ -350,13 +357,17 @@ export class Simulator {
           this.revealStalker(bump);
           return true;
         }
-        bumpCell = steps[i - 1]!;
-        resolveTarget = tileAt(this.map, bumpCell.q, bumpCell.r)!;
+        bumpedCell = steps[i - 1]!;
+        resolveTarget = tileAt(this.map, bumpedCell.q, bumpedCell.r)!;
         emitPath = steps.slice(0, i);
         break;
       }
       if (st.trap && st.trap.owner !== unit.owner) {
-        // Trap handling is added in the thorn-trap task; keep the structure stable.
+        // A thorn trap stops the mover on its own cell: it takes the trap's
+        // damage and the trap disappears.
+        trap = st;
+        resolveTarget = st;
+        emitPath = steps.slice(0, i + 1);
         break;
       }
     }
@@ -365,14 +376,35 @@ export class Simulator {
     this.clearAbandonedReady(fromTile, unit.owner);
     this.touchBonus(resolveTarget, unit);
     touchBottle(resolveTarget, this.turn);
-    const docked = !bump && canUsePort(resolveTarget, player) && unit.shipLevel === undefined;
+    const docked = !bump && !trap && canUsePort(resolveTarget, player) && unit.shipLevel === undefined;
     if (docked) {
       gainShipAbility(unit);
       unit.hasAttacked = true;
     }
     this.emit({ type: 'unitMoved', unitId, from, path: emitPath, to: { q: resolveTarget.q, r: resolveTarget.r }, shipLevel });
+    if (trap) this.triggerTrap(unit, trap);
     if (bump) this.revealStalker(bump);
     return true;
+  }
+
+  /** An enemy stepping onto a thorn trap stops there, takes ~90 damage (no
+   *  miss, no counter-attack) and consumes the trap. */
+  private triggerTrap(victim: Unit, trapTile: MapTile): void {
+    const damage = trapDamage();
+    victim.hp = Math.max(0, victim.hp - damage);
+    trapTile.trap = null;
+    this.emit({ type: 'trapTriggered', q: trapTile.q, r: trapTile.r, targetId: victim.id, damage, attackerIndex: this.currentPlayerIndex });
+    if (victim.hp <= 0) {
+      const t = tileAt(this.map, victim.q, victim.r);
+      if (t && t.unit === victim) t.unit = null;
+    }
+  }
+
+  /** Traps placed more than TRAP_TURNS rounds ago are swept away. */
+  private sweepTraps(): void {
+    for (const t of this.map.tiles) {
+      if (t.trap && !trapAlive(t.trap.placedTurn, this.turn)) t.trap = null;
+    }
   }
 
   /** A stalker revealed by an enemy colliding with it or by attacking. */
@@ -396,6 +428,27 @@ export class Simulator {
     unit.hasAttacked = true;
     unit.hasHealed = true;
     this.emit({ type: 'stealthEnabled', unitId });
+    return true;
+  }
+
+  /** Trapper builds a thorn trap on its own or an adjacent owned land cell. */
+  private doBuildTrap(unitId: string, q: number, r: number): boolean {
+    const unit = this.findUnit(unitId);
+    if (!unit || unit.owner !== this.currentPlayerIndex) return false;
+    if (unit.type !== 'trapper') return false;
+    if (unit.shipLevel !== undefined) return false;
+    if (unit.hasMoved || unit.hasAttacked || unit.hasHealed) return false;
+    if ((unit.stunTurns ?? 0) >= 1) return false;
+    const player = this.players[unit.owner]!;
+    const tile = tileAt(this.map, unit.q, unit.r)!;
+    const target = tileAt(this.map, q, r);
+    if (!target) return false;
+    if (!canPlaceTrapOn(this.map, target, tile, player)) return false;
+    if (!canAfford(player.resources, TRAP_COST)) return false;
+    player.resources = pay(player.resources, TRAP_COST);
+    target.trap = { owner: unit.owner, placedTurn: this.turn };
+    this.consumeUnitTurn(unit);
+    this.emit({ type: 'trapPlaced', q, r, playerIndex: player.index });
     return true;
   }
 
@@ -954,6 +1007,7 @@ export class Simulator {
         this.turn += 1;
         this.runBottleTurn();
         this.growTemples();
+        this.sweepTraps();
         this.resetUnitFlags();
         this.evaluateAchievementsForAll();
         if (this.checkEndConditions()) return;

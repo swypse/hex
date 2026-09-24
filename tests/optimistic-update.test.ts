@@ -43,6 +43,7 @@ describe('predictable command types', () => {
       'repair',
       'shipLanding',
       'spawn',
+      'trap',
       'upgradeShip',
       'upgradeVillage',
     ]);

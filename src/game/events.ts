@@ -46,6 +46,8 @@ export type GameEvent =
   | { type: 'pirateDealCanceled'; unitId: string; q: number; r: number; playerIndex: number }
   | { type: 'stealthEnabled'; unitId: string }
   | { type: 'stealthRevealed'; unitId: string; q: number; r: number }
+  | { type: 'trapPlaced'; q: number; r: number; playerIndex: number }
+  | { type: 'trapTriggered'; q: number; r: number; targetId: string; damage: number; attackerIndex: number }
   | { type: 'achievementUnlocked'; playerIndex: number; achievement: AchievementId }
   | { type: 'turnStarted'; playerIndex: number; turn: number }
   | { type: 'aiTurn'; playerIndex: number }
