@@ -32,7 +32,7 @@ describe('TRIBES', () => {
 
   it('declares the tribe starting bonuses', () => {
     const byCode = new Map(TRIBES.map((t) => [t.code, t]));
-    expect(byCode.get('villagers')!.startMoneyBonus).toBe(10);
+    expect(byCode.get('villagers')!.startMoneyBonus).toBe(8);
     expect(byCode.get('barbarians')!.startSkill).toBe('climbing');
     expect(byCode.get('cats')!.startSkill).toBe('shields');
     expect(byCode.get('warriors')!.startSkill).toBe('swordsman');

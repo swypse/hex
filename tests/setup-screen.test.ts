@@ -64,10 +64,21 @@ describe('SetupScreen', () => {
     keyHandler!({ key: 'ArrowDown', preventDefault: () => {} }); // enemies
     keyHandler!({ key: 'ArrowDown', preventDefault: () => {} }); // mode
     keyHandler!({ key: 'ArrowDown', preventDefault: () => {} }); // difficulty
+    keyHandler!({ key: 'ArrowDown', preventDefault: () => {} }); // start
     keyHandler!({ key: 'ArrowDown', preventDefault: () => {} }); // back
-    expect((screen as unknown as { selector: number }).selector).toBe(4);
+    expect((screen as unknown as { selector: number }).selector).toBe(5);
     keyHandler!({ key: 'Enter', preventDefault: () => {} });
     expect(useGameStore.getState().screen).toBe('start');
+  });
+
+  it('highlights the start button as a selectable element before back', () => {
+    const s = screen as unknown as { selector: number; startBtn: { selected: boolean } };
+    keyHandler!({ key: 'ArrowDown', preventDefault: () => {} });
+    keyHandler!({ key: 'ArrowDown', preventDefault: () => {} });
+    keyHandler!({ key: 'ArrowDown', preventDefault: () => {} });
+    keyHandler!({ key: 'ArrowDown', preventDefault: () => {} }); // start
+    expect(s.selector).toBe(4);
+    expect(s.startBtn!.selected).toBe(true);
   });
 
   it('paints a full-screen tribe-tinted shader background at mount', () => {

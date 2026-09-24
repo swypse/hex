@@ -5,7 +5,7 @@ export interface Resources {
   ore: number;
 }
 
-export const START_RESOURCES: Resources = { wood: 3, stone: 2, money: 5, ore: 0 };
+export const START_RESOURCES: Resources = { wood: 3, stone: 2, money: 8, ore: 0 };
 
 export const UPGRADE_COST: Resources = { wood: 2, stone: 1, money: 2, ore: 0 };
 

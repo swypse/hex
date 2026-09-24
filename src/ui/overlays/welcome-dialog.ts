@@ -5,7 +5,6 @@ import { type UIHost } from '../host';
 import { t } from '../../i18n';
 import { Modal } from '../kit/modal';
 import { makeCheckbox } from '../kit/checkbox';
-import { makeLabel } from '../kit/label';
 import { setWelcomeDismissed } from '../../storage/settings';
 
 function welcomeLines(mode: GameMode): string[] {
@@ -18,11 +17,11 @@ function welcomeLines(mode: GameMode): string[] {
 /** A "don't show again" checkbox row that persists to the settings. */
 function makeDontShowRow(): Container {
   const row = new Container();
-  const checkbox = makeCheckbox(false, (checked) => setWelcomeDismissed(checked));
+  const checkbox = makeCheckbox(false, (checked) => setWelcomeDismissed(checked), {
+    label: t('welcome.dontShow'),
+  });
   checkbox.el.position.set(0, 1);
-  const label = makeLabel(t('welcome.dontShow'), { fontSize: 14, fill: 0xcccccc });
-  label.position.set(30, 3);
-  row.addChild(checkbox.el, label);
+  row.addChild(checkbox.el);
   return row;
 }
 

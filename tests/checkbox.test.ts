@@ -35,4 +35,16 @@ describe('makeCheckbox', () => {
     const mark = checkbox.el.children[1] as unknown as { visible: boolean };
     expect(mark.visible).toBe(true);
   });
+
+  it('toggles when its label is clicked', () => {
+    const onToggle = vi.fn();
+    const checkbox = makeCheckbox(false, onToggle, { label: 'Don\'t show again' });
+    const label = checkbox.el.children[2] as unknown as { emit: (event: string, x: never) => void };
+
+    label.emit('pointertap', {} as never);
+    expect(onToggle).toHaveBeenCalledWith(true);
+
+    label.emit('pointertap', {} as never);
+    expect(onToggle).toHaveBeenCalledWith(false);
+  });
 });

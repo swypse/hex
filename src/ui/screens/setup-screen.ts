@@ -22,7 +22,7 @@ import { BG_FADE_MS, makeTribeBackgroundShader, tribeBackgroundTexture, type Tri
 const ENEMY_OPTIONS = [1, 2, 3, 4, 5, 6];
 const MODE_OPTIONS: GameMode[] = ['capture', 'turns30'];
 const DIFFICULTY_OPTIONS: AiDifficulty[] = ['easy', 'normal', 'hard'];
-const SELECTOR_COUNT = 5;
+const SELECTOR_COUNT = 6;
 // Horizontal margin kept clear on each side when laying out the tribe grid.
 const SIDE_MARGIN = 24;
 const RADIUS = 28;
@@ -325,6 +325,7 @@ export class SetupScreen implements ScreenController {
       b.selected = i === difficultyIndex;
     });
     this.backBtn!.selected = this.selector === SELECTOR_COUNT - 1;
+    this.startBtn!.selected = this.selector === SELECTOR_COUNT - 2;
     this.tribeTitle!.style.fill = this.selector === 0 ? 0xffffff : 0x888888;
     this.enemiesTitle!.style.fill = this.selector === 1 ? 0xffffff : 0x888888;
     this.modeTitle!.style.fill = this.selector === 2 ? 0xffffff : 0x888888;

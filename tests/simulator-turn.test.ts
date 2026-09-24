@@ -28,7 +28,7 @@ describe('Simulator turn engine', () => {
     expect(sim.turn).toBe(2);
     const last = events[events.length - 1];
     expect(last).toMatchObject({ type: 'turnStarted', playerIndex: 0, turn: 2 });
-    expect(players[0]!.resources.money).toBe(15 + 5);
+    expect(players[0]!.resources.money).toBe(16 + 5);
   });
 
   it('two humans: endTurn stops at the other human before income', () => {
@@ -46,11 +46,11 @@ describe('Simulator turn engine', () => {
     sim.applyCommand({ type: 'endTurn' });
     expect(sim.currentPlayerIndex).toBe(1);
     expect(sim.turn).toBe(1);
-    expect(players[0]!.resources.money).toBe(5);
+    expect(players[0]!.resources.money).toBe(8);
     sim.applyCommand({ type: 'endTurn' });
     expect(sim.currentPlayerIndex).toBe(0);
     expect(sim.turn).toBe(2);
-    expect(players[0]!.resources.money).toBe(10);
+    expect(players[0]!.resources.money).toBe(13);
   });
 
   it('capture win triggers gameOver at round end', () => {

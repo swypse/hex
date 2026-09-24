@@ -27,7 +27,7 @@ Tribes currently differ by color, a starting money bonus, or an opened starting 
 | Tribe         | Color  | Start bonus      |
 |---------------|--------|------------------|
 | Cats          | pink   | Shields skill    |
-| Villagers     | brown  | +10 money        |
+| Villagers     | brown  | +8 money         |
 | Warriors      | red    | Swordsman skill  |
 | Barbarians    | gray   | Climbing skill   |
 | Forest people | green  | Forestry skill   |
@@ -222,7 +222,7 @@ support only as many buildings as its level allows: level 1 → 1, level 2 → 2
 
 ## Resources
 
-Four resources: **money**, **wood**, **stone**, **ore**. Starting amounts: 3 wood, 2 stone, 5 money, 0 ore.
+Four resources: **money**, **wood**, **stone**, **ore**. Starting amounts: 3 wood, 2 stone, 8 money, 0 ore.
 
 Income is collected at the end of each round, after all players have taken their turns:
 

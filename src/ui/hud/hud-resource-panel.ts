@@ -98,7 +98,8 @@ export class HudResourcePanel implements Widget {
       this.el.addChild(icon, value);
       let rowW = value.width;
       if (row.income !== '') {
-        const income = makeLabel(row.income, { fontSize, fill: 0xffffff });
+        const income = makeLabel(row.income, { fontSize: 13, fill: 0xffffff });
+        income.alpha = 0.8;
         income.eventMode = 'static';
         income.cursor = 'pointer';
         income.position.set(x + iconSize + 11 + value.width, cy - income.height / 2);

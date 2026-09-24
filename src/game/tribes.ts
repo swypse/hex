@@ -23,7 +23,7 @@ export interface TribeInfo {
 
 export const TRIBES: TribeInfo[] = [
   { id: Tribe.Cats, name: t('tribe.cats'), code: 'cats', color: TRIBE_COLORS.Cats, startSkill: 'shields' },
-  { id: Tribe.Villagers, name: t('tribe.villagers'), code: 'villagers', color: TRIBE_COLORS.Villagers, startMoneyBonus: 10 },
+  { id: Tribe.Villagers, name: t('tribe.villagers'), code: 'villagers', color: TRIBE_COLORS.Villagers, startMoneyBonus: 8 },
   { id: Tribe.Warriors, name: t('tribe.warriors'), code: 'warriors', color: TRIBE_COLORS.Warriors, startSkill: 'swordsman' },
   { id: Tribe.Barbarians, name: t('tribe.barbarians'), code: 'barbarians', color: TRIBE_COLORS.Barbarians, startSkill: 'climbing' },
   { id: Tribe.Forest, name: t('tribe.forest'), code: 'forest', color: TRIBE_COLORS.Forest, startSkill: 'forestry' },
