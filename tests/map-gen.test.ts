@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { allTiles, axialKey, hexDistance, hexNeighbors, ringOf, tilesInRange } from '../src/game/hex';
-import { generateMap, mapRadiusFor, bridgeIslandVillages } from '../src/game/map-gen';
+import { generateMap, mapRadiusFor, bridgeIslandVillages, ensureStartVillagePaths } from '../src/game/map-gen';
 import { MapTile, Settlement } from '../src/game/map-gen';
 import { isLandType, isWaterType, TileType } from '../src/game/tile-types';
 import { isForestType, isMountainType } from '../src/game/tile-types';
@@ -307,6 +307,35 @@ describe('map generation', () => {
     }
   });
 
+  it('gives every starting village a non-water path to at least one empty village', () => {
+    for (const pc of [2, 3, 4, 5]) {
+      for (let seed = 1; seed <= 12; seed++) {
+        const map = generateMap(pc, seed * 5 + pc);
+        const byKey = new Map(map.tiles.map((t) => [axialKey(t), t] as const));
+        const empties = map.tiles.filter((t) => t.settlement !== null && t.settlement.owner === null);
+        for (const s of map.spawns) {
+          const reachable = new Set<string>();
+          const frontier = [{ q: s.start.q, r: s.start.r }];
+          reachable.add(axialKey(s.start));
+          while (frontier.length > 0) {
+            const cur = frontier.pop()!;
+            for (const n of hexNeighbors(cur)) {
+              const k = axialKey(n);
+              const t = byKey.get(k);
+              if (!t || reachable.has(k) || isWaterType(t.terrain)) continue;
+              reachable.add(k);
+              frontier.push(n);
+            }
+          }
+          expect(
+            empties.some((v) => reachable.has(axialKey(v))),
+            `pc=${pc} seed=${seed} start=${s.start.q},${s.start.r}`,
+          ).toBe(true);
+        }
+      }
+    }
+  });
+
   it('free villages claim their radius-1 territory with ownedBy null', () => {
     const map = generateMap(3, 42);
     const free = map.tiles.filter((t) => t.settlement !== null && t.settlement.owner === null);
@@ -377,6 +406,36 @@ describe('bridgeIslandVillages', () => {
     const before = tiles.map((t) => t.terrain);
 
     bridgeIslandVillages(tiles);
+
+    expect(tiles.map((t) => t.terrain)).toEqual(before);
+  });
+});
+
+describe('ensureStartVillagePaths', () => {
+  it('paves a land bridge between a starting village and its empty village', () => {
+    const tiles = [
+      tileAt(0, 0, TileType.GrasslandLand, { owner: 0, level: 1, captureReady: false, capital: true }),
+      tileAt(0, 1, TileType.Water),
+      tileAt(0, 2, TileType.GrasslandLand, { owner: null, level: 1, captureReady: false }),
+      tileAt(1, 1, TileType.Water),
+    ];
+    ensureStartVillagePaths(tiles, [{ start: { q: 0, r: 0 }, free: { q: 0, r: 2 } }]);
+
+    const byKey = new Map(tiles.map((t) => [axialKey(t), t]));
+    expect(isWaterType(byKey.get('0,1')!.terrain)).toBe(false);
+    expect(isWaterType(byKey.get('1,1')!.terrain)).toBe(true);
+  });
+
+  it('leaves the map untouched when the villages are already connected by land', () => {
+    const tiles = [
+      tileAt(0, 0, TileType.GrasslandLand, { owner: 0, level: 1, captureReady: false, capital: true }),
+      tileAt(0, 1, TileType.GrasslandLand),
+      tileAt(0, 2, TileType.GrasslandLand, { owner: null, level: 1, captureReady: false }),
+      tileAt(1, 1, TileType.Water),
+    ];
+    const before = tiles.map((t) => t.terrain);
+
+    ensureStartVillagePaths(tiles, [{ start: { q: 0, r: 0 }, free: { q: 0, r: 2 } }]);
 
     expect(tiles.map((t) => t.terrain)).toEqual(before);
   });

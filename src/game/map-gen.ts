@@ -177,8 +177,78 @@ function bridgeToNearestLand(tileMap: Map<string, MapTile>, settlement: MapTile)
   }
 }
 
-function ensureResourceNearVillage(
-  tileMap: Map<string, MapTile>,
+/** True when `from` reaches `to` moving only over non-water tiles. */
+function landReachable(tileMap: Map<string, MapTile>, from: { q: number; r: number }, to: { q: number; r: number }): boolean {
+  const target = axialKey(to);
+  const visited = new Set<string>([axialKey(from)]);
+  const queue: { q: number; r: number }[] = [from];
+  while (queue.length > 0) {
+    const cur = queue.shift()!;
+    for (const n of hexNeighbors(cur)) {
+      const k = axialKey(n);
+      if (visited.has(k)) continue;
+      const t = tileMap.get(k);
+      if (!t || isWaterType(t.terrain)) continue;
+      if (k === target) return true;
+      visited.add(k);
+      queue.push(n);
+    }
+  }
+  return false;
+}
+
+/** Converts the fewest water tiles to land so `from` has a non-water-only path
+ *  to `to` (0-1 BFS: crossing a land tile costs 0, a water tile costs 1). */
+function paveLandPath(tileMap: Map<string, MapTile>, from: { q: number; r: number }, to: { q: number; r: number }): void {
+  const startKey = axialKey(from);
+  const target = axialKey(to);
+  const cost = new Map<string, number>([[startKey, 0]]);
+  const parent = new Map<string, string | null>([[startKey, null]]);
+  const deque: { q: number; r: number }[] = [from];
+  while (deque.length > 0) {
+    const cur = deque.shift()!;
+    const curKey = axialKey(cur);
+    if (curKey === target) break;
+    const curCost = cost.get(curKey)!;
+    for (const n of hexNeighbors(cur)) {
+      const k = axialKey(n);
+      const t = tileMap.get(k);
+      if (!t) continue;
+      const step = isWaterType(t.terrain) ? 1 : 0;
+      const next = curCost + step;
+      const best = cost.get(k);
+      if (best !== undefined && next >= best) continue;
+      cost.set(k, next);
+      parent.set(k, curKey);
+      if (step === 0) deque.unshift(n);
+      else deque.push(n);
+    }
+  }
+  if (parent.get(target) === undefined) return;
+  let cur: string | null = target;
+  while (cur) {
+    const t = tileMap.get(cur);
+    // Forest and mountain are still passable, so converting to the biome's land
+    // tile is enough.
+    if (t && isWaterType(t.terrain)) t.terrain = BIOME_LAND[t.biome!];
+    cur = parent.get(cur) ?? null;
+  }
+}
+
+/** Gives every starting (owned) village a non-water path to its empty village,
+ *  paving any water in between, so a player is never boxed in on an island. */
+export function ensureStartVillagePaths(tiles: MapTile[], spawns: Spawn[]): void {
+  const tileMap = new Map<string, MapTile>(tiles.map((t) => [axialKey(t), t] as const));
+  for (const { start, free } of spawns) {
+    const s = tileMap.get(axialKey(start));
+    const f = tileMap.get(axialKey(free));
+    if (!s || !f) continue;
+    if (landReachable(tileMap, s, f)) continue;
+    paveLandPath(tileMap, s, f);
+  }
+}
+
+function ensureResourceNearVillage(  tileMap: Map<string, MapTile>,
   village: MapTile,
   reserved: Set<string>,
 ): void {
@@ -324,6 +394,7 @@ export function generateMap(playerCount: number, seed: number, size: MapSize = '
   }
 
   bridgeIslandVillages([...tileMap.values()]);
+  ensureStartVillagePaths([...tileMap.values()], spawns);
 
   const resourceReserved = new Set<string>();
   for (const tile of tileMap.values()) {
