@@ -54,8 +54,10 @@ cheat; simulator-only was rejected because it would drop the required confirm pr
 
 - `selection.ts` `isEnterable` gains a trailing `stealthed = false` parameter; when set, a tile
   with an enemy-owned settlement is not enterable.
-- Call sites pass `isMoveStealthed(unit)`: `reachableTargets`, `pathBetweenSteps`,
-  `pathBetweenCost`.
+- Call sites pass `isMoveStealthed(unit)`: `reachableTargets` and `pathBetween`, threading the
+  flag through to `pathBetweenSteps` / `pathBetweenCost` (these take a `stealthed` boolean rather
+  than the unit). The simulator's `doMove` calls `pathBetween` without a unit, so a
+  `stealthed = false` default keeps non-stalkers unchanged.
 - This single change covers the client (the village cell is not highlighted as a reachable
   target) and the server (`doMove` already validates against `reachableTargets`, so the move
   command is rejected). No separate check in `doMove` is needed for this rule.
