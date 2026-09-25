@@ -77,7 +77,7 @@ function buildTextures(map: GameMap): TextureSet {
     arrowTexture: tex(67, 13),
     glowFor: new Map(),
     cannonballTexture: tex(35, 15), 
-    attack16Texture: null,
+    attackIconTexture: null,
     cannonbalTexture: null,  
   };
 }
@@ -908,6 +908,45 @@ describe('move animation', () => {
       expect(bounce).not.toHaveBeenCalledWith(1, 0);
     } finally {
       bounce.mockRestore();
+    }
+  });
+
+  it('ripples the storm across the village water tiles when a storm fires', async () => {
+    const map = makeOpenMap();
+    const players = [player(0, Tribe.Cats), player(1, Tribe.Barbarians)];
+    h = setupGame(map, players);
+
+    const village = unitAt(map, 0, 0);
+    village.settlement = { owner: 0, level: 1, captureReady: false };
+    village.ownedBy = 0;
+    village.claimedByVillage = { q: 0, r: 0 };
+    village.unit = {
+      id: 'sc', owner: 0, type: 'stormcaller', q: 0, r: 0,
+      hasMoved: true, hasAttacked: true, hasHealed: true,
+      hp: 40, attack: 20, attackDistance: 1, spawnVillage: { q: 0, r: 0 },
+    };
+    const w1 = unitAt(map, 1, 0);
+    w1.terrain = TileType.Water;
+    w1.ownedBy = 0;
+    w1.claimedByVillage = { q: 0, r: 0 };
+    const w2 = unitAt(map, 2, 0);
+    w2.terrain = TileType.Water;
+    w2.ownedBy = 0;
+    w2.claimedByVillage = { q: 0, r: 0 };
+    h.mapView.update(map, players, null, new Set(), new Set(), 0, new Set(), {
+      x: 400, y: 300, scale: 1, width: 800, height: 600,
+    });
+
+    const pulse = vi.spyOn(h.mapView, 'stormWaterPulse');
+    try {
+      const events: GameEvent[] = [{ type: 'storm', unitId: 'sc', q: 0, r: 0, targets: [] }];
+      await h.gc.presentEvents(events, h.gc.exploredKeysFor(0));
+      expect(pulse).toHaveBeenCalledTimes(1);
+      const [waterTiles, origin] = pulse.mock.calls[0]!;
+      expect(origin).toEqual({ q: 0, r: 0 });
+      expect(waterTiles.map((t) => [t.q, t.r])).toEqual(expect.arrayContaining([[1, 0], [2, 0]]));
+    } finally {
+      pulse.mockRestore();
     }
   });
 

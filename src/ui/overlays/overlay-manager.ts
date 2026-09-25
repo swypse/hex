@@ -6,6 +6,7 @@ import { DisbandDialog } from './disband-dialog';
 import { LeaveGameDialog } from './leave-game-dialog';
 import { ShipLandingDialog } from './ship-landing-dialog';
 import { MoveAttackDialog } from './move-attack-dialog';
+import { StalkerRevealDialog } from './stalker-reveal-dialog';
 import { SpawnDialog } from './spawn-dialog';
 import { SkillTree } from './skill-tree';
 import { UnitHelpDialog } from './unit-help-dialog';
@@ -41,6 +42,7 @@ export class OverlayManager {
     leave: { make: () => new LeaveGameDialog(), mounted: null, hiding: false },
     ship: { make: () => new ShipLandingDialog(), mounted: null, hiding: false },
     moveattack: { make: () => new MoveAttackDialog(), mounted: null, hiding: false },
+    stalkerreveal: { make: () => new StalkerRevealDialog(), mounted: null, hiding: false },
     spawn: { make: () => new SpawnDialog(), mounted: null, hiding: false },
     skill: { make: () => new SkillTree(), mounted: null, hiding: false },
     gameover: { make: () => new GameOver(), mounted: null, hiding: false },
@@ -90,6 +92,9 @@ export class OverlayManager {
           break;
         case 'moveAttack':
           active.add('moveattack');
+          break;
+        case 'stalkerReveal':
+          active.add('stalkerreveal');
           break;
         case 'spawn':
           active.add('spawn');

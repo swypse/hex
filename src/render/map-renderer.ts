@@ -3,7 +3,7 @@ import {
 } from 'pixi.js';
 import { FONT_REGULAR } from '../ui/kit/bitmap-fonts';
 import {
-  axialKey, compareTileY, hexCorners, hexEdge, hexEdgeNeighbor, hexToPixel, splitHexBorder
+  axialKey, compareTileY, hexCorners, hexDistance, hexEdge, hexEdgeNeighbor, hexToPixel, splitHexBorder
 } from '../game/hex';
 import { tileMapByKey, type GameMap, type MapTile } from '../game/map-gen';
 import { bridgeCoastOffsets } from '../game/bridges';
@@ -48,6 +48,21 @@ const PIRATE_DEAL_HPBAR_GAP = 4;
 /** World offset of the hp bar anchor above/relative to the tile's unit top. */
 const HP_BAR_ANCHOR_OFFSET = 40;
 
+/** HP bar outer white box and the inner green/orange damage bars (screen px). */
+const HP_BAR_OUTER_W = 52;
+const HP_BAR_OUTER_H = 10;
+const HP_BAR_PADDING = 1;
+const HP_BAR_HEIGHT = HP_BAR_OUTER_H - 2 * HP_BAR_PADDING;
+const HP_BAR_INNER_W = HP_BAR_OUTER_W - 2 * HP_BAR_PADDING;
+const HP_BAR_GREEN = 0x49cc5d;
+const HP_BAR_GHOST = 0xfa9a09;
+const HP_BAR_GREEN_MS = 100;
+const HP_BAR_GHOST_MS = 300;
+/** After a damage animation settles, an up-swing back to the exact pre-damage
+ *  hp within this window is combat re-hydration (the presenter re-stages units
+ *  at their pre-attack hp), not a heal. */
+const HP_RESTAGE_WINDOW_MS = 1000;
+
 export interface OverlayItem {
   el: Container;
   world: { x: number; y: number };
@@ -81,6 +96,50 @@ interface TileView {
   /** Interactive row of 8px tribe-colored dots, one per active pirate deal. */
   dealCircles: Container | null;
   signature: string;
+}
+
+/** What the HP bar layer needs to draw one bar for a unit or a building. */
+interface HpBarSpec {
+  key: string;
+  world: { x: number; y: number };
+  hp: number;
+  maxHp: number;
+  label: string;
+  dim: boolean;
+  bonus: number;
+}
+
+/** A persistent unit/building hp bar: a white 62x12 box holding an orange
+ *  ghost bar and a green bar (60x10 at full hp). On damage both shrink to the
+ *  remaining hp: green over 100ms, ghost over 300ms (the classic trail). */
+interface HpBarEntry {
+  el: Container;
+  world: { x: number; y: number };
+  bg: Graphics;
+  ghost: Graphics;
+  green: Graphics;
+  label: BitmapText;
+  labelBg: Graphics;
+  bonusIcon: Sprite | null;
+  bonusText: BitmapText | null;
+  greenW: number;
+  ghostW: number;
+  greenAnim: { from: number; to: number; start: number } | null;
+  ghostAnim: { from: number; to: number; start: number } | null;
+  lastHp: number;
+  /** The hp the bar showed just before its current damage animation (used to
+   *  spot combat re-hydration to the pre-attack hp, so the bar does not bounce
+   *  back up mid-fight). */
+  damageFromHp: number | undefined;
+  /** Clamp time (`performance.now()`) when the last damage animation settled;
+   *  re-hydration is only honoured within the window after this. */
+  lastSettleAt: number;
+}
+
+/** A `stage:`-prefixed unit id (combat staging) refers to the same entity as
+ *  the real unit; map both to the real id's hp bar key. */
+function normalizeHpBarKey(key: string): string {
+  return key.startsWith('stage:') ? key.slice('stage:'.length) : key;
 }
 
 export class MapView {
@@ -149,6 +208,10 @@ export class MapView {
   /** Expected-damage preview badges (owned component; renders over hp bars
    *  and village labels). */
   readonly damageBadges: DamageBadgeLayer;
+  /** Persistent per-key (unit id / building tile) hp bars, kept across overlay
+   *  rebuilds so a damage animation plays to completion. */
+  private hpBars = new Map<string, HpBarEntry>();
+  private hpTickRemove: (() => void) | null = null;
   private viewport: Viewport | null = null;
   private lastLocalIndex = 0;
   /** Screen-space layer for edge capture markers. Kept out of `overlay` so a
@@ -220,6 +283,7 @@ export class MapView {
     this.markerRevealSig = '';
     this.stopBounce();
     this.stopHexBounce();
+    this.stopHpTick();
     // Release every village build texture this view still references so the
     // service can destroy them once no tile holds them.
     for (const tv of this.tileViews.values()) {
@@ -236,6 +300,7 @@ export class MapView {
     this.tileViews.clear();
     this.dealAnchors.clear();
     this.overlayItems.length = 0;
+    this.hpBars.clear();
     this.damageBadges.destroy();
     this.glowKey = '';
     this.map = null;
@@ -283,8 +348,8 @@ export class MapView {
     // When zoomed out far enough the hp bars, hp text and village names are too
     // small to read; drop them to keep the map clean.
     const detailHidden = (viewport.zoomOut ?? 0) > ZOOM_DETAIL_HIDE;
-    const hpBars: { unit: Unit; position: { x: number; y: number }; canAct: boolean; color: number; hp: number; bonus: number }[] = [];
-    const buildingHpBars: { position: { x: number; y: number }; hp: number }[] = [];
+    const hpBarSpecs: HpBarSpec[] = [];
+    const buildingHpBarSpecs: HpBarSpec[] = [];
     const labels: { tile: MapTile; owner: number; el: Container; world: { x: number; y: number } }[] = [];
     const exclamations: { el: Container; world: { x: number; y: number } }[] = [];
     const shipBobs: { sprite: Sprite; key: string; baseY: number }[] = [];
@@ -303,17 +368,19 @@ export class MapView {
 
       if (tile.unit && !hiddenUnitIds.has(tile.unit.id) && explored && !(tile.unit.owner !== localPlayerIndex && tile.unit.isStealthed === true)) {
         const unit = tile.unit;
-        const color = unit.type === 'pirate'
-          ? PIRATE_COLOR
-          : tribeById(players[unit.owner]!.tribe)!.color;
         if (!detailHidden) {
           const center = this.unitTextureTop(unit, players);
-          hpBars.push({
-            unit,
-            position: { x: p.x, y: y - center + 40 },
-            canAct: unit.type === 'pirate' ? false : unitCanAct(map, tile, unit, players[unit.owner]!),
-            color,
-            hp: this.hpOverrides.get(unit.id) ?? unit.hp,
+          const maxHp = UNIT_TYPES[unit.type].maxHp;
+          const hp = this.hpOverrides.get(unit.id) ?? unit.hp;
+          const canAct = unit.type === 'pirate' ? false : unitCanAct(map, tile, unit, players[unit.owner]!);
+          const stunned = (unit.stunTurns ?? 0) >= 1;
+          hpBarSpecs.push({
+            key: unit.id,
+            world: { x: p.x, y: y - center + HP_BAR_ANCHOR_OFFSET },
+            hp,
+            maxHp,
+            label: `${hp}/${maxHp}${stunned ? ' stunned' : ''}`,
+            dim: unit.owner === localPlayerIndex && (!localTurn || !canAct),
             bonus: attackBonus(unit, map),
           });
         }
@@ -325,15 +392,23 @@ export class MapView {
       // Damaged buildings (hp < max) show an hp bar + text like a unit's.
       const building = tile.building;
       if (building && explored && !detailHidden && buildingHp(building) < BUILDING_MAX_HP) {
-        buildingHpBars.push({
-          position: { x: p.x, y: y - this.hexSize * 0.6 },
-          hp: buildingHp(building),
+        const bhp = buildingHp(building);
+        buildingHpBarSpecs.push({
+          key: `building:${tile.q},${tile.r}`,
+          world: { x: p.x, y: y - this.hexSize * 0.6 },
+          hp: bhp,
+          maxHp: BUILDING_MAX_HP,
+          label: `${bhp}/${BUILDING_MAX_HP}`,
+          dim: false,
+          bonus: 0,
         });
       }
-      // Thorn traps are visible only to their owner.
+      // Thorn traps are visible only to their owner. The circle is drawn at the
+      // item's own origin: applyTransform positions the item at the tile's world
+      // coordinates, so drawing at (p.x, y) here would double-offset it.
       if (tile.trap && tile.trap.owner === localPlayerIndex && explored && !detailHidden) {
         const c = this.takeGraphics();
-        c.circle(p.x, y, 8).fill(0xff2222);
+        c.circle(0, 0, 8).fill(0xff2222);
         this.overlay.addChild(c);
         this.overlayItems.push({ el: c, world: { x: p.x, y } });
       }
@@ -381,8 +456,7 @@ export class MapView {
     for (const l of labels) this.addVillageLabel(l.tile, l.owner, l.el, l.world, players);
     // HP bars come after village labels so a unit's bar + text always render on
     // top of a village name label on the same tile.
-    for (const hp of hpBars) this.addHpBar(hp.unit, hp.position, hp.canAct, hp.color, localPlayerIndex, hp.hp, localTurn, hp.bonus);
-    for (const b of buildingHpBars) this.addBuildingHpBar(b.position, b.hp);
+    this.syncHpBars([...hpBarSpecs, ...buildingHpBarSpecs]);
     // Capture markers come last so the icon renders above the unit's hp bar and
     // its hp text.
     for (const ex of exclamations) {
@@ -631,6 +705,8 @@ export class MapView {
     if (tv.unitSprite) {
       const hiddenStealth = tile.unit !== null && tile.unit.owner !== localPlayerIndex && tile.unit.isStealthed === true;
       tv.unitSprite.visible = explored && !(tile.unit && hiddenUnitIds.has(tile.unit.id)) && !hiddenStealth;
+      // The owner sees their stealthed stalker slightly dimmed.
+      tv.unitSprite.alpha = tile.unit && tile.unit.owner === localPlayerIndex && tile.unit.isStealthed === true ? 0.6 : 1;
       if (tile.unit) {
         this.faceUnitSprite(tv.unitSprite, this.unitFacings.get(tile.unit.id) ?? 'right');
       }
@@ -1428,15 +1504,17 @@ export class MapView {
     return null;
   }
 
-  private runHexBounce(entries: { obj: Sprite | Graphics; baseY: number; delay: number }[]): void {
+  private runHexBounce(
+    entries: { obj: Sprite | Graphics; baseY: number; delay: number }[],
+    duration = 150,
+    amp = this.hexSize * 0.2,
+  ): void {
     this.stopHexBounce();
     this.hexBounceSprites = entries;
     if (entries.length === 0) return;
-    const amp = this.hexSize * 0.2;
-    const DURATION = 150;
     const start = performance.now();
     const maxDelay = entries.reduce((m, e) => Math.max(m, e.delay), 0);
-    const endAt = start + DURATION + maxDelay;
+    const endAt = start + duration + maxDelay;
     const fn = (): void => {
       const active = this.hexBounceSprites.filter((e) => !e.obj.destroyed);
       if (active.length === 0) {
@@ -1447,7 +1525,7 @@ export class MapView {
       for (const e of active) {
         const local = elapsed - e.delay;
         if (local < 0) continue;
-        const t = Math.min(1, local / DURATION);
+        const t = Math.min(1, local / duration);
         const p = t < 0.5 ? t * 2 : 2 - t * 2;
         e.obj.position.y = e.baseY - p * amp;
       }
@@ -1455,6 +1533,23 @@ export class MapView {
     };
     this.app.ticker.add(fn);
     this.hexBounceRemove = () => this.app.ticker.remove(fn);
+  }
+
+  /** Ripples a storm across the given water tiles outward from `origin`: each
+   *  tile (and any ship standing on it) lifts 10px and settles back over ~50ms,
+   *  staged 40ms per additional hex of distance from the stormcaller. */
+  stormWaterPulse(tiles: MapTile[], origin: { q: number; r: number }): void {
+    const entries: { obj: Sprite | Graphics; baseY: number; delay: number }[] = [];
+    for (const tile of tiles) {
+      const tv = this.tileViews.get(axialKey(tile));
+      if (!tv) continue;
+      const sprites = this.hexSurfaceSprites(tv);
+      if (tv.unitSprite && !tv.unitSprite.destroyed) sprites.push(tv.unitSprite);
+      if (sprites.length === 0) continue;
+      const delay = Math.max(0, hexDistance(origin, tile) - 1) * 40;
+      for (const s of sprites) entries.push({ obj: s, baseY: s.position.y, delay });
+    }
+    this.runHexBounce(entries, 50, 10);
   }
 
   /** The sprites that sit on top of a hex and move with it when its tile is
@@ -1675,62 +1770,122 @@ export class MapView {
     return tex ? tex.anchorY * tex.texture.height * this.spriteScale : this.hexSize * 0.5 * this.spriteScale;
   }
 
-  private addHpBar(unit: Unit, position: {
-    x: number;
-    y: number
-  }, canAct: boolean, tribeColor: number, localPlayerIndex: number, hp: number, localTurn: boolean, bonus = 0): void {
-    const el = new Container();
-    el.position.set(position.x, position.y);
-    const barWidth = this.hexSize * 0.6;
-    const barHeight = 5;
-    const maxHp = UNIT_TYPES[unit.type].maxHp;
-    const gap = 6;
-    const up = -(gap + barHeight / 2);
-    el.sortableChildren = true;
-
-    const background = this.takeGraphics();
-    background.zIndex = 0;
-    background.rect(-barWidth / 2, -barHeight / 2 + up, barWidth, barHeight).fill(0xff0000);
-    el.addChild(background);
-
-    const ratio = Math.max(0, Math.min(1, hp / maxHp));
-    if (ratio > 0) {
-      const fill = this.takeGraphics();
-      fill.zIndex = 0;
-      fill.rect(-barWidth / 2, -barHeight / 2 + up, barWidth * ratio, barHeight).fill(0x00ff00);
-      el.addChild(fill);
+  /** Reconciles the persistent hp bars with the visible units/buildings:
+   *  creates bars for new keys, destroys bars whose unit/building vanished,
+   *  and starts the damage animation whenever a bar's hp drops. */
+  private syncHpBars(specs: HpBarSpec[]): void {
+    const seen = new Set<string>();
+    for (const spec of specs) {
+      // Combat stages each involved unit under a `stage:` id while the lunge
+      // plays; a staged unit is the SAME entity as its real unit, so its bar
+      // keeps the real one's registry key (otherwise the real bar would be
+      // destroyed and recreated mid-fight, replaying the damage animation).
+      const key = normalizeHpBarKey(spec.key);
+      seen.add(key);
+      let bar = this.hpBars.get(key);
+      if (!bar) {
+        bar = this.createHpBar(spec);
+        this.hpBars.set(key, bar);
+        this.overlay.addChild(bar.el);
+      }
+      bar.world = spec.world;
+      bar.el.position.set(spec.world.x, spec.world.y);
+      const innerW = (w: number) => Math.max(0, Math.min(HP_BAR_INNER_W, w));
+      const targetW = innerW(HP_BAR_INNER_W * Math.max(0, Math.min(1, spec.hp / spec.maxHp)));
+      if (spec.hp < bar.lastHp) {
+        // Damage: green drops to the new hp fast, the orange ghost trails it.
+        const now = performance.now();
+        bar.damageFromHp = bar.lastHp;
+        bar.greenAnim = { from: bar.greenW, to: targetW, start: now };
+        bar.ghostAnim = { from: bar.ghostW, to: targetW, start: now };
+        bar.lastHp = spec.hp;
+        this.ensureHpTick();
+      } else if (spec.hp > bar.lastHp) {
+        // A higher hp here is either a genuine heal or a transient combat
+        // re-hydration: staging runs each unit at its pre-attack hp, so while a
+        // damage animation is live (or the value is that very pre-hp shortly
+        // after it settled) the bar must not bounce back up. Otherwise snap up.
+        const ghostLive = bar.greenAnim !== null || bar.ghostAnim !== null;
+        const rehydratesPre =
+          bar.damageFromHp !== undefined &&
+          spec.hp === bar.damageFromHp &&
+          performance.now() - bar.lastSettleAt < HP_RESTAGE_WINDOW_MS;
+        if (!ghostLive && !rehydratesPre) {
+          bar.greenAnim = null;
+          bar.ghostAnim = null;
+          bar.greenW = targetW;
+          bar.ghostW = targetW;
+          bar.lastHp = spec.hp;
+          bar.damageFromHp = undefined;
+          bar.lastSettleAt = 0;
+        }
+      }
+      this.updateHpBarLabel(bar, spec);
+      this.drawHpBars(bar);
     }
+    for (const [key, bar] of this.hpBars) {
+      if (seen.has(key)) continue;
+      bar.greenAnim = null;
+      bar.ghostAnim = null;
+      bar.el.parent?.removeChild(bar.el);
+      bar.el.destroy({ children: true });
+      this.hpBars.delete(key);
+    }
+    if (this.hpBars.size === 0) this.stopHpTick();
+  }
 
-    const stunned = (unit.stunTurns ?? 0) >= 1;
-    const label = this.takeText(`${hp}/${maxHp}${stunned ? ' stunned' : ''}`, {
+  private createHpBar(spec: HpBarSpec): HpBarEntry {
+    const el = new Container();
+    el.sortableChildren = true;
+    // The white box's top edge sits 11px above the anchor (its center at -5);
+    // the green/ghost bars fill the inner 60x10 area (1px padding); the label's
+    // bottom sits 13px above the anchor (2px above the box top).
+    const boxTop = -11;
+
+    const bg = new Graphics();
+    bg.zIndex = 0;
+    bg.rect(-HP_BAR_OUTER_W / 2, boxTop, HP_BAR_OUTER_W, HP_BAR_OUTER_H).fill(0xffffff);
+    el.addChild(bg);
+
+    const ghost = new Graphics();
+    ghost.zIndex = 1;
+    el.addChild(ghost);
+
+    const green = new Graphics();
+    green.zIndex = 2;
+    el.addChild(green);
+
+    const label = this.takeText(spec.label, {
       fontSize: 13,
       fill: 0xffffff,
-      fontFamily: FONT_REGULAR
+      fontFamily: FONT_REGULAR,
     });
     label.anchor.set(0.5, 1);
-    label.position.set(0, -barHeight / 2 - 2 + up);
+    label.position.set(0, boxTop - 2);
     label.zIndex = 1;
     this.hpLabelHeight = label.height;
 
     const labelBg = this.takeGraphics();
     labelBg.zIndex = 0;
-    const dim = unit.owner === localPlayerIndex && (!localTurn || !canAct);
+    const alpha = spec.dim ? 0.3 : 1;
     labelBg
       .rect(label.x - label.width / 2 - 2, label.y - label.height, label.width + 4, label.height)
-      .fill({ color: 0x000000, alpha: dim ? 0.3 : 1 });
+      .fill({ color: 0x000000, alpha });
     el.addChild(labelBg);
     el.addChild(label);
 
-    // Aura/rage attack bonus chip: attack-16 icon + "+10"/"+20" after the hp text.
-    if (bonus > 0 && this.textures.attack16Texture) {
-      const icon = new Sprite(this.textures.attack16Texture);
+    let bonusIcon: Sprite | null = null;
+    let bonusText: BitmapText | null = null;
+    if (spec.bonus > 0 && this.textures.attackIconTexture) {
+      const icon = new Sprite(this.textures.attackIconTexture);
       icon.anchor.set(0.5, 1);
       icon.width = 16;
       icon.height = 16;
       icon.position.set(label.x + label.width / 2 + 12, label.y);
       icon.zIndex = 1;
       el.addChild(icon);
-      const bonusText = this.takeText(`+${bonus}`, {
+      bonusIcon = icon;
+      bonusText = this.takeText(`+${spec.bonus}`, {
         fontSize: 13,
         fill: 0xffcc00,
         fontFamily: FONT_REGULAR,
@@ -1741,54 +1896,114 @@ export class MapView {
       el.addChild(bonusText);
     }
 
-    this.overlay.addChild(el);
-    this.overlayItems.push({ el, world: position });
+    const entry: HpBarEntry = {
+      el,
+      world: spec.world,
+      bg,
+      ghost,
+      green,
+      label,
+      labelBg,
+      bonusIcon,
+      bonusText,
+      greenW: HP_BAR_INNER_W,
+      ghostW: HP_BAR_INNER_W,
+      greenAnim: null,
+      ghostAnim: null,
+      lastHp: spec.hp,
+      damageFromHp: undefined,
+      lastSettleAt: 0,
+    };
+    return entry;
   }
 
-  /** HP bar + text for a damaged building, styled like a unit's (only shown
-   *  below full hp). */
-  private addBuildingHpBar(position: { x: number; y: number }, hp: number): void {
-    const el = new Container();
-    el.position.set(position.x, position.y);
-    const barWidth = this.hexSize * 0.6;
-    const barHeight = 5;
-    const maxHp = BUILDING_MAX_HP;
-    const gap = 6;
-    const up = -(gap + barHeight / 2);
-    el.sortableChildren = true;
+  private updateHpBarLabel(bar: HpBarEntry, spec: HpBarSpec): void {
+    bar.label.text = spec.label;
+    const alpha = spec.dim ? 0.3 : 1;
+    bar.labelBg.clear().rect(
+      bar.label.x - bar.label.width / 2 - 2,
+      bar.label.y - bar.label.height,
+      bar.label.width + 4,
+      bar.label.height,
+    ).fill({ color: 0x000000, alpha });
+    this.hpLabelHeight = bar.label.height;
+  }
 
-    const background = this.takeGraphics();
-    background.zIndex = 0;
-    background.rect(-barWidth / 2, -barHeight / 2 + up, barWidth, barHeight).fill(0xff0000);
-    el.addChild(background);
+  private drawHpBars(bar: HpBarEntry): void {
+    const boxTop = -11;
+    bar.ghost.clear().rect(-HP_BAR_OUTER_W / 2 + HP_BAR_PADDING, boxTop + HP_BAR_PADDING, bar.ghostW, HP_BAR_HEIGHT).fill(HP_BAR_GHOST);
+    bar.green.clear().rect(-HP_BAR_OUTER_W / 2 + HP_BAR_PADDING, boxTop + HP_BAR_PADDING, bar.greenW, HP_BAR_HEIGHT).fill(HP_BAR_GREEN);
+  }
 
-    const ratio = Math.max(0, Math.min(1, hp / maxHp));
-    if (ratio > 0) {
-      const fill = this.takeGraphics();
-      fill.zIndex = 0;
-      fill.rect(-barWidth / 2, -barHeight / 2 + up, barWidth * ratio, barHeight).fill(0x00ff00);
-      el.addChild(fill);
+  /** Runs the shared hp bar ticker while any bar is animating; redraws the
+   *  green/ghost widths from their timers each frame. */
+  private ensureHpTick(): void {
+    if (this.hpTickRemove) return;
+    const fn = (): void => {
+      let any = false;
+      const now = performance.now();
+      for (const bar of this.hpBars.values()) {
+        if (bar.el.destroyed) {
+          bar.greenAnim = null;
+          bar.ghostAnim = null;
+          continue;
+        }
+        let dirty = false;
+        if (bar.greenAnim) {
+          const a = bar.greenAnim;
+          const t = Math.min(1, (now - a.start) / HP_BAR_GREEN_MS);
+          bar.greenW = a.from + (a.to - a.from) * t;
+          if (t >= 1) {
+            bar.greenW = a.to;
+            bar.greenAnim = null;
+          }
+          dirty = true;
+        }
+        if (bar.ghostAnim) {
+          const a = bar.ghostAnim;
+          const t = Math.min(1, (now - a.start) / HP_BAR_GHOST_MS);
+          bar.ghostW = a.from + (a.to - a.from) * t;
+          if (t >= 1) {
+            bar.ghostW = a.to;
+            bar.ghostAnim = null;
+            // The damage has fully settled: a later up-swing to the pre-damage
+            // hp is a combat re-hydration until the restage window lapses.
+            bar.lastSettleAt = now;
+          }
+          dirty = true;
+        }
+        if (dirty) this.drawHpBars(bar);
+        if (bar.greenAnim || bar.ghostAnim) any = true;
+      }
+      if (!any) this.stopHpTick();
+    };
+    const remover = (): void => {
+      this.app.ticker.remove(fn);
+    };
+    this.app.ticker.add(fn);
+    this.hpTickRemove = remover;
+  }
+
+  private stopHpTick(): void {
+    if (this.hpTickRemove) {
+      const remover = this.hpTickRemove;
+      this.hpTickRemove = null;
+      remover();
     }
+  }
 
-    const label = this.takeText(`${hp}/${maxHp}`, {
-      fontSize: 13,
-      fill: 0xffffff,
-      fontFamily: FONT_REGULAR,
-    });
-    label.anchor.set(0.5, 1);
-    label.position.set(0, -barHeight / 2 - 2 + up);
-    label.zIndex = 1;
+  /** Screen positions for the persistent hp bars (they are not overlay items,
+   *  so `applyTransform` asks us to place them alongside the damage badges). */
+  syncHpBarPositions(pan: { x: number; y: number }, scale: number): void {
+    for (const bar of this.hpBars.values()) {
+      if (bar.el.destroyed) continue;
+      bar.el.position.set(pan.x + bar.world.x * scale, pan.y + bar.world.y * scale);
+    }
+  }
 
-    const labelBg = this.takeGraphics();
-    labelBg.zIndex = 0;
-    labelBg
-      .rect(label.x - label.width / 2 - 2, label.y - label.height, label.width + 4, label.height)
-      .fill({ color: 0x000000, alpha: 1 });
-    el.addChild(labelBg);
-    el.addChild(label);
-
-    this.overlay.addChild(el);
-    this.overlayItems.push({ el, world: position });
+  /** @private test accessor: the live hp bar entries (order of creation). */
+  hpBarEntries(): { el: Container; world: { x: number; y: number } }[] {
+    return [...this.hpBars.values()].map((b) => ({ el: b.el, world: b.world }));
   }
 
   /** Recompute the screen-edge indicators for capturable villages that are

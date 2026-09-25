@@ -8,10 +8,11 @@ import { buildingsInVillage, villageBuildingLimit } from './village';
 import { villageEnemyOccupied } from './capture';
 import type { BuildingKind } from './events';
 import { t } from '../i18n';
-import { canBuildBridgeHere } from './bridges';
+import { canBuildBridgeHere, BRIDGE_COST } from './bridges';
 
 export type BuilderBuildKind = BuildingKind | 'bridge';
-export const BUILDER_KINDS: BuilderBuildKind[] = ['sawmill', 'mine', 'port', 'bridge'];
+export type BuilderBuildableKind = 'sawmill' | 'mine' | 'port' | 'bridge';
+export const BUILDER_KINDS: BuilderBuildableKind[] = ['sawmill', 'mine', 'port', 'bridge'];
 
 export const SAWMILL_COST = 10;
 export const MINE_COST = 15;
@@ -59,6 +60,20 @@ export const BUILDING_COSTS: Record<BuildingKind, Resources> = {
   temple: { wood: 0, stone: 10, money: 30, ore: 0 },
   forestTemple: { wood: 0, stone: 10, money: 30, ore: 0 },
 };
+
+/** Spawn costs for every kind a builder (Villagers special unit) may construct,
+ *  keyed by that kind. */
+export const BUILDER_BUILD_COSTS: Record<BuilderBuildableKind, Resources> = {
+  sawmill: BUILDING_COSTS.sawmill,
+  mine: BUILDING_COSTS.mine,
+  port: BUILDING_COSTS.port,
+  bridge: BRIDGE_COST,
+};
+
+/** Whether the given resources cover at least one builder-constructable kind. */
+export function canAffordAnyBuilderBuild(resources: Resources): boolean {
+  return BUILDER_KINDS.some((kind) => canAfford(resources, BUILDER_BUILD_COSTS[kind]));
+}
 
 function neighborTile(map: GameMap, n: { q: number; r: number }): MapTile | undefined {
   return map.tiles.find((t) => t.q === n.q && t.r === n.r);

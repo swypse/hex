@@ -15,6 +15,7 @@ import { attackableTargets } from '../game/combat';
 import { builderBuildable, type BuilderBuildKind } from '../game/buildings';
 import { trapCells } from '../game/traps';
 import { stormEligible } from '../game/storm';
+import { adjacentEnemyVillages, isMoveStealthed } from '../game/stalker';
 import { movePoints, canMove, canAttack, canDisband, makeUnit, PIRATE_OWNER, type Unit, type UnitType } from '../game/units';
 import { cycleSelection, reachableTargets, tileAt } from '../game/selection';
 import { shouldPromptWatch, type GameMode } from '../game/game-mode';
@@ -642,6 +643,7 @@ class GameController {
     this.mapView.badgeLayer.scale.set(scale, scale);
     this.mapView.badgeLayer.position.set(camera.pan.x, camera.pan.y);
     this.mapView.syncBadgePositions(camera.pan, scale);
+    this.mapView.syncHpBarPositions(camera.pan, scale);
     for (const item of this.overlayItems) {
       item.el.position.set(camera.pan.x + item.world.x * scale, camera.pan.y + item.world.y * scale);
     }
@@ -778,6 +780,12 @@ class GameController {
         return;
       }
       if (unit && this.reachableKeys.has(axialKey(tile))) {
+        // A stealthed stalker arriving beside an enemy village will be spotted:
+        // ask before committing the move.
+        if (this.sim && isMoveStealthed(unit) && adjacentEnemyVillages(this.sim.map, tile, unit.owner).length > 0) {
+          store.setOverlay({ kind: 'stalkerReveal', target: { q: tile.q, r: tile.r } });
+          return;
+        }
         if (unit.shipLevel !== undefined && tile.terrain !== TileType.Water) {
           store.setOverlay({ kind: 'shipLanding', target: { q: tile.q, r: tile.r } });
           return;
@@ -1285,6 +1293,24 @@ class GameController {
     useGameStore.getState().setOverlay(null);
   }
 
+  confirmStalkerApproach(): void {
+    const store = useGameStore.getState();
+    const pending = store.overlay?.kind === 'stalkerReveal' ? store.overlay.target : null;
+    store.setOverlay(null);
+    if (!pending) return;
+    const selection = store.selection;
+    if (!selection || selection.kind !== 'unit' || !this.sim) return;
+    const unit = tileAt(this.sim.map, selection.q, selection.r)?.unit;
+    if (!unit) return;
+    this.sendCommand({ type: 'move', unitId: unit.id, q: pending.q, r: pending.r });
+    store.setSelection({ kind: 'unit', q: pending.q, r: pending.r });
+    sfx.play('click');
+  }
+
+  cancelStalkerApproach(): void {
+    useGameStore.getState().setOverlay(null);
+  }
+
   chooseMoveFromDialog(): void {
     const store = useGameStore.getState();
     const pending = store.overlay?.kind === 'moveAttack' ? store.overlay.target : null;
@@ -1531,8 +1557,7 @@ class GameController {
       const tile = tileAt(this.sim.map, store.selection.q, store.selection.r);
       const unit = tile?.unit;
       if (unit && unit.owner === store.localPlayerIndex) {
-        const p = store.players[store.localPlayerIndex]!;
-        this.placementKeys = new Set(trapCells(this.sim.map, tile!, p).map((t) => axialKey(t)));
+        this.placementKeys = new Set(trapCells(this.sim.map, tile!).map((t) => axialKey(t)));
       }
     }
     const isLocalTurn = store.currentPlayerIndex === store.localPlayerIndex && !store.aiActive;

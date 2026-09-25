@@ -5,6 +5,7 @@ import { attackableTargets, missChanceFor, performAttack, performSiege } from '.
 import { buildBridge, buildBridgeIgnoringSkill } from './bridges';
 import { buildRoad } from './roads';
 import { GameEvent, BuildingKind } from './events';
+import { adjacentEnemyVillages } from './stalker';
 import { bonusEligibleFor, explorerPath, findClosestVillage, revealExplorerPath, type BonusKind } from './bonus';
 import { captureWinnerIndex, computeWinner, GameMode, quickCaptureScore, quickCaptureTurnsCount } from './game-mode';
 import { hexDistance, hexNeighbors } from './hex';
@@ -394,10 +395,34 @@ export class Simulator {
     this.emit({ type: 'unitMoved', unitId, from, path: emitPath, to: { q: resolveTarget.q, r: resolveTarget.r }, shipLevel });
     if (trap) this.triggerTrap(unit, trap);
     if (bump) this.revealStalker(bump);
+    this.revealSpottedByVillage(unit);
     return true;
   }
 
-  /** An enemy stepping onto a thorn trap stops there, takes ~90 damage (no
+  /** A stealthed stalker that ends its move beside an enemy village is spotted:
+   *  its stealth drops and every player sees the notification. */
+  private revealSpottedByVillage(unit: Unit): void {
+    if (unit.isStealthed !== true) return;
+    const village = adjacentEnemyVillages(this.map, unit, unit.owner)[0];
+    if (!village) return;
+    this.revealStalker(unit);
+    this.emit({ type: 'stalkerSpotted', unitId: unit.id, villageQ: village.q, villageR: village.r });
+  }
+
+  /** A village that just changed hands may suddenly be an enemy of a stealthed
+   *  stalker parked next to it (e.g. it was a free village before): reveal it,
+   *  keeping the invariant that stealth never survives beside an enemy. */
+  private revealStalkersNearVillage(village: MapTile, newOwner: number): void {
+    for (const n of hexNeighbors(village)) {
+      const t = tileAt(this.map, n.q, n.r);
+      const u = t?.unit;
+      if (!u || u.isStealthed !== true || u.owner === newOwner) continue;
+      this.revealStalker(u);
+      this.emit({ type: 'stalkerSpotted', unitId: u.id, villageQ: village.q, villageR: village.r });
+    }
+  }
+
+  /** An enemy stepping onto a thorn trap stops there, takes ~45 damage (no
    *  miss, no counter-attack) and consumes the trap. */
   private triggerTrap(victim: Unit, trapTile: MapTile): void {
     const damage = trapDamage();
@@ -432,6 +457,7 @@ export class Simulator {
     if (unit.isStealthed) return false;
     if (unit.hasMoved || unit.hasAttacked || unit.hasHealed) return false;
     if ((unit.stunTurns ?? 0) >= 1) return false;
+    if (adjacentEnemyVillages(this.map, unit, unit.owner).length > 0) return false;
     unit.isStealthed = true;
     unit.firstMoveStealthDone = true;
     unit.hasMoved = true;
@@ -441,7 +467,7 @@ export class Simulator {
     return true;
   }
 
-  /** Trapper builds a thorn trap on its own or an adjacent owned land cell. */
+  /** Trapper builds a thorn trap on its own or an adjacent non-water cell. */
   private doBuildTrap(unitId: string, q: number, r: number): boolean {
     const unit = this.findUnit(unitId);
     if (!unit || unit.owner !== this.currentPlayerIndex) return false;
@@ -453,7 +479,7 @@ export class Simulator {
     const tile = tileAt(this.map, unit.q, unit.r)!;
     const target = tileAt(this.map, q, r);
     if (!target) return false;
-    if (!canPlaceTrapOn(this.map, target, tile, player)) return false;
+    if (!canPlaceTrapOn(target, tile)) return false;
     if (!canAfford(player.resources, TRAP_COST)) return false;
     player.resources = pay(player.resources, TRAP_COST);
     target.trap = { owner: unit.owner, placedTurn: this.turn };
@@ -656,6 +682,7 @@ export class Simulator {
     if (village.settlement.owner === unit.owner || !village.settlement.captureReady) return false;
     const oldOwner = village.settlement.owner;
     const result = captureVillage(this.map, village, unit);
+    this.revealStalkersNearVillage(village, unit.owner);
     const capturer = this.players[unit.owner]!;
     awardScore(capturer, CAPTURE_SCORE);
     this.statsOf(capturer).villagesCaptured += 1;

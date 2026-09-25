@@ -24,7 +24,6 @@
     "pack:village-forest": "node tools/packVillageForest.mjs",
     "pack:village-sand": "node tools/packVillageSand.mjs",
     "pack:village-barbarians": "node tools/packVillageBarbarians.mjs",
-    "pack:icons-16": "node tools/packIcons16.mjs",
     "pack:icons-32": "node tools/packIcons32.mjs",
     "relay": "node server/relay.mjs",
     "relay:dev": "wrangler dev -c worker/wrangler.jsonc",

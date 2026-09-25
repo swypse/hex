@@ -11,6 +11,7 @@ import { SeededRandom } from '../src/util/random';
 import { type BonusKind } from '../src/game/bonus';
 import { Simulator } from '../src/game/simulator';
 import { TileType } from '../src/game/tile-types';
+import { UNIT_TYPES } from '../src/game/units';
 import { hexNeighbors } from '../src/game/hex';
 import { t } from '../src/i18n';
 import type { GameMap, MapTile } from '../src/game/map-gen';
@@ -506,6 +507,71 @@ describe('HudSelected pirate deal info', () => {
     expect(all).toContain('Villagers');
     expect(all).toContain('Cats');
     expect(all).not.toContain('Pirate: no deal');
+  });
+});
+
+describe('HudSelected stealth info', () => {
+  let hud: HudSelected;
+  const originalSim = (gameController as unknown as { sim: unknown }).sim;
+
+  const texts = (): string[] => {
+    const el = (hud as unknown as { el: Container }).el!;
+    const out: string[] = [];
+    const walk = (c: Container): void => {
+      for (const ch of c.children) {
+        if (ch instanceof BitmapText) out.push((ch as BitmapText).text);
+        if (ch instanceof Container) walk(ch as Container);
+      }
+    };
+    walk(el);
+    return out;
+  };
+
+  const boot = (stealthed: boolean): void => {
+    (globalThis as { CanvasRenderingContext2D?: unknown }).CanvasRenderingContext2D = class {};
+    (globalThis as { document?: unknown }).document = {
+      createElement: () => ({ getContext: () => fakeCanvasContext(), width: 0, height: 0 }),
+    };
+    const map = makeTestMap(2);
+    const tile = tileAt(map, 0, 0)!;
+    tile.terrain = TileType.GrasslandLand;
+    tile.ownedBy = 0;
+    tile.unit = {
+      id: 'st', owner: 0, type: 'stalker', q: 0, r: 0,
+      hasMoved: true, hasAttacked: true, hasHealed: true,
+      hp: UNIT_TYPES.stalker.maxHp, attack: 10, attackDistance: 1, spawnVillage: null,
+      ...(stealthed ? { isStealthed: true } : {}),
+    };
+    const players = buildPlayers(Tribe.Cats, 1, new SeededRandom(1));
+    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    (gameController as unknown as { sim: Simulator | null }).sim = sim;
+    useGameStore.setState({
+      screen: 'game',
+      players,
+      localPlayerIndex: 0,
+      selection: { kind: 'unit', q: 0, r: 0 },
+      tutorial: false,
+      tutorialStep: null,
+    });
+    hud = new HudSelected();
+    hud.mount(makeHost(), new Container());
+  };
+
+  afterEach(() => {
+    hud?.destroy();
+    (gameController as unknown as { sim: unknown }).sim = originalSim;
+  });
+
+  it('shows a stealth tag on the owner stealthed stalker', () => {
+    boot(true);
+    const all = texts().join('\n');
+    expect(all).toContain('stealth');
+  });
+
+  it('omits the stealth tag when the stalker is not stealthed', () => {
+    boot(false);
+    const all = texts().join('\n');
+    expect(all).not.toContain('stealth');
   });
 });
 

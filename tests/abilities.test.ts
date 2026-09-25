@@ -59,7 +59,7 @@ describe('berserker rage', () => {
   it('gives +20 at or below 50% HP, else 0', () => {
     const u = makeUnit(0, 'berserker', 0, 0);
     expect(berserkerRage(u)).toBe(0);
-    u.hp = 35; // exactly 50% of 70
+    u.hp = 25; // exactly 50% of 50
     expect(berserkerRage(u)).toBe(20);
     u.hp = 20;
     expect(berserkerRage(u)).toBe(20);
@@ -76,12 +76,12 @@ describe('effectiveAttack', () => {
     put(map, 1, 0, makeUnit(0, 'banner', 1, 0));
     const berserker = makeUnit(0, 'berserker', 0, 0, { hp: 20 }); // raging
     put(map, 0, 0, berserker);
-    expect(effectiveAttack(berserker, map)).toBe(50 + 20 + 10);
+    expect(effectiveAttack(berserker, map)).toBe(30 + 20 + 10);
   });
 
   it('no map means no aura but rage still applies', () => {
     expect(effectiveAttack(makeUnit(0, 'warrior', 0, 0), null)).toBe(20);
-    expect(effectiveAttack(makeUnit(0, 'berserker', 0, 0, { hp: 10 }), null)).toBe(50 + 20);
+    expect(effectiveAttack(makeUnit(0, 'berserker', 0, 0, { hp: 10 }), null)).toBe(30 + 20);
   });
 });
 

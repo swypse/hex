@@ -12,7 +12,7 @@ const LAND_KEYS: Record<UnitType, string[]> = {
   catapult: ['help.catapult.base', 'help.catapult.damage', 'help.catapult.siege', 'help.shield.moveLock', 'help.catapult.noAdvance', 'help.catapult.noCounter', 'help.catapult.skill'],
   knight: ['help.knight.base', 'help.knight.rekill', 'help.knight.combo', 'help.warrior.advance', 'help.knight.skill'],
   pirate: ['help.pirate.base', 'help.pirate.spawn', 'help.pirate.act', 'help.pirate.capture', 'help.pirate.steal', 'help.pirate.reward'],
-  stalker: ['help.stalker.base', 'help.stalker.stealth', 'help.stalker.button', 'help.stalker.bump', 'help.stalker.attack'],
+  stalker: ['help.stalker.base', 'help.stalker.stealth', 'help.stalker.button', 'help.stalker.bump', 'help.stalker.attack', 'help.stalker.village'],
   builder: ['help.builder.base', 'help.builder.abuild'],
   banner: ['help.banner.base', 'help.banner.aura', 'help.banner.nostack'],
   berserker: ['help.berserker.base', 'help.berserker.rage'],
@@ -52,7 +52,7 @@ export function unitHelpDescription(unit: Unit): string {
 }
 
 interface UnitHelpStat {
-  /** 16px icon file, e.g. '16/move-16.png'. */
+  /** 32px icon key, e.g. 'move-32'. */
   icon: string;
   /** Localized stat text, e.g. '1 movement'. */
   text: string;
@@ -67,11 +67,11 @@ export function unitHelpStats(unit: Unit): UnitHelpStat[] {
   const upkeep = unitMaintenance(unit);
   const defense = unit.defense ?? 0;
   return [
-    { icon: '16/move-16.png', text: t('help.stat.movement', { n: movement }) },
-    { icon: '16/attack-16.png', text: t('help.stat.attack', { n: attack }) },
-    { icon: '16/hp-16.png', text: t('help.stat.hp', { n: hp }) },
-    { icon: '16/gold-16.png', text: t('help.stat.upkeep', { n: upkeep }) },
-    { icon: '16/def-16.png', text: t('help.stat.defense', { n: defense }) },
+    { icon: 'move-32', text: t('help.stat.movement', { n: movement }) },
+    { icon: 'attack-32', text: t('help.stat.attack', { n: attack }) },
+    { icon: 'hp-32', text: t('help.stat.hp', { n: hp }) },
+    { icon: 'gold-32', text: t('help.stat.upkeep', { n: upkeep }) },
+    { icon: 'def-32', text: t('help.stat.defense', { n: defense }) },
   ];
 }
 

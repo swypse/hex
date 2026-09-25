@@ -33,6 +33,16 @@ describe('tileSignature', () => {
     expect(a).not.toBe(b);
   });
 
+  it('changes when the owner toggles stealth on their own unit', () => {
+    const map = generateMap(2, 42);
+    const t = map.tiles.find((x) => x.unit);
+    if (!t || !t.unit) return;
+    const a = tileSignature(t, map, 0, new Set());
+    t.unit.isStealthed = true;
+    const b = tileSignature(t, map, 0, new Set());
+    expect(a).not.toBe(b);
+  });
+
   it('changes when ownership changes', () => {
     const map = generateMap(2, 42);
     const t = map.tiles[0]!;

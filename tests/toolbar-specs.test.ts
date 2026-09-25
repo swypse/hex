@@ -361,6 +361,24 @@ describe('toolbarSpecs', () => {
     expect(toolbarSpecs().some((a) => a.key === 'stealth')).toBe(false);
   });
 
+  it('hides enable stealth when the stalker stands beside an enemy village', () => {
+    const players = useGameStore.getState().players;
+    players[0]!.tribe = Tribe.Cats;
+    players[0]!.resources = { wood: 100, stone: 100, money: 100, ore: 100 };
+    useGameStore.getState().setPlayers(players);
+    const tile = map.tiles.find((t) => t.unit === null)!;
+    tile.ownedBy = 0;
+    tile.unit = {
+      id: 's', owner: 0, type: 'stalker', q: tile.q, r: tile.r,
+      hasMoved: false, hasAttacked: false, hasHealed: false,
+      hp: UNIT_TYPES.stalker.maxHp, attack: 30, attackDistance: 1, spawnVillage: null,
+    };
+    const nb = hexNeighbors(tile).map((n) => map.tiles.find((x) => x.q === n.q && x.r === n.r)).find((t) => t !== undefined)!;
+    nb.settlement = { owner: 1, level: 1, captureReady: false };
+    select(tile);
+    expect(toolbarSpecs().some((a) => a.key === 'stealth')).toBe(false);
+  });
+
   it('offers build only for a builder, and thorn-trap only for a trapper', () => {
     const players = useGameStore.getState().players;
     players[0]!.resources = { wood: 100, stone: 100, money: 100, ore: 100 };
@@ -388,6 +406,22 @@ describe('toolbarSpecs', () => {
     };
     expect(toolbarSpecs().some((a) => a.key === 'build')).toBe(false);
     expect(toolbarSpecs().some((a) => a.key === 'thorn-trap')).toBe(true);
+  });
+
+  it('hides the build action for a builder with no affordable buildable', () => {
+    const players = useGameStore.getState().players;
+    players[0]!.resources = { wood: 0, stone: 0, money: 0, ore: 0 };
+    useGameStore.getState().setPlayers(players);
+    const tile = map.tiles.find((t) => t.unit === null)!;
+    tile.ownedBy = 0;
+    tile.terrain = TileType.GrasslandLand;
+    tile.unit = {
+      id: 'b', owner: 0, type: 'builder', q: tile.q, r: tile.r,
+      hasMoved: false, hasAttacked: false, hasHealed: false,
+      hp: UNIT_TYPES.builder.maxHp, attack: 10, attackDistance: 1, spawnVillage: null,
+    };
+    select(tile);
+    expect(toolbarSpecs().some((a) => a.key === 'build')).toBe(false);
   });
 
   it('does not offer storm when the stormcaller village has no water', () => {

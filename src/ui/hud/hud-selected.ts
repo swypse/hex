@@ -24,7 +24,6 @@ import { useGameStore } from '../../store/game-store';
 import { type UIHost, type Widget } from '../host';
 import { makeLabel } from '../kit/label';
 import { makeIcon } from '../kit/icon';
-import { ICONS16_FILES, icons16FrameForIconPath, makeIcon16 } from '../kit/icons16';
 import { makeSkillMedallion } from '../kit/skill-medallion';
 import { makePanel } from '../kit/panel';
 import { THEME } from '../kit/theme';
@@ -124,10 +123,10 @@ export class HudSelected implements Widget {
       unitRow = {
         name: t('hud.selected.unit', { name: UNIT_TYPE_NAMES[unit.type] }),
         pairs: [
-          { icon: '16/hp-16.png', value: `${unit.hp}/${maxHp}${(unit.stunTurns ?? 0) >= 1 ? ` ${t('hud.selected.stunned')}` : ''}${canAct ? ' •' : ''}` },
-          { icon: '16/attack-16.png', value: String(attackDamage(unit)) },
-          { icon: '16/def-16.png', value: String(unit.defense ?? 0) },
-          { icon: '16/gold-16.png', value: String(unitMaintenance(unit)) },
+          { icon: 'hp-32', value: `${unit.hp}/${maxHp}${(unit.stunTurns ?? 0) >= 1 ? ` ${t('hud.selected.stunned')}` : ''}${unit.isStealthed ? ` ${t('hud.selected.stealth')}` : ''}${canAct ? ' •' : ''}` },
+          { icon: 'attack-32', value: String(attackDamage(unit)) },
+          { icon: 'def-32', value: String(unit.defense ?? 0) },
+          { icon: 'gold-32', value: String(unitMaintenance(unit)) },
         ],
       };
       lines.push(''); // placeholder — the unit line renders as a composite icon row
@@ -201,7 +200,7 @@ export class HudSelected implements Widget {
           ? BUILDING_NAMES[b.kind]
           : t('hud.selected.building', { name: BUILDING_NAMES[b.kind], level: b.level }),
         pairs: [
-          { icon: '16/hp-16.png', value: `${buildingHp(b)}/${BUILDING_MAX_HP}` },
+          { icon: 'hp-32', value: `${buildingHp(b)}/${BUILDING_MAX_HP}` },
           ...(y.wood > 0 ? [{ icon: 'wood-32', value: `+${y.wood}` }] : []),
           ...(y.stone > 0 ? [{ icon: 'stone-32', value: `+${y.stone}` }] : []),
           ...(y.ore > 0 ? [{ icon: 'ore-32', value: `+${y.ore}` }] : []),
@@ -227,9 +226,16 @@ export class HudSelected implements Widget {
 
     let maxW = 0;
     const lineH = 18;
+    // The info panel is capped at half the screen width; any line that would
+    // exceed the panel's inner width is word-wrapped to fit.
+    const capW = Math.floor((this.host?.app?.screen?.width ?? 0) * 0.5);
+    const innerW = Math.max(120, capW - 22);
     let y = 8;
     const lineWidths: number[] = [];
+    const rowY: number[] = [];
+    const rowH: number[] = [];
     for (let i = 0; i < lines.length; i++) {
+      rowY[i] = y;
       const iconRow =
         (i === unitLineIndex && unitRow) ||
         (i === settlementLineIndex && settlementRow) ||
@@ -238,15 +244,13 @@ export class HudSelected implements Widget {
         const row =
           (i === unitLineIndex ? unitRow : i === settlementLineIndex ? settlementRow : buildingRow)!;
         const fill = 0xeeeeee;
-        const title = makeLabel(row.name, { fontSize: 13, fill, fontWeight: '700' });
+        const title = makeLabel(row.name, { fontSize: 13, fill, fontWeight: '700', wordWrap: true, wordWrapWidth: innerW });
         title.position.set(10, y);
         const r = new Container();
         r.addChild(title);
         let x = 10 + title.width + 7;
         for (const pair of row.pairs) {
-          const icon = pair.icon.startsWith('16/')
-            ? makeIcon16(icons16FrameForIconPath(pair.icon), 16)
-            : makeIcon(pair.icon, 16);
+          const icon = makeIcon(pair.icon, 16);
           icon.anchor.set(0, 0);
           icon.position.set(x, y + (lineH - 16) / 2);
           const value = makeLabel(pair.value, { fontSize: 13, fill });
@@ -258,20 +262,24 @@ export class HudSelected implements Widget {
         const contentW = x - 17;
         lineWidths[i] = contentW;
         maxW = Math.max(maxW, contentW);
-        y += lineH;
+        rowH[i] = Math.max(lineH, title.height);
+        y += rowH[i]!;
         continue;
       }
       const highlight = highlightBuildingsLine && i === buildingLimitLineIndex;
       const t = makeLabel(lines[i]!, {
         fontSize: 13,
         fill: highlight ? 0xffd700 : 0xeeeeee,
-        fontWeight: highlight || bolds[i]! ? '700' : undefined
+        fontWeight: highlight || bolds[i]! ? '700' : undefined,
+        wordWrap: true,
+        wordWrapWidth: innerW,
       });
       t.position.set(10, y);
       this.el.addChild(t);
       lineWidths[i] = t.width;
       maxW = Math.max(maxW, t.width);
-      y += lineH;
+      rowH[i] = Math.max(lineH, t.height);
+      y += rowH[i]!;
     }
     if (actions.length > 0) y += 8;
     for (const a of actions) {
@@ -349,7 +357,7 @@ export class HudSelected implements Widget {
     // Reserve the panel's top-right corner for the close button.
     const CLOSE_SIZE = 16;
     const CLOSE_GAP = 6;
-    const bgW = contentW + 10 + CLOSE_GAP + CLOSE_SIZE + 8;
+    const bgW = Math.min(contentW + 10 + CLOSE_GAP + CLOSE_SIZE + 8, capW);
     // Button-style drop shadow under the info panel.
     const SHADOW_OFFSET = 4;
     const shadow = makePanel(bgW, this.measured, {
@@ -369,14 +377,14 @@ export class HudSelected implements Widget {
       circle
         .circle(HELP_SIZE / 2, HELP_SIZE / 2, HELP_SIZE / 2)
         .fill({ color: 0x000000, alpha: 0.7 });
-      const mark = makeIcon16(ICONS16_FILES['help']!, HELP_SIZE);
+      const mark = makeIcon('help-32', HELP_SIZE);
       mark.position.set(HELP_SIZE / 2, HELP_SIZE / 2);
       btn.addChild(circle, mark);
       btn.eventMode = 'static';
       btn.cursor = 'pointer';
       btn.hitArea = new Circle(HELP_SIZE / 2, HELP_SIZE / 2, HELP_SIZE / 2);
       btn.on('pointertap', () => useGameStore.getState().setOverlay({ kind: row.kind }));
-      btn.position.set(10 + lineWidths[row.index]! + 6, 8 + row.index * lineH + (lineH - HELP_SIZE) / 2);
+      btn.position.set(10 + lineWidths[row.index]! + 6, (rowY[row.index] ?? 8) + ((rowH[row.index] ?? lineH) - HELP_SIZE) / 2);
       this.el.addChild(btn);
     }
 

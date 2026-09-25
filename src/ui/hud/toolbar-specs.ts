@@ -3,7 +3,7 @@ import { gameController } from '../../controller/game-controller';
 import { useGameStore } from '../../store/game-store';
 import { tileAt } from '../../game/selection';
 import { canAfford, moneyCost, villageUpgradeCost } from '../../game/resources';
-import { canBuildSawmill, canBuildForestTemple, canBuildMine, canBuildPort, canBuildTemple, BUILDING_COSTS, canRepairBuilding, REPAIR_COST } from '../../game/buildings';
+import { canBuildSawmill, canBuildForestTemple, canBuildMine, canBuildPort, canBuildTemple, BUILDING_COSTS, canRepairBuilding, REPAIR_COST, canAffordAnyBuilderBuild } from '../../game/buildings';
 import { canHeal, canDisband, disbandCost, hasPirateDeal, PIRATE_DEAL_COST, UNIT_TYPES, UNIT_TYPE_NAMES } from '../../game/units';
 import { SHIP_UPGRADE_COST, canUpgradeShip } from '../../game/ship';
 import { unitsInVillage, villageCapacity, canBuildWall, WALL_COST } from '../../game/village';
@@ -14,6 +14,7 @@ import { bonusEligibleFor } from '../../game/bonus';
 import { bottleCollectableFor } from '../../game/bottles';
 import { trapCells, TRAP_COST } from '../../game/traps';
 import { stormEligible } from '../../game/storm';
+import { adjacentEnemyVillages } from '../../game/stalker';
 
 export interface ToolbarSpec {
   key: string;
@@ -128,13 +129,13 @@ export function toolbarSpecs(): ToolbarSpec[] {
       });
     }
     const idle = !unit.hasMoved && !unit.hasAttacked && !unit.hasHealed && (unit.stunTurns ?? 0) < 1;
-    if (unit.type === 'stalker' && !unit.isStealthed && unit.shipLevel === undefined && idle) {
+    if (unit.type === 'stalker' && !unit.isStealthed && unit.shipLevel === undefined && idle && adjacentEnemyVillages(map, tile, player.index).length === 0) {
       out.push({ key: 'stealth', label: t('action.enableStealth'), disabled: false, onClick: () => gameController.enableStealthSelected() });
     }
-    if (unit.type === 'builder' && unit.shipLevel === undefined) {
+    if (unit.type === 'builder' && unit.shipLevel === undefined && canAffordAnyBuilderBuild(player.resources)) {
       out.push({ key: 'build', label: t('action.build'), disabled: !idle, onClick: () => useGameStore.getState().setOverlay({ kind: 'builderBuild' }) });
     }
-    if (unit.type === 'trapper' && unit.shipLevel === undefined && trapCells(map, tile, player).length > 0) {
+    if (unit.type === 'trapper' && unit.shipLevel === undefined && trapCells(map, tile).length > 0) {
       out.push({ key: 'thorn-trap', label: t('action.buildTrap'), disabled: !idle || !canAfford(player.resources, TRAP_COST), onClick: () => gameController.placeTrap() });
     }
     if (unit.type === 'stormcaller' && stormEligible(map, unit)) {

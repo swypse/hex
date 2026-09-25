@@ -48,6 +48,7 @@ export function tileSignature(
     u ? u.owner : '',
     u ? (u.shipLevel ?? '') : '',
     u ? (u.paidBy ?? []).join(',') : '',
+    u ? (u.isStealthed ? 's' : '') : '',
     hidden ? 'h' : '',
     tile.building ? tile.building.kind : '',
     tile.building?.kind === 'port' ? (portDirection(map, tile) ?? '-') : '',

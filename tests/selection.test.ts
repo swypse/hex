@@ -189,6 +189,27 @@ it('a forest tile costs 14 to leave', () => {
     expect(path.some((s) => s.q === 1 && s.r === 0)).toBe(true);
   });
 
+  it('a stealthed stalker cannot target an enemy settlement cell, but a visible one can', () => {
+    const enemyVillage = { owner: 1, level: 1, captureReady: false };
+    const stealthed = mkUnit(0, 'stalker', 0, 0);
+    stealthed.isStealthed = true;
+    stealthed.firstMoveStealthDone = true;
+    const map = lineMap(L(0, 0, { unit: stealthed }), L(1, 0), L(2, 0, { settlement: enemyVillage }), L(3, 0));
+    const keys = reachableTargets(map, stealthed, 30).map((t) => `${t.q},${t.r}`);
+    expect(keys).toContain('1,0'); // beside the village is reachable
+    expect(keys).not.toContain('2,0'); // the village cell itself is barred
+    expect(keys).not.toContain('3,0'); // the barred cell blocks passage through it
+
+    const fresh = mkUnit(0, 'stalker', 0, 0); // first move will auto-stealth
+    const map2 = lineMap(L(0, 0, { unit: fresh }), L(1, 0), L(2, 0, { settlement: enemyVillage }));
+    expect(reachableTargets(map2, fresh, 30).map((t) => `${t.q},${t.r}`)).not.toContain('2,0');
+
+    const visible = mkUnit(0, 'stalker', 0, 0);
+    visible.firstMoveStealthDone = true;
+    const map3 = lineMap(L(0, 0, { unit: visible }), L(1, 0), L(2, 0, { settlement: enemyVillage }));
+    expect(reachableTargets(map3, visible, 30).map((t) => `${t.q},${t.r}`)).toContain('2,0');
+  });
+
   it('a mountain tile costs 20 to leave', () => {
     const unit = mkUnit(0, 'warrior', 0, 0);
     const start = L(0, 0, { unit });

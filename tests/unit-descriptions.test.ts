@@ -52,7 +52,7 @@ describe('unit help description line', () => {
 describe('unit help stat rows', () => {
   it('renders a movement icon row with the movement value', () => {
     const rows = unitHelpStats(unit('warrior'));
-    const move = rows.find((r) => r.icon === '16/move-16.png');
+    const move = rows.find((r) => r.icon === 'move-32');
     expect(move).not.toBeUndefined();
     expect(move!.text).toBe('10 move points');
   });
@@ -60,23 +60,23 @@ describe('unit help stat rows', () => {
   it('renders attack, hp, upkeep and defense rows with their values', () => {
     const rows = unitHelpStats(unit('warrior'));
     expect(rows).toEqual([
-      { icon: '16/move-16.png', text: '10 move points' },
-      { icon: '16/attack-16.png', text: '20 attack' },
-      { icon: '16/hp-16.png', text: '50 HP' },
-      { icon: '16/gold-16.png', text: '1 upkeep' },
-      { icon: '16/def-16.png', text: '0 defense' },
+      { icon: 'move-32', text: '10 move points' },
+      { icon: 'attack-32', text: '20 attack' },
+      { icon: 'hp-32', text: '50 HP' },
+      { icon: 'gold-32', text: '1 upkeep' },
+      { icon: 'def-32', text: '0 defense' },
     ]);
   });
 
   it('uses the current ship level values for a ship at that level', () => {
     const rows = unitHelpStats(unit('rider', 2));
-    expect(rows.find((r) => r.icon === '16/move-16.png')!.text).toBe('30 move points');
-    expect(rows.find((r) => r.icon === '16/attack-16.png')!.text).toBe('20 attack');
-    expect(rows.find((r) => r.icon === '16/gold-16.png')!.text).toBe('3 upkeep');
+    expect(rows.find((r) => r.icon === 'move-32')!.text).toBe('30 move points');
+    expect(rows.find((r) => r.icon === 'attack-32')!.text).toBe('20 attack');
+    expect(rows.find((r) => r.icon === 'gold-32')!.text).toBe('3 upkeep');
   });
 
   it('reports zero upkeep for a pirate', () => {
     const rows = unitHelpStats(unit('pirate'));
-    expect(rows.find((r) => r.icon === '16/gold-16.png')!.text).toBe('0 upkeep');
+    expect(rows.find((r) => r.icon === 'gold-32')!.text).toBe('0 upkeep');
   });
 });

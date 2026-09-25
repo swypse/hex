@@ -125,8 +125,8 @@ describe('SpawnDialog', () => {
     const rowXs = firstRow.map((c) => c.position.x).sort((a, b) => a - b);
     expect(rowXs[1]! - rowXs[0]!).toBeCloseTo(92 + 4, 5);
     expect(rowXs[2]! - rowXs[1]!).toBeCloseTo(92 + 4, 5);
-    // Popup width fits exactly 3 cells: 3 * CELL_W + 2 * 4px gaps.
-    expect(popup.contentWidth).toBeCloseTo(3 * 92 + 2 * 4, 5);
+    // Popup width fits exactly 3 cells + 2 * 4px inter-cell gaps + a 4px grid margin on each side.
+    expect(popup.contentWidth).toBeCloseTo(3 * 92 + 2 * 4 + 2 * 4, 5);
     dialog.destroy();
   });
 

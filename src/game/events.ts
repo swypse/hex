@@ -46,6 +46,7 @@ export type GameEvent =
   | { type: 'pirateDealCanceled'; unitId: string; q: number; r: number; playerIndex: number }
   | { type: 'stealthEnabled'; unitId: string }
   | { type: 'stealthRevealed'; unitId: string; q: number; r: number }
+  | { type: 'stalkerSpotted'; unitId: string; villageQ: number; villageR: number }
   | { type: 'trapPlaced'; q: number; r: number; playerIndex: number }
   | { type: 'trapTriggered'; q: number; r: number; targetId: string; damage: number; attackerIndex: number }
   | { type: 'storm'; unitId: string; q: number; r: number; targets: { q: number; r: number; damage: number }[] }

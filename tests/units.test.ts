@@ -59,15 +59,15 @@ describe('UNIT_TYPES', () => {
 describe('UNIT_IMAGE_FILES', () => {
   it('maps every tribe and unit type to its texture file', () => {
     const warrior = (prefix: string) => ({ warrior: `${prefix}-warrior.png`, rider: `${prefix}-rider.png`, archer: `${prefix}-archer.png`, swordsman: `${prefix}-swordsman.png`, shield: `${prefix}-shield.png`, catapult: `${prefix}-catapult.png`, knight: `${prefix}-knight.png` });
-    const sp = (prefix: string, special: Record<string, string>) => ({ ...warrior(prefix), ...special, trapper: `${prefix}-warrior.png`, stormcaller: `${prefix}-warrior.png`, stunner: `${prefix}-warrior.png` });
+    const sp = (prefix: string, special: Record<string, string>) => ({ ...warrior(prefix), ...special });
     expect(UNIT_IMAGE_FILES).toEqual({
-      [Tribe.Cats]: sp('cats', { stalker: 'cats-stalker.png', builder: 'cats-warrior.png', banner: 'cats-warrior.png', berserker: 'cats-warrior.png' }),
-      [Tribe.Warriors]: sp('warriors', { stalker: 'warriors-warrior.png', builder: 'warriors-warrior.png', banner: 'warriors-banner-bearer.png', berserker: 'warriors-warrior.png' }),
-      [Tribe.Villagers]: sp('villagers', { stalker: 'villagers-warrior.png', builder: 'villagers-builder.png', banner: 'villagers-warrior.png', berserker: 'villagers-warrior.png' }),
-      [Tribe.Barbarians]: sp('barbarians', { stalker: 'barbarians-warrior.png', builder: 'barbarians-warrior.png', banner: 'barbarians-warrior.png', berserker: 'barbarians-berserker.png' }),
-      [Tribe.Forest]: sp('forest', { stalker: 'forest-warrior.png', builder: 'forest-warrior.png', banner: 'forest-warrior.png', berserker: 'forest-warrior.png' }),
-      [Tribe.Aqua]: sp('aqua', { stalker: 'aqua-warrior.png', builder: 'aqua-warrior.png', banner: 'aqua-warrior.png', berserker: 'aqua-warrior.png' }),
-      [Tribe.Sand]: sp('sand', { stalker: 'sand-warrior.png', builder: 'sand-warrior.png', banner: 'sand-warrior.png', berserker: 'sand-warrior.png' }),
+      [Tribe.Cats]: sp('cats', { stalker: 'cats-stalker.png', builder: 'cats-warrior.png', banner: 'cats-warrior.png', berserker: 'cats-warrior.png', trapper: 'cats-warrior.png', stormcaller: 'cats-warrior.png', stunner: 'cats-warrior.png' }),
+      [Tribe.Warriors]: sp('warriors', { stalker: 'warriors-warrior.png', builder: 'warriors-warrior.png', banner: 'warriors-banner-bearer.png', berserker: 'warriors-warrior.png', trapper: 'warriors-warrior.png', stormcaller: 'warriors-warrior.png', stunner: 'warriors-warrior.png' }),
+      [Tribe.Villagers]: sp('villagers', { stalker: 'villagers-warrior.png', builder: 'villagers-builder.png', banner: 'villagers-warrior.png', berserker: 'villagers-warrior.png', trapper: 'villagers-warrior.png', stormcaller: 'villagers-warrior.png', stunner: 'villagers-warrior.png' }),
+      [Tribe.Barbarians]: sp('barbarians', { stalker: 'barbarians-warrior.png', builder: 'barbarians-warrior.png', banner: 'barbarians-warrior.png', berserker: 'barbarians-berserker.png', trapper: 'barbarians-warrior.png', stormcaller: 'barbarians-warrior.png', stunner: 'barbarians-warrior.png' }),
+      [Tribe.Forest]: sp('forest', { stalker: 'forest-warrior.png', builder: 'forest-warrior.png', banner: 'forest-warrior.png', berserker: 'forest-warrior.png', trapper: 'forest-trapper.png', stormcaller: 'forest-warrior.png', stunner: 'forest-warrior.png' }),
+      [Tribe.Aqua]: sp('aqua', { stalker: 'aqua-warrior.png', builder: 'aqua-warrior.png', banner: 'aqua-warrior.png', berserker: 'aqua-warrior.png', trapper: 'aqua-warrior.png', stormcaller: 'aqua-stormcaller.png', stunner: 'aqua-warrior.png' }),
+      [Tribe.Sand]: sp('sand', { stalker: 'sand-warrior.png', builder: 'sand-warrior.png', banner: 'sand-warrior.png', berserker: 'sand-warrior.png', trapper: 'sand-warrior.png', stormcaller: 'sand-warrior.png', stunner: 'sand-stunner.png' }),
     });
   });
 });
@@ -277,13 +277,13 @@ describe('unitMaintenance', () => {
 
 describe('special units', () => {
   const cases: Array<[UnitType, number, number, number, number, number, number, number, number]> = [
-    ['stalker', 12, 30, 1, 60, 0, 9, 2, 0],
-    ['builder', 8, 10, 1, 50, 0, 7, 0, 0],
-    ['banner', 8, 20, 1, 60, 8, 10, 0, 0],
-    ['berserker', 10, 50, 1, 70, 12, 11, 0, 3],
-    ['trapper', 10, 20, 1, 50, 8, 9, 2, 0],
-    ['stormcaller', 20, 20, 1, 50, 8, 9, 0, 2],
-    ['stunner', 8, 40, 2, 40, 10, 7, 0, 0],
+    ['stalker', 20, 10, 1, 20, 0, 9, 0, 2],
+    ['builder', 8, 10, 1, 40, 0, 15, 0, 0],
+    ['banner', 8, 20, 1, 40, 8, 7, 0, 2],
+    ['berserker', 10, 30, 1, 50, 8, 11, 0, 3],
+    ['trapper', 10, 20, 1, 40, 8, 9, 0, 2],
+    ['stormcaller', 20, 20, 1, 40, 8, 9, 0, 2],
+    ['stunner', 8, 20, 2, 40, 10, 7, 0, 2],
   ];
   for (const [type, move, atk, range, hp, def, price, wood, ore] of cases) {
     it(`defines the ${type} unit`, () => {

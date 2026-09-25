@@ -20,6 +20,11 @@ const CELL_W = 92;
 const CELL_H = 112;
 const ITEM_PAD = 4;
 const RESOURCE_ICON_SIZE = 16;
+// The circle buttons are drawn flush with (0, 0) inside their cell, and their
+// stroke is centered on the circle path, so it overhangs the fill by half its
+// width. Without this margin the popup's content mask (which starts exactly
+// at the grid's own top-left corner) clips that overhang off the top row.
+const GRID_MARGIN = 4;
 
 /** The special unit types (one per tribe). */
 const SPECIAL_TYPES = Object.values(TRIBE_SPECIAL_UNIT) as UnitType[];
@@ -62,8 +67,9 @@ export class SpawnDialog {
     const popup = new Popup({
       app: host.app,
       title: t('spawn.title'),
-      // Sized so the content area holds exactly 3 columns + the 4px margins.
-      width: 2 * 20 + COLS * CELL_W + (COLS - 1) * ITEM_PAD,
+      // Sized so the content area holds exactly 3 columns + the inter-cell
+      // margins, plus a 4px margin on each side of the grid itself.
+      width: 2 * 20 + 2 * GRID_MARGIN + COLS * CELL_W + (COLS - 1) * ITEM_PAD,
       onClose: () => useGameStore.getState().setOverlay(null),
     });
     root.addChild(popup.el);
@@ -126,7 +132,7 @@ export class SpawnDialog {
       const col = i % cols;
       const row = Math.floor(i / cols);
       const item = new Container();
-      item.position.set(col * (CELL_W + ITEM_PAD), row * (CELL_H + ITEM_PAD));
+      item.position.set(GRID_MARGIN + col * (CELL_W + ITEM_PAD), GRID_MARGIN + row * (CELL_H + ITEM_PAD));
       item.eventMode = 'static';
       item.cursor = 'pointer';
 
@@ -134,8 +140,15 @@ export class SpawnDialog {
       circle.circle(CELL_W / 2, 30, 30).fill(0x333333).stroke({ width: 2, color: 0x888888 });
       item.addChild(circle);
 
-      const icon = makeActionButtonIcon(`action-spawn-${isSpecialType(type) ? 'warrior' : type}`, 56);
+      // Clip the icon to the circle so its texture never spills past the
+      // button's border.
+      const clip = new Graphics();
+      clip.circle(CELL_W / 2, 30, 30).fill(0xffffff);
+      item.addChild(clip);
+
+      const icon = makeActionButtonIcon(`action-spawn-${type}`, 60);
       icon.position.set(CELL_W / 2, 30);
+      icon.mask = clip;
       item.addChild(icon);
 
       const name = makeLabel(UNIT_TYPE_NAMES[type], { fontSize: 14, fill: 0xffffff });

@@ -3,7 +3,7 @@ import { FONT_REGULAR } from '../ui/kit/bitmap-fonts';
 import { axialKey, hexToPixel } from '../game/hex';
 import { tileElevation } from './elevation';
 import { resolveCombat, counterDamageTo } from '../game/combat';
-import { makeIcon16 } from '../ui/kit/icons16';
+import { makeIcon32 } from '../ui/kit/icons32';
 import type { GameMap, MapTile } from '../game/map-gen';
 import type { Player } from '../game/players';
 import type { Unit } from '../game/units';
@@ -228,9 +228,9 @@ export class DamageBadgeLayer {
     });
     label.anchor.set(0.5, 0.5);
 
-    const iconKey = kill ? 'skull' : 'attack';
-    const icon = makeIcon16(iconKey, DAMAGE_BADGE_ICON_SIZE);
-    icon.label = iconKey === 'skull' ? 'skull-16' : 'attack-16';
+    const iconKey = kill ? 'skull-32' : 'attack-32';
+    const icon = makeIcon32(iconKey, DAMAGE_BADGE_ICON_SIZE);
+    icon.label = iconKey;
     icon.anchor.set(0.5, 0.5);
 
     const gap = DAMAGE_BADGE_ICON_GAP;

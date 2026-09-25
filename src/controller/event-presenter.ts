@@ -7,6 +7,7 @@ import { TRIBES, tribeById } from '../game/tribes';
 import { canAttack, canMove, HEAL_AMOUNT, PIRATE_OWNER, Unit, UNIT_TYPES } from '../game/units';
 import { isWaterType } from '../game/tile-types';
 import { tileAt } from '../game/selection';
+import { claimingVillage, villageWaterTiles } from '../game/storm';
 import { isExploredFor } from '../game/explore';
 import { axialKey, hexDistance, hexToPixel, type Axial } from '../game/hex';
 import { tileElevation } from '../render/elevation';
@@ -291,6 +292,9 @@ export class EventPresenter {
           case 'stealthRevealed':
             this.host.render();
             break;
+          case 'stalkerSpotted':
+            this.presentStalkerSpotted(e);
+            break;
           case 'trapPlaced':
             this.host.render();
             break;
@@ -301,6 +305,14 @@ export class EventPresenter {
             break;
           }
           case 'storm': {
+            const stormcaller = tileAt(sim.map, e.q, e.r);
+            if (stormcaller) {
+              const village = claimingVillage(sim.map, stormcaller);
+              const mapView = this.host.mapView();
+              if (village && mapView) {
+                mapView.stormWaterPulse(villageWaterTiles(sim.map, village), { q: e.q, r: e.r });
+              }
+            }
             for (const target of e.targets) {
               const t = tileAt(sim.map, target.q, target.r);
               if (t) this.spawnHpText(t, `-${target.damage}`, 0x88ccff);
@@ -990,6 +1002,14 @@ export class EventPresenter {
       const tribe = tribeById(dead.tribe);
       if (tribe) useGameStore.getState().setCenterMessage(t('msg.tribeDied', { tribe: tribe.name }), `${tribe.code}-icon.png`);
     }
+  }
+
+  private presentStalkerSpotted(e: Extract<GameEvent, { type: 'stalkerSpotted' }>): void {
+    const sim = this.host.sim();
+    const village = sim ? tileAt(sim.map, e.villageQ, e.villageR) : undefined;
+    const name = village?.settlement?.name ?? t('tile.Settlement');
+    useGameStore.getState().setCenterMessage(t('msg.stalkerSpotted', { village: name }));
+    this.host.render();
   }
 
   private showCaptureMessage(village: MapTile, capturer: Player): void {

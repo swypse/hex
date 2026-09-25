@@ -34,6 +34,7 @@ type OverlayState =
   | { kind: 'bridgeHelp' }
   | { kind: 'shipLanding'; target: { q: number; r: number } }
   | { kind: 'moveAttack'; target: { q: number; r: number } }
+  | { kind: 'stalkerReveal'; target: { q: number; r: number } }
   | { kind: 'stunChoice'; target: { q: number; r: number } }
   | { kind: 'builderBuild' }
   | { kind: 'thornTrap' }

@@ -16,6 +16,27 @@ function freshCatsSim() {
   return sim;
 }
 
+function freshTwoPlayerSim() {
+  const map = makeTestMap(4);
+  const players = buildPlayers(Tribe.Cats, 2, new SeededRandom(1));
+  const sim = new Simulator(map, players, 'turns30', { rng: () => 0.5 });
+  players[0]!.tribe = Tribe.Cats;
+  sim.startGame();
+  sim.drainEvents();
+  return sim;
+}
+
+function villageAt(sim: Simulator, q: number, r: number, owner: number | null): void {
+  tileAt(sim.map, q, r)!.settlement = { owner, level: 1, captureReady: false, name: `Village ${q},${r}` };
+}
+
+function placeIn(sim: Simulator, owner: number, type: Unit['type'], q: number, r: number, opts: Partial<Unit> = {}): Unit {
+  const u = makeUnit('u' + Math.random().toString(36).slice(2, 8), owner, type, q, r);
+  Object.assign(u, opts);
+  tileAt(sim.map, q, r)!.unit = u;
+  return u;
+}
+
 let sim: ReturnType<typeof freshCatsSim>;
 
 beforeEach(() => {
@@ -107,5 +128,78 @@ describe('stalker stealth', () => {
     sim.applyCommand({ type: 'enableStealth', unitId: stalker.id });
     const events = sim.drainEvents();
     expect(events.some((e) => e.type === 'stealthEnabled')).toBe(true);
+  });
+});
+
+describe('stalker village stealth', () => {
+  it('a stealthed stalker cannot move onto an enemy village cell', () => {
+    const s = freshTwoPlayerSim();
+    villageAt(s, 2, 0, 1);
+    const st = placeIn(s, 0, 'stalker', 0, 0, { isStealthed: true, firstMoveStealthDone: true });
+    expect(s.applyCommand({ type: 'move', unitId: st.id, q: 2, r: 0 })).toBe(false);
+    expect(tileAt(s.map, 0, 0)!.unit).toBe(st);
+    expect(tileAt(s.map, 2, 0)!.unit).toBeNull();
+  });
+
+  it('a fresh stalker cannot target an enemy village cell on its first move', () => {
+    const s = freshTwoPlayerSim();
+    villageAt(s, 2, 0, 1);
+    const st = placeIn(s, 0, 'stalker', 0, 0);
+    expect(s.applyCommand({ type: 'move', unitId: st.id, q: 2, r: 0 })).toBe(false);
+    expect(tileAt(s.map, 2, 0)!.unit).toBeNull();
+    // beside the village is fine: auto-stealth is applied, then the village spots it
+    expect(s.applyCommand({ type: 'move', unitId: st.id, q: 1, r: 0 })).toBe(true);
+    const moved = tileAt(s.map, 1, 0)!.unit!;
+    expect(moved.isStealthed).toBe(false);
+  });
+
+  it('moving beside an enemy village reveals the stalker and notifies', () => {
+    const s = freshTwoPlayerSim();
+    villageAt(s, 2, 0, 1);
+    const st = placeIn(s, 0, 'stalker', 0, 0, { isStealthed: true, firstMoveStealthDone: true });
+    expect(s.applyCommand({ type: 'move', unitId: st.id, q: 1, r: 0 })).toBe(true);
+    const moved = tileAt(s.map, 1, 0)!.unit!;
+    expect(moved.isStealthed).toBe(false);
+    const events = s.drainEvents();
+    const spotted = events.find((e) => e.type === 'stalkerSpotted');
+    expect(spotted).toBeDefined();
+    expect(spotted).toMatchObject({ villageQ: 2, villageR: 0 });
+  });
+
+  it('free and own villages never reveal a stealthed stalker', () => {
+    const s = freshTwoPlayerSim();
+    villageAt(s, 2, 0, null); // free
+    const st = placeIn(s, 0, 'stalker', 0, 0, { isStealthed: true, firstMoveStealthDone: true });
+    expect(s.applyCommand({ type: 'move', unitId: st.id, q: 1, r: 0 })).toBe(true);
+    expect(tileAt(s.map, 1, 0)!.unit!.isStealthed).toBe(true);
+    expect(s.drainEvents().some((e) => e.type === 'stalkerSpotted')).toBe(false);
+
+    const s2 = freshTwoPlayerSim();
+    villageAt(s2, 2, 0, 0); // own
+    const st2 = placeIn(s2, 0, 'stalker', 0, 0, { isStealthed: true, firstMoveStealthDone: true });
+    expect(s2.applyCommand({ type: 'move', unitId: st2.id, q: 1, r: 0 })).toBe(true);
+    expect(tileAt(s2.map, 1, 0)!.unit!.isStealthed).toBe(true);
+    expect(s2.drainEvents().some((e) => e.type === 'stalkerSpotted')).toBe(false);
+  });
+
+  it('enable stealth is refused beside an enemy village', () => {
+    const s = freshTwoPlayerSim();
+    villageAt(s, 2, 0, 1);
+    const st = placeIn(s, 0, 'stalker', 1, 0);
+    expect(s.applyCommand({ type: 'enableStealth', unitId: st.id })).toBe(false);
+    expect(st.isStealthed).toBeUndefined();
+  });
+
+  it('capturing a free village beside a stealthed stalker reveals it instantly', () => {
+    const s = freshTwoPlayerSim();
+    villageAt(s, 2, 0, null);
+    const st = placeIn(s, 0, 'stalker', 1, 0, { isStealthed: true, firstMoveStealthDone: true });
+    const enemy = placeIn(s, 1, 'warrior', 2, 0);
+    const village = tileAt(s.map, 2, 0)!;
+    village.settlement!.captureReady = true;
+    s.currentPlayerIndex = 1;
+    expect(s.applyCommand({ type: 'capture', q: 2, r: 0, unitId: enemy.id })).toBe(true);
+    expect(st.isStealthed).toBe(false);
+    expect(s.drainEvents().some((e) => e.type === 'stalkerSpotted')).toBe(true);
   });
 });

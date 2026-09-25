@@ -208,7 +208,7 @@ describe('spawnUnit', () => {
     const village = map.tiles[0]!;
     const cats = makePlayer(0, 100);
     cats.tribe = Tribe.Cats;
-    cats.resources.wood = 50;
+    cats.resources.ore = 50;
     expect(spawnUnit(map, village, 'stalker', cats)).toBe(true);
     expect(village.unit!.type).toBe('stalker');
   });

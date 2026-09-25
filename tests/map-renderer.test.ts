@@ -73,7 +73,7 @@ function buildTextures(map: GameMap): TextureSet {
     arrowTexture: tex(67, 13),
     glowFor: new Map([[unitTex.texture, tileTex(TEX_H + 8, TEX_H + 8)]]),
     cannonballTexture: tex(35, 15), 
-    attack16Texture: null,
+    attackIconTexture: null,
     cannonbalTexture: null,  
   };
 }
@@ -163,8 +163,9 @@ describe('MapView hp bar anchoring', () => {
   });
 
   function hpBarItem(): { el: import('pixi.js').Container; world: { x: number; y: number } } {
-    const item = view.overlayItems.find((o) => o.el.children[0] instanceof Graphics);
-    if (!item) throw new Error('no hp bar overlay item found');
+    const items = view.hpBarEntries();
+    const item = items[0]!;
+    if (!item) throw new Error('no hp bar entry found');
     return item;
   }
 
@@ -173,6 +174,41 @@ describe('MapView hp bar anchoring', () => {
     if (!tv) throw new Error('no tile view');
     return tv;
   }
+
+  it('renders a red trap circle at the tile for its owner only', () => {
+    const tile = map.tiles.find((t) => t.q === 1 && t.r === 0)!;
+    tile.ownedBy = 0;
+    tile.trap = { owner: 0, placedTurn: 0 };
+    view.update(map, players, null, new Set(), new Set(), 0, new Set(), {
+      x: 400,
+      y: 300,
+      scale: 1,
+      width: 800,
+      height: 600,
+    });
+    const trapItem = view.overlayItems.find(
+      (o) => o.el instanceof Graphics && o.el.context.instructions.some((i) => i.action === 'fill'),
+    );
+    expect(trapItem).toBeDefined();
+    const p = hexToPixel(tile, HEX);
+    expect(trapItem!.world.x).toBeCloseTo(p.x, 5);
+    expect(trapItem!.world.y).toBeCloseTo(p.y - tileElevation(tile, HEX), 5);
+
+    // Another player never sees the trap.
+    tile.trap!.owner = 1;
+    view.update(map, players, null, new Set(), new Set(), 0, new Set(), {
+      x: 400,
+      y: 300,
+      scale: 1,
+      width: 800,
+      height: 600,
+    });
+    expect(
+      view.overlayItems.some(
+        (o) => o.el instanceof Graphics && o.el.context.instructions.some((i) => i.action === 'fill'),
+      ),
+    ).toBe(false);
+  });
 
   it('does not draw a dot on the starting (capital) village', () => {
     const tile = map.tiles.find((t) => t.q === 0 && t.r === 0)!;
@@ -199,10 +235,10 @@ describe('MapView hp bar anchoring', () => {
     const base = { x: 400, y: 300, scale: 1, width: 800, height: 600 };
 
     view.update(map, players, null, new Set(), new Set(), 0, new Set(), { ...base, zoomOut: 0 });
-    expect(view.overlayItems.some((o) => o.el.children[0] instanceof Graphics)).toBe(true);
+    expect(view.hpBarEntries().length).toBeGreaterThan(0);
 
     view.update(map, players, null, new Set(), new Set(), 0, new Set(), { ...base, zoomOut: 1 });
-    expect(view.overlayItems.some((o) => o.el.children[0] instanceof Graphics)).toBe(false);
+    expect(view.hpBarEntries()).toEqual([]);
   });
 
   it('positions the capture icon 4px above the unit hp bar', () => {
@@ -237,7 +273,7 @@ describe('MapView hp bar anchoring', () => {
       width: 800,
       height: 600,
     });
-    const hp = view.overlayItems.find((o) => o.el.children[0] instanceof Graphics)!;
+    const hp = view.hpBarEntries()[0]!;
     const ex = view.overlayItems.find(
       (o) => o.el.children[0] instanceof Container && o.el.children[0].children.length > 0,
     )!;
@@ -246,8 +282,38 @@ describe('MapView hp bar anchoring', () => {
     expect(overlay.children.indexOf(ex.el)).toBeGreaterThan(overlay.children.indexOf(hp.el));
   });
 
-  it('bobs a visible ship sprite up and down on the ticker', () => {
-    const callbacks: Array<() => void> = [];
+  it('dims the owner stealthed stalker sprite to 0.6 and restores full alpha when revealed', () => {
+    const v = new MapView({
+      screen: { width: 800, height: 600 },
+      ticker: { add: (): void => {}, remove: (): void => {} },
+    } as unknown as Application, textures, HEX, SPRITE_SCALE, 2);
+    const tile: MapTile = {
+      q: 0, r: 0, terrain: TileType.GrasslandLand, height: 0, settlement: null,
+      building: null, roadOwner: null, unit: null, ownedBy: 0, claimedByVillage: null, exploredBy: [0],
+    };
+    tile.unit = {
+      id: 'st', owner: 0, type: 'warrior', q: 0, r: 0,
+      hasMoved: false, hasAttacked: false, hasHealed: false,
+      hp: UNIT_TYPES.warrior.maxHp, attack: 20, attackDistance: 1, spawnVillage: null,
+    };
+    const m: GameMap = { radius: 1, spawns: [], tiles: [tile] };
+    const vp = { x: 400, y: 300, scale: 1, width: 800, height: 600 };
+    v.update(m, players, null, new Set(), new Set(), 0, new Set(), vp);
+    const tvs = (v as unknown as { tileViews: Map<string, { unitSprite: Sprite | null }> }).tileViews;
+    const sprite = tvs.get('0,0')!.unitSprite!;
+    expect(sprite.alpha).toBe(1);
+
+    tile.unit.isStealthed = true;
+    v.update(m, players, null, new Set(), new Set(), 0, new Set(), vp);
+    expect(tvs.get('0,0')!.unitSprite!.alpha).toBe(0.6);
+
+    tile.unit.isStealthed = false;
+    v.update(m, players, null, new Set(), new Set(), 0, new Set(), vp);
+    expect(tvs.get('0,0')!.unitSprite!.alpha).toBe(1);
+    v.destroy();
+  });
+
+  it('bobs a visible ship sprite up and down on the ticker', () => {    const callbacks: Array<() => void> = [];
     const app = {
       screen: { width: 800, height: 600 },
       ticker: { add: (fn: () => void) => callbacks.push(fn), remove: (): void => {} },
@@ -662,7 +728,185 @@ describe('MapView hp bar anchoring', () => {
   it('does not draw the red can-act dot on an own unit hp bar', () => {
     const el = hpBarItem().el;
     const graphicsCount = el.children.filter((c) => c instanceof Graphics).length;
-    expect(graphicsCount).toBe(3);
+    expect(graphicsCount).toBe(4); // white box, orange ghost, green bar, label bg
+  });
+
+  it('draws a white 52x10 box with a full green bar and an orange ghost behind it', () => {
+    const el = hpBarItem().el;
+    const bg = el.children[0] as Graphics;
+    const ghost = el.children[1] as Graphics;
+    const green = el.children[2] as Graphics;
+    const bounds = bg.getBounds();
+    expect(bounds.width).toBeCloseTo(52, 5);
+    expect(bounds.height).toBeCloseTo(10, 5);
+    const fillOf = (g: Graphics): number =>
+      (g.context.instructions.find((i) => i.action === 'fill')!.data as { style: { color: number } }).style.color;
+    expect(fillOf(bg)).toBe(0xffffff);
+    expect(fillOf(ghost)).toBe(0xfa9a09);
+    expect(fillOf(green)).toBe(0x49cc5d);
+    // At full hp the green bar covers the orange ghost: both span the inner 50x8.
+    expect(ghost.getBounds().width).toBeCloseTo(50, 5);
+    expect(ghost.getBounds().height).toBeCloseTo(8, 5);
+    expect(green.getBounds().width).toBeCloseTo(50, 5);
+    expect(green.getBounds().height).toBeCloseTo(8, 5);
+    // The green bar renders above the ghost.
+    expect(green.zIndex).toBeGreaterThan(ghost.zIndex);
+  });
+
+  it('animates the green bar over 100ms and the ghost over 300ms when damaged, and heals snap', () => {
+    const callbacks: Array<() => void> = [];
+    const app = {
+      screen: { width: 800, height: 600 },
+      ticker: { add: (fn: () => void) => callbacks.push(fn), remove: (): void => {} },
+    } as unknown as Application;
+    const unit: Unit = {
+      id: 'u1', owner: 0, type: 'warrior', q: 0, r: 0,
+      hasMoved: false, hasAttacked: false, hasHealed: false,
+      hp: 50, attack: 20, attackDistance: 1, spawnVillage: null,
+    };
+    const tile: MapTile = {
+      q: 0, r: 0, terrain: TileType.GrasslandLand, height: 0.1, settlement: null,
+      building: null, roadOwner: null, unit, ownedBy: null, claimedByVillage: null, exploredBy: [0],
+    };
+    const m: GameMap = { radius: 1, spawns: [], tiles: [tile] };
+    const texs = buildTextures(m);
+    const v = new MapView(app, texs, HEX, SPRITE_SCALE, 2);
+    const players: Player[] = [
+      { index: 0, tribe: Tribe.Cats, isHuman: true, name: 'Cats', resources: { ...START_RESOURCES }, score: 0, kills: 0, skills: [], isActive: true },
+    ];
+    const vp = { x: 400, y: 300, scale: 1, width: 800, height: 600 };
+    const origNow = performance.now;
+    let now = 0;
+    (performance as { now: () => number }).now = () => now;
+    try {
+      v.update(m, players, null, new Set(), new Set(), 0, new Set(), vp);
+      const bar = v.hpBarEntries()[0]!;
+      const ghost = bar.el.children[1] as Graphics;
+      const green = bar.el.children[2] as Graphics;
+      const greenW = (): number => green.getBounds().width;
+      const ghostW = (): number => ghost.getBounds().width;
+      expect(greenW()).toBeCloseTo(50, 5);
+      expect(ghostW()).toBeCloseTo(50, 5);
+
+      // Damage to 25/50: green drops to 25 in 100ms, ghost trails in 300ms.
+      const addedBefore = callbacks.length;
+      unit.hp = 25;
+      v.update(m, players, null, new Set(), new Set(), 0, new Set(), vp);
+      const ticks = callbacks.slice(addedBefore);
+      expect(ticks.length).toBeGreaterThan(0);
+      now = 50; // halfway through the green animation, 1/6 of the ghost's
+      for (const tick of ticks) tick();
+      expect(greenW()).toBeCloseTo(37.5, 5);
+      expect(ghostW()).toBeCloseTo(275 / 6, 5); // 50 - 25/6
+      now = 100; // green is done, ghost is 1/3 of the way
+      for (const tick of ticks) tick();
+      expect(greenW()).toBeCloseTo(25, 5);
+      expect(ghostW()).toBeCloseTo(125 / 3, 5); // 50 - 25/3
+      now = 300; // both settled
+      for (const tick of ticks) tick();
+      expect(greenW()).toBeCloseTo(25, 5);
+      expect(ghostW()).toBeCloseTo(25, 5);
+
+      // A heal snaps both bars back instantly: the widths already read the target.
+      unit.hp = 40;
+      v.update(m, players, null, new Set(), new Set(), 0, new Set(), vp);
+      expect(greenW()).toBeCloseTo(40, 5); // 40/50 * 50
+      expect(ghostW()).toBeCloseTo(40, 5);
+    } finally {
+      (performance as { now: () => number }).now = origNow;
+      v.destroy();
+    }
+  });
+
+  it('never bounces the bar back up through staged combat and the revert, then heals', () => {
+    const callbacks: Array<() => void> = [];
+    const app = {
+      screen: { width: 800, height: 600 },
+      ticker: { add: (fn: () => void) => callbacks.push(fn), remove: (): void => {} },
+    } as unknown as Application;
+    const map: GameMap = {
+      radius: 1, spawns: [], tiles: [
+        { q: 0, r: 0, terrain: TileType.GrasslandLand, height: 0.1, settlement: null, building: null, roadOwner: null, unit: null, ownedBy: null, claimedByVillage: null, exploredBy: [0, 1] },
+        { q: 1, r: 0, terrain: TileType.GrasslandLand, height: 0.1, settlement: null, building: null, roadOwner: null, unit: null, ownedBy: null, claimedByVillage: null, exploredBy: [0, 1] },
+        { q: 0, r: 1, terrain: TileType.GrasslandLand, height: 0.1, settlement: null, building: null, roadOwner: null, unit: null, ownedBy: null, claimedByVillage: null, exploredBy: [0, 1] },
+        { q: 1, r: -1, terrain: TileType.GrasslandLand, height: 0.1, settlement: null, building: null, roadOwner: null, unit: null, ownedBy: null, claimedByVillage: null, exploredBy: [0, 1] },
+      ],
+    };
+    const tile = (q: number, r: number) => map.tiles.find((x) => x.q === q && x.r === r)!;
+    const war = (id: string, owner: number, q: number, r: number, hp: number): Unit => ({
+      id, owner, type: 'warrior', q, r, hasMoved: true, hasAttacked: true, hasHealed: true,
+      hp, attack: 20, attackDistance: 1, defense: 10, spawnVillage: null,
+    });
+    tile(0, 0).unit = war('a', 0, 0, 0, 50);
+    tile(1, 0).unit = war('d', 1, 1, 0, 50);
+    const players: Player[] = [
+      { index: 0, tribe: Tribe.Cats, isHuman: true, name: 'Cats', resources: { ...START_RESOURCES }, score: 0, kills: 0, skills: [], isActive: true },
+      { index: 1, tribe: Tribe.Warriors, isHuman: true, name: 'War', resources: { ...START_RESOURCES }, score: 0, kills: 0, skills: [], isActive: true },
+    ];
+    const texs = buildTextures(map);
+    const v = new MapView(app, texs, HEX, SPRITE_SCALE, 2);
+    const vp = { x: 400, y: 300, scale: 1, width: 800, height: 600 };
+    const origNow = performance.now;
+    let now = 0;
+    (performance as { now: () => number }).now = () => now;
+    try {
+      v.update(map, players, null, new Set(), new Set(), 0, new Set(), vp);
+      const greenOf = (): number =>
+        ((v as unknown as { hpBars: Map<string, { greenW: number }> }).hpBars.get('d')!).greenW;
+      const widths: number[] = [greenOf()];
+
+      const sync = (hp: number, id = 'd'): void => {
+        tile(1, 0).unit = war(id, 1, 1, 0, hp);
+        v.update(map, players, null, new Set(), new Set(), 0, new Set(), vp);
+      };
+
+      // Staged combat: the presenter swaps the real unit for a `stage:d` unit
+      // at its pre-hp, then the blow knocks it to 30, then it reverts to the
+      // real unit (still shown at the pre-hp override) and finally the real hp.
+      sync(50, 'stage:d');
+      sync(30, 'stage:d'); // damage lands -> animation starts
+      now = 50;
+      for (const cb of callbacks) cb();
+      widths.push(greenOf()); // mid-anim
+      now = 150;
+      for (const cb of callbacks) cb();
+      widths.push(greenOf()); // green done, ghost mid
+      now = 320;
+      for (const cb of callbacks) cb();
+      widths.push(greenOf()); // settled at 30/50 * 50 = 30
+      sync(50); // revert with the stale pre-attack override
+      sync(30); // real post-attack hp
+
+      // The bar never visibly rose during the whole combat.
+      for (let i = 1; i < widths.length; i++) {
+        expect(widths[i]!).toBeLessThanOrEqual(widths[i - 1]! + 1e-6);
+      }
+      expect(greenOf()).toBeCloseTo(30, 5); // 30/50 * 50
+
+      // A genuine heal after the restage window does snap back up.
+      now += 1000 + 10; // HP_RESTAGE_WINDOW_MS + margin
+      for (const cb of callbacks) cb();
+      sync(50);
+      expect(greenOf()).toBeCloseTo(50, 5);
+    } finally {
+      (performance as { now: () => number }).now = origNow;
+      v.destroy();
+    }
+  });
+
+  it('shows the same white-box hp bar for a damaged building', () => {
+    const tile = map.tiles.find((t) => t.q === 0 && t.r === 0)!;
+    tile.unit = null;
+    tile.building = { kind: 'mine', level: 1, hp: 1 };
+    view.update(map, players, null, new Set(), new Set(), 0, new Set(), {
+      x: 400, y: 300, scale: 1, width: 800, height: 600,
+    });
+    const bars = view.hpBarEntries().filter((b) => {
+      const label = b.el.children.find((c) => c instanceof BitmapText);
+      return label instanceof BitmapText && label.text === '1/2';
+    });
+    expect(bars).toHaveLength(1);
+    expect(bars[0]!.el.children.filter((c) => c instanceof Graphics).length).toBe(4);
   });
 
   it('draws move and attack markers in the marker layer above tiles and overlays', () => {
@@ -1373,6 +1617,67 @@ describe('MapView hp bar anchoring', () => {
       bounceFn();
       expect(tv.terrainSprite.position.y).toBeCloseTo(terrainBase, 5);
       expect(tv.villageSprite!.position.y).toBeCloseTo(villageBase, 5);
+    } finally {
+      (performance as { now: () => number }).now = origNow;
+      v.destroy();
+    }
+  });
+});
+
+describe('MapView storm water pulse', () => {
+  it('lifts water tiles 10px for 50ms, staggered 40ms per hex of distance, ships included', () => {
+    const callbacks: Array<() => void> = [];
+    const app = {
+      screen: { width: 800, height: 600 },
+      ticker: { add: (fn: () => void) => callbacks.push(fn), remove: (): void => {} },
+    } as unknown as Application;
+    const line = (q: number): MapTile => ({
+      q, r: 0, terrain: TileType.Water, height: 0.1,
+      settlement: null, building: null, roadOwner: null, unit: null,
+      ownedBy: null, claimedByVillage: null, exploredBy: [0],
+    });
+    const m: GameMap = { radius: 4, spawns: [], tiles: [line(0), line(1), line(2), line(3)] };
+    const players: Player[] = [
+      { index: 0, tribe: Tribe.Cats, isHuman: true, name: 'Cats', resources: { ...START_RESOURCES }, score: 0, kills: 0, skills: [], isActive: true },
+    ];
+    const texs = buildTextures(m);
+    const v = new MapView(app, texs, HEX, SPRITE_SCALE, 4);
+    const origNow = performance.now;
+    let now = 0;
+    (performance as { now: () => number }).now = () => now;
+    try {
+      v.update(m, players, null, new Set(), new Set(), 0, new Set(), {
+        x: 400, y: 300, scale: 1, width: 800, height: 600,
+      });
+
+      v.stormWaterPulse([m.tiles[1]!, m.tiles[2]!, m.tiles[3]!], { q: 0, r: 0 });
+      const entries1 = (v as unknown as { hexBounceSprites: { obj: unknown; baseY: number; delay: number }[] }).hexBounceSprites;
+      expect(entries1.map((e) => e.delay).sort((a, b) => a - b)).toEqual([0, 40, 80]);
+
+      // A ship on the tile lifts together with its water: terrain + unit, same delay.
+      m.tiles[1]!.unit = {
+        id: 'ship', owner: 0, type: 'warrior', q: 1, r: 0,
+        hasMoved: false, hasAttacked: false, hasHealed: false,
+        hp: 40, attack: 20, attackDistance: 1, spawnVillage: null,
+      };
+      v.update(m, players, null, new Set(), new Set(), 0, new Set(), {
+        x: 400, y: 300, scale: 1, width: 800, height: 600,
+      });
+      v.stormWaterPulse([m.tiles[1]!], { q: 0, r: 0 });
+      const entries2 = (v as unknown as { hexBounceSprites: { obj: unknown; baseY: number; delay: number }[] }).hexBounceSprites;
+      expect(entries2).toHaveLength(2);
+      expect(entries2.every((e) => e.delay === 0)).toBe(true);
+
+      // Midpoint of the 50ms pulse = full 10px lift.
+      const tv = (v as unknown as { tileViews: Map<string, { terrainSprite: Sprite }> }).tileViews.get('1,0')!;
+      const terrainBase = tv.terrainSprite.position.y;
+      const bounceFn = callbacks[callbacks.length - 1]!;
+      now = 25;
+      bounceFn();
+      expect(tv.terrainSprite.position.y).toBeCloseTo(terrainBase - 10, 5);
+      now = 50;
+      bounceFn();
+      expect(tv.terrainSprite.position.y).toBeCloseTo(terrainBase, 5);
     } finally {
       (performance as { now: () => number }).now = origNow;
       v.destroy();
@@ -2155,7 +2460,7 @@ describe('damage preview badges', () => {
     expect(label!.style.fill).toBe(0xffffff);
     expect(label!.text).toBe('-20');
     // A non-lethal hit keeps the attack icon.
-    expect((icon as { label: string }).label).toBe('attack-16');
+    expect((icon as { label: string }).label).toBe('attack-32');
     v.destroy();
   });
 
@@ -2201,7 +2506,7 @@ describe('damage preview badges', () => {
     const el = badgeEl(v, '-27');
     const icon = el.children.find((c) => c instanceof Sprite) as Sprite | undefined;
     expect(icon).toBeDefined();
-    expect((icon as { label: string }).label).toBe('skull-16');
+    expect((icon as { label: string }).label).toBe('skull-32');
     v.destroy();
   });
 
@@ -2269,8 +2574,8 @@ describe('damage preview badges', () => {
     const caretTipLocal = caretPath?.data?.[0]?.[5] ?? 0;
     const caretTipWorld = outer.position.y + caretTipLocal;
 
-    // Find the same unit's hp bar label height from the rendered overlay item.
-    const hpBar = v.overlayItems.find((o) => {
+    // Find the same unit's hp bar label height from the rendered hp bar.
+    const hpBar = v.hpBarEntries().find((o) => {
       const t = o.el.children.find((c) => c instanceof BitmapText);
       return t instanceof BitmapText && t.text === '50/50';
     })!;

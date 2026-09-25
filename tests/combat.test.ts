@@ -727,15 +727,15 @@ describe('special-unit combat hooks', () => {
     const target = map.tiles[1]!;
     target.unit = unitOf('t', 'swordsman', 1, 1, 0); // defense 16, full hp
     const { attackerDamage, counterDamage } = resolveCombat(map, stalker, target);
-    expect(attackerDamage).toBe(Math.round(30 * COMBAT_SCALE));
+    expect(attackerDamage).toBe(Math.round(10 * COMBAT_SCALE));
     expect(counterDamage).toBe(0);
   });
 
   it('a raging berserker never counter-attacks', () => {
     const berserker = unitOf('b', 'berserker', 0, 0, 0);
-    berserker.hp = 20; // <= 50% of 70
+    berserker.hp = 20; // <= 50% of 50
     expect(canCounterAttack(berserker)).toBe(false);
-    berserker.hp = 70;
+    berserker.hp = 50;
     expect(canCounterAttack(berserker)).toBe(true);
   });
 
