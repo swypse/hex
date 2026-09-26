@@ -1,4 +1,5 @@
 import { BuildingKind } from './events';
+import { BuilderBuildKind } from './buildings';
 import { SkillId } from './skills';
 import { UnitType } from './units';
 
@@ -41,6 +42,8 @@ export type AiAction =
   | { type: 'upgradeShip'; unitId: string }
   | { type: 'enableStealth'; unitId: string }
   | { type: 'storm'; unitId: string }
+  | { type: 'trap'; unitId: string; q: number; r: number }
+  | { type: 'builderBuild'; unitId: string; q: number; r: number; kind: BuilderBuildKind }
   | { type: 'openSkill'; skill: SkillId };
 
 export interface AiPlannerState {

@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { Container, Sprite, BitmapText } from 'pixi.js';
 import { HudScore } from '../src/ui/hud/hud-score';
 import { totalScore } from '../src/game/score';
-import { FONT_BLACK } from '../src/ui/kit/bitmap-fonts';
+import { FONT_REGULAR } from '../src/ui/kit/bitmap-fonts';
 import { useGameStore } from '../src/store/game-store';
 import { gameController } from '../src/controller/game-controller';
 import { type UIHost } from '../src/ui/host';
@@ -12,7 +12,8 @@ import { Tribe } from '../src/game/tribes';
 import { SeededRandom } from '../src/util/random';
 import { Simulator } from '../src/game/simulator';
 import { TileType } from '../src/game/tile-types';
-import { SCORE_PAD, SCORE_TOP_OFFSET, SCORE_CHIP_RADIUS, SCORE_TEXT_CHIP_GAP, SCORE_TEXT_HEIGHT } from '../src/ui/layout';
+import { SCORE_PAD, SCORE_TOP_OFFSET, SCORE_CHIP_RADIUS } from '../src/ui/layout';
+import { t } from '../src/i18n';
 
 function makeHost(): UIHost {
   return {
@@ -71,26 +72,28 @@ describe('HudScore buff icons', () => {
     expect(allSprites(buffRow).length).toBeGreaterThan(0);
   });
 
-  it('renders the local player tribe chip and orange bold score text below it', () => {
+  it('renders the local player tribe chip and a centred white "N pts" score below the resources', () => {
     mount(0);
     const hudAny = hud as unknown as { text: BitmapText | null; tribeChip: Container | null };
     expect(hudAny.tribeChip).not.toBeNull();
     expect(hudAny.text).not.toBeNull();
-    // Orange bold 16px score label (bold = Roboto Black family).
-    expect(hudAny.text!.style.fontSize).toBe(16);
-    expect(hudAny.text!.style.fill).toBe(0xffc465);
-    expect(hudAny.text!.style.fontFamily).toBe(FONT_BLACK);
+    // White regular (Roboto Regular) ~18px score label; pixi may normalise the
+    // exact fontSize against the shared style cache, but it is never bold.
+    const fs = Number(hudAny.text!.style.fontSize);
+    expect(fs).toBeGreaterThanOrEqual(18);
+    expect(fs).toBeLessThanOrEqual(20);
+    expect(hudAny.text!.style.fill).toBe(0xffffff);
+    expect(hudAny.text!.style.fontFamily).toBe(FONT_REGULAR);
     // The chip holds a white circle + clipped tribe icon sprite.
     expect(hudAny.tribeChip!.children.some((c) => c instanceof Sprite)).toBe(true);
-    // The score text sits below the chip, centred on it, with a 6px gap.
+    // The chip stays top-right; the score text is centred below the resource
+    // panel (screenWidth/2, ~34px from the top edge).
     const chipX = host.app.screen.width - SCORE_PAD - SCORE_CHIP_RADIUS;
     const chipY = SCORE_PAD + SCORE_TOP_OFFSET + SCORE_CHIP_RADIUS;
     expect(hudAny.tribeChip!.position.x).toBeCloseTo(chipX, 5);
     expect(hudAny.tribeChip!.position.y).toBeCloseTo(chipY, 5);
-    expect(hudAny.text!.position.x).toBeCloseTo(chipX, 5);
-    // Text centred vertically so the top of the label sits 6px below the chip
-    // bottom edge.
-    expect(hudAny.text!.position.y).toBeCloseTo(chipY + SCORE_CHIP_RADIUS + SCORE_TEXT_CHIP_GAP + SCORE_TEXT_HEIGHT / 2, 5);
+    expect(hudAny.text!.position.x).toBeCloseTo(host.app.screen.width / 2, 5);
+    expect(hudAny.text!.position.y).toBeCloseTo(34, 5);
   });
 
   it('shows the real map score at start instead of a stale 0', () => {
@@ -100,7 +103,7 @@ describe('HudScore buff icons', () => {
     const expected = totalScore(map, players[localPlayerIndex]!);
     expect(expected).toBeGreaterThan(0); // the test only matters if the start score is non-zero
     const hudAny = hud as unknown as { text: BitmapText };
-    expect(hudAny.text!.text).toBe(String(expected));
+    expect(hudAny.text!.text).toBe(t('stats.pts', { score: expected }));
   });
 
   it('shows no buff icon with only 2 water temples', () => {

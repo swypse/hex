@@ -3,16 +3,18 @@ import { Circle, Container, Graphics, Text } from 'pixi.js';
 import { gameController } from '../../controller/game-controller';
 import { TRIBES } from '../../game/tribes';
 import { isForestType, isMountainType, isWaterType, TILE_TYPE_NAMES } from '../../game/tile-types';
-import { UNIT_TYPE_NAMES, UNIT_TYPES, unitMaintenance, type Unit } from '../../game/units';
+import { UNIT_TYPE_NAMES, unitMaintenance, type Unit } from '../../game/units';
 import { unitCanAct } from '../../game/unit-actions';
 import { tileAt } from '../../game/selection';
 import { attackDamage } from '../../game/combat';
+import { berserkerRage } from '../../game/abilities';
 import { activeBuffs, VILLAGE_DEFENSE } from '../../game/buffs';
 import { isShip } from '../../game/ship';
 import { villageCapacity, villageBuildingLimit, buildingsInVillage, unitsInVillage } from '../../game/village';
 import { villageIncome, VILLAGE_CONNECTION_BONUS } from '../../game/capture';
 import { villageUpgradeCost } from '../../game/resources';
 import { buildingYield, buildingHp, BUILDING_MAX_HP, BUILDING_NAMES, DESTROY_BUILDING_COST } from '../../game/buildings';
+import { TRAP_TURNS } from '../../game/traps';
 import { isExploredFor } from '../../game/explore';
 import { hexNeighbors } from '../../game/hex';
 import { canOpenSkill, hasSkill, skillCost, type SkillId } from '../../game/skills';
@@ -117,14 +119,21 @@ export class HudSelected implements Widget {
     if (tile.unit) {
       const unit = tile.unit;
       const player = unit.owner >= 0 ? s.players[unit.owner] : null;
-      const maxHp = UNIT_TYPES[unit.type].maxHp;
       const canAct = unit.type === 'pirate' ? false : unitCanAct(map, tile, unit, player!);
+      const rageBonus = berserkerRage(unit);
       unitLineIndex = lines.length;
+      // Status tags that used to ride on the hp text (stunned / stealth / "can
+      // act now") move onto the unit name; the hp itself no longer shows here.
+      const statusBits: string[] = [];
+      if ((unit.stunTurns ?? 0) >= 1) statusBits.push(t('hud.selected.stunned'));
+      if (unit.isStealthed) statusBits.push(t('hud.selected.stealth'));
+      if (canAct) statusBits.push('•');
       unitRow = {
-        name: t('hud.selected.unit', { name: UNIT_TYPE_NAMES[unit.type] }),
+        name:
+          t('hud.selected.unit', { name: UNIT_TYPE_NAMES[unit.type] }) +
+          (statusBits.length > 0 ? ` (${statusBits.join(' ')})` : ''),
         pairs: [
-          { icon: 'hp-32', value: `${unit.hp}/${maxHp}${(unit.stunTurns ?? 0) >= 1 ? ` ${t('hud.selected.stunned')}` : ''}${unit.isStealthed ? ` ${t('hud.selected.stealth')}` : ''}${canAct ? ' •' : ''}` },
-          { icon: 'attack-32', value: String(attackDamage(unit)) },
+          { icon: 'attack-32', value: rageBonus > 0 ? `${attackDamage(unit)} +${rageBonus}` : String(attackDamage(unit)) },
           { icon: 'def-32', value: String(unit.defense ?? 0) },
           { icon: 'gold-32', value: String(unitMaintenance(unit)) },
         ],
@@ -217,6 +226,12 @@ export class HudSelected implements Widget {
 
     if (tile.bottle) {
       lines.push(t('hud.selected.bottle'));
+      bolds.push(false);
+    }
+
+    if (tile.trap && tile.trap.owner === human.index) {
+      const turnsLeft = Math.max(0, TRAP_TURNS - (s.turn - tile.trap.placedTurn));
+      lines.push(t('hud.selected.trap', { turns: turnsLeft }));
       bolds.push(false);
     }
 

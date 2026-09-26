@@ -655,9 +655,20 @@ export class Simulator {
       attackerPre,
       targetPre,
     });
+    // A melee killer stepped onto the dead unit's tile: the same rule as moving
+    // onto a trapped cell — it takes the trap's damage and the trap vanishes.
+    if (
+      result.targetDied &&
+      !result.attackerDied &&
+      target.unit === attacker &&
+      target.trap &&
+      target.trap.owner !== attacker.owner
+    ) {
+      this.triggerTrap(attacker, target);
+    }
     // A land knight that kills may attack again in the same turn. Every 3 kills
     // in one turn triggers a Combo kill bonus of 30 points at the kill tile.
-    if (attacker.type === 'knight' && attacker.shipLevel === undefined) {
+    if (attacker.type === 'knight' && attacker.shipLevel === undefined && attacker.hp > 0) {
       const killed = result.targetDied && !result.attackerDied;
       attacker.canExtraAttack = killed;
       if (killed) {
@@ -1193,6 +1204,12 @@ export class Simulator {
           break;
         case 'storm':
           ok = this.doStorm(a.unitId);
+          break;
+        case 'trap':
+          ok = this.doBuildTrap(a.unitId, a.q, a.r);
+          break;
+        case 'builderBuild':
+          ok = this.doBuildWithUnit(a.unitId, a.q, a.r, a.kind);
           break;
         case 'stun':
           ok = this.doStun(a.unitId, a.q, a.r);

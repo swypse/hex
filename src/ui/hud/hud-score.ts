@@ -1,4 +1,5 @@
 import { Container, Graphics, BitmapText } from 'pixi.js';
+import { t } from '../../i18n';
 import { gameController } from '../../controller/game-controller';
 import { totalScore } from '../../game/score';
 import { activeBuffs, BUFF_INFO, type BuffId } from '../../game/buffs';
@@ -12,19 +13,19 @@ import {
   SCORE_PAD,
   SCORE_TOP_OFFSET,
   SCORE_CHIP_RADIUS,
-  SCORE_TEXT_CHIP_GAP,
-  SCORE_TEXT_HEIGHT,
   buffRowPosition,
 } from '../layout';
 
-const SCORE_FONT_SIZE = 16;
-const SCORE_COLOR = 0xffc465;
+const SCORE_FONT_SIZE = 20;
+const SCORE_COLOR = 0xffffff;
 const CHIP_RADIUS = SCORE_CHIP_RADIUS;
 const PAD = SCORE_PAD;
 const TOP_OFFSET = SCORE_TOP_OFFSET;
 const ICON_SIZE = 16;
 /** Vertical gap between buff items (icon + sub score) under the score circle. */
 const BUFF_GAP = 8;
+/** Vertical centre of the score readout: just below the resource panel row. */
+const SCORE_BELOW_RESOURCE_Y = 34;
 
 export class HudScore implements Widget {
   /** Optional tap handler (used by the skill-tree screen to open score details). */
@@ -44,7 +45,6 @@ export class HudScore implements Widget {
     const text = makeLabel('0', {
       fontSize: SCORE_FONT_SIZE,
       fill: SCORE_COLOR,
-      fontWeight: '700',
     });
     text.anchor.set(0.5, 0.5);
 
@@ -71,7 +71,7 @@ export class HudScore implements Widget {
     // display 0 until the score next changed.
     const initial = this.readScore();
     this.lastScore = initial;
-    text.text = String(initial);
+    text.text = t('stats.pts', { score: initial });
     this.layout();
     window.addEventListener('resize', this.layout);
     this.unsub = useGameStore.subscribe(() => {
@@ -97,13 +97,12 @@ export class HudScore implements Widget {
 
   private layout = (): void => {
     if (!this.el || !this.host || !this.text || !this.tribeChip || !this.buffRow) return;
-    // The row hugs the top-right: tribe chip at the right edge, the score text
-    // centred below it (6px gap), buff icons stacked under the achievements
-    // button (which itself sits 8px below the score text).
+    // The tribe chip stays top-right; the score readout moves below the
+    // resource panel, centred horizontally, as "N pts" white regular text.
     const chipX = this.host.app.screen.width - PAD - CHIP_RADIUS;
     const chipY = PAD + TOP_OFFSET + CHIP_RADIUS;
     this.tribeChip.position.set(chipX, chipY);
-    this.text.position.set(chipX, chipY + CHIP_RADIUS + SCORE_TEXT_CHIP_GAP + SCORE_TEXT_HEIGHT / 2);
+    this.text.position.set(this.host.app.screen.width / 2, SCORE_BELOW_RESOURCE_Y);
     this.el.position.set(0, 0);
     const buff = buffRowPosition(this.host.app.screen.width, this.host.app.screen.height);
     this.buffRow.position.set(buff.x, buff.y);
@@ -122,7 +121,7 @@ export class HudScore implements Widget {
     const score = this.readScore();
     if (score === this.lastScore) return;
     this.lastScore = score;
-    this.text.text = String(score);
+    this.text.text = t('stats.pts', { score });
   }
 
   private updateBuffs(): void {

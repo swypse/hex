@@ -59,7 +59,7 @@ its own artwork and its own spawn-popup icon (`action-spawn-<type>`).
 | Stalker     | Cats       | 20   | 10     | 1     | 20 | 0       | 9 money + 2 ore  |
 | Builder     | Villagers  | 8    | 10     | 1     | 40 | 0       | 15 money         |
 | Banner      | Warriors   | 8    | 20     | 1     | 40 | 8       | 7 money + 2 ore  |
-| Berserker   | Barbarians | 10   | 30     | 1     | 50 | 8       | 11 money + 3 ore |
+| Berserker   | Barbarians | 10   | 26     | 1     | 50 | 8       | 11 money + 3 ore |
 | Trapper     | Forest     | 10   | 20     | 1     | 40 | 8       | 9 money + 2 ore  |
 | Stormcaller | Aqua       | 20   | 20     | 1     | 40 | 8       | 9 money + 2 ore  |
 | Stunner     | Sand       | 8    | 20     | 2     | 40 | 10      | 7 money + 2 ore  |
@@ -79,19 +79,20 @@ its own artwork and its own spawn-popup icon (`action-spawn-<type>`).
 - **Banner (war cry)** — Allies within 2 hexes (never the banner itself) gain +10 attack; bonuses from several banners
   do not stack, and the bonus disappears when the banner dies. Recipients show an `attack-16` icon with `+10` next to
   their HP bar.
-- **Berserker (rage)** — At 50% HP or less it gains +20 attack and takes no counter-attack damage. Shows an
-  `attack-16` icon with `+20` while raging.
+- **Berserker (rage)** — At 35% HP or less it gains +10 attack and takes no counter-attack damage. Shows an
+  `attack-16` icon with `+10` while raging.
 - **Trapper (thorn trap)** — Consumes its turn to place a trap on a non-water cell it stands on or is adjacent to
   (radius 1), as long as that cell has no village/building, no unit standing on it, and no trap already there (cost 5
   money + 3 ore). Traps are visible only to the trapper's owner, last 10 turns, and vanish when triggered. An enemy
   unit that moves onto a trap stops there and takes ~45 damage (attack 30 at full HP vs. defense 0); the trap
-  disappears.
+  disappears. A melee unit that kills someone and advances onto their tile also trips a trap buried there.
 - **Stormcaller (storm)** — While standing on an owned cell of its own village that has water tiles (including aboard a
   ship on an owned village water tile), the "Storm" action is available. It consumes the whole turn and strikes every
   enemy or pirate ship on that village's water tiles for ~90 damage each. Own ships are untouched.
 - **Stunner (stun)** — A range-2 target is always stunned; a range-1 target lets you pick a regular attack or a stun. A
   stun deals no damage but the target cannot act this turn (if it has not acted yet) or next turn (if it already has);
-  it provokes no counter-attack. Stunned units show a `stunned` tag on their HP text.
+  it provokes no counter-attack. Stunned units show a `stunned` tag on their HP text and cannot counter-attack while
+  dazed.
 
 - **Rider** additionally requires the *Riding* skill.
 - **Knight** additionally requires the *Knights* skill. After killing an enemy it may attack again in the same turn;
@@ -148,9 +149,11 @@ its own artwork and its own spawn-popup icon (`action-spawn-<type>`).
   the target is
   `round(attackForce / (attackForce + defenseForce) × attack × 1.5)`. Each attack has a 10% chance to miss (5% if the
   attacker's owner has opened Science), dealing no damage (the attack still counts as used). If the target survives and
-  is in range, it counter-attacks with
-  `round(defenseForce / (attackForce + defenseForce) × defense × 1.5)`, except a land catapult never counter-attacks
-  (aboard a ship the crew still fights back with the ship's cannon). A shield cannot attack in a turn in which it has
+   is in range, it counter-attacks with
+   `round(defenseForce / (attackForce + defenseForce) × defense × 1.5)`, except a land catapult never counter-attacks
+   (aboard a ship the crew still fights back with the ship's cannon). A **shield** doubles its counter-attack
+   (×2): attacking a shield unit head-on hurts, so it is dangerous to strike one without killing it. A shield cannot
+   attack in a turn in which it has
   already moved (as a ship this limit does not apply). On a kill, the attacker moves onto the target's tile (unless the
   attacker is an archer or a pirate, is a ship, or the target was a pirate or a ship).
 - **Heal** — if the unit hasn't moved/attacked this turn, restore +15 HP (once per turn).

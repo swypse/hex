@@ -458,17 +458,34 @@ describe('performAttack', () => {
     expect(attacker.r).toBe(0);
   });
 
-  it('a defending shield counters with defense-based damage', () => {
+  it('a stunned defender never counter-attacks', () => {
+    const map: GameMap = { radius: 4, tiles: [], spawns: [] };
+    const attacker = makeWarrior('a', 0, 0, 0, MAX_HP);
+    const stunned = makeShield('s', 1, 1, 0, 80);
+    stunned.stunTurns = 1;
+    const shield = makeTile(1, 0, TileType.GrasslandLand, stunned);
+    map.tiles.push(makeTile(0, 0, TileType.GrasslandLand, attacker), shield);
+    const result = performAttack(map, attacker, shield, noMiss);
+    // Normally a shield hits back for 30; dazed it just takes the hit (15).
+    expect(result.attackerDamage).toBe(15);
+    expect(result.targetDamage).toBe(0);
+    expect(shield.unit!.hp).toBe(65);
+    expect(attacker.hp).toBe(MAX_HP);
+    expect(result.attackerDied).toBe(false);
+  });
+
+  it('a defending shield counters with a doubled defense-based retaliation', () => {
     const map: GameMap = { radius: 4, tiles: [], spawns: [] };
     const attacker = makeWarrior('a', 0, 0, 0, MAX_HP);
     const shield = makeTile(1, 0, TileType.GrasslandLand, makeShield('s', 1, 1, 0, 80));
     map.tiles.push(makeTile(0, 0, TileType.GrasslandLand, attacker), shield);
     const result = performAttack(map, attacker, shield, noMiss);
-    // Both forces 20 -> attack 15, counter 15.
+    // Both forces 20 -> attack 15, shield counter 15 x2 = 30: hitting a shield
+    // is dangerous (hardened retaliates are what make shields hard targets).
     expect(result.attackerDamage).toBe(15);
-    expect(result.targetDamage).toBe(15);
+    expect(result.targetDamage).toBe(30);
     expect(shield.unit!.hp).toBe(65);
-    expect(attacker.hp).toBe(35);
+    expect(attacker.hp).toBe(20);
     expect(result.attackerDied).toBe(false);
   });
 
@@ -733,7 +750,7 @@ describe('special-unit combat hooks', () => {
 
   it('a raging berserker never counter-attacks', () => {
     const berserker = unitOf('b', 'berserker', 0, 0, 0);
-    berserker.hp = 20; // <= 50% of 50
+    berserker.hp = 10; // <= 35% of 50
     expect(canCounterAttack(berserker)).toBe(false);
     berserker.hp = 50;
     expect(canCounterAttack(berserker)).toBe(true);

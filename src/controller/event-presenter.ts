@@ -305,6 +305,12 @@ export class EventPresenter {
             break;
           }
           case 'storm': {
+            // Storming clears the unit's selection (its turn is spent), so
+            // render the deselection first: otherwise the render below the
+            // pulse would see the selection just changed to null and stop the
+            // hex-bounce animation it shares with the pulse, killing it before
+            // its first tick.
+            this.host.render();
             const stormcaller = tileAt(sim.map, e.q, e.r);
             if (stormcaller) {
               const village = claimingVillage(sim.map, stormcaller);
@@ -317,7 +323,6 @@ export class EventPresenter {
               const t = tileAt(sim.map, target.q, target.r);
               if (t) this.spawnHpText(t, `-${target.damage}`, 0x88ccff);
             }
-            this.host.render();
             break;
           }
           case 'stunShot': {

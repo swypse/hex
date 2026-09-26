@@ -12,7 +12,7 @@ import { SeededRandom } from '../util/random';
 import { buildingsInVillage, villageBuildingLimit } from './village';
 import { isMountainType } from './tile-types';
 import { TRIBES } from './tribes';
-import { AI_PATTERNS, AiPatternContext, bestSpawnableUnitType, enemyCanAttackNext, enemyCanReach, guardGarrisonAttack, isFrontierTile, landEnemyCanReach, nearestEnemyDistanceFrom, nearestFreeVillageDistanceFrom, nearestOwnUnitDistanceFrom, nearestVillageDistanceFrom } from './ai-patterns';
+import { AI_PATTERNS, AiPatternContext, bestSpawnableUnitType, enemyCanAttackNext, enemyCanReach, guardGarrisonAttack, isFrontierTile, isSupportUnit, landEnemyCanReach, nearestEnemyDistanceFrom, nearestFreeVillageDistanceFrom, nearestOwnUnitDistanceFrom, nearestVillageDistanceFrom } from './ai-patterns';
 import { AiAction, AiDirectives, AiPlannerState } from './ai-types';
 import { attackableTargets, chooseBestAttack, tradeIsFavorable } from './combat';
 import { isExploredFor } from './explore';
@@ -106,6 +106,10 @@ export function formatAiAction(a: AiAction): string {
       return `enableStealth ${a.unitId}`;
     case 'storm':
       return `storm ${a.unitId}`;
+    case 'trap':
+      return `trap ${a.unitId} -> (${a.q},${a.r})`;
+    case 'builderBuild':
+      return `builderBuild ${a.unitId} ${a.kind} (${a.q},${a.r})`;
   }
 }
 
@@ -265,7 +269,7 @@ function bestAvailableAction(
       continue;
     }
     const attackTile = chooseBestAttack(map, unit, unit.owner);
-    if (attackTile && (!difficulty || !difficulty.checkTrades || !mustering(directives) || tradeIsFavorable(unit, attackTile))) {
+    if (attackTile && !isSupportUnit(unit) && unit.type !== 'stalker' && (!difficulty || !difficulty.checkTrades || !mustering(directives) || tradeIsFavorable(unit, attackTile))) {
       const garrisonGuard = guardGarrisonAttack(map, player, unit, attackTile, state);
       if (garrisonGuard.kind !== 'hold') {
         const guardType = garrisonGuard.guardType;
@@ -288,6 +292,9 @@ function bestAvailableAction(
       candidates.push({ score: 600 + jitter(), action: { type: 'heal', unitId: unit.id, q: t.q, r: t.r } });
       continue;
     }
+    // Support units and stalkers are handled by their own patterns: never let
+    // the generic fallback send them into combat or wander with the army.
+    if (isSupportUnit(unit) || unit.type === 'stalker') continue;
     const garrison = !!t.settlement && t.settlement.owner === unit.owner;
     if (garrison && enemyCanReach(map, t, player.index)) continue;
     const canClimb = hasSkill(player, 'climbing');
@@ -488,6 +495,16 @@ function markUsed(state: AiPlannerState, action: AiAction): void {
       break;
     case 'upgradeShip':
       state.acted.add(action.unitId);
+      break;
+    case 'stun':
+    case 'enableStealth':
+    case 'storm':
+    case 'trap':
+      state.acted.add(action.unitId);
+      break;
+    case 'builderBuild':
+      state.acted.add(action.unitId);
+      state.built.add(key(action.q, action.r));
       break;
     case 'openSkill':
       state.opened.add(action.skill);

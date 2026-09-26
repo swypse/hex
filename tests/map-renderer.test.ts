@@ -70,6 +70,7 @@ function buildTextures(map: GameMap): TextureSet {
     captureTexture: null,
 
     wallTexture: null,
+    trapTexture: tileTex(50, 50),
     arrowTexture: tex(67, 13),
     glowFor: new Map([[unitTex.texture, tileTex(TEX_H + 8, TEX_H + 8)]]),
     cannonballTexture: tex(35, 15), 
@@ -169,13 +170,13 @@ describe('MapView hp bar anchoring', () => {
     return item;
   }
 
-  function tileView(q: number, r: number): { capitalDot: unknown } {
-    const tv = (view as unknown as { tileViews: Map<string, { capitalDot: unknown }> }).tileViews.get(axialKey({ q, r }));
+  function tileView(q: number, r: number): { capitalDot: unknown; trapSprite: Sprite | null } {
+    const tv = (view as unknown as { tileViews: Map<string, { capitalDot: unknown; trapSprite: Sprite | null }> }).tileViews.get(axialKey({ q, r }));
     if (!tv) throw new Error('no tile view');
     return tv;
   }
 
-  it('renders a red trap circle at the tile for its owner only', () => {
+  it('draws the trap texture at the tile for its owner only', () => {
     const tile = map.tiles.find((t) => t.q === 1 && t.r === 0)!;
     tile.ownedBy = 0;
     tile.trap = { owner: 0, placedTurn: 0 };
@@ -186,13 +187,14 @@ describe('MapView hp bar anchoring', () => {
       width: 800,
       height: 600,
     });
-    const trapItem = view.overlayItems.find(
-      (o) => o.el instanceof Graphics && o.el.context.instructions.some((i) => i.action === 'fill'),
-    );
-    expect(trapItem).toBeDefined();
     const p = hexToPixel(tile, HEX);
-    expect(trapItem!.world.x).toBeCloseTo(p.x, 5);
-    expect(trapItem!.world.y).toBeCloseTo(p.y - tileElevation(tile, HEX), 5);
+    const trapSprite = tileView(1, 0).trapSprite;
+    expect(trapSprite).toBeTruthy();
+    expect(trapSprite!.texture).toBe(textures.trapTexture!.texture);
+    expect(trapSprite!.visible).toBe(true);
+    expect(trapSprite!.position.x).toBeCloseTo(p.x, 5);
+    expect(trapSprite!.position.y).toBeCloseTo(p.y - tileElevation(tile, HEX), 5);
+    expect(view.overlayItems).toHaveLength(0);
 
     // Another player never sees the trap.
     tile.trap!.owner = 1;
@@ -203,11 +205,54 @@ describe('MapView hp bar anchoring', () => {
       width: 800,
       height: 600,
     });
-    expect(
-      view.overlayItems.some(
-        (o) => o.el instanceof Graphics && o.el.context.instructions.some((i) => i.action === 'fill'),
-      ),
-    ).toBe(false);
+    expect(tileView(1, 0).trapSprite).toBeNull();
+  });
+
+  it('falls back to a red trap circle when the atlas has no trap texture', () => {
+    textures.trapTexture = null;
+    const tile = map.tiles.find((t) => t.q === 1 && t.r === 0)!;
+    tile.ownedBy = 0;
+    tile.trap = { owner: 0, placedTurn: 0 };
+    view.update(map, players, null, new Set(), new Set(), 0, new Set(), {
+      x: 400,
+      y: 300,
+      scale: 1,
+      width: 800,
+      height: 600,
+    });
+    expect(tileView(1, 0).trapSprite).toBeNull();
+    const trapItem = view.overlayItems.find(
+      (o) => o.el instanceof Graphics && o.el.context.instructions.some((i) => i.action === 'fill'),
+    );
+    expect(trapItem).toBeDefined();
+    const p = hexToPixel(tile, HEX);
+    expect(trapItem!.world.x).toBeCloseTo(p.x, 5);
+    expect(trapItem!.world.y).toBeCloseTo(p.y - tileElevation(tile, HEX), 5);
+  });
+
+  it('renders the hp bar width to the unit real hp (a 25/50 unit shows a half bar)', () => {
+    // A unit that already carries damage must not be drawn as a full bar until
+    // something else changes (the classic stale full-bar at partial hp bug).
+    const partial = map.tiles.find((t) => t.q === 1 && t.r === 0)!;
+    partial.unit = {
+      id: 'half', owner: 0, type: 'warrior', q: 1, r: 0,
+      hasMoved: true, hasAttacked: true, hasHealed: true,
+      hp: 25, attack: 20, attackDistance: 1, spawnVillage: { q: 0, r: 0 },
+    };
+    view.update(map, players, null, new Set(), new Set(), 0, new Set(), {
+      x: 400,
+      y: 300,
+      scale: 1,
+      width: 800,
+      height: 600,
+    });
+    const bars = view.hpBarEntries();
+    const full = bars.find((b) => b.el.children.some((c) => c instanceof BitmapText && (c as BitmapText).text === '50/50'))!;
+    const half = bars.find((b) => b.el.children.some((c) => c instanceof BitmapText && (c as BitmapText).text === '25/50'))!;
+    expect(half).toBeDefined();
+    expect(half.greenW).toBeCloseTo(full.greenW / 2, 1);
+    expect(half.ghostW).toBeCloseTo(full.ghostW / 2, 1);
+    expect(half.greenW).toBeGreaterThan(0);
   });
 
   it('does not draw a dot on the starting (capital) village', () => {
@@ -1625,7 +1670,7 @@ describe('MapView hp bar anchoring', () => {
 });
 
 describe('MapView storm water pulse', () => {
-  it('lifts water tiles 10px for 50ms, staggered 40ms per hex of distance, ships included', () => {
+  it('bounces water tiles like a selected hex, staggered 80ms per hex of distance, ships included', () => {
     const callbacks: Array<() => void> = [];
     const app = {
       screen: { width: 800, height: 600 },
@@ -1652,7 +1697,7 @@ describe('MapView storm water pulse', () => {
 
       v.stormWaterPulse([m.tiles[1]!, m.tiles[2]!, m.tiles[3]!], { q: 0, r: 0 });
       const entries1 = (v as unknown as { hexBounceSprites: { obj: unknown; baseY: number; delay: number }[] }).hexBounceSprites;
-      expect(entries1.map((e) => e.delay).sort((a, b) => a - b)).toEqual([0, 40, 80]);
+      expect(entries1.map((e) => e.delay).sort((a, b) => a - b)).toEqual([0, 80, 160]);
 
       // A ship on the tile lifts together with its water: terrain + unit, same delay.
       m.tiles[1]!.unit = {
@@ -1668,14 +1713,15 @@ describe('MapView storm water pulse', () => {
       expect(entries2).toHaveLength(2);
       expect(entries2.every((e) => e.delay === 0)).toBe(true);
 
-      // Midpoint of the 50ms pulse = full 10px lift.
+      // Midpoint of the 150ms pulse = full hexSize*0.2 lift (same as a selected hex).
       const tv = (v as unknown as { tileViews: Map<string, { terrainSprite: Sprite }> }).tileViews.get('1,0')!;
       const terrainBase = tv.terrainSprite.position.y;
       const bounceFn = callbacks[callbacks.length - 1]!;
-      now = 25;
+      const amp = HEX * 0.2;
+      now = 75;
       bounceFn();
-      expect(tv.terrainSprite.position.y).toBeCloseTo(terrainBase - 10, 5);
-      now = 50;
+      expect(tv.terrainSprite.position.y).toBeCloseTo(terrainBase - amp, 5);
+      now = 150;
       bounceFn();
       expect(tv.terrainSprite.position.y).toBeCloseTo(terrainBase, 5);
     } finally {

@@ -92,6 +92,22 @@ describe('trapper traps', () => {
     expect(sim.drainEvents().some((e) => e.type === 'trapTriggered')).toBe(true);
   });
 
+  it('a melee killer that advances onto the dead unit trapped cell trips the trap', () => {
+    // An enemy trap sits under the victim: a land kill makes the attacker step
+    // onto that cell, which must trigger the trap like any move onto it.
+    const trapped = tileAt(map, 1, 0)!;
+    trapped.ownedBy = 1;
+    trapped.trap = { owner: 1, placedTurn: sim.turn };
+    place(1, 'warrior', 1, 0, { hp: 5 });
+    const swordsman = place(0, 'swordsman', 0, 0, { hp: 80 });
+    expect(sim.applyCommand({ type: 'attack', unitId: swordsman.id, q: 1, r: 0 })).toBe(true);
+    // 45 trap damage on top of the clean kill (no counter: the victim died).
+    expect(findUnit(swordsman.id).hp).toBe(80 - trapDamage());
+    expect(tileAt(map, 1, 0)!.unit?.id).toBe(swordsman.id); // advanced onto the trap
+    expect(tileAt(map, 1, 0)!.trap).toBeNull();             // consumed
+    expect(sim.drainEvents().some((e) => e.type === 'trapTriggered' && e.q === 1 && e.r === 0)).toBe(true);
+  });
+
   it('expires a trap after 10 turns', () => {
     const trapper = place(0, 'trapper', 0, 0);
     expect(sim.applyCommand({ type: 'trap', unitId: trapper.id, q: 1, r: 0 })).toBe(true);

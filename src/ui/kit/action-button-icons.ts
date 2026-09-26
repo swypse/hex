@@ -11,6 +11,7 @@ export const ACTION_BUTTON_ICON_FILES: Record<string, string> = {
   'upgrade-ship': 'action-ship-upgrade',
   wall: 'action-build-wall',
   build: 'action-build',
+  'thorn-trap': 'action-build-trap',
   stealth: 'action-stealth',
   stormcaller: 'action-stormcaller',
   sawmill: 'action-build-sawmill',

@@ -12,6 +12,7 @@ import { type BonusKind } from '../src/game/bonus';
 import { Simulator } from '../src/game/simulator';
 import { TileType } from '../src/game/tile-types';
 import { UNIT_TYPES } from '../src/game/units';
+import { TRAP_TURNS } from '../src/game/traps';
 import { hexNeighbors } from '../src/game/hex';
 import { t } from '../src/i18n';
 import type { GameMap, MapTile } from '../src/game/map-gen';
@@ -168,7 +169,8 @@ describe('HudSelected village building constraints', () => {
     mount(1, 1, 0, { unitOnVillage: true, wall: true });
     const all = texts().join('\n');
     const labels = texts();
-    expect(labels.some((x) => x.startsWith('50/50'))).toBe(true);
+    // The unit hp no longer appears in the selected-cell panel.
+    expect(labels.some((x) => x.startsWith('50/50'))).toBe(false);
     expect(labels).toContain('20');
     expect(labels).toContain('10');
     expect(labels).toContain('1');
@@ -177,21 +179,21 @@ describe('HudSelected village building constraints', () => {
     expect(all).not.toContain('UPKEEP');
   });
 
-  it('appends a bullet to the hp text while the unit still has actions', () => {
+  it('appends a bullet to the unit name while the unit still has actions', () => {
     mount(1, 1, 0, { unitOnVillage: true });
     const labels = texts();
-    const hp = labels.find((x) => x.startsWith('50/50'))!;
-    expect(hp).toBe('50/50 •');
+    expect(labels.some((x) => x.startsWith('Warrior') && x.includes('•'))).toBe(true);
   });
 
-  it('renders 4 stat icons inline on the selected unit line plus the income icon', () => {
+  it('renders 3 stat icons inline on the selected unit line plus the income icon', () => {
     mount(1, 1, 0, { unitOnVillage: true });
     const widths = findSprites((hud as unknown as { el: Container }).el!)
       .map((s) => s.width)
       .filter((w) => w === 16);
-    // 4 unit stats + the gold village income icon on the settlement line, plus
-    // the three 16px help buttons (unit / settlement / building limit).
-    expect(widths).toEqual([16, 16, 16, 16, 16, 16, 16, 16]);
+    // 3 unit stats (attack/defense/gold, hp removed) + the gold village income
+    // icon on the settlement line, plus the three 16px help buttons (unit /
+    // settlement / building limit).
+    expect(widths).toEqual([16, 16, 16, 16, 16, 16, 16]);
   });
 
   it('draws a button-style drop shadow behind the info panel', () => {
@@ -510,6 +512,67 @@ describe('HudSelected pirate deal info', () => {
   });
 });
 
+describe('HudSelected berserker rage attack info', () => {
+  let hud: HudSelected;
+  const originalSim = (gameController as unknown as { sim: unknown }).sim;
+
+  const texts = (): string[] => {
+    const el = (hud as unknown as { el: Container }).el!;
+    const out: string[] = [];
+    const walk = (c: Container): void => {
+      for (const ch of c.children) {
+        if (ch instanceof BitmapText) out.push((ch as BitmapText).text);
+        if (ch instanceof Container) walk(ch as Container);
+      }
+    };
+    walk(el);
+    return out;
+  };
+
+  const boot = (hp: number): void => {
+    (globalThis as { CanvasRenderingContext2D?: unknown }).CanvasRenderingContext2D = class {};
+    (globalThis as { document?: unknown }).document = {
+      createElement: () => ({ getContext: () => fakeCanvasContext(), width: 0, height: 0 }),
+    };
+    const map = makeTestMap(2);
+    const tile = tileAt(map, 0, 0)!;
+    tile.unit = makeUnit('b1', 0, 'berserker', 0, 0);
+    tile.unit.hp = hp;
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    (gameController as unknown as { sim: Simulator | null }).sim = sim;
+    useGameStore.setState({
+      screen: 'game',
+      players,
+      localPlayerIndex: 0,
+      selection: { kind: 'unit', q: 0, r: 0 },
+      tutorial: false,
+      tutorialStep: null,
+    });
+    hud = new HudSelected();
+    hud.mount(makeHost(), new Container());
+  };
+
+  afterEach(() => {
+    hud?.destroy();
+    (gameController as unknown as { sim: unknown }).sim = originalSim;
+  });
+
+  it('appends the +10 rage bonus to the attack value while rage is active', () => {
+    boot(10); // 10 <= 35% of 50 → raging
+    const all = texts().join('\n');
+    expect(all).toMatch(/\+10/);
+    // No hp readout in the panel anymore.
+    expect(all).not.toMatch(/\/50/);
+  });
+
+  it('shows a plain attack value when not raging', () => {
+    boot(40); // above the 35% rage threshold
+    const all = texts().join('\n');
+    expect(all).not.toMatch(/\+10/);
+  });
+});
+
 describe('HudSelected stealth info', () => {
   let hud: HudSelected;
   const originalSim = (gameController as unknown as { sim: unknown }).sim;
@@ -572,6 +635,80 @@ describe('HudSelected stealth info', () => {
     boot(false);
     const all = texts().join('\n');
     expect(all).not.toContain('stealth');
+  });
+});
+
+describe('HudSelected trap info', () => {
+  let hud: HudSelected;
+  const originalSim = (gameController as unknown as { sim: unknown }).sim;
+
+  const texts = (): string[] => {
+    const el = (hud as unknown as { el: Container }).el!;
+    const out: string[] = [];
+    const walk = (c: Container): void => {
+      for (const ch of c.children) {
+        if (ch instanceof BitmapText) out.push((ch as BitmapText).text);
+        if (ch instanceof Container) walk(ch as Container);
+      }
+    };
+    walk(el);
+    return out;
+  };
+
+  const boot = (trapOwner: number | null, turn: number): void => {
+    (globalThis as { CanvasRenderingContext2D?: unknown }).CanvasRenderingContext2D = class {};
+    (globalThis as { document?: unknown }).document = {
+      createElement: () => ({ getContext: () => fakeCanvasContext(), width: 0, height: 0 }),
+    };
+    const map = makeTestMap(2);
+    const tile = tileAt(map, 0, 0)!;
+    tile.ownedBy = 0;
+    if (trapOwner !== null) tile.trap = { owner: trapOwner, placedTurn: 2 };
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    (gameController as unknown as { sim: Simulator | null }).sim = sim;
+    useGameStore.setState({
+      screen: 'game',
+      players,
+      localPlayerIndex: 0,
+      turn,
+      selection: { kind: 'terrain', q: 0, r: 0 },
+      tutorial: false,
+      tutorialStep: null,
+    });
+    hud = new HudSelected();
+    hud.mount(makeHost(), new Container());
+  };
+
+  afterEach(() => {
+    hud?.destroy();
+    useGameStore.setState({ turn: 1 });
+    (gameController as unknown as { sim: unknown }).sim = originalSim;
+  });
+
+  it('shows the trap for its owner with the turns left on the map', () => {
+    boot(0, 2);
+    expect(texts().join('\n')).toContain(`Thorn trap: ${TRAP_TURNS} turns left`);
+  });
+
+  it('counts down as the game advances beyond the placement turn', () => {
+    boot(0, 4);
+    expect(texts().join('\n')).toContain(`Thorn trap: ${TRAP_TURNS - 2} turns left`);
+  });
+
+  it('never shows a negative count once a trap has expired', () => {
+    boot(0, 2 + TRAP_TURNS + 5);
+    expect(texts().join('\n')).toContain('Thorn trap: 0 turns left');
+  });
+
+  it('does not reveal a foreign trap to the selected owner', () => {
+    boot(1, 2);
+    expect(texts().join('\n')).not.toContain('Thorn trap');
+  });
+
+  it('shows no trap line on a tile without a trap', () => {
+    boot(null, 2);
+    expect(texts().join('\n')).not.toContain('Thorn trap');
   });
 });
 

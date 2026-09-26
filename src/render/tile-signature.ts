@@ -54,6 +54,7 @@ export function tileSignature(
     tile.building?.kind === 'port' ? (portDirection(map, tile) ?? '-') : '',
     tile.building?.kind === 'temple' || tile.building?.kind === 'forestTemple' ? String(tile.building.level) : '',
     tile.bottle ? tile.bottle.bornTurn : '',
+    tile.trap ? `t${tile.trap.owner}` : '',
     tile.roadOwner ?? '-',
     tile.bridge ? `${tile.bridge.dir}${tile.bridge.owner}` : '',
     tile.ownedBy ?? '-',

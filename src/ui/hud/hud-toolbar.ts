@@ -35,14 +35,14 @@ const ICON_ACTIONS: Record<string, string> = {
   repair: 'build',
   stealth: 'stealth',
   build: 'build',
-  'thorn-trap': 'build',
+  'thorn-trap': 'thorn-trap',
   storm: 'stormcaller',
 };
 
 const LAST_TURN_COLOR = 0x9cff55;
 const SIDE_PADDING = 12;
 const ACTION_BTN = {
-  color: { color: 0xffffff, alpha: 0.6 },
+  color: { color: 0xffffff, alpha: 1 },
   hoverColor: { color: 0xffffff, alpha: 1 },
   pressedColor: { color: 0xffffff, alpha: 1 },
   borderWidth: 0,

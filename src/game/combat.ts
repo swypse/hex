@@ -5,7 +5,7 @@ import { isExploredFor } from './explore';
 import { hasSkill } from './skills';
 import type { Player } from './players';
 import { UNIT_TYPES, Unit } from './units';
-import { attackBonus, effectiveAttack, berserkerRage } from './abilities';
+import { attackBonus, effectiveAttack, berserkerRage, isStunned } from './abilities';
 import { damageReduction } from './buffs';
 import { BUILDING_MAX_HP } from './buildings';
 
@@ -55,7 +55,9 @@ export interface CombatResolution {
  *      total        = attackForce + defenseForce
  *      attackerDamage = round(attackForce / total × attacker.attack  × COMBAT_SCALE)
  *      counterDamage  = round(defenseForce / total × defender.defense × COMBAT_SCALE)
- */
+ *  A shield's counter-attack is doubled: wall of steel, it is dangerous to hit
+ *  a shield unit head-on (its retaliation still uses the same defense force,
+ *  just boosted so attackers think twice). */
 export function resolveCombat(map: GameMap | null, attacker: Unit, target: MapTile): CombatResolution {
   const defender = target.unit!;
   // A stealthed stalker's strike ignores the defender's armor entirely.
@@ -73,14 +75,17 @@ export function resolveCombat(map: GameMap | null, attacker: Unit, target: MapTi
   // so a ship's counter math is unchanged, while bonuses apply on top.
   const scaleAttack = attacker.attack + bonus;
   const attackerDamage = Math.round((attackForce / total) * scaleAttack * COMBAT_SCALE);
-  const counterDamage = Math.round((defenseForce / total) * def * COMBAT_SCALE);
+  const counterMult = defender.type === 'shield' && !isShip(defender) ? 2 : 1;
+  const counterDamage = Math.round((defenseForce / total) * def * COMBAT_SCALE * counterMult);
   return { attackerDamage, counterDamage };
 }
 
 /** Whether a unit retaliates when it survives an attack. Land catapults never
- *  counter-attack; a raging berserker takes no counter-attacks; aboard a ship
- *  the crew fights back with the ship's cannon. */
+ *  counter-attack; a raging berserker takes no counter-attacks; a stunned unit
+ *  is too dazed to fight back; aboard a ship the crew fights back with the
+ *  ship's cannon. */
 export function canCounterAttack(unit: Unit): boolean {
+  if (isStunned(unit)) return false;
   if (berserkerRage(unit) > 0) return false;
   return !(unit.type === 'catapult' && !isShip(unit));
 }

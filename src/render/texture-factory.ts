@@ -106,6 +106,10 @@ export interface TextureSet {
   villageConnectedTexture: Texture | null;
   captureTexture: Texture | null;
   wallTexture: TileTexture | null;
+  /** Thorn-trap tile (trap.png) from the buildings atlas. Optional: null until
+   *  the tile is packed into the atlas, and the map then falls back to a plain
+   *  red circle marker. */
+  trapTexture?: TileTexture | null;
   /** arrow.png projectile texture used by the archer attack animation */
   arrowTexture: Texture | null;
   /** cannonball.png projectile texture used by ship attacks */
@@ -456,6 +460,8 @@ export async function createTextures(
   // Bake the wall at the same hex image-scale as villages/units so its on-map
   // footprint always matches the tile, regardless of the camera quality factor.
   const wallTexture = wallImg ? makeUnitImageTexture(app, wallImg, hexSize) : null;
+  const trapImg = buildingTileTexture('trap');
+  const trapTexture = trapImg ? makeUnitImageTexture(app, trapImg, hexSize) : null;
   const pirateTexture =
     makeUnitImageTexture(app, terrainFrameTexture('pirates-ship'), hexSize) ?? blankTile(0.5);
   glowFor.set(pirateTexture.texture, makeUnitGlowTexture(app, pirateTexture));
@@ -491,6 +497,7 @@ export async function createTextures(
     villageConnectedTexture,
     captureTexture,
     wallTexture,
+    trapTexture,
     arrowTexture,
     cannonballTexture,
     attackIconTexture,

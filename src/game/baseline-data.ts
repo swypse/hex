@@ -45,7 +45,7 @@ export const BASELINE: Baseline = {
     stalker: { attack: 30, defense: 0, maxHp: 60, price: 9, priceWood: 2, priceOre: 0 },
     builder: { attack: 10, defense: 0, maxHp: 50, price: 7, priceWood: 0, priceOre: 0 },
     banner: { attack: 20, defense: 8, maxHp: 60, price: 10, priceWood: 0, priceOre: 0 },
-    berserker: { attack: 50, defense: 12, maxHp: 70, price: 11, priceWood: 0, priceOre: 3 },
+    berserker: { attack: 26, defense: 8, maxHp: 50, price: 11, priceWood: 0, priceOre: 3 },
     trapper: { attack: 20, defense: 8, maxHp: 50, price: 9, priceWood: 2, priceOre: 0 },
     stormcaller: { attack: 20, defense: 8, maxHp: 50, price: 9, priceWood: 0, priceOre: 2 },
     stunner: { attack: 40, defense: 10, maxHp: 40, price: 7, priceWood: 0, priceOre: 0 },

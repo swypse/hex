@@ -13,7 +13,7 @@ import { Selection } from '../game/selection';
 import { TRIBES, tribeById } from '../game/tribes';
 import { UNIT_TYPES, PIRATE_COLOR, Unit } from '../game/units';
 import { unitCanAct } from '../game/unit-actions';
-import { attackBonus } from '../game/abilities';
+import { attackBonus, berserkerRage } from '../game/abilities';
 import { isExploredFor } from '../game/explore';
 import { territoryColor } from '../game/discovery';
 import { villageCapacity, unitsInVillage } from '../game/village';
@@ -89,6 +89,8 @@ interface TileView {
   bonusSprite: Sprite | null;
   bottleSprite: Sprite | null;
   unitSprite: Sprite | null;
+  /** Own thorn trap standing on the tile (trap.png from the buildings atlas). */
+  trapSprite: Sprite | null;
   /** White silhouette glow shown behind the unit sprite while it is selected. */
   glowSprite: Sprite | null;
   territory: Graphics;
@@ -374,12 +376,13 @@ export class MapView {
           const hp = this.hpOverrides.get(unit.id) ?? unit.hp;
           const canAct = unit.type === 'pirate' ? false : unitCanAct(map, tile, unit, players[unit.owner]!);
           const stunned = (unit.stunTurns ?? 0) >= 1;
+          const raging = berserkerRage(unit) > 0;
           hpBarSpecs.push({
             key: unit.id,
             world: { x: p.x, y: y - center + HP_BAR_ANCHOR_OFFSET },
             hp,
             maxHp,
-            label: `${hp}/${maxHp}${stunned ? ' stunned' : ''}`,
+            label: `${hp}/${maxHp}${stunned ? ' stunned' : ''}${raging ? ' rage' : ''}`,
             dim: unit.owner === localPlayerIndex && (!localTurn || !canAct),
             bonus: attackBonus(unit, map),
           });
@@ -403,10 +406,15 @@ export class MapView {
           bonus: 0,
         });
       }
-      // Thorn traps are visible only to their owner. The circle is drawn at the
-      // item's own origin: applyTransform positions the item at the tile's world
+      // Thorn traps are visible only to their owner. `applyTile` owns the trap
+      // sprite's texture; here it follows the per-frame detail cutoff, and the
+      // red circle stands in for tiles that have no trap texture (the frame is
+      // missing from the buildings atlas). The circle is drawn at the item's
+      // own origin: applyTransform positions the item at the tile's world
       // coordinates, so drawing at (p.x, y) here would double-offset it.
-      if (tile.trap && tile.trap.owner === localPlayerIndex && explored && !detailHidden) {
+      if (tv.trapSprite) {
+        tv.trapSprite.visible = !detailHidden;
+      } else if (tile.trap && tile.trap.owner === localPlayerIndex && explored && !detailHidden && !this.textures.trapTexture) {
         const c = this.takeGraphics();
         c.circle(0, 0, 8).fill(0xff2222);
         this.overlay.addChild(c);
@@ -616,6 +624,7 @@ export class MapView {
         bonusSprite: null,
         bottleSprite: null,
         unitSprite: null,
+        trapSprite: null,
         glowSprite: null,
         territory,
         roadGraphics: null,
@@ -688,6 +697,11 @@ export class MapView {
     const bottleVisible = explored && !!tile.bottle;
     this.syncSprite(tv, 'bottleSprite', bottleVisible ? this.textures.bottleTexture.texture : null, p.x, y, this.textures.bottleTexture.anchorY);
     if (tv.bottleSprite) tv.bottleSprite.visible = bottleVisible;
+
+    // A thorn trap is only drawn for its owner; `update` hides the sprite when
+    // the tile is unexplored or the view is zoomed out past the detail cutoff.
+    const trapTex = this.textures.trapTexture;
+    this.syncSprite(tv, 'trapSprite', tile.trap?.owner === localPlayerIndex ? trapTex?.texture ?? null : null, p.x, y, trapTex?.anchorY ?? 0.5);
 
     const isShipUnit = tile.unit !== null && tile.unit.shipLevel !== undefined;
     const isPirateUnit = tile.unit !== null && tile.unit.type === 'pirate';
@@ -914,13 +928,13 @@ export class MapView {
 
   private syncSprite(
     tv: TileView,
-    kind: 'villageSprite' | 'wallSprite' | 'buildingSprite' | 'bridgeSprite' | 'bonusSprite' | 'bottleSprite' | 'unitSprite',
+    kind: 'villageSprite' | 'wallSprite' | 'buildingSprite' | 'bridgeSprite' | 'bonusSprite' | 'bottleSprite' | 'unitSprite' | 'trapSprite',
     texture: Texture | null,
     x: number,
     y: number,
     anchorY = 0.5,
   ): void {
-    const zIndex = kind === 'unitSprite' ? 7 : kind === 'buildingSprite' || kind === 'bridgeSprite' ? 5 : kind === 'wallSprite' ? 4 : kind === 'bonusSprite' || kind === 'bottleSprite' ? 8 : 3;
+    const zIndex = kind === 'unitSprite' ? 7 : kind === 'buildingSprite' || kind === 'bridgeSprite' ? 5 : kind === 'trapSprite' ? 6 : kind === 'wallSprite' ? 4 : kind === 'bonusSprite' || kind === 'bottleSprite' ? 8 : 3;
     const current = tv[kind];
     if (texture && !current) {
       const sprite = new Sprite(texture);
@@ -1536,8 +1550,9 @@ export class MapView {
   }
 
   /** Ripples a storm across the given water tiles outward from `origin`: each
-   *  tile (and any ship standing on it) lifts 10px and settles back over ~50ms,
-   *  staged 40ms per additional hex of distance from the stormcaller. */
+   *  tile (and any ship standing on it) bounces with the same lift/duration as
+   *  a selected hex, staged 80ms per additional hex of distance from the
+   *  stormcaller so the ripple visibly travels outward. */
   stormWaterPulse(tiles: MapTile[], origin: { q: number; r: number }): void {
     const entries: { obj: Sprite | Graphics; baseY: number; delay: number }[] = [];
     for (const tile of tiles) {
@@ -1546,10 +1561,10 @@ export class MapView {
       const sprites = this.hexSurfaceSprites(tv);
       if (tv.unitSprite && !tv.unitSprite.destroyed) sprites.push(tv.unitSprite);
       if (sprites.length === 0) continue;
-      const delay = Math.max(0, hexDistance(origin, tile) - 1) * 40;
+      const delay = Math.max(0, hexDistance(origin, tile) - 1) * 80;
       for (const s of sprites) entries.push({ obj: s, baseY: s.position.y, delay });
     }
-    this.runHexBounce(entries, 50, 10);
+    this.runHexBounce(entries);
   }
 
   /** The sprites that sit on top of a hex and move with it when its tile is
@@ -1790,8 +1805,9 @@ export class MapView {
       }
       bar.world = spec.world;
       bar.el.position.set(spec.world.x, spec.world.y);
+      const ratio = spec.maxHp > 0 ? Math.max(0, Math.min(1, spec.hp / spec.maxHp)) : 1;
       const innerW = (w: number) => Math.max(0, Math.min(HP_BAR_INNER_W, w));
-      const targetW = innerW(HP_BAR_INNER_W * Math.max(0, Math.min(1, spec.hp / spec.maxHp)));
+      const targetW = innerW(HP_BAR_INNER_W * ratio);
       if (spec.hp < bar.lastHp) {
         // Damage: green drops to the new hp fast, the orange ghost trails it.
         const now = performance.now();
@@ -1819,6 +1835,13 @@ export class MapView {
           bar.damageFromHp = undefined;
           bar.lastSettleAt = 0;
         }
+      } else if (!bar.greenAnim && !bar.ghostAnim && (bar.greenW !== targetW || bar.ghostW !== targetW)) {
+        // The unit sits at the same hp as last frame but the bar's width is
+        // stale (a freshly created bar starts at the damage target, or the
+        // value changed through hp overrides/re-hydration). Keep the bar
+        // honest to the actual hp instead of leaving it frozen at 100%.
+        bar.greenW = targetW;
+        bar.ghostW = targetW;
       }
       this.updateHpBarLabel(bar, spec);
       this.drawHpBars(bar);
@@ -1906,8 +1929,11 @@ export class MapView {
       labelBg,
       bonusIcon,
       bonusText,
-      greenW: HP_BAR_INNER_W,
-      ghostW: HP_BAR_INNER_W,
+      // A bar is born at the unit's actual hp, not full: a unit that already
+      // shows damage (e.g. 20/40) must not render a 100% bar until something
+      // else changes.
+      greenW: HP_BAR_INNER_W * (spec.maxHp > 0 ? Math.max(0, Math.min(1, spec.hp / spec.maxHp)) : 1),
+      ghostW: HP_BAR_INNER_W * (spec.maxHp > 0 ? Math.max(0, Math.min(1, spec.hp / spec.maxHp)) : 1),
       greenAnim: null,
       ghostAnim: null,
       lastHp: spec.hp,
@@ -2001,9 +2027,10 @@ export class MapView {
     }
   }
 
-  /** @private test accessor: the live hp bar entries (order of creation). */
-  hpBarEntries(): { el: Container; world: { x: number; y: number } }[] {
-    return [...this.hpBars.values()].map((b) => ({ el: b.el, world: b.world }));
+  /** @private test accessor: the live hp bar entries (order of creation) plus
+   *  each bar's current green/ghost fill widths. */
+  hpBarEntries(): { el: Container; world: { x: number; y: number }; greenW: number; ghostW: number }[] {
+    return [...this.hpBars.values()].map((b) => ({ el: b.el, world: b.world, greenW: b.greenW, ghostW: b.ghostW }));
   }
 
   /** Recompute the screen-edge indicators for capturable villages that are

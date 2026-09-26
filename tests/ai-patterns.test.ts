@@ -11,6 +11,7 @@ import { analyzeSituation } from '../src/game/ai-situation';
 import { AI_DIFFICULTY_PROFILES } from '../src/game/ai-difficulty';
 import { GameMode } from '../src/game/game-mode';
 import { TRIBE_SPECIAL_UNIT } from '../src/game/tribes';
+import { makeTestMap, tileAt } from './helpers/test-map';
 
 function tile(
   q: number,
@@ -588,26 +589,36 @@ describe('AI patterns', () => {
     expect(TRIBE_SPECIAL_UNIT[Tribe.Cats]).toBe('stalker');
   });
 
-  it('special-unit-abilities hides an idle visible stalker', () => {
+  it('stalker-restealth hides an idle visible stalker near an enemy', () => {
     const map: GameMap = { radius: 4, tiles: [], spawns: [] };
     const stalker = tile(0, 0, null, {
       id: 'st', owner: 1, type: 'stalker', q: 0, r: 0,
       hasMoved: false, hasAttacked: false, hasHealed: false,
       hp: 60, attack: 30, attackDistance: 1, spawnVillage: null,
     });
-    map.tiles.push(stalker);
-    const actions = findPattern('special-unit-abilities').evaluate(ctx(map, player(100), new SeededRandom(1)));
+    map.tiles.push(stalker, tile(2, 0, null, warrior('enemy', 0, 2, 0)));
+    const actions = findPattern('stalker-restealth').evaluate(ctx(map, player(100), new SeededRandom(1)));
     expect(actions).toEqual([{ type: 'enableStealth', unitId: 'st' }]);
   });
 
-  it('special-unit-abilities does not stealth an already hidden stalker', () => {
+  it('stalker-restealth does not hide a stalker far from the enemy', () => {
+    const map: GameMap = { radius: 4, tiles: [], spawns: [] };
+    map.tiles.push(tile(0, 0, null, {
+      id: 'st', owner: 1, type: 'stalker', q: 0, r: 0,
+      hasMoved: false, hasAttacked: false, hasHealed: false,
+      hp: 60, attack: 30, attackDistance: 1, spawnVillage: null,
+    }), tile(9, 0, null, warrior('enemy', 0, 9, 0)));
+    expect(findPattern('stalker-restealth').evaluate(ctx(map, player(100), new SeededRandom(1)))).toBeNull();
+  });
+
+  it('stalker-restealth does not hide an already hidden stalker', () => {
     const map: GameMap = { radius: 4, tiles: [], spawns: [] };
     map.tiles.push(tile(0, 0, null, {
       id: 'st', owner: 1, type: 'stalker', q: 0, r: 0,
       hasMoved: false, hasAttacked: false, hasHealed: false,
       hp: 60, attack: 30, attackDistance: 1, spawnVillage: null, isStealthed: true,
-    }));
-    expect(findPattern('special-unit-abilities').evaluate(ctx(map, player(100), new SeededRandom(1)))).toBeNull();
+    }), tile(2, 0, null, warrior('enemy', 0, 2, 0)));
+    expect(findPattern('stalker-restealth').evaluate(ctx(map, player(100), new SeededRandom(1)))).toBeNull();
   });
 
   it('special-unit-abilities storms a stormcaller with an enemy ship on village waters', () => {
@@ -625,5 +636,122 @@ describe('AI patterns', () => {
     map.tiles[2]!.terrain = TileType.Water;
     const actions = findPattern('special-unit-abilities').evaluate(ctx(map, player(100), new SeededRandom(1)));
     expect(actions).toEqual([{ type: 'storm', unitId: 'sc' }]);
+  });
+});
+
+describe('AI special unit patterns', () => {
+  it('stunner-prefer-stun stuns a range-2 enemy instead of attacking', () => {
+    const map: GameMap = { radius: 4, tiles: [], spawns: [] };
+    map.tiles.push(
+      tile(0, 0, null, { id: 'su', owner: 1, type: 'stunner', q: 0, r: 0, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 40, attack: 20, attackDistance: 2, spawnVillage: null }),
+      tile(1, 0, null, warrior('adjacent', 0, 1, 0)),
+      tile(2, 0, null, warrior('far', 0, 2, 0)),
+    );
+    const actions = findPattern('stunner-prefer-stun').evaluate(ctx(map, player(100), new SeededRandom(1)));
+    expect(actions).toEqual([{ type: 'stun', unitId: 'su', q: 2, r: 0 }]);
+  });
+
+  it('stunner-prefer-stun returns nothing when no enemy sits at range 2', () => {
+    const map: GameMap = { radius: 4, tiles: [], spawns: [] };
+    map.tiles.push(
+      tile(0, 0, null, { id: 'su', owner: 1, type: 'stunner', q: 0, r: 0, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 40, attack: 20, attackDistance: 2, spawnVillage: null }),
+      tile(1, 0, null, warrior('adjacent', 0, 1, 0)),
+    );
+    expect(findPattern('stunner-prefer-stun').evaluate(ctx(map, player(100), new SeededRandom(1)))).toBeNull();
+  });
+
+  it('stalker-scout attacks only when it can kill an enemy standing in a village', () => {
+    const map: GameMap = { radius: 4, tiles: [], spawns: [] };
+    map.tiles.push(
+      tile(0, 0, null, { id: 'st', owner: 1, type: 'stalker', q: 0, r: 0, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 20, attack: 10, attackDistance: 1, spawnVillage: null }),
+      tile(1, 0, { owner: 0, level: 1, captureReady: false }, warrior('guard', 0, 1, 0, 5), 0),
+    );
+    const actions = findPattern('stalker-scout').evaluate(ctx(map, player(100), new SeededRandom(1)));
+    expect(actions).toEqual([{ type: 'attack', unitId: 'st', q: 1, r: 0 }]);
+  });
+
+  it('stalker-scout never attacks a village guard it cannot kill', () => {
+    const map: GameMap = { radius: 4, tiles: [], spawns: [] };
+    map.tiles.push(
+      tile(0, 0, null, { id: 'st', owner: 1, type: 'stalker', q: 0, r: 0, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 20, attack: 10, attackDistance: 1, spawnVillage: null }),
+      tile(1, 0, { owner: 0, level: 1, captureReady: false }, warrior('guard', 0, 1, 0, 50), 0),
+    );
+    expect(findPattern('stalker-scout').evaluate(ctx(map, player(100), new SeededRandom(1)))).toBeNull();
+  });
+
+  it('stalker-scout moves onto a free village to claim it', () => {
+    const map = makeTestMap(4);
+    tileAt(map, 0, 0)!.unit = { id: 'st', owner: 1, type: 'stalker', q: 0, r: 0, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 20, attack: 10, attackDistance: 1, spawnVillage: null };
+    tileAt(map, 2, 0)!.settlement = { owner: null, level: 1, captureReady: false };
+    const actions = findPattern('stalker-scout').evaluate(ctx(map, player(100), new SeededRandom(1)));
+    expect(actions).toEqual([{ type: 'move', unitId: 'st', q: 2, r: 0 }]);
+  });
+
+  it('banner-position holds still when it already covers two friendly units', () => {
+    const map: GameMap = { radius: 4, tiles: [], spawns: [] };
+    map.tiles.push(
+      tile(0, 0, null, { id: 'bn', owner: 1, type: 'banner', q: 0, r: 0, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 40, attack: 20, attackDistance: 1, spawnVillage: null }),
+      tile(0, 1, null, warrior('f1', 1, 0, 1)),
+      tile(1, 0, null, warrior('f2', 1, 1, 0)),
+    );
+    expect(findPattern('banner-position').evaluate(ctx(map, player(100), new SeededRandom(1)))).toBeNull();
+  });
+
+  it('builder-work builds an adjacent mine without the smithery skill', () => {
+    const map: GameMap = { radius: 4, tiles: [], spawns: [] };
+    const village = tile(0, 0, { owner: 1, level: 1, captureReady: false }, { id: 'bd', owner: 1, type: 'builder', q: 0, r: 0, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 40, attack: 10, attackDistance: 1, spawnVillage: null }, 1);
+    village.claimedByVillage = { q: 0, r: 0 };
+    const mountain = tile(1, 0, null, null, 1);
+    mountain.terrain = TileType.GrasslandMountain;
+    mountain.claimedByVillage = { q: 0, r: 0 };
+    map.tiles.push(village, mountain);
+    const actions = findPattern('builder-work').evaluate(ctx(map, player(100), new SeededRandom(1)));
+    expect(actions).toEqual([{ type: 'builderBuild', unitId: 'bd', q: 1, r: 0, kind: 'mine' }]);
+  });
+
+  it('trapper-lay plants a trap on an owned frontier cell', () => {
+    const map: GameMap = { radius: 4, tiles: [], spawns: [] };
+    map.tiles.push(
+      tile(0, 0, null, { id: 'tp', owner: 1, type: 'trapper', q: 0, r: 0, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 40, attack: 20, attackDistance: 1, spawnVillage: null }, 1),
+      tile(1, 0, null, null, 1),
+    );
+    map.tiles[1]!.exploredBy = []; // (1,0) unexplored → (0,0) is a frontier cell.
+    const actions = findPattern('trapper-lay').evaluate(ctx(map, player(100), new SeededRandom(1)));
+    expect(actions).toEqual([{ type: 'trap', unitId: 'tp', q: 0, r: 0 }]);
+  });
+
+  it('spawn-special-unit spawns a Villagers builder when a mine needs building without smithery', () => {
+    const map: GameMap = { radius: 4, tiles: [], spawns: [] };
+    const village = tile(0, 0, { owner: 1, level: 1, captureReady: false }, null, 1);
+    village.claimedByVillage = { q: 0, r: 0 };
+    const mountain = tile(1, 0, null, null, 1);
+    mountain.terrain = TileType.GrasslandMountain;
+    mountain.claimedByVillage = { q: 0, r: 0 };
+    map.tiles.push(village, mountain);
+    const actions = findPattern('spawn-special-unit').evaluate(ctx(map, player(100), new SeededRandom(1)));
+    expect(actions).toEqual([{ type: 'spawn', q: 0, r: 0, unitType: 'builder' }]);
+  });
+
+  it('spawn-special-unit does not spawn a second copy of the special unit', () => {
+    const map: GameMap = { radius: 4, tiles: [], spawns: [] };
+    const village = tile(0, 0, { owner: 1, level: 1, captureReady: false }, { id: 'bd', owner: 1, type: 'builder', q: 0, r: 0, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 40, attack: 10, attackDistance: 1, spawnVillage: null }, 1);
+    village.claimedByVillage = { q: 0, r: 0 };
+    const mountain = tile(1, 0, null, null, 1);
+    mountain.terrain = TileType.GrasslandMountain;
+    mountain.claimedByVillage = { q: 0, r: 0 };
+    map.tiles.push(village, mountain);
+    expect(findPattern('spawn-special-unit').evaluate(ctx(map, player(100), new SeededRandom(1)))).toBeNull();
+  });
+
+  it('spawn-special-unit spawns an Aqua stormcaller under a naval threat', () => {
+    const map: GameMap = { radius: 4, tiles: [], spawns: [] };
+    map.tiles.push(tile(0, 0, { owner: 1, level: 1, captureReady: false }, null, 1));
+    const situation = {
+      stance: 'defend' as const, enemies: [], dangers: [], endangered: true, frontTarget: null,
+      freeVillages: [], ownPower: 1, enemyPower: 1, navalThreat: true, navalEnemies: [], nearestNaval: null,
+    };
+    const context = { map, player: { ...player(100), tribe: Tribe.Aqua }, rng: new SeededRandom(1), state: state(), situation };
+    const actions = findPattern('spawn-special-unit').evaluate(context);
+    expect(actions).toEqual([{ type: 'spawn', q: 0, r: 0, unitType: 'stormcaller' }]);
   });
 });

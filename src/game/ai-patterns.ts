@@ -1,15 +1,15 @@
 import { GameMap, MapTile } from './map-gen';
 import { Player } from './players';
 import { canAfford, villageUpgradeCost } from './resources';
-import { isWaterType } from './tile-types';
+import { isWaterType, isMountainType } from './tile-types';
 import { canOpenSkill, hasSkill, SkillId } from './skills';
 import { reachableTargets, tileAt } from './selection';
 import { UNIT_MOVE_POINTS, UNIT_TYPES, UNIT_ATTACK_DISTANCE, canHeal, HEAL_AMOUNT, Unit, UnitType } from './units';
 import { SeededRandom } from '../util/random';
 import { hexDistance, hexNeighbors } from './hex';
 import { attackableTargets, attackDamage, canCounterAttack, counterDamageTo as counterDamageToFromCombat, resolveCombat, tradeIsFavorable } from './combat';
-import { canBuildPort, canBuildSawmill, canBuildMine, BUILDING_COSTS } from './buildings';
-import { unitsInVillage, villageCapacity } from './village';
+import { canBuildPort, canBuildSawmill, canBuildMine, builderBuildable, BUILDING_COSTS, type BuilderBuildableKind } from './buildings';
+import { unitsInVillage, villageCapacity, buildingsInVillage, villageBuildingLimit } from './village';
 import { isExploredFor } from './explore';
 import { AiAction, AiDirectives, AiPlannerState, SpawnPreference } from './ai-types';
 import { AiDifficultyProfile } from './ai-difficulty';
@@ -17,6 +17,8 @@ import { AiSituation, coastExposedTile, isMelee, isNavalEnemy } from './ai-situa
 import { isShip, shipAttackDistance, shipMovePoints, canUpgradeShip } from './ship';
 import { TRIBE_SPECIAL_UNIT } from './tribes';
 import { stormTargetShips } from './storm';
+import { TRAP_COST, trapCells } from './traps';
+import { adjacentEnemyVillages } from './stalker';
 
 export interface AiPatternContext {
   map: GameMap;
@@ -37,6 +39,11 @@ interface AiPattern {
 function key(q: number, r: number): string {
   return `${q},${r}`;
 }
+
+/** A visible stalker within this many hexes of an enemy re-hides instead of
+ *  staying exposed (stealth costs a whole turn, so far-from-danger stalkers
+ *  keep scouting instead of hiding pointlessly). */
+const STALKER_STEALTH_RADIUS = 6;
 
 /** Movement and attack reach of a unit in hexes, honoring ship stat tables.
  *  Ships keep their land-unit `.type`, so the raw MOVE_POINTS/ATTACK_DISTANCE
@@ -80,6 +87,88 @@ export function enemyCanAttackNext(map: GameMap, tile: MapTile, playerIndex: num
     const reach = enemyReach(t.unit);
     return hexDistance(tile, t) <= reach.move + reach.attack;
   });
+}
+
+/** Non-combat special units: the Villagers builder, the Forest trapper and the
+ *  Warriors banner. They never attack and the AI keeps them out of fights —
+ *  they build, plant traps and buff their neighbours instead. */
+export function isSupportUnit(unit: Unit): boolean {
+  return unit.type === 'builder' || unit.type === 'trapper' || unit.type === 'banner';
+}
+
+/** Number of the player's own units within `dist` hexes of `tile` (excluding a
+ *  unit standing on it). Used to keep the banner inside its aura cluster. */
+function friendlyUnitsWithin(map: GameMap, owner: number, tile: MapTile, dist: number): number {
+  let n = 0;
+  for (const t of map.tiles) {
+    if (!t.unit || t.unit.owner !== owner) continue;
+    if (t.q === tile.q && t.r === tile.r) continue;
+    if (hexDistance(tile, t) <= dist) n += 1;
+  }
+  return n;
+}
+
+/** Own unbuilt mountain the Villagers builder could turn into a mine (owned,
+ *  claimed by an own settlement with a free slot). */
+function builderHasMineToBuild(map: GameMap, player: Player): boolean {
+  return map.tiles.some((t) => {
+    if (t.ownedBy !== player.index || t.building || t.settlement) return false;
+    if (!isMountainType(t.terrain)) return false;
+    if (!t.claimedByVillage) return false;
+    const village = map.tiles.find(
+      (x) => x.q === t.claimedByVillage!.q && x.r === t.claimedByVillage!.r && x.settlement?.owner === player.index,
+    );
+    return village !== undefined && buildingsInVillage(map, village) < villageBuildingLimit(village.settlement!.level);
+  });
+}
+
+/** The builder is summoned when a mine is wanted but no mining skill is open:
+ *  only then does the builder, who builds without any skill, unlock it. */
+function builderWanted(map: GameMap, player: Player): boolean {
+  if (hasSkill(player, 'smithery')) return false;
+  if (!builderHasMineToBuild(map, player)) {
+    // No mine site yet, but a bare owned mountain claim list is enough to aim for.
+    if (!map.tiles.some((t) => t.ownedBy === player.index && !t.building && !t.settlement && isMountainType(t.terrain))) return false;
+  }
+  return true;
+}
+
+/** A trap is only useful where someone walks: on the border of our territory
+ *  or adjacent to unexplored ground / an already trapped route. */
+function frontierTile(map: GameMap, tile: MapTile, playerIndex: number): boolean {
+  if (!isExploredFor(tile, playerIndex)) return false;
+  return hexNeighbors(tile).some((n) => {
+    const nt = tileAt(map, n.q, n.r);
+    if (!nt) return false;
+    if (!isExploredFor(nt, playerIndex)) return true;
+    return nt.ownedBy !== null && nt.ownedBy !== playerIndex;
+  });
+}
+
+/** Whether the tribe's special unit is worth fielding right now. */
+function specialUnitWanted(
+  map: GameMap,
+  player: Player,
+  situation: AiSituation | undefined,
+): boolean {
+  const special = TRIBE_SPECIAL_UNIT[player.tribe];
+  switch (special) {
+    case 'stormcaller':
+      return !!situation?.navalThreat;
+    case 'banner':
+      return map.tiles.filter((t) => t.unit && t.unit.owner === player.index).length >= 3;
+    case 'stalker':
+      return map.tiles.some((t) => !isExploredFor(t, player.index)) || map.tiles.some((t) => t.settlement && t.settlement.owner !== player.index);
+    case 'trapper':
+      return map.tiles.some((t) => t.ownedBy === player.index && frontierTile(map, t, player.index));
+    case 'builder':
+      return builderWanted(map, player);
+    case 'stunner':
+    case 'berserker':
+      return (situation?.enemies.length ?? 0) > 0 || situation?.stance === 'war';
+    default:
+      return false;
+  }
 }
 
 const SPAWN_ORDER: Record<SpawnPreference, UnitType[]> = {
@@ -216,6 +305,9 @@ function attackersForTile(
     const unit = t.unit;
     if (!unit || unit.owner !== player.index) continue;
     if (state.acted.has(unit.id) || state.moved.has(unit.id)) continue;
+    // Support units and stalkers never join a gang-up: the builder/trapper/
+    // banner have jobs to do and the stalker only strikes to free a village.
+    if (isSupportUnit(unit) || unit.type === 'stalker') continue;
     const endangeredGarrison =
       !!t.settlement && t.settlement.owner === player.index && enemyCanReach(map, t, player.index);
     if (attackableTargets(map, unit, player.index).some((a) => a.q === targetTile.q && a.r === targetTile.r)) {
@@ -256,6 +348,37 @@ export const AI_PATTERNS: AiPattern[] = [
     },
   },
   {
+    id: 'stunner-prefer-stun',
+    priority: 210,
+    evaluate({ map, player, state }): AiAction[] | null {
+      // The stunner is a regular ranged combat unit (it attacks like any
+      // ranged unit), but when an enemy sits at full reach it prefers the stun:
+      // no damage, no counter, and the target loses its turn.
+      for (const t of map.tiles) {
+        const unit = t.unit;
+        if (!unit || unit.owner !== player.index) continue;
+        if (unit.type !== 'stunner') continue;
+        if (unit.shipLevel !== undefined) continue;
+        if (state.acted.has(unit.id) || state.moved.has(unit.id)) continue;
+        if (unit.hasMoved || unit.hasAttacked || unit.hasHealed) continue;
+        let best: MapTile | null = null;
+        let bestScore = -Infinity;
+        for (const e of map.tiles) {
+          if (!e.unit || e.unit.owner === player.index) continue;
+          if (!isExploredFor(e, player.index)) continue;
+          if (hexDistance(unit, e) !== 2) continue;
+          const score = attackDamage(e.unit);
+          if (score > bestScore) {
+            bestScore = score;
+            best = e;
+          }
+        }
+        if (best) return [{ type: 'stun', unitId: unit.id, q: best.q, r: best.r }];
+      }
+      return null;
+    },
+  },
+  {
     id: 'attack-enemy-in-village',
     priority: 200,
     evaluate({ map, player, state }): AiAction[] | null {
@@ -272,6 +395,10 @@ export const AI_PATTERNS: AiPattern[] = [
         const unit = t.unit;
         if (!unit || unit.owner !== player.index) continue;
         if (state.acted.has(unit.id)) continue;
+        // Support units never join a fight; a stalker strikes only when it can
+        // kill the defender outright.
+        if (isSupportUnit(unit)) continue;
+        if (unit.type === 'stalker' && enemyInVillage.unit && attackDamage(unit) < enemyInVillage.unit.hp) continue;
         if (
           attackableTargets(map, unit, unit.owner).some(
             (a) => a.q === enemyInVillage.q && a.r === enemyInVillage.r,
@@ -348,6 +475,133 @@ export const AI_PATTERNS: AiPattern[] = [
     },
   },
   {
+    id: 'stalker-restealth',
+    priority: 132,
+    evaluate({ map, player, state }): AiAction[] | null {
+      // A stalker exposed near the enemy re-hides (stealth is lost by attacking
+      // or ending a move beside an enemy village). Far from danger it stays
+      // visible and scouts instead — hiding pointlessly wastes a whole turn.
+      for (const t of map.tiles) {
+        const unit = t.unit;
+        if (!unit || unit.owner !== player.index) continue;
+        if (unit.type !== 'stalker' || unit.shipLevel !== undefined) continue;
+        if (unit.isStealthed) continue;
+        if (state.acted.has(unit.id) || state.moved.has(unit.id)) continue;
+        if (unit.hasMoved || unit.hasAttacked || unit.hasHealed) continue;
+        // The holster cannot hide while standing beside an enemy village.
+        if (adjacentEnemyVillages(map, unit, player.index).length > 0) continue;
+        if (nearestEnemyDistanceFrom(map, player.index, t) > STALKER_STEALTH_RADIUS) continue;
+        return [{ type: 'enableStealth', unitId: unit.id }];
+      }
+      return null;
+    },
+  },
+  {
+    id: 'stalker-scout',
+    priority: 131,
+    evaluate({ map, player, state, situation }): AiAction[] | null {
+      // The stalker is the Cats' scout: it explores to find villages, claims
+      // empty ones and free villages, and only ever fights to kill a defender
+      // standing inside a village so the tile can be claimed afterwards.
+      const canClimb = hasSkill(player, 'climbing');
+      const canDock = hasSkill(player, 'navigation');
+      for (const t of map.tiles) {
+        const unit = t.unit;
+        if (!unit || unit.owner !== player.index) continue;
+        if (unit.type !== 'stalker') continue;
+        if (unit.shipLevel !== undefined) continue;
+        if (state.acted.has(unit.id) || state.moved.has(unit.id)) continue;
+        if (t.settlement && t.settlement.owner === player.index && enemyCanReach(map, t, player.index)) continue;
+
+        // 1. Kill an enemy standing inside a village (its only combat) so the
+        //    village tile can be taken next turn.
+        let killTile: MapTile | null = null;
+        let killStep: MapTile | null = null;
+        for (const e of map.tiles) {
+          if (!e.settlement || !e.unit || e.unit.owner === player.index) continue;
+          if (!isExploredFor(e, player.index)) continue;
+          if (attackableTargets(map, unit, player.index).some((a) => a.q === e.q && a.r === e.r)) {
+            if (attackDamage(unit) >= e.unit.hp) {
+              killTile = e;
+              killStep = null;
+              break;
+            }
+            continue;
+          }
+          for (const c of reachableTargets(map, unit, undefined, canClimb, canDock, player.index)) {
+            if (state.occupied.has(key(c.q, c.r))) continue;
+            if (c.settlement && c.settlement.owner === player.index) continue;
+            const ghost: Unit = { ...unit, q: c.q, r: c.r };
+            if (
+              attackableTargets(map, ghost, player.index).some((a) => a.q === e.q && a.r === e.r) &&
+              attackDamage(unit) >= e.unit.hp
+            ) {
+              killTile = e;
+              killStep = c;
+              break;
+            }
+          }
+          if (killTile) break;
+        }
+        if (killTile) {
+          return killStep
+            ? [
+                { type: 'move', unitId: unit.id, q: killStep.q, r: killStep.r },
+                { type: 'attack', unitId: unit.id, q: killTile.q, r: killTile.r },
+              ]
+            : [{ type: 'attack', unitId: unit.id, q: killTile.q, r: killTile.r }];
+        }
+
+        // 2. Move onto an empty (free) village to claim it.
+        for (const v of map.tiles) {
+          if (!v.settlement || v.settlement.owner !== null) continue;
+          if (v.unit) continue;
+          if (state.occupied.has(key(v.q, v.r))) continue;
+          if (!reachableTargets(map, unit, undefined, canClimb, canDock, player.index).some((c) => c.q === v.q && c.r === v.r)) continue;
+          return [{ type: 'move', unitId: unit.id, q: v.q, r: v.r }];
+        }
+
+        // 3. Scout one step toward unexplored ground or an empty enemy village.
+        let goal: MapTile | null = null;
+        let goalDist = Infinity;
+        for (const g of map.tiles) {
+          if (!isExploredFor(g, player.index)) {
+            const d = hexDistance(t, g);
+            if (d < goalDist) {
+              goalDist = d;
+              goal = g;
+            }
+            continue;
+          }
+          if (g.settlement && g.settlement.owner !== player.index && !g.unit) {
+            const d = hexDistance(t, g);
+            if (d < goalDist) {
+              goalDist = d;
+              goal = g;
+            }
+          }
+        }
+        if (goal) {
+          let bestStep: MapTile | null = null;
+          let bestDist = Infinity;
+          for (const c of reachableTargets(map, unit, undefined, canClimb, canDock, player.index)) {
+            if (state.occupied.has(key(c.q, c.r))) continue;
+            if (c.settlement && c.settlement.owner === player.index) continue;
+            if (situation?.navalThreat && coastExposedTile(map, c, situation.navalEnemies)) continue;
+            const d = hexDistance(c, goal);
+            if (d >= hexDistance(t, goal)) continue;
+            if (d < bestDist) {
+              bestDist = d;
+              bestStep = c;
+            }
+          }
+          if (bestStep) return [{ type: 'move', unitId: unit.id, q: bestStep.q, r: bestStep.r }];
+        }
+      }
+      return null;
+    },
+  },
+  {
     id: 'capture-free-village',
     priority: 130,
     evaluate({ map, player, state }): AiAction[] | null {
@@ -364,6 +618,7 @@ export const AI_PATTERNS: AiPattern[] = [
           const unit = t.unit;
           if (!unit || unit.owner !== player.index) continue;
           if (state.acted.has(unit.id) || state.moved.has(unit.id)) continue;
+          if (isSupportUnit(unit)) continue;
           if (t.settlement && t.settlement.owner === player.index && enemyCanReach(map, t, player.index)) continue;
           if (
             !reachableTargets(map, unit, undefined, canClimb, canDock, player.index).some(
@@ -450,6 +705,7 @@ export const AI_PATTERNS: AiPattern[] = [
           const unit = t.unit;
           if (!unit || unit.owner !== player.index) continue;
           if (state.acted.has(unit.id) || state.moved.has(unit.id)) continue;
+          if (isSupportUnit(unit)) continue;
           if (t.settlement && t.settlement.owner === player.index) continue;
           // A unit that can strike an enemy this turn is pressing that fight —
           // do not strip it for garrison duty (that causes pointless retreat
@@ -495,6 +751,7 @@ export const AI_PATTERNS: AiPattern[] = [
           const unit = src.unit;
           if (!unit || unit.owner !== player.index) continue;
           if (state.acted.has(unit.id) || state.moved.has(unit.id)) continue;
+          if (isSupportUnit(unit)) continue;
           // Don't strip the last defender from a village an enemy could reach.
           if (src.settlement && src.settlement.owner === player.index && enemyCanReach(map, src, player.index)) continue;
           if (state.occupied.has(key(t.q, t.r))) continue;
@@ -525,6 +782,7 @@ export const AI_PATTERNS: AiPattern[] = [
           const unit = t.unit;
           if (!unit || unit.owner !== player.index) continue;
           if (state.acted.has(unit.id) || state.moved.has(unit.id)) continue;
+          if (isSupportUnit(unit)) continue;
           if (enemyCanAttackNext(map, t, player.index)) continue;
           if (t.settlement && t.settlement.owner === player.index && enemyCanReach(map, t, player.index)) continue;
           const reach = reachableTargets(map, unit, undefined, canClimb, canDock, player.index).filter(
@@ -581,6 +839,8 @@ export const AI_PATTERNS: AiPattern[] = [
         const unit = t.unit;
         if (!unit || unit.owner !== player.index) continue;
         if (state.acted.has(unit.id) || state.moved.has(unit.id)) continue;
+        // Support units don't retaliate and the stalker avoids combat entirely.
+        if (isSupportUnit(unit) || unit.type === 'stalker') continue;
         // Ships have their own naval-hunt pattern; don't retreat them here.
         if (unit.shipLevel !== undefined) continue;
         // Don't retreat the last defender out of an endangered own village;
@@ -631,6 +891,7 @@ export const AI_PATTERNS: AiPattern[] = [
           const unit = t.unit;
           if (!unit || unit.owner !== player.index) continue;
           if (state.acted.has(unit.id) || state.moved.has(unit.id)) continue;
+          if (isSupportUnit(unit)) continue;
           if (t.settlement && t.settlement.owner === player.index) continue;
           const reach = reachableTargets(map, unit, undefined, canClimb, canDock, player.index);
           if (!reach.some((c) => c.q === v.q && c.r === v.r)) continue;
@@ -692,6 +953,145 @@ export const AI_PATTERNS: AiPattern[] = [
           return [{ type: 'heal', unitId: unit.id, q: t.q, r: t.r }];
         }
         return null;
+      }
+      return null;
+    },
+  },
+  {
+    id: 'banner-position',
+    priority: 88,
+    evaluate({ map, player, state, situation }): AiAction[] | null {
+      // The banner is an aura (friends within 2 hexes get +10 attack): keep it
+      // next to the army cluster and never send it into a fight.
+      const canClimb = hasSkill(player, 'climbing');
+      const canDock = hasSkill(player, 'navigation');
+      for (const t of map.tiles) {
+        const unit = t.unit;
+        if (!unit || unit.owner !== player.index) continue;
+        if (unit.type !== 'banner') continue;
+        if (unit.shipLevel !== undefined) continue;
+        if (state.acted.has(unit.id) || state.moved.has(unit.id)) continue;
+        // Already covering at least two friends: hold position.
+        if (friendlyUnitsWithin(map, player.index, t, 2) >= 2) continue;
+        let bestStep: MapTile | null = null;
+        let bestScore = -Infinity;
+        for (const c of reachableTargets(map, unit, undefined, canClimb, canDock, player.index)) {
+          if (state.occupied.has(key(c.q, c.r))) continue;
+          if (c.settlement && c.settlement.owner !== player.index) continue;
+          if (enemyCanAttackNext(map, c, player.index)) continue;
+          if (situation?.navalThreat && coastExposedTile(map, c, situation.navalEnemies)) continue;
+          const allies = friendlyUnitsWithin(map, player.index, c, 2);
+          const score = allies * 20 - hexDistance(t, c);
+          if (score > bestScore) {
+            bestScore = score;
+            bestStep = c;
+          }
+        }
+        if (bestStep && bestScore > 0) return [{ type: 'move', unitId: unit.id, q: bestStep.q, r: bestStep.r }];
+      }
+      return null;
+    },
+  },
+  {
+    id: 'builder-work',
+    priority: 87,
+    evaluate({ map, player, state }): AiAction[] | null {
+      // The Villagers builder raises buildings without any skill: send it to a
+      // mine when mining is locked (smithery), a sawmill when forestry is
+      // locked, and otherwise to the best mine/sawmill site. It never fights.
+      const canClimb = hasSkill(player, 'climbing');
+      const canDock = hasSkill(player, 'navigation');
+      for (const t of map.tiles) {
+        const unit = t.unit;
+        if (!unit || unit.owner !== player.index) continue;
+        if (unit.type !== 'builder') continue;
+        if (unit.shipLevel !== undefined) continue;
+        if (state.acted.has(unit.id) || state.moved.has(unit.id)) continue;
+        if (t.settlement && t.settlement.owner === player.index && enemyCanReach(map, t, player.index)) continue;
+        const kinds: Exclude<BuilderBuildableKind, 'bridge'>[] = [];
+        if (!hasSkill(player, 'smithery')) kinds.push('mine');
+        if (!hasSkill(player, 'forestry')) kinds.push('sawmill');
+        if (!kinds.includes('mine')) kinds.unshift('mine');
+        if (!kinds.includes('sawmill')) kinds.push('sawmill');
+        kinds.push('port');
+        for (const kind of kinds) {
+          if (!canAfford(player.resources, BUILDING_COSTS[kind])) continue;
+          // Already standing where it can build something.
+          const local = builderBuildable(map, t, kind, player);
+          if (local.length > 0) {
+            return [{ type: 'builderBuild', unitId: unit.id, q: local[0]!.q, r: local[0]!.r, kind }];
+          }
+          let bestStep: MapTile | null = null;
+          let bestDist = Infinity;
+          for (const c of reachableTargets(map, unit, undefined, canClimb, canDock, player.index)) {
+            if (state.occupied.has(key(c.q, c.r))) continue;
+            if (c.settlement) continue;
+            if (enemyCanAttackNext(map, c, player.index)) continue;
+            if (builderBuildable(map, c, kind, player).length === 0) continue;
+            const d = hexDistance(t, c);
+            if (d < bestDist) {
+              bestDist = d;
+              bestStep = c;
+            }
+          }
+          if (bestStep) return [{ type: 'move', unitId: unit.id, q: bestStep.q, r: bestStep.r }];
+        }
+      }
+      return null;
+    },
+  },
+  {
+    id: 'trapper-lay',
+    priority: 86,
+    evaluate({ map, player, state, situation }): AiAction[] | null {
+      // The Forest trapper lays thorn traps on the front lines and never
+      // fights: it stays back from combat and plants traps on likely enemy paths.
+      const canClimb = hasSkill(player, 'climbing');
+      const canDock = hasSkill(player, 'navigation');
+      for (const t of map.tiles) {
+        const unit = t.unit;
+        if (!unit || unit.owner !== player.index) continue;
+        if (unit.type !== 'trapper') continue;
+        if (unit.shipLevel !== undefined) continue;
+        if (state.acted.has(unit.id) || state.moved.has(unit.id)) continue;
+        if (t.settlement && t.settlement.owner === player.index && enemyCanReach(map, t, player.index)) continue;
+
+        // Lay a trap now when affordable, on the best cell within reach.
+        const spots = trapCells(map, t);
+        if (spots.length > 0 && canAfford(player.resources, TRAP_COST)) {
+          let best: MapTile | null = null;
+          let bestScore = -Infinity;
+          for (const s of spots) {
+            const frontier = frontierTile(map, s, player.index) ? 30 : 0;
+            const nearEnemy = nearestEnemyDistanceFrom(map, player.index, s) <= 3 ? 20 : 0;
+            const score = frontier + nearEnemy - hexDistance(t, s);
+            if (score > bestScore) {
+              bestScore = score;
+              best = s;
+            }
+          }
+          if (best) return [{ type: 'trap', unitId: unit.id, q: best.q, r: best.r }];
+        }
+
+        // Otherwise move toward a camp where a trap can cover a frontier tile.
+        let bestStep: MapTile | null = null;
+        let bestScore = -Infinity;
+        for (const c of reachableTargets(map, unit, undefined, canClimb, canDock, player.index)) {
+          if (state.occupied.has(key(c.q, c.r))) continue;
+          if (c.settlement) continue;
+          if (enemyCanAttackNext(map, c, player.index)) continue;
+          if (situation?.navalThreat && coastExposedTile(map, c, situation.navalEnemies)) continue;
+          let cover = 0;
+          for (const s of trapCells(map, c)) {
+            if (frontierTile(map, s, player.index)) cover += 10;
+          }
+          const score = cover - hexDistance(t, c);
+          if (score > bestScore) {
+            bestScore = score;
+            bestStep = c;
+          }
+        }
+        if (bestStep && bestScore > 0) return [{ type: 'move', unitId: unit.id, q: bestStep.q, r: bestStep.r }];
       }
       return null;
     },
@@ -770,6 +1170,9 @@ export const AI_PATTERNS: AiPattern[] = [
         const unit = t.unit;
         if (!unit || unit.owner !== player.index) continue;
         if (state.acted.has(unit.id) || state.moved.has(unit.id)) continue;
+        // Support units don't hunt; the stalker only strikes to free a village
+        // (handled by its own scout pattern), so keep it out of general hunts.
+        if (isSupportUnit(unit) || unit.type === 'stalker') continue;
         if (t.settlement && t.settlement.owner === player.index) continue;
         const melee = isMelee(unit);
         for (const e of situation.enemies) {
@@ -1033,6 +1436,8 @@ export const AI_PATTERNS: AiPattern[] = [
         const unit = t.unit;
         if (!unit || unit.owner !== player.index) continue;
         if (state.acted.has(unit.id) || state.moved.has(unit.id)) continue;
+        // Support units stay on their jobs (build/trap/buff), not scouting.
+        if (isSupportUnit(unit)) continue;
         if (t.settlement && t.settlement.owner === player.index && enemyCanReach(map, t, player.index)) continue;
         for (const c of reachableTargets(map, unit, undefined, canClimb, canDock, player.index)) {
           if (state.occupied.has(key(c.q, c.r))) continue;
@@ -1053,6 +1458,56 @@ export const AI_PATTERNS: AiPattern[] = [
       }
       if (best) return [{ type: 'move', unitId: best.unit.id, q: best.target.q, r: best.target.r }];
       return null;
+    },
+  },
+  {
+    id: 'spawn-special-unit',
+    priority: 65,
+    evaluate({ map, player, state, situation }): AiAction[] | null {
+      // Each tribe fields its special unit when it is actually useful (naval
+      // stormcaller, mine-locked builder, scout stalker, etc.); a second copy
+      // is only spawned after the first one dies.
+      const special = TRIBE_SPECIAL_UNIT[player.tribe];
+      if (!special) return null;
+      if (map.tiles.some((t) => t.unit && t.unit.owner === player.index && t.unit.type === special)) return null;
+      if (!specialUnitWanted(map, player, situation)) return null;
+      const cost = { wood: UNIT_TYPES[special].priceWood, stone: 0, money: UNIT_TYPES[special].price, ore: UNIT_TYPES[special].priceOre };
+      if (!canAfford(player.resources, cost)) return null;
+      // Pick the village that puts the special unit where it works: the banner
+      // next to the army cluster, the builder beside an unbuilt mine, everyone
+      // else on the front line.
+      let best: MapTile | null = null;
+      let bestScore = -Infinity;
+      const mineDist = (v: MapTile): number => {
+        let d = Infinity;
+        for (const t of map.tiles) {
+          if (t.ownedBy !== player.index || t.building || t.settlement) continue;
+          if (!isMountainType(t.terrain)) continue;
+          d = Math.min(d, hexDistance(v, t));
+        }
+        return d;
+      };
+        for (const v of map.tiles) {
+          if (!v.settlement || v.settlement.owner !== player.index) continue;
+          if (v.unit) continue;
+          const k = key(v.q, v.r);
+          if (state.spawned.has(k) || state.occupied.has(k)) continue;
+          const enemyDist = nearestEnemyDistanceFrom(map, player.index, v);
+          const score =
+            special === 'banner'
+              ? friendlyUnitsWithin(map, player.index, v, 3) * 100
+              : special === 'builder'
+                ? -mineDist(v)
+                : Number.isFinite(enemyDist)
+                  ? -enemyDist
+                  : 0;
+          if (score > bestScore) {
+            bestScore = score;
+            best = v;
+          }
+        }
+      if (!best) return null;
+      return [{ type: 'spawn', q: best.q, r: best.r, unitType: special }];
     },
   },
   {
@@ -1088,27 +1543,15 @@ export const AI_PATTERNS: AiPattern[] = [
     id: 'special-unit-abilities',
     priority: 20,
     evaluate({ map, player }): AiAction[] | null {
-      // Light use of the tribe special abilities: hide idle visible stalkers,
-      // storm when enemy/pirate ships sit on a stormcaller's village waters,
-      // and stun-ranged targets from a stunner at full reach.
+      // Storm when enemy or pirate ships sit on a stormcaller's village waters.
+      // Stalker stealth and stunner stun have their own higher-priority
+      // patterns (stalker-restealth, stunner-prefer-stun).
       for (const t of map.tiles) {
         const u = t.unit;
         if (!u || u.owner !== player.index) continue;
         const idle = !u.hasMoved && !u.hasAttacked && !u.hasHealed;
-        if (u.type === 'stalker' && idle && !u.isStealthed && u.shipLevel === undefined) {
-          return [{ type: 'enableStealth', unitId: u.id }];
-        }
         if (u.type === 'stormcaller' && idle && stormTargetShips(map, u).length > 0) {
           return [{ type: 'storm', unitId: u.id }];
-        }
-        if (u.type === 'stunner' && idle) {
-          const reach2 = attackableTargets(map, u, player.index).filter(
-            (x) => hexDistance({ q: u.q, r: u.r }, x) === 2,
-          );
-          if (reach2.length > 0) {
-            const x = reach2[0]!;
-            return [{ type: 'stun', unitId: u.id, q: x.q, r: x.r }];
-          }
         }
       }
       return null;

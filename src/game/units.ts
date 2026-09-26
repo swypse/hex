@@ -38,7 +38,7 @@ export const UNIT_TYPES: Record<UnitType, UnitTypeInfo> = {
   stalker: { movePoints: 20, attack: 10, attackDistance: 1, maxHp: 20, defense: 0, price: 9, priceWood: 0, priceOre: 2, shape: 'circle' },
   builder: { movePoints: 8, attack: 10, attackDistance: 1, maxHp: 40, defense: 0, price: 15, priceWood: 0, priceOre: 0, shape: 'circle' },
   banner: { movePoints: 8, attack: 20, attackDistance: 1, maxHp: 40, defense: 8, price: 7, priceWood: 0, priceOre: 2, shape: 'circle' },
-  berserker: { movePoints: 10, attack: 30, attackDistance: 1, maxHp: 50, defense: 8, price: 11, priceWood: 0, priceOre: 3, shape: 'circle' },
+  berserker: { movePoints: 10, attack: 26, attackDistance: 1, maxHp: 50, defense: 8, price: 11, priceWood: 0, priceOre: 3, shape: 'circle' },
   trapper: { movePoints: 10, attack: 20, attackDistance: 1, maxHp: 40, defense: 8, price: 9, priceWood: 0, priceOre: 2, shape: 'circle' },
   stormcaller: { movePoints: 20, attack: 20, attackDistance: 1, maxHp: 40, defense: 8, price: 9, priceWood: 0, priceOre: 2, shape: 'circle' },
   stunner: { movePoints: 8, attack: 20, attackDistance: 2, maxHp: 40, defense: 10, price: 7, priceWood: 0, priceOre: 2, shape: 'circle' },

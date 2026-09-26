@@ -131,7 +131,10 @@ export function duel(
     if (total <= 0) return { dmg: 0, counter: 0 };
     const dmg = Math.round((attackForce / total) * att.attack * COMBAT_SCALE);
     const canCounter = distance <= def.attackDistance && canCounterAttackType(defType);
-    const counter = canCounter ? Math.round((defenseForce / total) * (def.defense ?? 0) * COMBAT_SCALE) : 0;
+    // A shield's counter-attack is doubled in the real combat formula too
+    // (resolveCombat), so the report's duels stay accurate.
+    const counterMult = defType === 'shield' ? 2 : 1;
+    const counter = canCounter ? Math.round((defenseForce / total) * (def.defense ?? 0) * COMBAT_SCALE * counterMult) : 0;
     return { dmg, counter };
   };
 

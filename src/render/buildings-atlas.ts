@@ -9,6 +9,7 @@ const TEXTURE_BASE = `${import.meta.env.BASE_URL}textures/`;
 export const BUILDING_TILE_FILES: string[] = [
   'sawmill',
   'mine',
+  'trap',
   'bridge-nw',
   'bridge-ne',
   'bridge-we',
