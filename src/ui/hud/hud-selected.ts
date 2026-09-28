@@ -241,9 +241,9 @@ export class HudSelected implements Widget {
 
     let maxW = 0;
     const lineH = 18;
-    // The info panel is capped at half the screen width; any line that would
+    // The info panel is capped at 80% of the screen width; any line that would
     // exceed the panel's inner width is word-wrapped to fit.
-    const capW = Math.floor((this.host?.app?.screen?.width ?? 0) * 0.5);
+    const capW = Math.floor((this.host?.app?.screen?.width ?? 0) * 0.8);
     const innerW = Math.max(120, capW - 22);
     let y = 8;
     const lineWidths: number[] = [];

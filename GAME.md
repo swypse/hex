@@ -58,7 +58,7 @@ its own artwork and its own spawn-popup icon (`action-spawn-<type>`).
 |-------------|------------|------|--------|-------|----|---------|------------------|
 | Stalker     | Cats       | 20   | 10     | 1     | 20 | 0       | 9 money + 2 ore  |
 | Builder     | Villagers  | 8    | 10     | 1     | 40 | 0       | 15 money         |
-| Banner      | Warriors   | 8    | 20     | 1     | 40 | 8       | 7 money + 2 ore  |
+| Banner      | Warriors   | 8    | 20     | 1     | 30 | 0       | 7 money + 2 ore  |
 | Berserker   | Barbarians | 10   | 26     | 1     | 50 | 8       | 11 money + 3 ore |
 | Trapper     | Forest     | 10   | 20     | 1     | 40 | 8       | 9 money + 2 ore  |
 | Stormcaller | Aqua       | 20   | 20     | 1     | 40 | 8       | 9 money + 2 ore  |
@@ -76,8 +76,8 @@ its own artwork and its own spawn-popup icon (`action-spawn-<type>`).
   stealthed stalker left beside a free village is revealed instantly if an enemy captures it.
 - **Builder (building)** — Consumes its turn to build a sawmill, mine, port or bridge on its own or an adjacent owned
   cell — no building skill required, costs unchanged. Cannot build while aboard a ship.
-- **Banner (war cry)** — Allies within 2 hexes (never the banner itself) gain +10 attack; bonuses from several banners
-  do not stack, and the bonus disappears when the banner dies. Recipients show an `attack-16` icon with `+10` next to
+- **Banner (war cry)** — Allies within 2 hexes (never the banner itself) gain +5 attack; bonuses from several banners
+  do not stack, and the bonus disappears when the banner dies. Recipients show an `attack-16` icon with `+5` next to
   their HP bar.
 - **Berserker (rage)** — At 35% HP or less it gains +10 attack and takes no counter-attack damage. Shows an
   `attack-16` icon with `+10` while raging.

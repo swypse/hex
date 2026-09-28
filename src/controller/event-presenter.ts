@@ -18,7 +18,7 @@ import { TextureSet } from '../render/texture-factory';
 import { useGameStore } from '../store/game-store';
 import { EXPLORED_SCORE } from '../game/score';
 import { makeLabel } from '../ui/kit/label';
-import { FONT_BLACK } from '../ui/kit/bitmap-fonts';
+import { FONT_BLACK, sizedFontFamily } from '../ui/kit/bitmap-fonts';
 import { saveRepository } from '../storage/save-game';
 import { BonusKind } from '../game/bonus';
 import { SKILLS } from '../game/skills';
@@ -215,8 +215,10 @@ export class EventPresenter {
             break;
           case 'attack':
             hadAttack = true;
-            await this.presentAttack(e, this.presenceOverrides(events, i + 1));
-            this.applyPostAttackHp(events, i);
+            await this.presentAttack(e, this.presenceOverrides(events, i + 1), () => this.setPostAttackHp(events, i));
+            // Idempotent safety net for early exits inside presentAttack.
+            this.setPostAttackHp(events, i);
+            this.host.render();
             break;
           case 'siege':
             hadAttack = true;
@@ -392,19 +394,23 @@ export class EventPresenter {
 
   /** After an attack is presented, drop the affected units' hp display to the
    *  value they should have until their next attack in this batch (their real
-   *  post-battle hp when none follows). */
-  private applyPostAttackHp(events: GameEvent[], index: number): void {
+   *  post-battle hp when none follows). Only these two units are touched: every
+   *  other unit keeps its pre-batch hp hold until its own attack plays. */
+  private setPostAttackHp(events: GameEvent[], index: number): void {
     const mapView = this.host.mapView();
     if (!mapView) return;
     for (const step of hpOverrideAfterAttack(events, index)) {
       mapView.setHpOverride(step.unitId, step.hp);
     }
-    this.host.render();
   }
 
+  /** `settleHp` moves the attack's two units from their held pre-attack hp to
+   *  the hp they show afterwards; it runs right before the final render so the
+   *  bar never flashes back to the pre-attack value or the final sim hp. */
   private async presentAttack(
     e: Extract<GameEvent, { type: 'attack' }>,
     keep: Map<string, Unit>,
+    settleHp: () => void,
   ): Promise<void> {
     const sim = this.host.sim();
     if (!sim) return;
@@ -489,25 +495,21 @@ export class EventPresenter {
           await this.presentStagedAttack(e, attackerTile, targetTile, targetVisible, attackerAdvanced, facing, impact, keep, attackerShot);
         }
       } finally {
+        settleHp();
         mapView.setUnitOverrides(keep);
         this.host.render();
       }
     } else {
-      if (mapView && !e.missed) {
-        const attacker = attackerTile?.unit;
-        const target = targetTile?.unit;
-        if (attacker) mapView.setHpOverride(attacker.id, attacker.hp + e.targetDamage);
-        if (target) mapView.setHpOverride(target.id, target.hp + e.attackerDamage);
-        this.host.render();
-      }
       if (attackerTile && targetTile && attackerVisible) {
         const scale = this.host.camera().scale;
         await this.host.mapView()?.lungeUnit(axialKey(attackerTile), axialKey(targetTile), 10 / scale);
       }
-      if (mapView) {
-        mapView.clearHpOverrides();
-        this.host.render();
-      }
+      // The batch-wide pre-attack holds (set in `present`) keep both bars at
+      // their old hp through the lunge; they only move once the hit lands.
+      // Never clear every hold here: units with a later attack in this batch
+      // must keep showing their pre-batch hp until that attack plays.
+      settleHp();
+      if (mapView) this.host.render();
       if (!e.missed && impact) sfx.play(impact);
       if (e.missed) {
         if (targetTile && attackerVisible) this.spawnHpText(targetTile, t('msg.miss'), 0xffa500);
@@ -1075,7 +1077,7 @@ export class EventPresenter {
     el.zIndex = 10;
     const label = new BitmapText({
       text,
-      style: { fontFamily: FONT_BLACK, fontSize: 20, fill: color },
+      style: { fontFamily: sizedFontFamily(FONT_BLACK, 20), fontSize: 20, fill: color },
     });
     label.anchor.set(0.5);
     el.addChild(label);

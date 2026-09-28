@@ -11,7 +11,7 @@ import { attackableTargets, attackDamage, canCounterAttack, counterDamageTo as c
 import { canBuildPort, canBuildSawmill, canBuildMine, builderBuildable, BUILDING_COSTS, type BuilderBuildableKind } from './buildings';
 import { unitsInVillage, villageCapacity, buildingsInVillage, villageBuildingLimit } from './village';
 import { isExploredFor } from './explore';
-import { AiAction, AiDirectives, AiPlannerState, SpawnPreference } from './ai-types';
+import { AiAction, AiDirectives, AiOperation, AiPlannerState, SpawnPreference } from './ai-types';
 import { AiDifficultyProfile } from './ai-difficulty';
 import { AiSituation, coastExposedTile, isMelee, isNavalEnemy } from './ai-situation';
 import { isShip, shipAttackDistance, shipMovePoints, canUpgradeShip } from './ship';
@@ -19,6 +19,8 @@ import { TRIBE_SPECIAL_UNIT } from './tribes';
 import { stormTargetShips } from './storm';
 import { TRAP_COST, trapCells } from './traps';
 import { adjacentEnemyVillages } from './stalker';
+import { flagsFor } from './ai-flags';
+import { berserkerRage } from './abilities';
 
 export interface AiPatternContext {
   map: GameMap;
@@ -28,6 +30,7 @@ export interface AiPatternContext {
   situation?: AiSituation;
   difficulty?: AiDifficultyProfile;
   directives?: AiDirectives;
+  operation?: AiOperation | null;
 }
 
 interface AiPattern {
@@ -45,6 +48,9 @@ function key(q: number, r: number): string {
  *  keep scouting instead of hiding pointlessly). */
 const STALKER_STEALTH_RADIUS = 6;
 
+/** Minimum attack force of an enemy worth walking the stunner up to. */
+const STUN_MIN_DAMAGE = 15;
+
 /** Movement and attack reach of a unit in hexes, honoring ship stat tables.
  *  Ships keep their land-unit `.type`, so the raw MOVE_POINTS/ATTACK_DISTANCE
  *  tables drastically underestimate a levelled enemy ship's strike zone.
@@ -55,20 +61,25 @@ function enemyReach(unit: Unit): { move: number; attack: number } {
   return { move: UNIT_MOVE_POINTS[unit.type] / 10, attack: UNIT_ATTACK_DISTANCE[unit.type] };
 }
 
-export function enemyCanReach(map: GameMap, tile: MapTile, playerIndex: number): boolean {
+/** Turns of enemy movement the garrison logic looks ahead. Taking a village
+ *  needs an arrival turn plus a hold turn, so a defender who leaves when the
+ *  enemy is two moves away can no longer get back in time. */
+export const AI_TUNING = { garrisonHorizonTurns: 2, operationAfterExplore: false };
+
+export function enemyCanReach(map: GameMap, tile: MapTile, playerIndex: number, turns: number = AI_TUNING.garrisonHorizonTurns): boolean {
   return map.tiles.some(
     (t) =>
       t.unit &&
       t.unit.owner !== playerIndex &&
       t.unit.isStealthed !== true &&
       isExploredFor(t, playerIndex) &&
-      hexDistance(tile, t) <= enemyReach(t.unit).move,
+      hexDistance(tile, t) <= enemyReach(t.unit).move * turns,
   );
 }
 
 /** Like `enemyCanReach` but ignoring pirates (owner -1): pirates never
  *  capture or occupy villages, so garrison/spawn decisions ignore them. */
-export function landEnemyCanReach(map: GameMap, tile: MapTile, playerIndex: number): boolean {
+export function landEnemyCanReach(map: GameMap, tile: MapTile, playerIndex: number, turns: number = AI_TUNING.garrisonHorizonTurns): boolean {
   return map.tiles.some(
     (t) =>
       t.unit &&
@@ -76,7 +87,7 @@ export function landEnemyCanReach(map: GameMap, tile: MapTile, playerIndex: numb
       t.unit.owner !== playerIndex &&
       t.unit.isStealthed !== true &&
       isExploredFor(t, playerIndex) &&
-      hexDistance(tile, t) <= enemyReach(t.unit).move,
+      hexDistance(tile, t) <= enemyReach(t.unit).move * turns,
   );
 }
 
@@ -94,6 +105,14 @@ export function enemyCanAttackNext(map: GameMap, tile: MapTile, playerIndex: num
  *  they build, plant traps and buff their neighbours instead. */
 export function isSupportUnit(unit: Unit): boolean {
   return unit.type === 'builder' || unit.type === 'trapper' || unit.type === 'banner';
+}
+
+/** A raging berserker (<=35% hp) takes no counter-damage when it attacks, so
+ *  when it can strike now it presses on instead of retreating. */
+function berserkerShouldPress(map: GameMap, player: Player, unit: Unit): boolean {
+  if (!flagsFor(player).berserkerHold) return false;
+  if (berserkerRage(unit) <= 0) return false;
+  return attackableTargets(map, unit, player.index).some((a) => a.unit !== null);
 }
 
 /** Number of the player's own units within `dist` hexes of `tile` (excluding a
@@ -374,6 +393,55 @@ export const AI_PATTERNS: AiPattern[] = [
           }
         }
         if (best) return [{ type: 'stun', unitId: unit.id, q: best.q, r: best.r }];
+      }
+      return null;
+    },
+  },
+  {
+    id: 'stunner-approach-stun',
+    priority: 205,
+    evaluate({ map, player, state }): AiAction[] | null {
+      // Walk into stun range (exactly 2 hexes) of the hardest-hitting reachable
+      // enemy and stun it, but only with a follow-up attacker close behind:
+      // a stunned target cannot counter, so the rest of the army hits it free.
+      if (!flagsFor(player).stunnerHunt) return null;
+      const canClimb = hasSkill(player, 'climbing');
+      const canDock = hasSkill(player, 'navigation');
+      for (const t of map.tiles) {
+        const unit = t.unit;
+        if (!unit || unit.owner !== player.index || unit.type !== 'stunner') continue;
+        if (unit.shipLevel !== undefined) continue;
+        if (state.acted.has(unit.id) || state.moved.has(unit.id)) continue;
+        if (unit.hasMoved || unit.hasAttacked || unit.hasHealed) continue;
+        if (t.settlement && t.settlement.owner === player.index && enemyCanReach(map, t, player.index)) continue;
+        let best: { step: MapTile; target: MapTile; score: number } | null = null;
+        for (const e of map.tiles) {
+          if (!e.unit || e.unit.owner === player.index || e.unit.owner < 0) continue;
+          if (!isExploredFor(e, player.index) || e.unit.isStealthed === true) continue;
+          if ((e.unit.stunTurns ?? 0) >= 1) continue;
+          const power = attackDamage(e.unit);
+          if (power < STUN_MIN_DAMAGE) continue;
+          let followers = 0;
+          for (const f of map.tiles) {
+            if (!f.unit || f.unit.owner !== player.index || f.unit === unit) continue;
+            if (isSupportUnit(f.unit) || f.unit.type === 'stalker') continue;
+            if (hexDistance(f, e) <= 4) followers += 1;
+          }
+          if (followers === 0) continue;
+          for (const c of reachableTargets(map, unit, undefined, canClimb, canDock, player.index)) {
+            if (state.occupied.has(key(c.q, c.r))) continue;
+            if (c.settlement && c.settlement.owner !== player.index) continue;
+            if (hexDistance(c, e) !== 2) continue;
+            const score = power * 10 + followers - hexDistance(t, c);
+            if (!best || score > best.score) best = { step: c, target: e, score };
+          }
+        }
+        if (best) {
+          return [
+            { type: 'move', unitId: unit.id, q: best.step.q, r: best.step.r },
+            { type: 'stun', unitId: unit.id, q: best.target.q, r: best.target.r },
+          ];
+        }
       }
       return null;
     },
@@ -843,6 +911,7 @@ export const AI_PATTERNS: AiPattern[] = [
         if (isSupportUnit(unit) || unit.type === 'stalker') continue;
         // Ships have their own naval-hunt pattern; don't retreat them here.
         if (unit.shipLevel !== undefined) continue;
+        if (berserkerShouldPress(map, player, unit)) continue;
         // Don't retreat the last defender out of an endangered own village;
         // defend-hurt-unit decides whether it heals, retreats+spawns, or holds.
         if (t.settlement && t.settlement.owner === player.index && enemyCanReach(map, t, player.index)) continue;
@@ -893,6 +962,9 @@ export const AI_PATTERNS: AiPattern[] = [
           if (state.acted.has(unit.id) || state.moved.has(unit.id)) continue;
           if (isSupportUnit(unit)) continue;
           if (t.settlement && t.settlement.owner === player.index) continue;
+          // A unit that can strike an enemy keeps pressing that fight unless an
+          // enemy could take the village next turn.
+          if (attackableTargets(map, unit, player.index).length > 0 && !landEnemyCanReach(map, v, player.index, 1)) continue;
           const reach = reachableTargets(map, unit, undefined, canClimb, canDock, player.index);
           if (!reach.some((c) => c.q === v.q && c.r === v.r)) continue;
           const dist = hexDistance(unit, v);
@@ -961,7 +1033,7 @@ export const AI_PATTERNS: AiPattern[] = [
     id: 'banner-position',
     priority: 88,
     evaluate({ map, player, state, situation }): AiAction[] | null {
-      // The banner is an aura (friends within 2 hexes get +10 attack): keep it
+      // The banner is an aura (friends within 2 hexes get +5 attack): keep it
       // next to the army cluster and never send it into a fight.
       const canClimb = hasSkill(player, 'climbing');
       const canDock = hasSkill(player, 'navigation');
@@ -1107,6 +1179,7 @@ export const AI_PATTERNS: AiPattern[] = [
         if (!unit || unit.owner !== player.index) continue;
         if (state.acted.has(unit.id) || state.moved.has(unit.id)) continue;
         if (unit.hp > UNIT_TYPES[unit.type].maxHp / 2) continue;
+        if (berserkerShouldPress(map, player, unit)) continue;
         if (t.settlement && t.settlement.owner === player.index) continue;
         if (!enemyCanAttackNext(map, t, player.index)) continue;
         let best: MapTile | null = null;
@@ -1469,7 +1542,11 @@ export const AI_PATTERNS: AiPattern[] = [
       // is only spawned after the first one dies.
       const special = TRIBE_SPECIAL_UNIT[player.tribe];
       if (!special) return null;
-      if (map.tiles.some((t) => t.unit && t.unit.owner === player.index && t.unit.type === special)) return null;
+      const fielded = map.tiles.filter((t) => t.unit && t.unit.owner === player.index && t.unit.type === special).length;
+      const cap = flagsFor(player).multiSpecial && (special === 'berserker' || special === 'stunner')
+        ? Math.max(1, Math.floor(map.tiles.filter((t) => t.unit && t.unit.owner === player.index && !isSupportUnit(t.unit)).length / 3))
+        : 1;
+      if (fielded >= cap) return null;
       if (!specialUnitWanted(map, player, situation)) return null;
       const cost = { wood: UNIT_TYPES[special].priceWood, stone: 0, money: UNIT_TYPES[special].price, ore: UNIT_TYPES[special].priceOre };
       if (!canAfford(player.resources, cost)) return null;

@@ -24,13 +24,13 @@ function put(map: GameMap, q: number, r: number, unit: ReturnType<typeof makeUni
 }
 
 describe('banner aura', () => {
-  it('gives +10 to allies within 2 hexes, not to the banner itself', () => {
+  it('gives +5 to allies within 2 hexes, not to the banner itself', () => {
     const map = mapWith();
     const banner = makeUnit(0, 'banner', 0, 0);
     put(map, 0, 0, banner);
     const ally = makeUnit(0, 'warrior', 2, 0);
     put(map, 2, 0, ally);
-    expect(bannerAttackBonus(map, ally)).toBe(10);
+    expect(bannerAttackBonus(map, ally)).toBe(5);
     expect(bannerAttackBonus(map, banner)).toBe(0);
   });
 
@@ -45,13 +45,13 @@ describe('banner aura', () => {
     expect(bannerAttackBonus(map, far)).toBe(0);
   });
 
-  it('is a flat +10 even with several banners nearby', () => {
+  it('is a flat +5 even with several banners nearby', () => {
     const map = mapWith();
     put(map, 0, 0, makeUnit(0, 'banner', 0, 0));
     put(map, 1, 0, makeUnit(0, 'banner', 1, 0));
     const ally = makeUnit(0, 'warrior', 0, 1);
     put(map, 0, 1, ally);
-    expect(bannerAttackBonus(map, ally)).toBe(10);
+    expect(bannerAttackBonus(map, ally)).toBe(5);
   });
 });
 
@@ -78,7 +78,7 @@ describe('effectiveAttack', () => {
     put(map, 1, 0, makeUnit(0, 'banner', 1, 0));
     const berserker = makeUnit(0, 'berserker', 0, 0, { hp: 10 }); // raging
     put(map, 0, 0, berserker);
-    expect(effectiveAttack(berserker, map)).toBe(26 + 10 + 10);
+    expect(effectiveAttack(berserker, map)).toBe(26 + 5 + 10);
   });
 
   it('no map means no aura but rage still applies', () => {

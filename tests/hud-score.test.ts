@@ -40,7 +40,7 @@ describe('HudScore buff icons', () => {
     }
     const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
     (gameController as unknown as { sim: unknown }).sim = sim;
-    
+
     useGameStore.setState({ screen: 'game', players, localPlayerIndex: 0 });
     root = new Container();
     host = makeHost();
@@ -87,13 +87,13 @@ describe('HudScore buff icons', () => {
     // The chip holds a white circle + clipped tribe icon sprite.
     expect(hudAny.tribeChip!.children.some((c) => c instanceof Sprite)).toBe(true);
     // The chip stays top-right; the score text is centred below the resource
-    // panel (screenWidth/2, ~34px from the top edge).
+    // panel (screenWidth/2, ~40px from the top edge).
     const chipX = host.app.screen.width - SCORE_PAD - SCORE_CHIP_RADIUS;
     const chipY = SCORE_PAD + SCORE_TOP_OFFSET + SCORE_CHIP_RADIUS;
     expect(hudAny.tribeChip!.position.x).toBeCloseTo(chipX, 5);
     expect(hudAny.tribeChip!.position.y).toBeCloseTo(chipY, 5);
     expect(hudAny.text!.position.x).toBeCloseTo(host.app.screen.width / 2, 5);
-    expect(hudAny.text!.position.y).toBeCloseTo(34, 5);
+    expect(hudAny.text!.position.y).toBeCloseTo(48, 5);
   });
 
   it('shows the real map score at start instead of a stale 0', () => {

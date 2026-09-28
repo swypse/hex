@@ -31,7 +31,7 @@ export function missChanceFor(player: Player): number {
 }
 
 /** Raw attack force: attack × current hp ratio (no defense applied). The
- *  attack value includes banner-aura (+10) and berserker-rage (+20) bonuses. */
+ *  attack value includes banner-aura (+5) and berserker-rage (+20) bonuses. */
 export function attackDamage(attacker: Unit): number {
   return Math.round((effectiveAttack(attacker) * attacker.hp) / UNIT_TYPES[attacker.type].maxHp);
 }

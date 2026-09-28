@@ -55,7 +55,7 @@ describe('AI grind and capture behaviour', () => {
 
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1), 'normal');
     const actions = planAiActions(map, players[1]!, new SeededRandom(2), 'capture');
-    expect(actions[0]).toEqual({ type: 'attack', unitId: 'ai1', q: 2, r: 0 });
+    expect(actions).toContainEqual({ type: 'attack', unitId: 'ai1', q: 2, r: 0 });
     expect(actions.some((a) => a.type === 'move' && a.unitId === 'ai1' && a.q === 0 && a.r === 0)).toBe(false);
   });
 

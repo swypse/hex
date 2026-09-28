@@ -279,7 +279,7 @@ describe('special units', () => {
   const cases: Array<[UnitType, number, number, number, number, number, number, number, number]> = [
     ['stalker', 20, 10, 1, 20, 0, 9, 0, 2],
     ['builder', 8, 10, 1, 40, 0, 15, 0, 0],
-    ['banner', 8, 20, 1, 40, 8, 7, 0, 2],
+    ['banner', 8, 20, 1, 30, 0, 7, 0, 2],
     ['berserker', 10, 26, 1, 50, 8, 11, 0, 3],
     ['trapper', 10, 20, 1, 40, 8, 9, 0, 2],
     ['stormcaller', 20, 20, 1, 40, 8, 9, 0, 2],

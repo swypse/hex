@@ -1,5 +1,5 @@
 import { Application, BitmapText, Container, Graphics, type TextStyleOptions } from 'pixi.js';
-import { FONT_REGULAR } from '../ui/kit/bitmap-fonts';
+import { FONT_REGULAR, sizedFontFamily } from '../ui/kit/bitmap-fonts';
 import { axialKey, hexToPixel } from '../game/hex';
 import { tileElevation } from './elevation';
 import { resolveCombat, counterDamageTo } from '../game/combat';
@@ -223,7 +223,7 @@ export class DamageBadgeLayer {
       style: {
         fontSize: DAMAGE_BADGE_FONT_SIZE,
         fill: 0xffffff,
-        fontFamily: FONT_REGULAR,
+        fontFamily: sizedFontFamily(FONT_REGULAR, DAMAGE_BADGE_FONT_SIZE),
       },
     });
     label.anchor.set(0.5, 0.5);

@@ -10,6 +10,7 @@ import { isExploredFor } from './explore';
 import { hexDistance } from './hex';
 import { AI_PERSONALITIES } from './ai-personality';
 import { hasSkill, SkillId } from './skills';
+import { flagsFor } from './ai-flags';
 
 export function goalTargetKey(g: AiGoalState): string {
   return g.target ? `${g.target.q},${g.target.r}` : '';
@@ -156,7 +157,9 @@ export function updateStrategy(
   return state;
 }
 function economySkillChain(player: Player): SkillId[] | null {
-  const chain: SkillId[] = ['forestry', 'climbing', 'smithery', 'geology', 'science'];
+  const chain: SkillId[] = flagsFor(player).militarySkills
+    ? ['forestry', 'climbing', 'smithery', 'swordsman', 'science', 'geology', 'riding', 'knights']
+    : ['forestry', 'climbing', 'smithery', 'geology', 'science'];
   for (const s of chain) if (!hasSkill(player, s)) return chain.slice(chain.indexOf(s));
   return null;
 }

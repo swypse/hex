@@ -12,7 +12,7 @@ import { SeededRandom } from '../util/random';
 import { buildingsInVillage, villageBuildingLimit } from './village';
 import { isMountainType } from './tile-types';
 import { TRIBES } from './tribes';
-import { AI_PATTERNS, AiPatternContext, bestSpawnableUnitType, enemyCanAttackNext, enemyCanReach, guardGarrisonAttack, isFrontierTile, isSupportUnit, landEnemyCanReach, nearestEnemyDistanceFrom, nearestFreeVillageDistanceFrom, nearestOwnUnitDistanceFrom, nearestVillageDistanceFrom } from './ai-patterns';
+import { AI_PATTERNS, AI_TUNING, AiPatternContext, bestSpawnableUnitType, enemyCanAttackNext, enemyCanReach, guardGarrisonAttack, isFrontierTile, isSupportUnit, landEnemyCanReach, nearestEnemyDistanceFrom, nearestFreeVillageDistanceFrom, nearestOwnUnitDistanceFrom, nearestVillageDistanceFrom } from './ai-patterns';
 import { AiAction, AiDirectives, AiPlannerState } from './ai-types';
 import { attackableTargets, chooseBestAttack, tradeIsFavorable } from './combat';
 import { isExploredFor } from './explore';
@@ -21,8 +21,17 @@ import { AiSituation, analyzeSituation, coastExposedTile, isNavalEnemy } from '.
 import { AiDifficultyProfile, profileFor } from './ai-difficulty';
 import { isShip } from './ship';
 import { updateStrategy, deriveDirectives } from './ai-strategy';
+import { flagsFor } from './ai-flags';
+import { OPERATION_PATTERN, updateOperation } from './ai-operations';
 
 const MAX_PLAN_STEPS = 200;
+
+/** Pattern list with the squad operation slotted in ahead of the lone-hunter
+ *  pattern (or, experimentally, ahead of frontier exploration). */
+function buildPatterns() {
+  const before = AI_TUNING.operationAfterExplore ? 'explore-frontier' : 'hunt-idle-enemy';
+  return AI_PATTERNS.flatMap((p) => (p.id === before ? [OPERATION_PATTERN, p] : [p]));
+}
 
 /** Strong penalty for idle land units standing where a naval enemy can hit. */
 const NAVAL_EXPOSURE_PENALTY = 400;
@@ -119,6 +128,25 @@ function key(q: number, r: number): string {
 
 /** Skill-open order the AI prefers: economy/production first so it can build
  *  mines (stone/ore) and sawmills early instead of opening random leaves. */
+const MILITARY_SKILL_ORDER: SkillId[] = [
+  'forestry',
+  'climbing',
+  'smithery',
+  'swordsman',
+  'riding',
+  'knights',
+  'shields',
+  'science',
+  'geology',
+  'roads',
+  'water',
+  'waterTemples',
+  'navigation',
+  'catapult',
+  'forestTemple',
+  'bridges',
+];
+
 const AI_SKILL_ORDER: SkillId[] = [
   'forestry',
   'climbing',
@@ -441,10 +469,11 @@ function bestAvailableAction(
       }
     }
   } else if (!situation?.navalThreat) {
-    for (const id of AI_SKILL_ORDER) {
+    const order = flagsFor(player).militarySkills ? MILITARY_SKILL_ORDER : AI_SKILL_ORDER;
+    for (const id of order) {
       if (state.opened.has(id)) continue;
       if (canOpenSkill(player, id)) {
-        const rank = AI_SKILL_ORDER.indexOf(id);
+        const rank = order.indexOf(id);
         candidates.push({ score: 240 - rank * 8 + jitter(), action: { type: 'openSkill', skill: id } });
       }
     }
@@ -512,6 +541,12 @@ function markUsed(state: AiPlannerState, action: AiAction): void {
   }
 }
 
+/** Executes one planned action on the live game and reports whether it took
+ *  effect. Supplying it switches the planner to live mode: every step is
+ *  applied before the next is chosen, so patterns always see the real board
+ *  (kills, misses, counter damage, spent money) instead of a frozen snapshot. */
+export type AiActionExecutor = (action: AiAction, marker: AiActionMarker) => boolean;
+
 export function planAiActions(
   map: GameMap,
   player: Player,
@@ -519,11 +554,12 @@ export function planAiActions(
   mode: GameMode = 'capture',
   markers?: AiActionMarker[],
   turn: number = 0,
+  execute?: AiActionExecutor,
 ): AiAction[] {
   const difficulty = profileFor(player);
-  const situation = analyzeSituation(map, player, mode, difficulty);
+  let situation = analyzeSituation(map, player, mode, difficulty);
   const strategy = updateStrategy(map, player, situation, mode, difficulty, turn, rng);
-  const directives = deriveDirectives(map, player, situation, difficulty, strategy);
+  let directives = deriveDirectives(map, player, situation, difficulty, strategy);
   if (AI_DEBUG_LOGGING) aiLog(`  situation: ${situationSummary(situation)}`);
   if (AI_DEBUG_LOGGING) aiLog(`  strategy: ${strategy.goals.map((g) => `${g.id}:${g.phase}`).join(',')} directives: {front=${directives.frontTarget ? key(directives.frontTarget.q, directives.frontTarget.r) : '-'}, reserve=${directives.moneyReserve}, pace=${directives.pace}}`);
   const state: AiPlannerState = {
@@ -535,14 +571,20 @@ export function planAiActions(
     opened: new Set(),
     occupied: new Set(),
   };
+  const patterns = buildPatterns();
+  const operation = updateOperation(map, player, situation, turn);
   const actions: AiAction[] = [];
   let stepNo = 0;
   for (let i = 0; i < MAX_PLAN_STEPS; i++) {
-    const ctx: AiPatternContext = { map, player, rng, state, situation, difficulty, directives };
+    if (execute && i > 0) {
+      situation = analyzeSituation(map, player, mode, difficulty);
+      directives = deriveDirectives(map, player, situation, difficulty, strategy);
+    }
+    const ctx: AiPatternContext = { map, player, rng, state, situation, difficulty, directives, operation };
     let next: AiAction[] | null = null;
     let label = 'fallback(best-score)';
     let note = '';
-    for (const pattern of AI_PATTERNS) {
+    for (const pattern of patterns) {
       next = pattern.evaluate(ctx);
       if (next) {
         label = `pattern=${pattern.id}`;
@@ -558,10 +600,16 @@ export function planAiActions(
     if (!next) break;
     stepNo += 1;
     aiLog(`  step ${stepNo}. ${label} -> ${next.map(formatAiAction).join(' | ')}${note}`);
+    // A failed action cancels the rest of its step (e.g. the attack after a
+    // failed move), but every action is still marked used so the planner
+    // cannot pick the same doomed step again.
+    let failed = false;
     for (const a of next) {
       actions.push(a);
-      if (markers) markers.push({ label, note });
+      const marker = { label, note };
+      if (markers) markers.push(marker);
       markUsed(state, a);
+      if (execute && !failed && !execute(a, marker)) failed = true;
     }
   }
   return actions;

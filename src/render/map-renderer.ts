@@ -1,7 +1,7 @@
 import {
   Application, BitmapText, Circle, Container, Graphics, ImageSource, Sprite, Texture, type TextStyleOptions, type Ticker
 } from 'pixi.js';
-import { FONT_REGULAR } from '../ui/kit/bitmap-fonts';
+import { FONT_REGULAR, sizedFontFamily } from '../ui/kit/bitmap-fonts';
 import {
   axialKey, compareTileY, hexCorners, hexDistance, hexEdge, hexEdgeNeighbor, hexToPixel, splitHexBorder
 } from '../game/hex';
@@ -45,6 +45,12 @@ const PIRATE_DEAL_DOT = 8;
 const PIRATE_DEAL_GAP = 4;
 /** Screen-px gap between the pirate's hp bar anchor and the deal-dot row. */
 const PIRATE_DEAL_HPBAR_GAP = 4;
+/** Village name label text size (px). */
+const VILLAGE_LABEL_FONT_SIZE = 12;
+/** Overlay stacking: village labels sit below the unit standing on the village,
+ *  and both sit below everything else (hp bars, fire, markers) at zIndex 0. */
+const OVERLAY_Z_VILLAGE_LABEL = -2;
+const OVERLAY_Z_UNIT_MIRROR = -1;
 /** World offset of the hp bar anchor above/relative to the tile's unit top. */
 const HP_BAR_ANCHOR_OFFSET = 40;
 
@@ -204,6 +210,10 @@ export class MapView {
    *  decorative animations resume from exactly where they paused. */
   private pausedMs = 0;
   private unitFacings = new Map<string, 'left' | 'right'>();
+  /** Screen-space copies of the unit sprites standing on labelled villages,
+   *  drawn above the village name label (which lives in the overlay, above the
+   *  world tiles). Each copy follows its source sprite via `onRender`. */
+  private unitMirrors: Sprite[] = [];
   private dealTooltip: Tooltip | null = null;
   /** World anchor (hp bar point) + row width of each pirate-deal dot row. */
   private dealAnchors = new Map<string, { x: number; y: number; rowW: number }>();
@@ -461,7 +471,10 @@ export class MapView {
       }
     }
 
-    for (const l of labels) this.addVillageLabel(l.tile, l.owner, l.el, l.world, players);
+    for (const l of labels) {
+      this.addVillageLabel(l.tile, l.owner, l.el, l.world, players);
+      this.addUnitMirror(l.tile);
+    }
     // HP bars come after village labels so a unit's bar + text always render on
     // top of a village name label on the same tile.
     this.syncHpBars([...hpBarSpecs, ...buildingHpBarSpecs]);
@@ -1720,9 +1733,13 @@ export class MapView {
   }
 
   private takeText(text: string, style: TextStyleOptions): BitmapText {
-    const t = this.textPool.pop() ?? new BitmapText({ text: '', style });
+    const sized: TextStyleOptions = {
+      ...style,
+      fontFamily: sizedFontFamily(String(style.fontFamily ?? FONT_REGULAR), Number(style.fontSize ?? 16)),
+    };
+    const t = this.textPool.pop() ?? new BitmapText({ text: '', style: sized });
     t.text = text;
-    t.style = style;
+    t.style = sized;
     return t;
   }
 
@@ -1736,6 +1753,12 @@ export class MapView {
   }
 
   private releaseOverlay(): void {
+    for (const mirror of this.unitMirrors) {
+      mirror.onRender = null;
+      mirror.parent?.removeChild(mirror);
+      mirror.destroy();
+    }
+    this.unitMirrors = [];
     for (const item of this.overlayItems) {
       item.el.parent?.removeChild(item.el);
       for (const child of item.el.children) {
@@ -2132,6 +2155,33 @@ export class MapView {
     this.edgePulseStart = null;
   }
 
+  /** Draws the tile's unit again in the overlay, right above the village name
+   *  label, so the unit texture is never covered by the name. */
+  private addUnitMirror(tile: MapTile): void {
+    const source = this.tileViews.get(axialKey(tile))?.unitSprite;
+    if (!tile.unit || !source || !source.visible) return;
+    const mirror = new Sprite(source.texture);
+    mirror.zIndex = OVERLAY_Z_UNIT_MIRROR;
+    const sync = (): void => {
+      if (source.destroyed) {
+        mirror.visible = false;
+        return;
+      }
+      const world = this.container;
+      const s = world.scale.x;
+      mirror.texture = source.texture;
+      mirror.anchor.copyFrom(source.anchor);
+      mirror.position.set(world.x + source.x * s, world.y + source.y * s);
+      mirror.scale.set(source.scale.x * s, source.scale.y * s);
+      mirror.alpha = source.alpha;
+      mirror.visible = source.visible && source.parent?.visible !== false;
+    };
+    mirror.onRender = sync;
+    sync();
+    this.overlay.addChild(mirror);
+    this.unitMirrors.push(mirror);
+  }
+
   private addVillageLabel(
     tile: MapTile,
     owner: number,
@@ -2148,7 +2198,7 @@ export class MapView {
     const iconSize = 16;
     const gap = 4;
     const label = this.takeText(`${tile.settlement!.name ?? ''} ${count}/${capacity}`.trim(), {
-      fontSize: 14,
+      fontSize: VILLAGE_LABEL_FONT_SIZE,
       fill: 0xffffff,
       fontFamily: FONT_REGULAR
     });
@@ -2176,6 +2226,7 @@ export class MapView {
       el.addChild(icon);
     }
     el.sortableChildren = true;
+    el.zIndex = OVERLAY_Z_VILLAGE_LABEL;
     el.addChild(labelBg);
     el.addChild(label);
     el.position.set(world.x, world.y);

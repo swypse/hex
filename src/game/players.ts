@@ -6,7 +6,7 @@ import { EMPTY_STATS, type PlayerStats } from './score';
 import type { AchievementId } from './achievements';
 import { Tribe, TRIBES, tribeById } from './tribes';
 import { AiDifficulty, DEFAULT_AI_DIFFICULTY } from './ai-difficulty';
-import type { AiStrategyState } from './ai-types';
+import type { AiOperation, AiStrategyState } from './ai-types';
 
 export interface Player {
   index: number;
@@ -21,8 +21,14 @@ export interface Player {
   knownTribes?: Tribe[];
   stats?: PlayerStats;
   difficulty?: AiDifficulty;
+  /** AI planning engine: 'live' (default) applies each step before planning the next; 'batch' plans the whole turn on a frozen board (legacy, kept for benchmarking). */
+  aiEngine?: 'batch' | 'live';
+  /** Per-behaviour AI switches (default: all on). */
+  aiFlags?: Partial<import('./ai-flags').AiFlags>;
   achievements?: AchievementId[];
   strategy?: AiStrategyState;
+  /** Current squad operation (AI only), rebuilt at the start of each AI turn. */
+  operation?: AiOperation | null;
 }
 
 function startingResourcesFor(tribe: Tribe): Resources {

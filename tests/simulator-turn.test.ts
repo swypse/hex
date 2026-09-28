@@ -132,6 +132,8 @@ describe('Simulator turn engine', () => {
   it('auto-heals an idle damaged AI unit when its turn ends', () => {
     const map = makeTestMap(4);
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    // Broke, so it cannot open Climbing and stays boxed in by mountains.
+    players[1]!.resources.money = 0;
     const aiUnit = makeUnit('ai', 1, 'warrior', 0, 2);
     aiUnit.hp = 2;
     tileAt(map, 0, 2)!.unit = aiUnit;

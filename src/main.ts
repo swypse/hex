@@ -3,7 +3,7 @@ import { initNavigation, useGameStore } from './store/game-store';
 import { readJoinCode, setPendingJoin } from './net/join-link';
 import { ScreenManager } from './ui/screen-manager';
 import { gameController } from './controller/game-controller';
-import { loadBitmapFonts } from './ui/kit/bitmap-fonts';
+import { enableSizedFonts, loadBitmapFonts } from './ui/kit/bitmap-fonts';
 import { preventCanvasContextMenu } from './prevent-canvas-context-menu';
 import { initErrorReporter } from './error-reporter';
 import { installRenderGate, markDirty } from './render/render-gate';
@@ -44,6 +44,7 @@ async function boot(): Promise<void> {
     document.fonts.load('800 16px "Roboto"'),
   ]);
   await loadBitmapFonts();
+  enableSizedFonts();
   const app = new Application();
   const format = preferredCanvasFormat();
   await app.init({

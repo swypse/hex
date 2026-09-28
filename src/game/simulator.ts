@@ -1,4 +1,5 @@
 import { planAiActions, logAiTurnStart, aiLoggingEnabled, formatAiAction, type AiActionMarker } from './ai';
+import type { AiAction } from './ai-types';
 import { buildingIncome, buildBuilding, buildBuildingIgnoringSkill, canUsePort, repairBuilding, destroyBuilding, builderBuildable, type BuilderBuildKind } from './buildings';
 import { captureVillage, setCaptureReady, villageIncomeTotal } from './capture';
 import { attackableTargets, missChanceFor, performAttack, performSiege } from './combat';
@@ -1160,68 +1161,79 @@ export class Simulator {
     this.decrementStunsFor(playerIndex);
     this.emit({ type: 'aiTurn', playerIndex });
     const markers: AiActionMarker[] = [];
-    const actions = planAiActions(this.map, ai, this.aiRng(), this.mode, markers, this.turn);
     let actionNo = 0;
-    for (const a of actions) {
+    const exec = (a: AiAction, marker?: AiActionMarker): boolean => {
       actionNo += 1;
-      let ok = false;
-      switch (a.type) {
-        case 'upgrade':
-          ok = this.doUpgradeVillage(a.q, a.r);
-          break;
-        case 'move':
-          ok = this.doMove(a.unitId, a.q, a.r);
-          break;
-        case 'attack':
-          ok = this.doAttack(a.unitId, a.q, a.r);
-          break;
-        case 'spawn':
-          ok = this.doSpawn(a.q, a.r, a.unitType);
-          break;
-        case 'capture':
-          ok = this.doCapture(a.q, a.r, a.unitId);
-          break;
-        case 'heal':
-          ok = this.doHeal(a.unitId);
-          break;
-        case 'build':
-          ok = this.doBuild(a.q, a.r, a.kind);
-          break;
-        case 'buildRoad':
-          ok = this.doBuildRoad(a.q, a.r);
-          break;
-        case 'buildBridge':
-          ok = this.doBuildBridge(a.q, a.r);
-          break;
-        case 'upgradeShip':
-          ok = this.doUpgradeShip(a.unitId);
-          break;
-        case 'openSkill':
-          ok = this.doOpenSkill(a.skill);
-          break;
-        case 'enableStealth':
-          ok = this.doEnableStealth(a.unitId);
-          break;
-        case 'storm':
-          ok = this.doStorm(a.unitId);
-          break;
-        case 'trap':
-          ok = this.doBuildTrap(a.unitId, a.q, a.r);
-          break;
-        case 'builderBuild':
-          ok = this.doBuildWithUnit(a.unitId, a.q, a.r, a.kind);
-          break;
-        case 'stun':
-          ok = this.doStun(a.unitId, a.q, a.r);
-          break;
-      }
+      const ok = this.execAiAction(a);
       if (aiLoggingEnabled()) {
-        const marker = actionNo - 1 < markers.length ? markers[actionNo - 1]! : undefined;
-        const tag = marker ? `<${marker.label}>${marker.note}` : '<unknown>';
+        const m = marker ?? (actionNo - 1 < markers.length ? markers[actionNo - 1] : undefined);
+        const tag = m ? `<${m.label}>${m.note}` : '<unknown>';
         console.log(`[AI]   exec ${ok ? 'OK  ' : 'FAIL'} #${actionNo} ${formatAiAction(a)} ${tag}`);
       }
+      return ok;
+    };
+    if (ai.aiEngine !== 'batch') {
+      planAiActions(this.map, ai, this.aiRng(), this.mode, undefined, this.turn, exec);
+    } else {
+      const actions = planAiActions(this.map, ai, this.aiRng(), this.mode, markers, this.turn);
+      for (const a of actions) exec(a);
     }
     this.evaluateAchievementsForAll();
+  }
+
+  private execAiAction(a: AiAction): boolean {
+    let ok = false;
+    switch (a.type) {
+      case 'upgrade':
+        ok = this.doUpgradeVillage(a.q, a.r);
+        break;
+      case 'move':
+        ok = this.doMove(a.unitId, a.q, a.r);
+        break;
+      case 'attack':
+        ok = this.doAttack(a.unitId, a.q, a.r);
+        break;
+      case 'spawn':
+        ok = this.doSpawn(a.q, a.r, a.unitType);
+        break;
+      case 'capture':
+        ok = this.doCapture(a.q, a.r, a.unitId);
+        break;
+      case 'heal':
+        ok = this.doHeal(a.unitId);
+        break;
+      case 'build':
+        ok = this.doBuild(a.q, a.r, a.kind);
+        break;
+      case 'buildRoad':
+        ok = this.doBuildRoad(a.q, a.r);
+        break;
+      case 'buildBridge':
+        ok = this.doBuildBridge(a.q, a.r);
+        break;
+      case 'upgradeShip':
+        ok = this.doUpgradeShip(a.unitId);
+        break;
+      case 'openSkill':
+        ok = this.doOpenSkill(a.skill);
+        break;
+      case 'enableStealth':
+        ok = this.doEnableStealth(a.unitId);
+        break;
+      case 'storm':
+        ok = this.doStorm(a.unitId);
+        break;
+      case 'trap':
+        ok = this.doBuildTrap(a.unitId, a.q, a.r);
+        break;
+      case 'builderBuild':
+        ok = this.doBuildWithUnit(a.unitId, a.q, a.r, a.kind);
+        break;
+      case 'stun':
+        ok = this.doStun(a.unitId, a.q, a.r);
+        break;
+    }
+    return ok;
   }
 
   private runPirateTurn(): void {

@@ -25,7 +25,7 @@ const ICON_SIZE = 16;
 /** Vertical gap between buff items (icon + sub score) under the score circle. */
 const BUFF_GAP = 8;
 /** Vertical centre of the score readout: just below the resource panel row. */
-const SCORE_BELOW_RESOURCE_Y = 34;
+const SCORE_BELOW_RESOURCE_Y = 48;
 
 export class HudScore implements Widget {
   /** Optional tap handler (used by the skill-tree screen to open score details). */
