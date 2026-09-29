@@ -7,19 +7,31 @@ export interface AiFlags {
   militarySkills: boolean;
   /** A raging berserker that can strike keeps fighting instead of retreating. */
   berserkerHold: boolean;
-  /** The stunner walks into stun range and walks into stun range. */
+  /** The stunner walks into stun range (2 hexes) of a strong enemy when allies can follow up. */
   stunnerHunt: boolean;
   /** Berserkers and stunners are fielded in proportion to the army, not once. */
   multiSpecial: boolean;
-  /** Idle units gather into a squad and advance on an enemy village together. */
+  /** Idle units (nothing better to do this turn) gather into a squad and advance on an enemy village together. */
   operations: boolean;
+  /** Offense/defense spawns are picked by open-terrain duel counter value against the visible
+   *  enemy army (per unit of effective cost) instead of a fixed unit-type priority order. Off by
+   *  default: two 160-game benchmarks (offense+defense, then defense-only) both came out worse
+   *  (lower win share, score, villages held) despite raising kills in the first variant. Likely
+   *  cause: the duel model is open-terrain only and ignores the village/wall defense bonus a
+   *  `defense` spawn actually fights behind, so it counter-picks for the wrong fight; and
+   *  concentrating spawns on the single best duelist sacrifices the army diversity/mobility that
+   *  grabs territory. Would need a garrison-aware duel model to be worth another try. */
+  composition: boolean;
 }
 
-/** Shipped defaults. `multiSpecial` and `operations` stay off: 160-game benchmarks showed no gain
- *  (multiSpecial 44% wins with equal score; operations 44% wins and fewer enemy villages captured). */
-export const DEFAULT_AI_FLAGS: AiFlags = { militarySkills: true, berserkerHold: true, stunnerHunt: true, multiSpecial: false, operations: false };
-export const ALL_AI_FLAGS_ON: AiFlags = { militarySkills: true, berserkerHold: true, stunnerHunt: true, multiSpecial: true, operations: true };
-export const ALL_AI_FLAGS_OFF: AiFlags = { militarySkills: false, berserkerHold: false, stunnerHunt: false, multiSpecial: false, operations: false };
+/** Shipped defaults. `multiSpecial` stays off: a 160-game benchmark showed no gain (44% wins,
+ *  equal score). `composition` stays off: see its doc comment. `operations` is on, placed after
+ *  the solo-hunt/naval patterns so it only ever claims units those left idle — an earlier
+ *  placement ahead of them regressed the AI (44% wins, fewer enemy villages captured) by pulling
+ *  units off easy solo kills to wait for the group. */
+export const DEFAULT_AI_FLAGS: AiFlags = { militarySkills: true, berserkerHold: true, stunnerHunt: true, multiSpecial: false, operations: true, composition: false };
+export const ALL_AI_FLAGS_ON: AiFlags = { militarySkills: true, berserkerHold: true, stunnerHunt: true, multiSpecial: true, operations: true, composition: true };
+export const ALL_AI_FLAGS_OFF: AiFlags = { militarySkills: false, berserkerHold: false, stunnerHunt: false, multiSpecial: false, operations: false, composition: false };
 
 export function flagsFor(player: Pick<Player, 'aiFlags'>): AiFlags {
   return player.aiFlags ? { ...DEFAULT_AI_FLAGS, ...player.aiFlags } : DEFAULT_AI_FLAGS;

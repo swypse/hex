@@ -174,6 +174,33 @@ function key(a: UnitType, b: UnitType): string {
   return `${a}\u2192${b}`;
 }
 
+let cachedDeterministicDuels: Record<string, DuelResult> | null = null;
+
+/** Deterministic (no-miss) duel result for every playable pair, computed once
+ *  and cached. Unlike `runDuels`'s Monte Carlo pass this has no RNG loop, so
+ *  it is cheap enough to consult from AI planning (a spawn decision or two per
+ *  AI turn), not just offline balance reports. */
+export function deterministicDuelMatrix(): Record<string, DuelResult> {
+  if (!cachedDeterministicDuels) {
+    const table: Record<string, DuelResult> = {};
+    for (const a of PLAYABLE_UNITS) {
+      for (const b of PLAYABLE_UNITS) table[key(a, b)] = duel(a, b);
+    }
+    cachedDeterministicDuels = table;
+  }
+  return cachedDeterministicDuels;
+}
+
+/** How well `a` counters `b` in an open-terrain duel: 1 when `a` wins
+ *  outright, 0 when `b` does, 0.5 for a mirror match or a draw (round cap). A
+ *  coarse, cheap alternative to `symWin`'s Monte Carlo win rate. */
+export function counterScore(a: UnitType, b: UnitType): number {
+  if (a === b) return 0.5;
+  const d = deterministicDuelMatrix()[key(a, b)];
+  if (!d || d.winner === null) return 0.5;
+  return d.winner === a ? 1 : 0;
+}
+
 export interface Duels {
   /** Deterministic (no-miss) result for each ordered pair. */
   deterministic: Record<string, DuelResult>;

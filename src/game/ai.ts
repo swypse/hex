@@ -12,7 +12,7 @@ import { SeededRandom } from '../util/random';
 import { buildingsInVillage, villageBuildingLimit } from './village';
 import { isMountainType } from './tile-types';
 import { TRIBES } from './tribes';
-import { AI_PATTERNS, AI_TUNING, AiPatternContext, bestSpawnableUnitType, enemyCanAttackNext, enemyCanReach, guardGarrisonAttack, isFrontierTile, isSupportUnit, landEnemyCanReach, nearestEnemyDistanceFrom, nearestFreeVillageDistanceFrom, nearestOwnUnitDistanceFrom, nearestVillageDistanceFrom } from './ai-patterns';
+import { AI_PATTERNS, AI_TUNING, AiPatternContext, bestSpawnableUnitType, enemyCanAttackNext, enemyCanReach, guardGarrisonAttack, incomingForceAt, isFrontierTile, isLikelyLethal, isSupportUnit, INCOMING_FORCE_WEIGHT, landEnemyCanReach, LETHAL_PENALTY, nearestEnemyDistanceFrom, nearestFreeVillageDistanceFrom, nearestOwnUnitDistanceFrom, nearestVillageDistanceFrom } from './ai-patterns';
 import { AiAction, AiDirectives, AiPlannerState } from './ai-types';
 import { attackableTargets, chooseBestAttack, tradeIsFavorable } from './combat';
 import { isExploredFor } from './explore';
@@ -26,11 +26,15 @@ import { OPERATION_PATTERN, updateOperation } from './ai-operations';
 
 const MAX_PLAN_STEPS = 200;
 
-/** Pattern list with the squad operation slotted in ahead of the lone-hunter
- *  pattern (or, experimentally, ahead of frontier exploration). */
+/** Pattern list with the squad operation slotted in after the lone-hunter and
+ *  naval patterns, right before frontier exploration: a unit that can kill or
+ *  chase down an enemy on its own this turn still does so (hunt-idle-enemy
+ *  claims it first), and only units with nothing better to do join the squad's
+ *  gather/assault march. Benchmarked: placing it *before* hunt-idle-enemy
+ *  regressed the AI (44% win rate, fewer enemy villages captured) because it
+ *  pulled units away from easy solo kills to wait for the group instead. */
 function buildPatterns() {
-  const before = AI_TUNING.operationAfterExplore ? 'explore-frontier' : 'hunt-idle-enemy';
-  return AI_PATTERNS.flatMap((p) => (p.id === before ? [OPERATION_PATTERN, p] : [p]));
+  return AI_PATTERNS.flatMap((p) => (p.id === 'explore-frontier' ? [OPERATION_PATTERN, p] : [p]));
 }
 
 /** Strong penalty for idle land units standing where a naval enemy can hit. */
@@ -272,7 +276,7 @@ function bestAvailableAction(
               : situation?.stance === 'settle' && freeVillageToGrab
                 ? 'scout'
                 : 'offense';
-      const type = bestSpawnableUnitType(player, prefer);
+      const type = bestSpawnableUnitType(player, prefer, map);
       if (type) {
         const cost = { wood: UNIT_TYPES[type].priceWood, stone: 0, money: UNIT_TYPES[type].price, ore: UNIT_TYPES[type].priceOre };
         if (canAfford(player.resources, cost)) {
@@ -351,7 +355,17 @@ function bestAvailableAction(
       }
       const distToVillage = nearestVillageDistanceFrom(map, unit.owner, c);
       const distToFree = nearestFreeVillageDistanceFrom(map, c);
-      const inThreat = enemyCanAttackNext(map, c, player.index);
+      // Graded by how much force could actually hit here, not just whether any
+      // enemy could: a tile three weak enemies can gang up on is worse than one
+      // only a single enemy reaches, and a likely-lethal tile is rejected
+      // outright unless every option is just as bad.
+      const threatPenalty = !AI_TUNING.gradedThreat
+        ? enemyCanAttackNext(map, c, player.index)
+          ? 200
+          : 0
+        : isLikelyLethal(map, c, player.index, unit)
+          ? LETHAL_PENALTY
+          : incomingForceAt(map, c, player.index) * INCOMING_FORCE_WEIGHT;
       const ownBonus = c.settlement && c.settlement.owner === unit.owner ? 40 : 0;
       const frontier = isFrontierTile(map, c, player.index) ? 20 : 0;
       const freeBonus = Number.isFinite(distToFree) ? Math.max(0, 60 - distToFree * 10) : 0;
@@ -359,7 +373,7 @@ function bestAvailableAction(
       // Keep the army clustered: favour tiles close to other friendly units.
       const ownDist = nearestOwnUnitDistanceFrom(map, player.index, c);
       const groupBonus = Number.isFinite(ownDist) ? Math.max(0, 26 - ownDist * 3) : 0;
-      let s = villageBonus + freeBonus + frontier + groupBonus - (inThreat ? 200 : 0) + ownBonus;
+      let s = villageBonus + freeBonus + frontier + groupBonus - threatPenalty + ownBonus;
       if (situation?.stance === 'war' && situation.frontTarget) {
         const df = hexDistance(c, situation.frontTarget);
         s += 500 - df * 10;

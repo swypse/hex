@@ -32,7 +32,7 @@ const GAMES = Number(args[0] ?? 20);
 const PLAYERS = Number(args[1] ?? 4);
 const MAX_TURNS = Number(args[2] ?? 60);
 if (process.env.HORIZON) AI_TUNING.garrisonHorizonTurns = Number(process.env.HORIZON);
-if (process.env.OP_AFTER_EXPLORE) AI_TUNING.operationAfterExplore = true;
+if (process.env.GRADED_THREAT === '0') AI_TUNING.gradedThreat = false;
 const DIFFICULTY = (args[3] ?? 'hard') as AiDifficulty;
 
 interface Tally {

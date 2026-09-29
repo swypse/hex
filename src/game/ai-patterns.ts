@@ -21,6 +21,7 @@ import { TRAP_COST, trapCells } from './traps';
 import { adjacentEnemyVillages } from './stalker';
 import { flagsFor } from './ai-flags';
 import { berserkerRage } from './abilities';
+import { counterScore, effectiveCost } from './balance';
 
 export interface AiPatternContext {
   map: GameMap;
@@ -64,7 +65,7 @@ function enemyReach(unit: Unit): { move: number; attack: number } {
 /** Turns of enemy movement the garrison logic looks ahead. Taking a village
  *  needs an arrival turn plus a hold turn, so a defender who leaves when the
  *  enemy is two moves away can no longer get back in time. */
-export const AI_TUNING = { garrisonHorizonTurns: 2, operationAfterExplore: false };
+export const AI_TUNING = { garrisonHorizonTurns: 2, gradedThreat: true };
 
 export function enemyCanReach(map: GameMap, tile: MapTile, playerIndex: number, turns: number = AI_TUNING.garrisonHorizonTurns): boolean {
   return map.tiles.some(
@@ -99,6 +100,40 @@ export function enemyCanAttackNext(map: GameMap, tile: MapTile, playerIndex: num
     return hexDistance(tile, t) <= reach.move + reach.attack;
   });
 }
+
+/** Combined attack force of every enemy that could move and attack `tile` this
+ *  turn — a graded measure of how exposed a tile is, for weighing risky
+ *  positions instead of the flat `enemyCanAttackNext` yes/no flag. Doesn't
+ *  model defense, order of attacks, or counters: it is a cheap proxy, not a
+ *  combat simulation, but a tile several weak enemies can gang up on is
+ *  correctly rated worse than one only a single enemy can reach. */
+export function incomingForceAt(map: GameMap, tile: MapTile, playerIndex: number): number {
+  let total = 0;
+  for (const t of map.tiles) {
+    if (!t.unit || t.unit.owner === playerIndex || !isExploredFor(t, playerIndex)) continue;
+    if (t.unit.isStealthed === true) continue;
+    const reach = enemyReach(t.unit);
+    if (hexDistance(tile, t) <= reach.move + reach.attack) total += attackDamage(t.unit);
+  }
+  return total;
+}
+
+/** A tile where the combined enemy force alone is likely to kill the unit,
+ *  even ignoring its own defense — worth avoiding outright rather than just
+ *  weighing down, unless it is the only option. */
+export function isLikelyLethal(map: GameMap, tile: MapTile, playerIndex: number, unit: Unit): boolean {
+  if (!AI_TUNING.gradedThreat) return false;
+  return incomingForceAt(map, tile, playerIndex) >= unit.hp * LETHAL_FORCE_RATIO;
+}
+
+const LETHAL_FORCE_RATIO = 0.9;
+/** Scoring weight so a single average attacker (~20-25 force) costs about as
+ *  much as the old flat -200 threat penalty; a second attacker stacks on top
+ *  instead of being invisible to the score. */
+export const INCOMING_FORCE_WEIGHT = 8;
+/** Penalty for a likely-lethal tile, so it only wins when every reachable
+ *  option is rated just as bad. */
+export const LETHAL_PENALTY = 100000;
 
 /** Non-combat special units: the Villagers builder, the Forest trapper and the
  *  Warriors banner. They never attack and the AI keeps them out of fights —
@@ -197,10 +232,30 @@ const SPAWN_ORDER: Record<SpawnPreference, UnitType[]> = {
   naval: ['catapult', 'archer', 'shield', 'warrior', 'rider', 'swordsman', 'knight', 'stalker', 'builder', 'banner', 'berserker', 'trapper', 'stormcaller', 'stunner'],
 };
 
+/** Count of each enemy unit type currently visible to `player`, for weighing
+ *  a spawn choice against what the enemy is actually fielding. */
+function visibleEnemyComposition(map: GameMap, playerIndex: number): Map<UnitType, number> {
+  const counts = new Map<UnitType, number>();
+  for (const t of map.tiles) {
+    if (!t.unit || t.unit.owner === playerIndex || t.unit.owner < 0) continue;
+    if (t.unit.isStealthed === true || !isExploredFor(t, playerIndex)) continue;
+    counts.set(t.unit.type, (counts.get(t.unit.type) ?? 0) + 1);
+  }
+  return counts;
+}
+
+/** Best affordable, unlocked unit type for `prefer`. Behind `AiFlags.composition`
+ *  (off by default — see the flag's doc comment), and with `map` and a visible
+ *  enemy army, offense/defense spawns are picked by open-terrain duel counter
+ *  value against that army per unit of effective cost, instead of the fixed
+ *  `SPAWN_ORDER`; the static order remains the fallback otherwise (nothing
+ *  spotted yet, no map given, or a scout/naval preference). */
 export function bestSpawnableUnitType(
   player: Player,
   prefer: SpawnPreference = 'offense',
+  map?: GameMap,
 ): UnitType | null {
+  const candidates: UnitType[] = [];
   for (const type of SPAWN_ORDER[prefer]) {
     if (TRIBE_SPECIAL_UNIT[player.tribe] !== type && Object.values(TRIBE_SPECIAL_UNIT).includes(type)) continue;
     if (type === 'rider' && !hasSkill(player, 'riding')) continue;
@@ -209,9 +264,27 @@ export function bestSpawnableUnitType(
     if (type === 'catapult' && !hasSkill(player, 'catapult')) continue;
     if (type === 'shield' && !hasSkill(player, 'shields')) continue;
     const cost = { wood: UNIT_TYPES[type].priceWood, stone: 0, money: UNIT_TYPES[type].price, ore: UNIT_TYPES[type].priceOre };
-    if (canAfford(player.resources, cost)) return type;
+    if (canAfford(player.resources, cost)) candidates.push(type);
   }
-  return null;
+  if (candidates.length === 0) return null;
+  if (!map || (prefer !== 'offense' && prefer !== 'defense') || !flagsFor(player).composition) return candidates[0]!;
+  const enemies = visibleEnemyComposition(map, player.index);
+  if (enemies.size === 0) return candidates[0]!;
+
+  let best = candidates[0]!;
+  let bestScore = -Infinity;
+  candidates.forEach((type, rank) => {
+    let raw = 0;
+    for (const [enemyType, count] of enemies) raw += count * counterScore(type, enemyType);
+    // Divide by cost so a cheap solid counter beats an expensive marginal one;
+    // a tiny rank-based nudge keeps ties resolved toward the static priority.
+    const score = raw / effectiveCost(type) - rank * 1e-6;
+    if (score > bestScore) {
+      bestScore = score;
+      best = type;
+    }
+  });
+  return best;
 }
 
 /** Counter damage an attack on `target` would draw back onto `attacker` (0
@@ -257,7 +330,7 @@ export function guardGarrisonAttack(
   const garrisonHome = unit.spawnVillage !== null && key(unit.spawnVillage.q, unit.spawnVillage.r) === vk;
   const stayed = unitsInVillage(map, tile) - (garrisonHome ? 1 : 0);
   if (stayed >= villageCapacity(tile.settlement.level)) return { kind: 'hold' };
-  const guardType = bestSpawnableUnitType(player, 'defense');
+  const guardType = bestSpawnableUnitType(player, 'defense', map);
   if (!guardType) return { kind: 'hold' };
   return { kind: 'attack', guardType };
 }
@@ -890,7 +963,7 @@ export const AI_PATTERNS: AiPattern[] = [
         if (state.spawned.has(k)) continue;
         if (v.unit) continue;
         if (!landEnemyCanReach(map, v, player.index)) continue;
-        const type = bestSpawnableUnitType(player, 'defense');
+        const type = bestSpawnableUnitType(player, 'defense', map);
         if (!type) continue;
         return [{ type: 'spawn', q: v.q, r: v.r, unitType: type }];
       }
@@ -998,7 +1071,7 @@ export const AI_PATTERNS: AiPattern[] = [
         // in the village instead (only when the village can actually spawn it).
         const canClimb = hasSkill(player, 'climbing');
         const canDock = hasSkill(player, 'navigation');
-        const spawnType = bestSpawnableUnitType(player, 'defense');
+        const spawnType = bestSpawnableUnitType(player, 'defense', map);
         const slotFree = unitsInVillage(map, t) < villageCapacity(t.settlement.level);
         if (spawnType && slotFree) {
           let best: MapTile | null = null;
@@ -1517,6 +1590,9 @@ export const AI_PATTERNS: AiPattern[] = [
           // Don't explore into a beach a naval enemy can hit with land units
           // that cannot fight back (catapults and ships are the naval answer).
           if (situation?.navalThreat && !isShip(unit) && unit.type !== 'catapult' && coastExposedTile(map, c, situation.navalEnemies)) continue;
+          // Don't walk a scout into a spot where the enemy's combined reach is
+          // likely lethal: a stalled scout beats a dead one.
+          if (isLikelyLethal(map, c, player.index, unit)) continue;
           if (!isFrontierTile(map, c, player.index)) continue;
           const unexplored = hexNeighbors(c).filter((n) => {
             const nt = tileAt(map, n.q, n.r);
