@@ -51,6 +51,8 @@ const VILLAGE_LABEL_FONT_SIZE = 12;
  *  and both sit below everything else (hp bars, fire, markers) at zIndex 0. */
 const OVERLAY_Z_VILLAGE_LABEL = -2;
 const OVERLAY_Z_UNIT_MIRROR = -1;
+/** Attack markers above a mirrored unit, still below hp bars (0). */
+const OVERLAY_Z_ATTACK_MARKER = -0.5;
 /** World offset of the hp bar anchor above/relative to the tile's unit top. */
 const HP_BAR_ANCHOR_OFFSET = 40;
 
@@ -214,6 +216,10 @@ export class MapView {
    *  drawn above the village name label (which lives in the overlay, above the
    *  world tiles). Each copy follows its source sprite via `onRender`. */
   private unitMirrors: Sprite[] = [];
+  /** Keys of tiles whose unit is mirrored into the overlay (village units). */
+  private mirroredKeys = new Set<string>();
+  /** Attack markers redrawn in the overlay right above a unit mirror. */
+  private attackProxies: Container[] = [];
   private dealTooltip: Tooltip | null = null;
   /** World anchor (hp bar point) + row width of each pirate-deal dot row. */
   private dealAnchors = new Map<string, { x: number; y: number; rowW: number }>();
@@ -1122,6 +1128,13 @@ export class MapView {
       this.revealMarker(key, attackDot);
       this.markerLayer.addChild(attackDot);
       this.highlights.push(attackDot);
+      // A village unit is drawn by its overlay mirror, which sits above the
+      // marker layer: draw the marker again in the overlay right above the
+      // mirror so it is never covered by the unit, and hide the layer copy.
+      if (this.mirroredKeys.has(key)) {
+        attackDot.visible = false;
+        this.addAttackProxy(key, p.x, y, dotRadius);
+      }
     }
     this.startAttackPulse();
     this.startMovePulse();
@@ -1768,6 +1781,7 @@ export class MapView {
       mirror.destroy();
     }
     this.unitMirrors = [];
+    this.mirroredKeys.clear();
     for (const item of this.overlayItems) {
       item.el.parent?.removeChild(item.el);
       for (const child of item.el.children) {
@@ -1795,6 +1809,13 @@ export class MapView {
     this.movePulseParts = [];
     this.markerRevealEls.clear();
     this.stopMarkerRevealTick();
+    for (const proxy of this.attackProxies) {
+      proxy.onRender = null;
+      proxy.removeChildren();
+      proxy.parent?.removeChild(proxy);
+      proxy.destroy();
+    }
+    this.attackProxies = [];
     for (const g of this.highlights) {
       g.parent?.removeChild(g);
       this.releaseGraphics(g);
@@ -2164,6 +2185,27 @@ export class MapView {
     this.edgePulseStart = null;
   }
 
+  /** An attack marker drawn inside the overlay (above the unit mirrors at
+   *  zIndex -1, below hp bars at 0), following the world transform each frame. */
+  private addAttackProxy(key: string, x: number, y: number, radius: number): void {
+    const holder = new Container();
+    holder.zIndex = OVERLAY_Z_ATTACK_MARKER;
+    const g = this.takeGraphics();
+    this.drawMarkerShape(g, x, y, radius, THEME.map.selected);
+    this.revealMarker(key, g);
+    holder.addChild(g);
+    const sync = (): void => {
+      const world = this.container;
+      holder.position.set(world.x, world.y);
+      holder.scale.set(world.scale.x, world.scale.y);
+    };
+    holder.onRender = sync;
+    sync();
+    this.overlay.addChild(holder);
+    this.attackProxies.push(holder);
+    this.highlights.push(g);
+  }
+
   /** Draws the tile's unit again in the overlay, right above the village name
    *  label, so the unit texture is never covered by the name. */
   private addUnitMirror(tile: MapTile): void {
@@ -2189,6 +2231,7 @@ export class MapView {
     sync();
     this.overlay.addChild(mirror);
     this.unitMirrors.push(mirror);
+    this.mirroredKeys.add(axialKey(tile));
   }
 
   private addVillageLabel(

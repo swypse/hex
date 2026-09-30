@@ -956,6 +956,23 @@ describe('MapView hp bar anchoring', () => {
     expect(bars[0]!.el.children.filter((c) => c instanceof Graphics).length).toBe(4);
   });
 
+  it('draws the attack marker of a village unit in the overlay above its unit mirror', () => {
+    const village = map.tiles[0]!;
+    village.settlement = { owner: 0, level: 1, captureReady: false, name: 'Alpha' };
+    const vp = { x: 400, y: 300, scale: 1, width: 800, height: 600 };
+    view.update(map, players, null, new Set(), new Set(['0,0']), 0, new Set(), vp);
+    const mirror = view.overlay.children.find((c) => c instanceof Sprite && c.zIndex === -1);
+    expect(mirror).toBeDefined();
+    const proxy = view.overlay.children.find((c) => c instanceof Container && !(c instanceof Sprite) && c.zIndex === -0.5);
+    expect(proxy).toBeDefined();
+    expect(proxy!.zIndex).toBeGreaterThan(mirror!.zIndex);
+    // The layer copy is hidden so the marker is not drawn twice.
+    expect(view.markerLayer.children.every((c) => !c.visible)).toBe(true);
+    // A clear removes the proxy again.
+    view.update(map, players, null, new Set(), new Set(), 0, new Set(), vp);
+    expect(view.overlay.children.some((c) => c.zIndex === -0.5)).toBe(false);
+  });
+
   it('draws move and attack markers in the marker layer above tiles and overlays', () => {
     const t00: MapTile = {
       q: 0, r: 0, terrain: TileType.GrasslandLand, height: 0.1, settlement: null, building: null,
