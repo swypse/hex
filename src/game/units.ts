@@ -1,5 +1,6 @@
 import { t } from '../i18n';
 import { shipMovePoints } from './ship';
+import type { Resources } from './resources';
 import { Tribe } from './tribes';
 
 export type UnitType = 'warrior' | 'rider' | 'archer' | 'swordsman' | 'shield' | 'catapult' | 'knight' | 'pirate' | 'stalker' | 'builder' | 'banner' | 'berserker' | 'trapper' | 'stormcaller' | 'stunner';
@@ -33,16 +34,22 @@ export const UNIT_TYPES: Record<UnitType, UnitTypeInfo> = {
   swordsman: { movePoints: 10, attack: 40, attackDistance: 1, maxHp: 80, defense: 16, price: 10, priceWood: 0, priceOre: 2, shape: 'swordsman' },
   shield: { movePoints: 10, attack: 7, attackDistance: 1, maxHp: 80, defense: 20, price: 8, priceWood: 0, priceOre: 2, shape: 'square' },
   catapult: { movePoints: 10, attack: 50, attackDistance: 4, maxHp: 30, defense: 0, price: 15, priceWood: 10, priceOre: 3, shape: 'square' },
-  knight: { movePoints: 30, attack: 46, attackDistance: 1, maxHp: 70, defense: 12, price: 14, priceWood: 0, priceOre: 5, shape: 'swordsman' },
+  knight: { movePoints: 30, attack: 40, attackDistance: 1, maxHp: 70, defense: 12, price: 14, priceWood: 0, priceOre: 5, shape: 'swordsman' },
   pirate: { movePoints: 50, attack: 15, attackDistance: 3, maxHp: PIRATE_HP, defense: 5, price: 0, priceWood: 0, priceOre: 0, shape: 'square' },
   stalker: { movePoints: 20, attack: 10, attackDistance: 1, maxHp: 20, defense: 0, price: 9, priceWood: 0, priceOre: 2, shape: 'circle' },
   builder: { movePoints: 8, attack: 10, attackDistance: 1, maxHp: 40, defense: 0, price: 15, priceWood: 0, priceOre: 0, shape: 'circle' },
-  banner: { movePoints: 8, attack: 20, attackDistance: 1, maxHp: 30, defense: 0, price: 7, priceWood: 0, priceOre: 2, shape: 'circle' },
-  berserker: { movePoints: 10, attack: 26, attackDistance: 1, maxHp: 50, defense: 8, price: 11, priceWood: 0, priceOre: 3, shape: 'circle' },
-  trapper: { movePoints: 10, attack: 20, attackDistance: 1, maxHp: 40, defense: 8, price: 9, priceWood: 0, priceOre: 2, shape: 'circle' },
-  stormcaller: { movePoints: 20, attack: 20, attackDistance: 1, maxHp: 40, defense: 8, price: 9, priceWood: 0, priceOre: 2, shape: 'circle' },
+  banner: { movePoints: 8, attack: 10, attackDistance: 1, maxHp: 30, defense: 0, price: 7, priceWood: 0, priceOre: 2, shape: 'circle' },
+  berserker: { movePoints: 10, attack: 26, attackDistance: 1, maxHp: 50, defense: 8, price: 10, priceWood: 0, priceOre: 2, shape: 'circle' },
+  trapper: { movePoints: 10, attack: 20, attackDistance: 1, maxHp: 44, defense: 8, price: 6, priceWood: 0, priceOre: 2, shape: 'circle' },
+  stormcaller: { movePoints: 20, attack: 20, attackDistance: 1, maxHp: 44, defense: 8, price: 6, priceWood: 0, priceOre: 2, shape: 'circle' },
   stunner: { movePoints: 8, attack: 20, attackDistance: 2, maxHp: 40, defense: 10, price: 7, priceWood: 0, priceOre: 2, shape: 'circle' },
 };
+
+/** Resources needed to spawn a unit of this type. */
+export function unitSpawnCost(type: UnitType): Resources {
+  const info = UNIT_TYPES[type];
+  return { wood: info.priceWood, stone: 0, money: info.price, ore: info.priceOre, food: 0 };
+}
 
 export const UNIT_IMAGE_FILES: Record<Tribe, Record<PlayableUnitType, string>> = {
   [Tribe.Cats]: { warrior: 'cats-warrior.png', rider: 'cats-rider.png', archer: 'cats-archer.png', swordsman: 'cats-swordsman.png', shield: 'cats-shield.png', catapult: 'cats-catapult.png', knight: 'cats-knight.png', stalker: 'cats-stalker.png', builder: 'cats-warrior.png', banner: 'cats-warrior.png', berserker: 'cats-warrior.png', trapper: 'cats-warrior.png', stormcaller: 'cats-warrior.png', stunner: 'cats-warrior.png' },
@@ -159,6 +166,30 @@ const UNIT_MAINTENANCE: Record<UnitType, number> = {
   stunner: 2,
 };
 
+/** Food a land unit of this type eats per turn from the village that raised it. */
+const UNIT_FOOD_UPKEEP: Record<UnitType, number> = {
+  warrior: 1,
+  archer: 1,
+  rider: 1,
+  swordsman: 3,
+  knight: 3,
+  catapult: 3,
+  shield: 2,
+  pirate: 0,
+  stalker: 3,
+  builder: 3,
+  banner: 3,
+  berserker: 3,
+  trapper: 3,
+  stormcaller: 3,
+  stunner: 3,
+};
+
+/** Per-turn food upkeep of a unit type. */
+export function unitFoodUpkeep(type: UnitType): number {
+  return UNIT_FOOD_UPKEEP[type];
+}
+
 /** Money upkeep a ship costs its home village each turn, by ship level. */
 const SHIP_MAINTENANCE: Record<1 | 2 | 3, number> = {
   1: 2,
@@ -171,6 +202,11 @@ const SHIP_MAINTENANCE: Record<1 | 2 | 3, number> = {
 export function unitMaintenance(unit: Unit): number {
   if (unit.shipLevel !== undefined) return SHIP_MAINTENANCE[unit.shipLevel];
   return UNIT_MAINTENANCE[unit.type];
+}
+
+/** Upkeep of a land unit type (balance analysis; ignores ship levels). */
+export function unitTypeMaintenance(type: UnitType): number {
+  return UNIT_MAINTENANCE[type];
 }
 
 /** Money cost of disbanding a unit: three rounds of its upkeep. */

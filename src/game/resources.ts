@@ -3,20 +3,21 @@ export interface Resources {
   stone: number;
   money: number;
   ore: number;
+  food: number;
 }
 
-export const START_RESOURCES: Resources = { wood: 3, stone: 2, money: 8, ore: 0 };
+export const START_RESOURCES: Resources = { wood: 3, stone: 2, money: 8, ore: 0, food: 40 };
 
-export const UPGRADE_COST: Resources = { wood: 2, stone: 1, money: 2, ore: 0 };
+export const UPGRADE_COST: Resources = { wood: 2, stone: 1, money: 2, ore: 0, food: 0 };
 
 // Cost to upgrade a village from the given level to the next one.
 export function villageUpgradeCost(level: number): Resources {
-  return { wood: 2 * level, stone: level, money: 2 * level, ore: 0 };
+  return { wood: 2 * level, stone: level, money: 2 * level, ore: 0, food: 0 };
 }
 
 /** Money-only cost, the common case for maintaining reserve checks. */
 export function moneyCost(money: number): Resources {
-  return { wood: 0, stone: 0, money, ore: 0 };
+  return { wood: 0, stone: 0, money, ore: 0, food: 0 };
 }
 
 export function canAfford(have: Resources, cost: Resources): boolean {
@@ -24,7 +25,8 @@ export function canAfford(have: Resources, cost: Resources): boolean {
     have.wood >= cost.wood &&
     have.stone >= cost.stone &&
     have.money >= cost.money &&
-    have.ore >= cost.ore
+    have.ore >= cost.ore &&
+    have.food >= cost.food
   );
 }
 
@@ -34,5 +36,6 @@ export function pay(have: Resources, cost: Resources): Resources {
     stone: have.stone - cost.stone,
     money: have.money - cost.money,
     ore: have.ore - cost.ore,
+    food: have.food - cost.food,
   };
 }

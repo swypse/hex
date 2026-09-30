@@ -4,7 +4,7 @@ import { canAfford, villageUpgradeCost } from './resources';
 import { isWaterType, isMountainType } from './tile-types';
 import { canOpenSkill, hasSkill, SkillId } from './skills';
 import { reachableTargets, tileAt } from './selection';
-import { UNIT_MOVE_POINTS, UNIT_TYPES, UNIT_ATTACK_DISTANCE, canHeal, HEAL_AMOUNT, Unit, UnitType } from './units';
+import { UNIT_MOVE_POINTS, unitSpawnCost, UNIT_TYPES, UNIT_ATTACK_DISTANCE, canHeal, HEAL_AMOUNT, Unit, UnitType } from './units';
 import { SeededRandom } from '../util/random';
 import { hexDistance, hexNeighbors } from './hex';
 import { attackableTargets, attackDamage, canCounterAttack, counterDamageTo as counterDamageToFromCombat, resolveCombat, tradeIsFavorable } from './combat';
@@ -22,6 +22,7 @@ import { adjacentEnemyVillages } from './stalker';
 import { flagsFor } from './ai-flags';
 import { berserkerRage } from './abilities';
 import { counterScore, effectiveCost } from './balance';
+import { eatsFarmMaterials } from './food';
 
 export interface AiPatternContext {
   map: GameMap;
@@ -263,7 +264,7 @@ export function bestSpawnableUnitType(
     if (type === 'swordsman' && !hasSkill(player, 'swordsman')) continue;
     if (type === 'catapult' && !hasSkill(player, 'catapult')) continue;
     if (type === 'shield' && !hasSkill(player, 'shields')) continue;
-    const cost = { wood: UNIT_TYPES[type].priceWood, stone: 0, money: UNIT_TYPES[type].price, ore: UNIT_TYPES[type].priceOre };
+    const cost = unitSpawnCost(type);
     if (canAfford(player.resources, cost)) candidates.push(type);
   }
   if (candidates.length === 0) return null;
@@ -1624,7 +1625,7 @@ export const AI_PATTERNS: AiPattern[] = [
         : 1;
       if (fielded >= cap) return null;
       if (!specialUnitWanted(map, player, situation)) return null;
-      const cost = { wood: UNIT_TYPES[special].priceWood, stone: 0, money: UNIT_TYPES[special].price, ore: UNIT_TYPES[special].priceOre };
+      const cost = unitSpawnCost(special);
       if (!canAfford(player.resources, cost)) return null;
       // Pick the village that puts the special unit where it works: the banner
       // next to the army cluster, the builder beside an unbuilt mine, everyone
@@ -1676,6 +1677,7 @@ export const AI_PATTERNS: AiPattern[] = [
         const k = key(t.q, t.r);
         if (state.upgraded.has(k)) continue;
         if (!canAfford(player.resources, villageUpgradeCost(t.settlement.level))) continue;
+        if (eatsFarmMaterials(map, player, villageUpgradeCost(t.settlement.level))) continue;
         const front = nearestEnemyDistanceFrom(map, player.index, t) <= 4;
         if (front || ownUnits <= 2) return [{ type: 'upgrade', q: t.q, r: t.r }];
       }

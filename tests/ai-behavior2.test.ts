@@ -90,7 +90,7 @@ describe('AI grind and capture behaviour', () => {
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1), 'normal');
     const p = players[1]!;
     p.skills = ['roads'];
-    p.resources = { wood: 50, stone: 50, money: 100, ore: 0 };
+    p.resources = { wood: 50, stone: 50, money: 100, ore: 0, food: 20 };
     const actions = planAiActions(map, p, new SeededRandom(2), 'capture');
     expect(actions.some((a) => a.type === 'buildRoad' && a.q === 1 && a.r === 0)).toBe(true);
   });

@@ -1,3 +1,4 @@
+import { BUILDING_NAMES } from '../game/buildings';
 import { Application, BitmapText, Container, Graphics, Sprite, Texture } from 'pixi.js';
 import { Simulator } from '../game/simulator';
 import { AttackUnitPre, GameEvent } from '../game/events';
@@ -47,6 +48,62 @@ const PROJECTILE_MS_PER_TILE = 150;
 
 const ACH_CHIP_BG = 0x373748;
 const ACH_CHIP_SIZE = 64;
+
+/** Pause after one of the local player's own (or visible ally) events. */
+const EVENT_PAUSE_MS = 150;
+/** Pause after a visible enemy/AI event: shorter so AI turns don't crawl. */
+const ENEMY_EVENT_PAUSE_MS = 50;
+/** Walk tween per hex (ms) and gap between hexes, own vs enemy units. */
+const OWN_STEP_MS = 110;
+const OWN_STEP_GAP_MS = 60;
+const ENEMY_STEP_MS = 70;
+const ENEMY_STEP_GAP_MS = 10;
+
+/** Events that only update state / HUD and leave nothing to wait for. */
+const INSTANT_EVENTS: ReadonlySet<GameEvent['type']> = new Set<GameEvent['type']>([
+  'aiTurn',
+  'turnStarted',
+  'spawned',
+  'built',
+  'templeGrown',
+  'skillOpened',
+  'shipUpgraded',
+  'shipReverted',
+  'scoreFly',
+  'knightCombo',
+  'achievementUnlocked',
+]);
+
+/** Tiles an event happens on (empty when it has no location). */
+function eventTiles(e: GameEvent): { q: number; r: number }[] {
+  const out: { q: number; r: number }[] = [];
+  const rec = e as unknown as Record<string, unknown>;
+  const isAxial = (v: unknown): v is { q: number; r: number } =>
+    typeof v === 'object' && v !== null && typeof (v as { q?: unknown }).q === 'number' && typeof (v as { r?: unknown }).r === 'number';
+  if (typeof rec.q === 'number' && typeof rec.r === 'number') out.push({ q: rec.q, r: rec.r });
+  for (const key of ['from', 'to', 'attackerTile', 'targetTile']) {
+    const v = rec[key];
+    if (isAxial(v)) out.push(v);
+  }
+  return out;
+}
+
+/** Whether `local` is the actor of an event (its own action: keep the full pause). */
+function isLocalActor(e: GameEvent, local: number): boolean {
+  const rec = e as unknown as Record<string, unknown>;
+  return rec.playerIndex === local || rec.attackerIndex === local;
+}
+
+/** ms to wait after presenting `e`: nothing for instant events and for
+ *  enemy events the local player cannot see (fogged tiles), a short beat for
+ *  visible enemy actions, the full beat for the local player's own. */
+export function pauseAfterEvent(e: GameEvent, local: number, isExplored: (q: number, r: number) => boolean): number {
+  if (INSTANT_EVENTS.has(e.type)) return 0;
+  if (isLocalActor(e, local)) return EVENT_PAUSE_MS;
+  const tiles = eventTiles(e);
+  if (tiles.length === 0 || !tiles.some((t) => isExplored(t.q, t.r))) return 0;
+  return ENEMY_EVENT_PAUSE_MS;
+}
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -300,6 +357,28 @@ export class EventPresenter {
           case 'trapPlaced':
             this.host.render();
             break;
+          case 'burned': {
+            this.host.render();
+            const victim = tileAt(sim.map, e.q, e.r)?.ownedBy;
+            if (victim === local && e.playerIndex !== local) {
+              useGameStore.getState().setCenterMessage(t('msg.foodBuildingBurned', { building: BUILDING_NAMES[e.kind] }));
+            }
+            break;
+          }
+          case 'starvation': {
+            for (const u of e.units) {
+              const ut = tileAt(sim.map, u.q, u.r);
+              if (ut && u.damage > 0 && isExploredFor(ut, local)) this.spawnHpText(ut, `-${u.damage}`, 0xff4d4d);
+            }
+            if (e.playerIndex === local) {
+              const village = tileAt(sim.map, e.q, e.r);
+              useGameStore.getState().setCenterMessage(
+                t('msg.starving', { village: village?.settlement?.name ?? t('hud.selected.settlementDefault') }),
+              );
+            }
+            this.host.render();
+            break;
+          }
           case 'trapTriggered': {
             this.host.render();
             const t = tileAt(sim.map, e.q, e.r);
@@ -380,7 +459,11 @@ export class EventPresenter {
             this.presentGameOver(e.winnerIndex, e.bonus);
             break;
         }
-        await new Promise((resolve) => setTimeout(resolve, 150));
+        const pause = pauseAfterEvent(e, local, (q, r) => {
+          const tile = tileAt(sim.map, q, r);
+          return tile !== undefined && isExploredFor(tile, local);
+        });
+        if (pause > 0) await sleep(pause);
       }
     } finally {
       this.restoreDeferredFog(deferredFog);
@@ -855,7 +938,9 @@ export class EventPresenter {
     this.host.hiddenUnitIds().add(unit.id);
     // Post-move attackable/reachable markers must not appear while the mover is
     // still sliding, so defer their reveal until the animation completes.
-    mapView.deferNewMarkers(steps.length * 170 + 100);
+    const stepMs = unit.owner === local ? OWN_STEP_MS : ENEMY_STEP_MS;
+    const stepGapMs = unit.owner === local ? OWN_STEP_GAP_MS : ENEMY_STEP_GAP_MS;
+    mapView.deferNewMarkers(steps.length * (stepMs + stepGapMs) + 100);
     this.host.render();
     const sprite = new Sprite(texture);
     sprite.anchor.set(0.5, unitTex.anchorY);
@@ -878,10 +963,10 @@ export class EventPresenter {
       }
       const targetTile = tileAt(map, step.q, step.r);
       const y = targetTile ? to.y - tileElevation(targetTile, HEX_SIZE) : to.y;
-      await this.tweenSpriteTo(sprite, { x: to.x, y }, 110);
+      await this.tweenSpriteTo(sprite, { x: to.x, y }, stepMs);
       if (seaUnit) this.spawnShipWakeSegment(prev, step);
       prev = step;
-      await new Promise((resolve) => setTimeout(resolve, 60));
+      await sleep(stepGapMs);
     }
     this.host.hiddenUnitIds().delete(unit.id);
     mapView.container.removeChild(sprite);

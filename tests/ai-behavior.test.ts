@@ -98,7 +98,7 @@ describe('AI behavior scenarios', () => {
     const map = makeTestMap(2);
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1), 'easy');
     const broke = players[1]!;
-    broke.resources = { wood: 0, stone: 0, money: 0, ore: 0 };
+    broke.resources = { wood: 0, stone: 0, money: 0, ore: 0, food: 20 };
     const alwaysRollMistake = { next: () => 0 } as SeededRandom;
     expect(planAiActions(map, broke, alwaysRollMistake, 'capture')).toEqual([]);
   });
@@ -122,7 +122,7 @@ describe('AI behavior scenarios', () => {
     extra.ownedBy = 0;
     tileAt(map, 1, 0)!.unit = makeUnit('enemy', 0, 'knight', 1, 0);
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1), 'easy');
-    players[1]!.resources = { wood: 50, stone: 50, money: 100, ore: 10 };
+    players[1]!.resources = { wood: 50, stone: 50, money: 100, ore: 10, food: 20 };
     const sim = new Simulator(map, players, 'capture', { rng: () => 0.5, aiRng: () => new SeededRandom(2) });
     sim.startGame();
     sim.applyCommand({ type: 'endTurn' });
@@ -143,7 +143,7 @@ describe('AI behavior scenarios', () => {
     extra.ownedBy = 0;
     tileAt(map, 1, 0)!.unit = makeUnit('enemy', 0, 'knight', 1, 0);
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1), 'easy');
-    players[1]!.resources = { wood: 0, stone: 0, money: 0, ore: 0 };
+    players[1]!.resources = { wood: 0, stone: 0, money: 0, ore: 0, food: 20 };
     const sim = new Simulator(map, players, 'capture', { rng: () => 0.5, aiRng: () => new SeededRandom(2) });
     sim.startGame();
     sim.applyCommand({ type: 'endTurn' });

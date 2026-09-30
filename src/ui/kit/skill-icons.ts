@@ -25,6 +25,8 @@ export const SKILL_ICON_FILES: Partial<Record<SkillId, string>> = {
   riding: 'skill-riding',
   bridges: 'skill-bridges',
   knights: 'skill-knights',
+  agriculture: 'skill-agriculture',
+  granary: 'skill-granary',
 };
 
 let atlasTexture: Texture | null = null;

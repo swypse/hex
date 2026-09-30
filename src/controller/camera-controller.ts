@@ -17,6 +17,8 @@ import {
 
 const DRAG_THRESHOLD = 5;
 const CAMERA_DURATION_MS = 600;
+/** Pan time when following an enemy action: quicker so AI turns don't crawl. */
+export const CAMERA_FOLLOW_MS = 300;
 const CAMERA_MARGIN_TILES = 2;
 const START_ZOOM = 1.2;
 
@@ -148,7 +150,7 @@ export class CameraController {
     );
   }
 
-  animateTo(target: { x: number; y: number }, clamp = true): Promise<void> {
+  animateTo(target: { x: number; y: number }, clamp = true, durationMs = CAMERA_DURATION_MS): Promise<void> {
     return new Promise<void>((resolve) => {
       if (!this.ctx.app) {
         resolve();
@@ -162,7 +164,7 @@ export class CameraController {
       this.cameraResolve = resolve;
       const ticker = this.ctx.app.ticker;
       const fn = (t: Ticker): void => {
-        const progress = Math.min(1, (performance.now() - this.cameraStartTime) / CAMERA_DURATION_MS);
+        const progress = Math.min(1, (performance.now() - this.cameraStartTime) / durationMs);
         const step = cameraPanStep(this.cameraStartPan, this.cameraTarget, progress);
         this.pan = clamp
           ? clampPan(

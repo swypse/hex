@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { Circle, Container, Graphics, Sprite, BitmapText } from 'pixi.js';
+import { Circle, Rectangle, Container, Graphics, Sprite, BitmapText } from 'pixi.js';
 import { HudSelected } from '../src/ui/hud/hud-selected';
 import { useGameStore } from '../src/store/game-store';
 import { gameController } from '../src/controller/game-controller';
@@ -113,6 +113,45 @@ describe('HudSelected village building constraints', () => {
     (gameController as unknown as { sim: unknown }).sim = originalSim;
   });
 
+  it('shows the food balance of an own village and a red starvation line when it starves', () => {
+    mount(1, 0, 0);
+    expect(texts().some((s) => s.startsWith('Food: farms 0'))).toBe(true);
+    expect(texts().some((s) => s.startsWith('Starving!'))).toBe(false);
+    const village = tileAt(gameController.getMap()!, 0, 0)!;
+    village.settlement!.starving = true;
+    useGameStore.setState({ selection: { kind: 'village', q: 0, r: 0 } });
+    expect(texts().some((s) => s.startsWith('Starving!'))).toBe(true);
+  });
+
+  it('suggests opening Agriculture on an own empty land tile, then Granary next to a farm', () => {
+    mount(1, 0, 0);
+    const map = gameController.getMap()!;
+    const tile = tileAt(map, 1, 0)!;
+    tile.ownedBy = 0;
+    const human = useGameStore.getState().players[0]!;
+    useGameStore.setState({ selection: { kind: 'terrain', q: 1, r: 0 } });
+    expect(texts()).toContain('Open Agriculture');
+    human.skills.push('agriculture');
+    const farm = tileAt(map, 1, -1)!;
+    farm.ownedBy = 0;
+    farm.building = { kind: 'farm', level: 1 };
+    useGameStore.setState({ selection: { kind: 'terrain', q: 1, r: 0 } });
+    expect(texts()).not.toContain('Open Agriculture');
+    expect(texts()).toContain('Open Granary');
+  });
+
+  it('shows the stored food of a selected granary', () => {
+    mount(1, 0, 0);
+    const map = gameController.getMap()!;
+    const granary = tileAt(map, 1, 0)!;
+    granary.ownedBy = 0;
+    granary.building = { kind: 'granary', level: 1, food: 7 };
+    tileAt(map, 1, -1)!.ownedBy = 0;
+    tileAt(map, 1, -1)!.building = { kind: 'farm', level: 1 };
+    useGameStore.setState({ selection: { kind: 'terrain', q: 1, r: 0 } });
+    expect(texts()).toContain('Stored food: 7 (+1 per turn from adjacent farms)');
+  });
+
   it('lays the drop shadow beneath the info panel background', () => {
     mount(1, 1, 0);
     const el = (hud as unknown as { el: Container }).el!;
@@ -179,10 +218,10 @@ describe('HudSelected village building constraints', () => {
     expect(all).not.toContain('UPKEEP');
   });
 
-  it('appends a bullet to the unit name while the unit still has actions', () => {
+  it('does not append a bullet to the unit name', () => {
     mount(1, 1, 0, { unitOnVillage: true });
     const labels = texts();
-    expect(labels.some((x) => x.startsWith('Warrior') && x.includes('•'))).toBe(true);
+    expect(labels.some((x) => x.includes('•'))).toBe(false);
   });
 
   it('renders 3 stat icons inline on the selected unit line plus the income icon', () => {
@@ -191,9 +230,9 @@ describe('HudSelected village building constraints', () => {
       .map((s) => s.width)
       .filter((w) => w === 16);
     // 3 unit stats (attack/defense/gold, hp removed) + the gold village income
-    // icon on the settlement line, plus the three 16px help buttons (unit /
-    // settlement / building limit).
-    expect(widths).toEqual([16, 16, 16, 16, 16, 16, 16]);
+    // and food balance icons on the settlement line, plus the three 16px help
+    // buttons (unit / settlement / building limit) and the 16px close icon.
+    expect(widths).toEqual([16, 16, 16, 16, 16, 16, 16, 16, 16]);
   });
 
   it('draws a button-style drop shadow behind the info panel', () => {
@@ -277,6 +316,26 @@ describe('HudSelected building produce and bridge info lines', () => {
     return n;
   };
 
+  /** The green 8x8 hp squares drawn on the building row (x positions). */
+  const hpSquares = (): { w: number; h: number; x: number }[] => {
+    const el = (hud as unknown as { el: Container }).el!;
+    const out: { w: number; h: number; x: number }[] = [];
+    const walk = (c: Container): void => {
+      for (const ch of c.children) {
+        if (ch instanceof Graphics) {
+          for (const ins of ch.context.instructions) {
+            const data = ins.data as { style?: { color?: number }; path?: { shapePath: { shapePrimitives: { shape: { x: number; y: number; width: number; height: number } }[] } } };
+            if (ins.action !== 'fill' || data.style?.color !== 0x49cc5d) continue;
+            for (const prim of data.path!.shapePath.shapePrimitives) out.push({ w: prim.shape.width, h: prim.shape.height, x: prim.shape.x });
+          }
+        }
+        if (ch instanceof Container) walk(ch as Container);
+      }
+    };
+    walk(el);
+    return out;
+  };
+
   const boot = (setup: (map: GameMap) => MapTile): void => {
     (globalThis as { CanvasRenderingContext2D?: unknown }).CanvasRenderingContext2D = class {};
     (globalThis as { document?: unknown }).document = {
@@ -312,7 +371,7 @@ describe('HudSelected building produce and bridge info lines', () => {
       return t;
     });
     const all = texts().join('\n');
-    expect((all.match(/\+1/g) ?? []).length).toBe(2);
+    expect(texts().filter((x) => x === '1')).toHaveLength(2); // plain N, no plus sign
     expect(all).not.toMatch(/wood/);
   });
 
@@ -323,7 +382,11 @@ describe('HudSelected building produce and bridge info lines', () => {
       t.building = { kind: 'mine', level: 1 };
       return t;
     });
-    expect(texts().join('\n')).toContain('2/2');
+    const squares = hpSquares();
+    expect(squares).toHaveLength(2);
+    expect(squares.every((q) => q.w === 8 && q.h === 8)).toBe(true);
+    expect(squares[1]!.x - squares[0]!.x).toBe(11); // 8px square + 3px gap
+    expect(texts().join('\n')).not.toContain('2/2');
   });
 
   it('shows the reduced hp next to a damaged building', () => {
@@ -333,7 +396,7 @@ describe('HudSelected building produce and bridge info lines', () => {
       t.building = { kind: 'mine', level: 1, hp: 1 };
       return t;
     });
-    expect(texts().join('\n')).toContain('1/2');
+    expect(hpSquares()).toHaveLength(1);
   });
 
   it('lists only the sawmill yield (wood) on the building row', () => {
@@ -348,7 +411,7 @@ describe('HudSelected building produce and bridge info lines', () => {
       return t;
     });
     const all = texts().join('\n');
-    expect((all.match(/\+1/g) ?? []).length).toBe(1);
+    expect(texts().filter((x) => x === '1')).toHaveLength(1);
     expect(all).not.toMatch(/stone \d/);
     expect(all).not.toMatch(/ore \d/);
   });
@@ -864,10 +927,9 @@ describe('HudSelected close button and collapsed state', () => {
       for (const ch of c.children) {
         if (
           ch instanceof Container &&
-          ch.hitArea instanceof Circle &&
-          ch.children.length === 2 &&
-          ch.children[0] instanceof Graphics &&
-          ch.children[1] instanceof Graphics
+          ch.hitArea instanceof Rectangle &&
+          ch.children.length === 1 &&
+          ch.children[0] instanceof Sprite
         ) {
           return ch as Container;
         }

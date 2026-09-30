@@ -13,7 +13,7 @@ function player(skills: Player['skills'] = [], money = 100): Player {
     tribe: Tribe.Villagers,
     isHuman: true,
     name: 'p',
-    resources: { wood: 100, stone: 100, money, ore: 0 },
+    resources: { wood: 100, stone: 100, money, ore: 0, food: 20 },
     score: 0,
     kills: 0,
     skills,

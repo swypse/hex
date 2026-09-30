@@ -19,6 +19,8 @@ export type SkillId =
   | 'catapult'
   | 'riding'
   | 'knights'
+  | 'agriculture'
+  | 'granary'
   | 'bridges';
 
 interface SkillInfo {
@@ -148,6 +150,20 @@ export const SKILLS: Record<SkillId, SkillInfo> = {
     level: 2,
     parent: 'riding',
     description: t('skill.knights.desc'),
+  },
+  agriculture: {
+    id: 'agriculture',
+    name: t('skill.agriculture.name'),
+    level: 1,
+    parent: null,
+    description: t('skill.agriculture.desc'),
+  },
+  granary: {
+    id: 'granary',
+    name: t('skill.granary.name'),
+    level: 2,
+    parent: 'agriculture',
+    description: t('skill.granary.desc'),
   },
 };
 

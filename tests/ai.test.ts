@@ -42,7 +42,7 @@ function makeKnight(id: string, owner: number, q: number, r: number): Unit {
 function aiPlayer(): import('../src/game/players').Player {
   return {
     index: 1, tribe: Tribe.Villagers, isHuman: false, name: 'AI',
-    resources: { wood: 5, stone: 5, money: 100, ore: 5 },
+    resources: { wood: 5, stone: 5, money: 100, ore: 5, food: 20 },
     score: 0, kills: 0, skills: [], isActive: true,
   };
 }
@@ -91,7 +91,9 @@ describe('planAiActions', () => {
   });
 
   it('spawns and upgrades across seeds', () => {
-    const all = planSeeds(makeAiMap(), aiPlayer(), 40);
+    const rich = aiPlayer();
+    rich.resources.wood = 10; // an upgrade must leave the wood of a first farm
+    const all = planSeeds(makeAiMap(), rich, 40);
     expect(all.some((a) => a.type === 'spawn')).toBe(true);
     expect(all.some((a) => a.type === 'upgrade')).toBe(true);
   });
@@ -227,7 +229,7 @@ describe('planAiActions', () => {
       makeTile(1, 0),
       makeTile(2, 0, 0, null, makeRider('enemy', 0, 2, 0)),
     );
-    const player = { ...aiPlayer(), skills: ['shields' as SkillId], resources: { wood: 5, stone: 5, money: 10, ore: 3 } };
+    const player = { ...aiPlayer(), skills: ['shields' as SkillId], resources: { wood: 5, stone: 5, money: 10, ore: 3, food: 20 } };
     const spawns = planSeeds(map, player, 40).filter((a) => a.type === 'spawn');
     expect(spawns.length).toBeGreaterThan(0);
     for (const s of spawns) {
@@ -242,7 +244,7 @@ describe('planAiActions', () => {
       makeTile(1, 0),
       makeTile(5, 0, null, { owner: null, level: 1, captureReady: false }),
     );
-    const player = { ...aiPlayer(), resources: { wood: 5, stone: 5, money: 10, ore: 0 }, skills: ['riding'] as import('../src/game/players').Player['skills'] };
+    const player = { ...aiPlayer(), resources: { wood: 5, stone: 5, money: 10, ore: 0, food: 20 }, skills: ['riding'] as import('../src/game/players').Player['skills'] };
     const spawns = planSeeds(map, player, 40).filter((a) => a.type === 'spawn');
     expect(spawns.length).toBeGreaterThan(0);
     for (const s of spawns) {
@@ -278,7 +280,7 @@ describe('planAiActions', () => {
       makeTile(0, 0, 1, { owner: 1, level: 1, captureReady: false }, makeArcher('g', 1, 0, 0, 5)),
       makeTile(1, 0, 0, null, makeKnight('enemy', 0, 1, 0)),
     );
-    const player = { ...aiPlayer(), difficulty: 'easy' as const, resources: { wood: 5, stone: 5, money: 0, ore: 0 } };
+    const player = { ...aiPlayer(), difficulty: 'easy' as const, resources: { wood: 5, stone: 5, money: 0, ore: 0, food: 20 } };
     const all = planSeeds(map, player, 20);
     expect(all.some((a) => a.type === 'attack' && a.unitId === 'g')).toBe(false);
   });
@@ -292,7 +294,7 @@ describe('planAiActions', () => {
       makeTile(0, 0, 1, { owner: 1, level: 1, captureReady: false }, makeArcher('g', 1, 0, 0, 5)),
       makeTile(1, 0, 0, null, makeKnight('enemy', 0, 1, 0)),
     );
-    const player = { ...aiPlayer(), difficulty: 'easy' as const, resources: { wood: 5, stone: 5, money: 100, ore: 0 } };
+    const player = { ...aiPlayer(), difficulty: 'easy' as const, resources: { wood: 5, stone: 5, money: 100, ore: 0, food: 20 } };
     const plans: AiAction[][] = [];
     for (let seed = 1; seed <= 20; seed++) plans.push(planAiActions(map, player, new SeededRandom(seed)));
     for (const plan of plans) {
@@ -310,7 +312,7 @@ describe('AI bridge building', () => {
     const map: GameMap = { radius: 4, tiles, spawns: [] };
     const p = aiPlayer();
     p.skills = Object.keys(SKILLS) as SkillId[];
-    p.resources = { wood: 100, stone: 100, money: 100, ore: 0 };
+    p.resources = { wood: 100, stone: 100, money: 100, ore: 0, food: 20 };
     const actions = planAiActions(map, p, new SeededRandom(1));
     expect(actions.some((a) => a.type === 'buildBridge')).toBe(true);
   });

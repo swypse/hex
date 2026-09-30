@@ -1,6 +1,7 @@
 import { GameMap, MapTile } from './map-gen';
 import { BUILDING_COSTS, BUILDING_NAMES, buildingYield } from './buildings';
 import { villageIncome } from './capture';
+import { FARM_FOOD, FARM_FOOD_SCIENCE, STARVATION_DAMAGE } from './food';
 import { villageUpgradeCost } from './resources';
 import { buildingsInVillage, claimRadius, villageBuildingLimit, unitsInVillage, villageCapacity } from './village';
 import { SHIP_UPGRADE_COST } from './ship';
@@ -31,6 +32,7 @@ export function settlementHelpLines(map: GameMap, tile: MapTile): string[] {
     lines.push(t('help.settlement.neutral'));
   } else {
     lines.push(t('help.settlement.spawns'));
+    lines.push(t('help.settlement.food', { damage: STARVATION_DAMAGE }));
   }
   return lines;
 }
@@ -124,6 +126,20 @@ export function buildingHelpLines(map: GameMap, tile: MapTile): string[] {
         t('help.building.temple.score'),
         t('help.building.forestTemple.skill', { stone: BUILDING_COSTS.forestTemple.stone, money: BUILDING_COSTS.forestTemple.money }),
         t('help.building.forestTemple.place'),
+      ];
+    }
+    case 'farm': {
+      return [
+        t('help.building.farm.produce', { food: FARM_FOOD, science: FARM_FOOD_SCIENCE }),
+        t('help.building.farm.skill', { money: BUILDING_COSTS.farm.money, wood: BUILDING_COSTS.farm.wood, stone: BUILDING_COSTS.farm.stone }),
+        t('help.building.farm.place'),
+      ];
+    }
+    case 'granary': {
+      return [
+        t('help.building.granary.store', { food: b.food ?? 0 }),
+        t('help.building.granary.skill', { money: BUILDING_COSTS.granary.money, wood: BUILDING_COSTS.granary.wood, stone: BUILDING_COSTS.granary.stone }),
+        t('help.building.granary.place'),
       ];
     }
   }

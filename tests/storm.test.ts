@@ -25,7 +25,7 @@ beforeEach(() => {
   const s = freshAquaSim();
   sim = s.sim;
   map = s.map;
-  sim.players[0]!.resources = { wood: 100, stone: 100, money: 100, ore: 100 };
+  sim.players[0]!.resources = { wood: 100, stone: 100, money: 100, ore: 100, food: 20 };
   // Village A at (0,0), its claimed water (1,1); village B at (-1,0), its own water (0,1).
   tileAt(map, 0, 0)!.settlement = { owner: 0, level: 1, captureReady: false };
   tileAt(map, 0, 0)!.ownedBy = 0;

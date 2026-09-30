@@ -158,8 +158,8 @@ export function updateStrategy(
 }
 function economySkillChain(player: Player): SkillId[] | null {
   const chain: SkillId[] = flagsFor(player).militarySkills
-    ? ['forestry', 'climbing', 'smithery', 'swordsman', 'science', 'geology', 'riding', 'knights']
-    : ['forestry', 'climbing', 'smithery', 'geology', 'science'];
+    ? ['forestry', 'agriculture', 'climbing', 'smithery', 'swordsman', 'science', 'geology', 'riding', 'knights']
+    : ['forestry', 'agriculture', 'climbing', 'smithery', 'geology', 'science'];
   for (const s of chain) if (!hasSkill(player, s)) return chain.slice(chain.indexOf(s));
   return null;
 }

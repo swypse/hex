@@ -1,5 +1,5 @@
 import { t } from '../../i18n';
-import { Circle, Container, Graphics, Text } from 'pixi.js';
+import { Circle, Container, Graphics, Rectangle, Text } from 'pixi.js';
 import { gameController } from '../../controller/game-controller';
 import { TRIBES } from '../../game/tribes';
 import { isForestType, isMountainType, isWaterType, TILE_TYPE_NAMES } from '../../game/tile-types';
@@ -12,8 +12,9 @@ import { activeBuffs, VILLAGE_DEFENSE } from '../../game/buffs';
 import { isShip } from '../../game/ship';
 import { villageCapacity, villageBuildingLimit, buildingsInVillage, unitsInVillage } from '../../game/village';
 import { villageIncome, VILLAGE_CONNECTION_BONUS } from '../../game/capture';
+import { adjacentFarmCount, farmYield, GRANARY_FOOD_PER_FARM, STARVATION_DAMAGE, villageFood, villageGranaries } from '../../game/food';
 import { villageUpgradeCost } from '../../game/resources';
-import { buildingYield, buildingHp, BUILDING_MAX_HP, BUILDING_NAMES, DESTROY_BUILDING_COST } from '../../game/buildings';
+import { buildingYield, buildingHp, canPlaceFoodBuilding, BUILDING_MAX_HP, BUILDING_NAMES, DESTROY_BUILDING_COST } from '../../game/buildings';
 import { TRAP_TURNS } from '../../game/traps';
 import { isExploredFor } from '../../game/explore';
 import { hexNeighbors } from '../../game/hex';
@@ -26,7 +27,7 @@ import { useGameStore } from '../../store/game-store';
 import { type UIHost, type Widget } from '../host';
 import { makeLabel } from '../kit/label';
 import { makeIcon } from '../kit/icon';
-import { makeSkillMedallion } from '../kit/skill-medallion';
+import { makeSkillIcon, SKILL_ICON_FILES } from '../kit/skill-icons';
 import { makePanel } from '../kit/panel';
 import { THEME } from '../kit/theme';
 import { makeActionButtonIcon } from '../kit/action-button-icons';
@@ -43,6 +44,22 @@ function unitDefenseBuffs(map: GameMap, unit: Unit, tile: MapTile): { key: strin
   if (tile.settlement && tile.settlement.owner === unit.owner) out.push({ key: 'hud.buff.village', amount: VILLAGE_DEFENSE });
   if (tile.settlement?.wall && tile.settlement.owner === unit.owner) out.push({ key: 'hud.buff.wall', amount: 3 });
   return out;
+}
+
+/** A composite title + icon/value pairs row; `hp` adds green hp squares. */
+interface IconRow {
+  name: string;
+  pairs: { icon: string; value: string }[];
+  hp?: number;
+}
+
+const HP_SQUARE = 8;
+const HP_SQUARE_GAP = 3;
+const HP_SQUARE_COLOR = 0x49cc5d;
+
+/** Plain `N` for income values; negative values keep their `-N`. */
+function signed(n: number): string {
+  return String(n);
 }
 
 export class HudSelected implements Widget {
@@ -101,14 +118,16 @@ export class HudSelected implements Widget {
 
     const lines: string[] = [TILE_TYPE_NAMES[tile.terrain]];
     const bolds: boolean[] = [false];
+    // Lines drawn in red (starvation warnings).
+    const redLines = new Set<number>();
     let unitLineIndex = -1;
     let settlementLineIndex = -1;
     let buildingLineIndex = -1;
     let buildingLimitLineIndex = -1;
     let bridgeLineIndex = -1;
-    let unitRow: { name: string; pairs: { icon: string; value: string }[] } | null = null;
-    let settlementRow: { name: string; pairs: { icon: string; value: string }[] } | null = null;
-    let buildingRow: { name: string; pairs: { icon: string; value: string }[] } | null = null;
+    let unitRow: IconRow | null = null;
+    let settlementRow: IconRow | null = null;
+    let buildingRow: IconRow | null = null;
 
     if (hasBridge(tile)) {
       bridgeLineIndex = lines.length;
@@ -127,7 +146,6 @@ export class HudSelected implements Widget {
       const statusBits: string[] = [];
       if ((unit.stunTurns ?? 0) >= 1) statusBits.push(t('hud.selected.stunned'));
       if (unit.isStealthed) statusBits.push(t('hud.selected.stealth'));
-      if (canAct) statusBits.push('•');
       unitRow = {
         name:
           t('hud.selected.unit', { name: UNIT_TYPE_NAMES[unit.type] }) +
@@ -168,7 +186,12 @@ export class HudSelected implements Widget {
       settlementRow = {
         name: t('hud.selected.settlement', { name: settlement.name ?? t('hud.selected.settlementDefault'), level: settlement.level, units: unitsInVillage(map, tile), cap: villageCapacity(settlement.level) }),
         pairs: settlement.owner !== null
-          ? [{ icon: 'gold-32', value: String(villageIncome(map, tile)) }]
+          ? [
+              { icon: 'gold-32', value: String(villageIncome(map, tile)) },
+              ...(settlement.owner === human.index
+                ? [{ icon: 'food-32', value: signed(villageFood(map, tile, human).balance) }]
+                : []),
+            ]
           : [],
       };
       lines.push('');
@@ -176,6 +199,20 @@ export class HudSelected implements Widget {
       if (settlement.owner === human.index && isVillageRoadConnected(map, tile)) {
         lines.push(t('hud.selected.connectedBonus', { bonus: VILLAGE_CONNECTION_BONUS }));
         bolds.push(false);
+      }
+      if (settlement.owner === human.index) {
+        const food = villageFood(map, tile, human);
+        lines.push(t('hud.selected.foodBalance', { production: food.production, upkeep: food.upkeep, balance: signed(food.balance) }));
+        bolds.push(false);
+        if (villageGranaries(map, tile).length > 0) {
+          lines.push(t('hud.selected.villageGranary', { food: food.granaryFood }));
+          bolds.push(false);
+        }
+      }
+      if (settlement.owner !== null && settlement.starving) {
+        redLines.add(lines.length);
+        lines.push(t('hud.selected.starving', { damage: STARVATION_DAMAGE }));
+        bolds.push(true);
       }
       if (settlement.owner === human.index) {
         const count = buildingsInVillage(map, tile);
@@ -205,18 +242,25 @@ export class HudSelected implements Widget {
       // pairs, like the unit characteristics row, so damage and production
       // read at a glance.
       buildingRow = {
-        name: b.kind === 'sawmill' || b.kind === 'mine'
+        name: b.kind === 'sawmill' || b.kind === 'mine' || b.kind === 'farm' || b.kind === 'granary'
           ? BUILDING_NAMES[b.kind]
           : t('hud.selected.building', { name: BUILDING_NAMES[b.kind], level: b.level }),
+        hp: buildingHp(b),
         pairs: [
-          { icon: 'hp-32', value: `${buildingHp(b)}/${BUILDING_MAX_HP}` },
-          ...(y.wood > 0 ? [{ icon: 'wood-32', value: `+${y.wood}` }] : []),
-          ...(y.stone > 0 ? [{ icon: 'stone-32', value: `+${y.stone}` }] : []),
-          ...(y.ore > 0 ? [{ icon: 'ore-32', value: `+${y.ore}` }] : []),
+          ...(y.wood > 0 ? [{ icon: 'wood-32', value: String(y.wood) }] : []),
+          ...(y.stone > 0 ? [{ icon: 'stone-32', value: String(y.stone) }] : []),
+          ...(y.ore > 0 ? [{ icon: 'ore-32', value: String(y.ore) }] : []),
+          ...(b.kind === 'farm' ? [{ icon: 'food-32', value: String(farmYield(owner)) }] : []),
+          ...(b.kind === 'granary' ? [{ icon: 'food-32', value: String(b.food ?? 0) }] : []),
         ],
       };
       lines.push('');
       bolds.push(true);
+      if (b.kind === 'granary') {
+        const farms = tile.ownedBy !== null ? adjacentFarmCount(map, tile, tile.ownedBy) : 0;
+        lines.push(t('hud.selected.granaryFood', { food: b.food ?? 0, gain: farms * GRANARY_FOOD_PER_FARM }));
+        bolds.push(false);
+      }
     }
 
     if (tile.bonus) {
@@ -264,6 +308,16 @@ export class HudSelected implements Widget {
         const r = new Container();
         r.addChild(title);
         let x = 10 + title.width + 7;
+        // Remaining building hp: one green square per hp point.
+        const hpPoints = row.hp ?? 0;
+        if (hpPoints > 0) {
+          const squares = new Graphics();
+          for (let n = 0; n < hpPoints; n++) {
+            squares.rect(x + n * (HP_SQUARE + HP_SQUARE_GAP), y + (lineH - HP_SQUARE) / 2, HP_SQUARE, HP_SQUARE).fill(HP_SQUARE_COLOR);
+          }
+          r.addChild(squares);
+          x += hpPoints * HP_SQUARE + (hpPoints - 1) * HP_SQUARE_GAP + 7;
+        }
         for (const pair of row.pairs) {
           const icon = makeIcon(pair.icon, 16);
           icon.anchor.set(0, 0);
@@ -284,7 +338,7 @@ export class HudSelected implements Widget {
       const highlight = highlightBuildingsLine && i === buildingLimitLineIndex;
       const t = makeLabel(lines[i]!, {
         fontSize: 13,
-        fill: highlight ? 0xffd700 : 0xeeeeee,
+        fill: highlight ? 0xffd700 : redLines.has(i) ? 0xff4d4d : 0xeeeeee,
         fontWeight: highlight || bolds[i]! ? '700' : undefined,
         wordWrap: true,
         wordWrapWidth: innerW,
@@ -307,26 +361,33 @@ export class HudSelected implements Widget {
       row.on('pointertap', () => {
         if (!disabled) gameController.openSkill(a.id);
       });
-      const size = 44;
-      const med = makeSkillMedallion({
-        skill: a.id,
-        opened: false,
-        priceText: String(skillCost(a.id, human.skills.length)),
-        size,
-      });
+      // Just the skill texture (no background or border), then the label
+      // "Open <Skill>" followed by the money icon and the price.
+      const size = 40;
+      const iconKey = SKILL_ICON_FILES[a.id];
       const cy = y + size / 2;
-      med.position.set(10 + size / 2, cy);
+      const halo = new Graphics();
       if (highlighted) {
-        const halo = new Graphics();
         halo.circle(10 + size / 2, cy, size / 2 + 6).stroke({ width: 4, color: 0xffd700, alpha: 0.95 });
         halo.circle(10 + size / 2, cy, size / 2 + 10).stroke({ width: 2, color: 0xffd700, alpha: 0.5 });
-        row.addChildAt(halo, 0);
+        row.addChild(halo);
       }
-      const label = makeLabel(a.label, { fontSize: 13, fill: highlighted ? 0xffd700 : 0xeeeeee });
+      if (iconKey) {
+        const skillIcon = makeSkillIcon(iconKey, size);
+        skillIcon.position.set(10 + size / 2, cy);
+        row.addChild(skillIcon);
+      }
+      const fill = highlighted ? 0xffd700 : 0xeeeeee;
+      const label = makeLabel(a.label, { fontSize: 13, fill });
       label.position.set(10 + size + 8, cy - label.height / 2);
-      row.addChild(med, label);
+      const coin = makeIcon('gold-32', 16);
+      coin.anchor.set(0, 0.5);
+      coin.position.set(label.x + label.width + 6, cy);
+      const price = makeLabel(String(skillCost(a.id, human.skills.length)), { fontSize: 13, fill });
+      price.position.set(coin.x + 19, cy - price.height / 2);
+      row.addChild(label, coin, price);
       this.el.addChild(row);
-      maxW = Math.max(maxW, 10 + size + 8 + label.width);
+      maxW = Math.max(maxW, price.x + price.width);
       y += size + 6;
     }
     // Demolish your own building: same icon as disbanding a unit, 5 money.
@@ -403,19 +464,14 @@ export class HudSelected implements Widget {
       this.el.addChild(btn);
     }
 
+    // The close button is just the close-32 icon, no background.
     const close = new Container();
-    const closeCircle = new Graphics();
-    closeCircle
-      .circle(CLOSE_SIZE / 2, CLOSE_SIZE / 2, CLOSE_SIZE / 2)
-      .fill({ color: 0x000000, alpha: 0.7 });
-    const mark = new Graphics();
-    const markPad = 4;
-    mark.moveTo(markPad, markPad).lineTo(CLOSE_SIZE - markPad, CLOSE_SIZE - markPad).stroke({ width: 2, color: 0xeeeeee });
-    mark.moveTo(CLOSE_SIZE - markPad, markPad).lineTo(markPad, CLOSE_SIZE - markPad).stroke({ width: 2, color: 0xeeeeee });
-    close.addChild(closeCircle, mark);
+    const closeIcon = makeIcon('close-32', CLOSE_SIZE);
+    closeIcon.anchor.set(0, 0);
+    close.addChild(closeIcon);
     close.eventMode = 'static';
     close.cursor = 'pointer';
-    close.hitArea = new Circle(CLOSE_SIZE / 2, CLOSE_SIZE / 2, CLOSE_SIZE / 2);
+    close.hitArea = new Rectangle(0, 0, CLOSE_SIZE, CLOSE_SIZE);
     close.on('pointertap', () => {
       setSelectedInfoClosed(true);
       this.closed = true;
@@ -484,6 +540,20 @@ export class HudSelected implements Widget {
       }
       if (!isWaterType(tile.terrain) && hasSkill(human, 'forestry') && !hasSkill(human, 'roads') && canBuildRoadHere(map, tile, human)) {
         push('roads', t('ui.openroads'));
+      }
+    }
+    // Food buildings: hint at Agriculture on any own empty land tile, and at
+    // Granary next to one of your farms.
+    if (map && canPlaceFoodBuilding(tile, human)) {
+      if (!hasSkill(human, 'agriculture')) push('agriculture', t('ui.openagriculture'));
+      else if (
+        !hasSkill(human, 'granary') &&
+        hexNeighbors(tile).some((n) => {
+          const nt = tileAt(map, n.q, n.r);
+          return nt !== undefined && nt.building?.kind === 'farm' && nt.ownedBy === human.index;
+        })
+      ) {
+        push('granary', t('ui.opengranary'));
       }
     }
     if (

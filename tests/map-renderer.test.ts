@@ -41,6 +41,8 @@ function buildTextures(map: GameMap): TextureSet {
     pirateTexture: unitTex,
     sawmillTexture: tileTex(50, 50),
     mineTexture: tileTex(50, 50),
+    farmTexture: tileTex(50, 50),
+    granaryTexture: tileTex(50, 50),
     portTextures: {
       e: tileTex(40, 40, 0.7),
       ne: tileTex(40, 40, 0.7),
@@ -247,8 +249,8 @@ describe('MapView hp bar anchoring', () => {
       height: 600,
     });
     const bars = view.hpBarEntries();
-    const full = bars.find((b) => b.el.children.some((c) => c instanceof BitmapText && (c as BitmapText).text === '50/50'))!;
-    const half = bars.find((b) => b.el.children.some((c) => c instanceof BitmapText && (c as BitmapText).text === '25/50'))!;
+    const full = bars.find((b) => b.el.children.some((c) => c instanceof BitmapText && (c as BitmapText).text.startsWith('50/50')))!;
+    const half = bars.find((b) => b.el.children.some((c) => c instanceof BitmapText && (c as BitmapText).text.startsWith('25/50')))!;
     expect(half).toBeDefined();
     expect(half.greenW).toBeCloseTo(full.greenW / 2, 1);
     expect(half.ghostW).toBeCloseTo(full.ghostW / 2, 1);
@@ -1434,7 +1436,7 @@ describe('MapView hp bar anchoring', () => {
     const item = hpBarItem();
     const label = item.el.children.find((c): c is BitmapText => c instanceof BitmapText);
     expect(label).toBeDefined();
-    expect(label!.text).toBe('2/50');
+    expect(label!.text).toBe('2/50 •');
     view.clearHpOverrides();
     view.update(map, players, null, new Set(), new Set(), 0, new Set(), {
       x: 400,
@@ -1445,7 +1447,7 @@ describe('MapView hp bar anchoring', () => {
     });
     const item2 = hpBarItem();
     const label2 = item2.el.children.find((c): c is BitmapText => c instanceof BitmapText);
-    expect(label2!.text).toBe('50/50');
+    expect(label2!.text).toBe('50/50 •');
   });
 
   it('flips a unit sprite to face its last attack direction and keeps it on re-render', () => {

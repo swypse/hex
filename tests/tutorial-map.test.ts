@@ -70,7 +70,7 @@ describe('tutorial map', () => {
     expect(human.isHuman).toBe(true);
     expect(human.isActive).toBe(true);
     expect(human.skills).toEqual([]);
-    expect(human.resources).toEqual({ money: 250, wood: 60, stone: 60, ore: 30 });
+    expect(human.resources).toEqual({ money: 250, wood: 60, stone: 60, ore: 30, food: 20 });
     expect(dummy.isHuman).toBe(false);
     expect(dummy.isActive).toBe(false);
   });

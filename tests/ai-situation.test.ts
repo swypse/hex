@@ -16,7 +16,7 @@ function unit(id: string, owner: number, type: keyof typeof UNIT_TYPES, q: numbe
 }
 
 function player(index: number): Player {
-  return { index, tribe: Tribe.Villagers, isHuman: false, name: 'AI', resources: { wood: 5, stone: 5, money: 100, ore: 5 }, score: 0, kills: 0, skills: [], isActive: true };
+  return { index, tribe: Tribe.Villagers, isHuman: false, name: 'AI', resources: { wood: 5, stone: 5, money: 100, ore: 5, food: 20 }, score: 0, kills: 0, skills: [], isActive: true };
 }
 
 describe('aiSituation', () => {

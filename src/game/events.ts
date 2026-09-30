@@ -5,7 +5,7 @@ import type { BonusKind } from './bonus';
 import type { AchievementId } from './achievements';
 import type { BottleEffect } from './bottles';
 
-export type BuildingKind = 'sawmill' | 'mine' | 'port' | 'temple' | 'forestTemple';
+export type BuildingKind = 'sawmill' | 'mine' | 'port' | 'temple' | 'forestTemple' | 'farm' | 'granary';
 
 /** Pre-attack visual info for a combatant so presenters can keep showing a
  * unit (and its hp) after the sim has already applied the combat result. */
@@ -48,6 +48,8 @@ export type GameEvent =
   | { type: 'stealthRevealed'; unitId: string; q: number; r: number }
   | { type: 'stalkerSpotted'; unitId: string; villageQ: number; villageR: number }
   | { type: 'trapPlaced'; q: number; r: number; playerIndex: number }
+  | { type: 'burned'; unitId: string; kind: 'farm' | 'granary'; q: number; r: number; playerIndex: number }
+  | { type: 'starvation'; q: number; r: number; playerIndex: number; units: { q: number; r: number; damage: number }[] }
   | { type: 'trapTriggered'; q: number; r: number; targetId: string; damage: number; attackerIndex: number }
   | { type: 'storm'; unitId: string; q: number; r: number; targets: { q: number; r: number; damage: number }[] }
   | { type: 'stunShot'; attackerId: string; targetId: string; attackerTile: Axial; targetTile: Axial; missed: boolean; stunned: boolean }

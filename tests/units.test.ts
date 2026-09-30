@@ -39,10 +39,10 @@ describe('UNIT_TYPES', () => {
     expect(UNIT_TYPE_NAMES.catapult).toBe('Catapult');
   });
 
-  it('defines the knight unit with 30 move points, 4.6 attack and an ore cost', () => {
-    expect(UNIT_TYPES.knight).toEqual({ movePoints: 30, attack: 46, attackDistance: 1, maxHp: 70, defense: 12, price: 14, priceWood: 0, priceOre: 5, shape: 'swordsman' });
+  it('defines the knight unit with 30 move points, 40 attack and an ore cost', () => {
+    expect(UNIT_TYPES.knight).toEqual({ movePoints: 30, attack: 40, attackDistance: 1, maxHp: 70, defense: 12, price: 14, priceWood: 0, priceOre: 5, shape: 'swordsman' });
     expect(UNIT_MOVE_POINTS.knight).toBe(30);
-    expect(UNIT_ATTACK.knight).toBe(46);
+    expect(UNIT_ATTACK.knight).toBe(40);
     expect(UNIT_ATTACK_DISTANCE.knight).toBe(1);
     expect(UNIT_TYPE_NAMES.knight).toBe('Knight');
   });
@@ -279,10 +279,10 @@ describe('special units', () => {
   const cases: Array<[UnitType, number, number, number, number, number, number, number, number]> = [
     ['stalker', 20, 10, 1, 20, 0, 9, 0, 2],
     ['builder', 8, 10, 1, 40, 0, 15, 0, 0],
-    ['banner', 8, 20, 1, 30, 0, 7, 0, 2],
-    ['berserker', 10, 26, 1, 50, 8, 11, 0, 3],
-    ['trapper', 10, 20, 1, 40, 8, 9, 0, 2],
-    ['stormcaller', 20, 20, 1, 40, 8, 9, 0, 2],
+    ['banner', 8, 10, 1, 30, 0, 7, 0, 2],
+    ['berserker', 10, 26, 1, 50, 8, 10, 0, 2],
+    ['trapper', 10, 20, 1, 44, 8, 6, 0, 2],
+    ['stormcaller', 20, 20, 1, 44, 8, 6, 0, 2],
     ['stunner', 8, 20, 2, 40, 10, 7, 0, 2],
   ];
   for (const [type, move, atk, range, hp, def, price, wood, ore] of cases) {

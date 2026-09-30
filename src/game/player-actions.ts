@@ -12,6 +12,9 @@ import {
   canBuildPort,
   canBuildTemple,
   canBuildForestTemple,
+  canBuildFarm,
+  canBuildGranary,
+  canBurnBuilding,
   BUILDING_COSTS,
 } from './buildings';
 import { canBuildRoad, ROAD_COST, villageConnectedNodes } from './roads';
@@ -37,7 +40,8 @@ export function hasAnyAvailableAction(map: GameMap, player: Player, turn: number
       if (
         (canMove(unit) && reachableTargets(map, unit, undefined, canClimb, canDock, player.index).length > 0) ||
         (canAttack(unit) && attackableTargets(map, unit, player.index).length > 0) ||
-        canHeal(unit)
+        canHeal(unit) ||
+        canBurnBuilding(tile, unit)
       ) {
         return true;
       }
@@ -82,6 +86,8 @@ export function hasAnyAvailableAction(map: GameMap, player: Player, turn: number
     if (canBuildPort(map, tile, player) && canAfford(player.resources, BUILDING_COSTS.port)) return true;
     if (canBuildTemple(map, tile, player) && canAfford(player.resources, BUILDING_COSTS.temple)) return true;
     if (canBuildForestTemple(map, tile, player) && canAfford(player.resources, BUILDING_COSTS.forestTemple)) return true;
+    if (canBuildFarm(map, tile, player) && canAfford(player.resources, BUILDING_COSTS.farm)) return true;
+    if (canBuildGranary(map, tile, player) && canAfford(player.resources, BUILDING_COSTS.granary)) return true;
     if (canBuildRoad(map, tile, player, roadConnected)) return true;
     if (canBuildBridge(map, tile, player) && canAfford(player.resources, BRIDGE_COST)) return true;
   }

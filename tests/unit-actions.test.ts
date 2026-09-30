@@ -22,7 +22,7 @@ function unit(overrides: Partial<Unit> = {}): Unit {
 function player(): Player {
   return {
     index: 0, tribe: Tribe.Villagers, isHuman: true, name: 'p',
-    resources: { wood: 0, stone: 0, money: 0, ore: 0 },
+    resources: { wood: 0, stone: 0, money: 0, ore: 0, food: 20 },
     isActive: true, score: 0, kills: 0, skills: [],
   };
 }

@@ -94,6 +94,8 @@ export interface TextureSet {
   pirateTexture: TileTexture;
   sawmillTexture: TileTexture;
   mineTexture: TileTexture;
+  farmTexture: TileTexture;
+  granaryTexture: TileTexture;
   bridgeTextures: Record<BridgeDir, TileTexture>;
   portTextures: Record<PortDirection, TileTexture>;
   freePortTexture: Texture;
@@ -422,6 +424,10 @@ export async function createTextures(
     makeUnitImageTexture(app, buildingTileTexture('sawmill'), hexSize) ?? blankTile(0.5);
   const mineTexture =
     makeUnitImageTexture(app, buildingTileTexture('mine'), hexSize) ?? blankTile(0.5);
+  const farmTexture =
+    makeUnitImageTexture(app, buildingTileTexture('farm'), hexSize) ?? blankTile(0.5);
+  const granaryTexture =
+    makeUnitImageTexture(app, buildingTileTexture('granary'), hexSize) ?? blankTile(0.5);
   const bridgeTextures = {} as Record<BridgeDir, TileTexture>;
   for (const dir of Object.keys(BRIDGE_TILE_FILES) as BridgeDir[]) {
     const img = buildingTileTexture(BRIDGE_TILE_FILES[dir]);
@@ -487,6 +493,8 @@ export async function createTextures(
     pirateTexture,
     sawmillTexture,
     mineTexture,
+    farmTexture,
+    granaryTexture,
     bridgeTextures,
     portTextures,
     freePortTexture,

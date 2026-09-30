@@ -29,7 +29,7 @@ function tile(
 function player(index: number, overrides: Partial<Player> = {}): Player {
   return {
     index, tribe: Tribe.Villagers, isHuman: index === 0, name: `P${index}`,
-    resources: { wood: 0, stone: 0, money: 0, ore: 0 },
+    resources: { wood: 0, stone: 0, money: 0, ore: 0, food: 20 },
     score: 0, kills: 0, skills: [], isActive: true,
     ...overrides,
   };

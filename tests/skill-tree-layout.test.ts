@@ -17,15 +17,15 @@ describe('skill tree layout', () => {
   const CY = 340;
   const centerAngle = (id: SkillId): number => Math.atan2(layout[id].y - CY, layout[id].x - CX);
 
-  it('spaces the six root skills evenly at 60 degrees', () => {
+  it('spaces the root skills evenly', () => {
     const roots = (Object.keys(SKILLS) as SkillId[]).filter((id) => SKILLS[id].parent === null);
-    expect(roots.length).toBe(6);
+    expect(roots.length).toBe(7);
     const angles = roots.map(centerAngle).sort((a, b) => a - b);
     for (let i = 0; i < angles.length; i++) {
       const a = angles[i]!;
       const b = angles[(i + 1) % angles.length]!;
       const gap = i === angles.length - 1 ? angles[0]! + 2 * Math.PI - a : b - a;
-      expect(gap).toBeCloseTo((2 * Math.PI) / 6, 5);
+      expect(gap).toBeCloseTo((2 * Math.PI) / roots.length, 5);
     }
   });
 
@@ -36,9 +36,12 @@ describe('skill tree layout', () => {
       const kids = childIds(id);
       if (kids.length === 0) continue;
       const a = centerAngle(id);
-      const childAngles = kids.map(centerAngle).sort((x, y) => x - y);
-      const mid = (childAngles[0]! + childAngles[childAngles.length - 1]!) / 2;
-      expect(a).toBeCloseTo(mid, 5);
+      // Circular mean of the children's angles (robust to the ±π wrap).
+      const mid = Math.atan2(
+        kids.reduce((sum, k) => sum + Math.sin(centerAngle(k)), 0),
+        kids.reduce((sum, k) => sum + Math.cos(centerAngle(k)), 0),
+      );
+      expect(Math.cos(a - mid)).toBeCloseTo(1, 5);
     }
   });
 

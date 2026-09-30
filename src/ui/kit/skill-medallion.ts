@@ -13,6 +13,8 @@ interface SkillMedallionOpts {
   priceText: string;
   /** Full circle diameter in px (default 40). */
   size?: number;
+  /** Glyph bake multiplier for the price text (see `makeLabel`). */
+  textBake?: number;
 }
 
 /** A skill node medallion: a coloured circle (grey unopened / blue opened)
@@ -53,6 +55,7 @@ export function makeSkillMedallion(opts: SkillMedallionOpts): Container {
       fontSize: Math.max(8, Math.round(size * 0.26)),
       fill: THEME.white,
       fontWeight: '800',
+      bake: opts.textBake,
     });
     label.anchor.set(0.5, 0.5);
     label.position.set(badgeX, badgeY);

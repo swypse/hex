@@ -16,7 +16,7 @@ import { planAiActions } from '../src/game/ai';
 function aiPlayer(name: string): Player {
   return {
     index: 1, tribe: 3, isHuman: false, name,
-    resources: { wood: 5, stone: 5, money: 100, ore: 5 },
+    resources: { wood: 5, stone: 5, money: 100, ore: 5, food: 20 },
     score: 0, kills: 0, skills: [], isActive: true,
   };
 }

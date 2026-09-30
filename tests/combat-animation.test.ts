@@ -45,6 +45,8 @@ function buildTextures(map: GameMap): TextureSet {
     pirateTexture: unitTex,
     sawmillTexture: tileTex(50, 50),
     mineTexture: tileTex(50, 50),
+    farmTexture: tileTex(50, 50),
+    granaryTexture: tileTex(50, 50),
     portTextures,
     bridgeTextures: { nw: unitTex, ne: unitTex, we: unitTex },
     freePortTexture: tex(1, 1),

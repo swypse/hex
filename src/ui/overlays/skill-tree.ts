@@ -17,6 +17,10 @@ import { makeSkillMedallion } from '../kit/skill-medallion';
 import { THEME } from '../kit/theme';
 
 const RING_SPACING = 110;
+/** The tree is magnified up to the max zoom: bake its text that many times
+ *  larger so it stays sharp when zoomed all the way in. */
+const TREE_TEXT_BAKE = 3;
+
 const CX = 400;
 const CY = 340;
 
@@ -393,6 +397,7 @@ export class SkillTree {
         opened,
         priceText: opened ? '\u2713' : String(skillCost(id, human.skills.length)),
         size: 56,
+        textBake: TREE_TEXT_BAKE,
       });
       medallion.position.set(pos.x, pos.y);
       node.addChild(medallion);
@@ -400,6 +405,7 @@ export class SkillTree {
       const name = makeLabel(SKILLS[id].name, {
         fontSize: 13,
         fill: opened ? THEME.skillTree.openedLabelText : THEME.skillTree.closedLabelText,
+        bake: TREE_TEXT_BAKE,
       });
       name.anchor.set(0.5, 0.5);
       name.position.set(pos.x, pos.y + 50);

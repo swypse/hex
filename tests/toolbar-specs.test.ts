@@ -346,7 +346,7 @@ describe('toolbarSpecs', () => {
   it('offers enable stealth only for a visible idle stalker', () => {
     const players = useGameStore.getState().players;
     players[0]!.tribe = Tribe.Cats;
-    players[0]!.resources = { wood: 100, stone: 100, money: 100, ore: 100 };
+    players[0]!.resources = { wood: 100, stone: 100, money: 100, ore: 100, food: 20 };
     useGameStore.getState().setPlayers(players);
     const tile = map.tiles.find((t) => t.unit === null)!;
     tile.ownedBy = 0;
@@ -364,7 +364,7 @@ describe('toolbarSpecs', () => {
   it('hides enable stealth when the stalker stands beside an enemy village', () => {
     const players = useGameStore.getState().players;
     players[0]!.tribe = Tribe.Cats;
-    players[0]!.resources = { wood: 100, stone: 100, money: 100, ore: 100 };
+    players[0]!.resources = { wood: 100, stone: 100, money: 100, ore: 100, food: 20 };
     useGameStore.getState().setPlayers(players);
     const tile = map.tiles.find((t) => t.unit === null)!;
     tile.ownedBy = 0;
@@ -381,7 +381,7 @@ describe('toolbarSpecs', () => {
 
   it('offers build only for a builder, and thorn-trap only for a trapper', () => {
     const players = useGameStore.getState().players;
-    players[0]!.resources = { wood: 100, stone: 100, money: 100, ore: 100 };
+    players[0]!.resources = { wood: 100, stone: 100, money: 100, ore: 100, food: 20 };
     useGameStore.getState().setPlayers(players);
     const tile = map.tiles.find((t) => t.unit === null)!;
     tile.ownedBy = 0;
@@ -410,7 +410,7 @@ describe('toolbarSpecs', () => {
 
   it('hides the build action for a builder with no affordable buildable', () => {
     const players = useGameStore.getState().players;
-    players[0]!.resources = { wood: 0, stone: 0, money: 0, ore: 0 };
+    players[0]!.resources = { wood: 0, stone: 0, money: 0, ore: 0, food: 20 };
     useGameStore.getState().setPlayers(players);
     const tile = map.tiles.find((t) => t.unit === null)!;
     tile.ownedBy = 0;
@@ -427,7 +427,7 @@ describe('toolbarSpecs', () => {
   it('does not offer storm when the stormcaller village has no water', () => {
     const players = useGameStore.getState().players;
     players[0]!.tribe = Tribe.Aqua;
-    players[0]!.resources = { wood: 100, stone: 100, money: 100, ore: 100 };
+    players[0]!.resources = { wood: 100, stone: 100, money: 100, ore: 100, food: 20 };
     useGameStore.getState().setPlayers(players);
     const tile = map.tiles.find((t) => t.unit === null)!;
     tile.ownedBy = 0;
@@ -438,5 +438,48 @@ describe('toolbarSpecs', () => {
     };
     select(tile);
     expect(toolbarSpecs().some((a) => a.key === 'storm')).toBe(false);
+  });
+
+  it('offers build-farm on an own empty land tile once Agriculture is open and affordable', () => {
+    const tile = map.tiles.find((t) => t.unit === null && t.terrain === TileType.GrasslandLand && !t.settlement)!;
+    tile.ownedBy = 0;
+    const players = useGameStore.getState().players;
+    players[0]!.resources = { wood: 5, stone: 2, money: 15, ore: 0, food: 20 };
+    selectCell(tile);
+    expect(toolbarSpecs().some((a) => a.key === 'farm')).toBe(false);
+    players[0]!.skills.push('agriculture');
+    const spec = toolbarSpecs().find((a) => a.key === 'farm');
+    expect(spec).toBeDefined();
+    expect(spec!.disabled).toBe(false);
+    players[0]!.resources.stone = 1;
+    expect(toolbarSpecs().find((a) => a.key === 'farm')!.disabled).toBe(true);
+  });
+
+  it('offers build-granary next to an own farm once the Granary skill is open', () => {
+    const tile = map.tiles.find((t) => t.unit === null && t.terrain === TileType.GrasslandLand && !t.settlement)!;
+    const farm = map.tiles.find((t) => hexNeighbors(tile).some((n) => n.q === t.q && n.r === t.r) && t.terrain === TileType.GrasslandLand && !t.settlement && !t.unit)!;
+    tile.ownedBy = 0;
+    farm.ownedBy = 0;
+    farm.building = { kind: 'farm', level: 1 };
+    const players = useGameStore.getState().players;
+    players[0]!.resources = { wood: 10, stone: 10, money: 20, ore: 0, food: 20 };
+    players[0]!.skills.push('agriculture', 'granary');
+    selectCell(tile);
+    expect(toolbarSpecs().some((a) => a.key === 'granary')).toBe(true);
+  });
+
+  it('offers burn-farm to an enemy unit standing on an enemy farm', () => {
+    const tile = map.tiles.find((t) => t.unit === null && t.terrain === TileType.GrasslandLand && !t.settlement)!;
+    tile.ownedBy = 1;
+    tile.building = { kind: 'farm', level: 1 };
+    tile.unit = {
+      id: 'raider', owner: 0, type: 'warrior', q: tile.q, r: tile.r,
+      hasMoved: true, hasAttacked: false, hasHealed: false,
+      hp: UNIT_TYPES.warrior.maxHp, attack: 2, attackDistance: 1, spawnVillage: null,
+    };
+    select(tile);
+    expect(toolbarSpecs().some((a) => a.key === 'burn-farm')).toBe(true);
+    tile.building = { kind: 'granary', level: 1, food: 0 };
+    expect(toolbarSpecs().some((a) => a.key === 'burn-granary')).toBe(true);
   });
 });

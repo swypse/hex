@@ -42,7 +42,7 @@ describe('AI builds a mine instead of wasting its last slot on a sawmill', () =>
     const map = makeTestMap(6);
     const ai = makeAI();
     ai.skills = ['forestry', 'smithery'];
-    ai.resources = { wood: 3, stone: 2, money: 40, ore: 0 };
+    ai.resources = { wood: 3, stone: 2, money: 40, ore: 0, food: 20 };
     // Level-1 village (one building slot) claiming both a forest and a mountain.
     const village = tileAt(map, 0, 0)!;
     village.settlement = { owner: 1, level: 1, captureReady: false };

@@ -17,7 +17,7 @@ function player(money: number, skills: SkillId[] = []): Player {
     tribe: Tribe.Villagers,
     isHuman: true,
     name: 'p',
-    resources: { wood: 0, stone: 0, money, ore: 0 },
+    resources: { wood: 0, stone: 0, money, ore: 0, food: 20 },
     isActive: true,
     score: 0,
     kills: 0,
@@ -26,8 +26,8 @@ function player(money: number, skills: SkillId[] = []): Player {
 }
 
 describe('skills', () => {
-  it('defines the seventeen skills with base costs 3 and 6 and correct parents', () => {
-    expect(Object.keys(SKILLS)).toHaveLength(17);
+  it('defines the nineteen skills with base costs 3 and 6 and correct parents', () => {
+    expect(Object.keys(SKILLS)).toHaveLength(19);
     expect(skillCost('climbing', 0)).toBe(3);
     expect(skillCost('water', 0)).toBe(3);
     expect(skillCost('forestry', 0)).toBe(3);

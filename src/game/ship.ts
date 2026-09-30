@@ -33,13 +33,13 @@ export function canUpgradeShip(unit: Unit, tile: MapTile, player: Player): boole
   if (unit.shipLevel === undefined || unit.shipLevel >= 3) return false;
   if (tile.ownedBy !== player.index) return false;
   const cost = SHIP_UPGRADE_COST[(unit.shipLevel + 1) as 2 | 3];
-  return canAfford(player.resources, { wood: cost.wood, stone: 0, money: cost.money, ore: cost.ore });
+  return canAfford(player.resources, { wood: cost.wood, stone: 0, money: cost.money, ore: cost.ore, food: 0 });
 }
 
 export function upgradeShip(unit: Unit, tile: MapTile, player: Player): boolean {
   if (!canUpgradeShip(unit, tile, player)) return false;
   const cost = SHIP_UPGRADE_COST[(unit.shipLevel! + 1) as 2 | 3];
-  player.resources = pay(player.resources, { wood: cost.wood, stone: 0, money: cost.money, ore: cost.ore });
+  player.resources = pay(player.resources, { wood: cost.wood, stone: 0, money: cost.money, ore: cost.ore, food: 0 });
   unit.shipLevel = (unit.shipLevel! + 1) as 1 | 2 | 3;
   return true;
 }

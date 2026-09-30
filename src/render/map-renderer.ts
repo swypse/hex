@@ -392,7 +392,7 @@ export class MapView {
             world: { x: p.x, y: y - center + HP_BAR_ANCHOR_OFFSET },
             hp,
             maxHp,
-            label: `${hp}/${maxHp}${stunned ? ' stunned' : ''}${raging ? ' rage' : ''}`,
+            label: `${hp}/${maxHp}${unit.owner === localPlayerIndex && localTurn && canAct ? ' •' : ''}${stunned ? ' stunned' : ''}${raging ? ' rage' : ''}`,
             dim: unit.owner === localPlayerIndex && (!localTurn || !canAct),
             bonus: attackBonus(unit, map),
           });
@@ -675,17 +675,7 @@ export class MapView {
     if (tv.wallSprite) tv.wallSprite.visible = explored;
 
     const buildingIsPort = tile.building !== null && tile.building.kind === 'port';
-    const buildingIsSawmill = tile.building !== null && tile.building.kind === 'sawmill';
-    const buildingIsTemple = tile.building !== null && (tile.building.kind === 'temple' || tile.building.kind === 'forestTemple');
-    const buildingTileTex = buildingIsSawmill
-      ? this.textures.sawmillTexture
-      : buildingIsTemple
-        ? tile.building!.kind === 'forestTemple'
-          ? this.textures.forestTempleTextures[tile.building!.level as 1 | 2 | 3 | 4]
-          : this.textures.templeTextures[tile.building!.level as 1 | 2 | 3 | 4]
-        : tile.building !== null && !buildingIsPort
-          ? this.textures.mineTexture
-          : null;
+    const buildingTileTex = tile.building !== null && !buildingIsPort ? this.buildingTexture(tile.building) : null;
     const portTex = buildingIsPort ? this.portTileTexture(tile) : null;
     this.syncSprite(tv, 'buildingSprite', tile.building
       ? buildingIsPort
@@ -931,6 +921,25 @@ export class MapView {
     };
     for (const e of orangeEdges) drawStrip(e.x, e.y, THEME.map.road);
     for (const e of waterEdges) drawStrip(e.x, e.y, THEME.map.waterRoad);
+  }
+
+  /** Sprite texture of a non-port building. */
+  private buildingTexture(b: NonNullable<MapTile['building']>): TileTexture {
+    const tx = this.textures;
+    switch (b.kind) {
+      case 'sawmill':
+        return tx.sawmillTexture;
+      case 'farm':
+        return tx.farmTexture;
+      case 'granary':
+        return tx.granaryTexture;
+      case 'temple':
+        return tx.templeTextures[b.level as 1 | 2 | 3 | 4];
+      case 'forestTemple':
+        return tx.forestTempleTextures[b.level as 1 | 2 | 3 | 4];
+      default:
+        return tx.mineTexture;
+    }
   }
 
   private portTileTexture(tile: MapTile): TileTexture {
@@ -2229,6 +2238,25 @@ export class MapView {
     el.zIndex = OVERLAY_Z_VILLAGE_LABEL;
     el.addChild(labelBg);
     el.addChild(label);
+    if (tile.settlement!.starving) {
+      // Red starvation tag right below the village name.
+      const tag = this.takeText(t('village.starving'), {
+        fontSize: VILLAGE_LABEL_FONT_SIZE,
+        fill: 0xff4d4d,
+        fontFamily: FONT_REGULAR,
+      });
+      tag.anchor.set(0.5, 0);
+      const tagY = label.height / 2 + 3;
+      tag.position.set(0, tagY);
+      tag.zIndex = 1;
+      const tagBg = this.takeGraphics();
+      tagBg.zIndex = 0;
+      tagBg
+        .roundRect(-tag.width / 2 - padX, tagY - 1, tag.width + padX * 2, tag.height + 2, 2)
+        .fill({ color: 0x000000, alpha: 0.7 });
+      el.addChild(tagBg);
+      el.addChild(tag);
+    }
     el.position.set(world.x, world.y);
     this.overlay.addChild(el);
     this.overlayItems.push({ el, world });

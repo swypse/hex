@@ -34,7 +34,7 @@ function villageTile(q: number, r: number, owner: number): MapTile {
 function player(money = 100, wood = 10, stone = 10, index = 0, skills: SkillId[] = []): Player {
   return {
     index, tribe: Tribe.Villagers, isHuman: true, name: 'p',
-    resources: { wood, stone, money, ore: 0 },
+    resources: { wood, stone, money, ore: 0, food: 20 },
     score: 0, kills: 0, skills, isActive: true,
   };
 }
@@ -45,7 +45,7 @@ function mapWith(tiles: MapTile[]): GameMap {
 
 describe('roads', () => {
   it('costs 5 wood, 2 stone, and 10 money', () => {
-    expect(ROAD_COST).toEqual({ wood: 5, stone: 2, money: 10, ore: 0 });
+    expect(ROAD_COST).toEqual({ wood: 5, stone: 2, money: 10, ore: 0, food: 0 });
   });
 
   it('builds on a hex adjacent to an owned village', () => {
@@ -217,7 +217,7 @@ describe('roads', () => {
     ]);
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
     players[0]!.skills = ['forestry', 'roads'];
-    players[0]!.resources = { wood: 10, stone: 10, money: 20, ore: 0 };
+    players[0]!.resources = { wood: 10, stone: 10, money: 20, ore: 0, food: 20 };
     const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
     sim.startGame();
     sim.drainEvents();

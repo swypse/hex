@@ -6,6 +6,7 @@ import { hasSkill } from './skills';
 import { isForestType, isLandType, isMountainType, isWaterType } from './tile-types';
 import { buildingsInVillage, villageBuildingLimit } from './village';
 import { villageEnemyOccupied } from './capture';
+import type { Unit } from './units';
 import type { BuildingKind } from './events';
 import { t } from '../i18n';
 import { canBuildBridgeHere, BRIDGE_COST } from './bridges';
@@ -20,7 +21,7 @@ export const MINE_COST = 15;
 /** Maximum hp of every building (catapult siege deals 1 per hit). */
 export const BUILDING_MAX_HP = 2;
 /** Repairing a damaged building to full hp. */
-export const REPAIR_COST: Resources = { wood: 2, stone: 2, ore: 2, money: 3 };
+export const REPAIR_COST: Resources = { wood: 2, stone: 2, ore: 2, money: 3, food: 0 };
 
 /** A building's current hp; `undefined` (new/undamaged) reads as full. */
 export function buildingHp(building: { hp?: number } | null | undefined): number {
@@ -51,14 +52,18 @@ export const BUILDING_NAMES: Record<BuildingKind, string> = {
   port: t('building.port'),
   temple: t('building.temple'),
   forestTemple: t('building.forestTemple'),
+  farm: t('building.farm'),
+  granary: t('building.granary'),
 };
 
 export const BUILDING_COSTS: Record<BuildingKind, Resources> = {
   sawmill: moneyCost(SAWMILL_COST),
   mine: moneyCost(MINE_COST),
-  port: { wood: 10, stone: 0, money: 30, ore: 2 },
-  temple: { wood: 0, stone: 10, money: 30, ore: 0 },
-  forestTemple: { wood: 0, stone: 10, money: 30, ore: 0 },
+  port: { wood: 10, stone: 0, money: 30, ore: 2, food: 0 },
+  temple: { wood: 0, stone: 10, money: 30, ore: 0, food: 0 },
+  forestTemple: { wood: 0, stone: 10, money: 30, ore: 0, food: 0 },
+  farm: { wood: 5, stone: 2, money: 15, ore: 0, food: 0 },
+  granary: { wood: 10, stone: 10, money: 20, ore: 0, food: 0 },
 };
 
 /** Spawn costs for every kind a builder (Villagers special unit) may construct,
@@ -131,6 +136,58 @@ export function canBuildForestTemple(map: GameMap, tile: MapTile, player: Player
   return isForestType(tile.terrain);
 }
 
+/** A food building's shared placement rule: an own, empty land tile (no
+ *  forest/mountain/water; a road is fine) with no enemy unit standing on it.
+ *  Food buildings do not use up a village building slot. */
+export function canPlaceFoodBuilding(tile: MapTile, player: Player): boolean {
+  if (tile.ownedBy !== player.index) return false;
+  if (tile.settlement || tile.building) return false;
+  if (!isLandType(tile.terrain)) return false;
+  if (tile.bridge !== undefined && tile.bridge !== null) return false;
+  if (tile.unit && tile.unit.owner !== player.index) return false;
+  return true;
+}
+
+export function canBuildFarm(map: GameMap, tile: MapTile, player: Player): boolean {
+  if (!hasSkill(player, 'agriculture')) return false;
+  return canPlaceFoodBuilding(tile, player);
+}
+
+/** A granary must stand next to one of the player's farms. */
+export function canBuildGranary(map: GameMap, tile: MapTile, player: Player): boolean {
+  if (!hasSkill(player, 'granary')) return false;
+  if (!canPlaceFoodBuilding(tile, player)) return false;
+  return hexNeighbors(tile).some((n) => {
+    const t = neighborTile(map, n);
+    return t !== undefined && t.building?.kind === 'farm' && t.ownedBy === player.index;
+  });
+}
+
+export function isFoodBuilding(building: { kind: string } | null | undefined): boolean {
+  return building?.kind === 'farm' || building?.kind === 'granary';
+}
+
+/** Whether `unit`, standing on an enemy farm or granary, may burn it: the unit
+ *  must not have attacked or healed yet (moving onto the tile is fine). */
+export function canBurnBuilding(tile: MapTile, unit: Unit): boolean {
+  if (tile.unit !== unit) return false;
+  if (!isFoodBuilding(tile.building)) return false;
+  if (tile.ownedBy === null || tile.ownedBy === undefined || tile.ownedBy === unit.owner) return false;
+  if (unit.owner < 0 || unit.shipLevel !== undefined) return false;
+  if (unit.hasAttacked || unit.hasHealed) return false;
+  return (unit.stunTurns ?? 0) < 1;
+}
+
+/** Destroys the food building under the unit and spends its whole turn. */
+export function burnBuilding(tile: MapTile, unit: Unit): boolean {
+  if (!canBurnBuilding(tile, unit)) return false;
+  tile.building = null;
+  unit.hasMoved = true;
+  unit.hasAttacked = true;
+  unit.hasHealed = true;
+  return true;
+}
+
 /** Placement rule for a building kind with the skill check skipped — exactly
  *  what the Villagers builder uses: terrain/territory/slot rules unchanged,
  *  no skill required. */
@@ -140,7 +197,7 @@ export function canBuildKindIgnoringSkill(
   tile: MapTile,
   player: Player,
 ): boolean {
-  if (kind === 'temple' || kind === 'forestTemple') return false;
+  if (kind === 'temple' || kind === 'forestTemple' || kind === 'farm' || kind === 'granary') return false;
   if (tile.ownedBy !== player.index) return false;
   if (tile.settlement || tile.building) return false;
   if (!villageHasBuildingSlot(map, tile, player)) return false;
@@ -265,7 +322,11 @@ export function buildBuilding(
           ? canBuildPort(map, tile, player)
           : kind === 'temple'
             ? canBuildTemple(map, tile, player)
-            : canBuildForestTemple(map, tile, player);
+            : kind === 'farm'
+              ? canBuildFarm(map, tile, player)
+              : kind === 'granary'
+                ? canBuildGranary(map, tile, player)
+                : canBuildForestTemple(map, tile, player);
   if (!allowed) return false;
   return payAndPlaceBuilding(tile, kind, player);
 }
@@ -281,7 +342,7 @@ function payAndPlaceBuilding(tile: MapTile, kind: BuildingKind, player: Player):
   const cost = BUILDING_COSTS[kind];
   if (!canAfford(player.resources, cost)) return false;
   player.resources = pay(player.resources, cost);
-  tile.building = { kind, level: 1 };
+  tile.building = kind === 'granary' ? { kind, level: 1, food: 0 } : { kind, level: 1 };
   return true;
 }
 

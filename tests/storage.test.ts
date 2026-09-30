@@ -24,7 +24,7 @@ function sampleSnapshot(): GameStateSnapshot {
       tiles: [{ q: 0, r: 0, terrain: TileType.GrasslandLand, settlement: null, unit: null, ownedBy: null, claimedByVillage: null, building: null, exploredBy: [0] }],
       spawns: [],
     },
-    players: [{ index: 0, tribe: 0, isHuman: true, name: 'P', resources: { wood: 3, stone: 2, money: 5, ore: 0 }, score: 0, kills: 0, skills: [], isActive: true }],
+    players: [{ index: 0, tribe: 0, isHuman: true, name: 'P', resources: { wood: 3, stone: 2, money: 5, ore: 0, food: 20 }, score: 0, kills: 0, skills: [], isActive: true }],
     mode: 'capture',
     turn: 3,
     currentPlayerIndex: 0,

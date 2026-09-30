@@ -25,7 +25,7 @@ beforeEach(() => {
   const s = freshForestSim();
   sim = s.sim;
   map = s.map;
-  sim.players[0]!.resources = { wood: 100, stone: 100, money: 100, ore: 100 };
+  sim.players[0]!.resources = { wood: 100, stone: 100, money: 100, ore: 100, food: 20 };
 });
 
 function place(owner: number, type: Unit['type'], q: number, r: number, opts: Partial<Unit> = {}): Unit {
@@ -48,7 +48,7 @@ describe('trapper traps', () => {
     expect(findUnit(trapper.id).hasMoved).toBe(true);
     expect(sim.players[0]!.resources.money).toBe(95);
     expect(sim.players[0]!.resources.ore).toBe(97);
-    expect(TRAP_COST).toEqual({ wood: 0, stone: 0, money: 5, ore: 3 });
+    expect(TRAP_COST).toEqual({ wood: 0, stone: 0, money: 5, ore: 3, food: 0 });
   });
 
   it('places a trap on its own cell, the one the trapper stands on', () => {

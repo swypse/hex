@@ -3,7 +3,7 @@ import { gameController } from '../../controller/game-controller';
 import { useGameStore } from '../../store/game-store';
 import { tileAt } from '../../game/selection';
 import { canAfford, moneyCost, villageUpgradeCost } from '../../game/resources';
-import { canBuildSawmill, canBuildForestTemple, canBuildMine, canBuildPort, canBuildTemple, BUILDING_COSTS, canRepairBuilding, REPAIR_COST, canAffordAnyBuilderBuild } from '../../game/buildings';
+import { canBuildSawmill, canBuildFarm, canBuildGranary, canBurnBuilding, canBuildForestTemple, canBuildMine, canBuildPort, canBuildTemple, BUILDING_COSTS, canRepairBuilding, REPAIR_COST, canAffordAnyBuilderBuild } from '../../game/buildings';
 import { canHeal, canDisband, disbandCost, hasPirateDeal, PIRATE_DEAL_COST, UNIT_TYPES, UNIT_TYPE_NAMES } from '../../game/units';
 import { SHIP_UPGRADE_COST, canUpgradeShip } from '../../game/ship';
 import { unitsInVillage, villageCapacity, canBuildWall, WALL_COST } from '../../game/village';
@@ -87,6 +87,8 @@ export function toolbarSpecs(): ToolbarSpec[] {
       { kind: 'port', label: t('ui.buildport10w302ore') },
       { kind: 'temple', label: t('ui.buildwatertemple10s30') },
       { kind: 'forestTemple', label: t('ui.buildforesttemple10s30') },
+      { kind: 'farm', label: t('ui.buildfarm') },
+      { kind: 'granary', label: t('ui.buildgranary') },
     ];
     for (const { kind, label } of kinds) {
       const ok = kind === 'sawmill'
@@ -97,7 +99,11 @@ export function toolbarSpecs(): ToolbarSpec[] {
             ? canBuildPort(map, tile, player)
             : kind === 'temple'
               ? canBuildTemple(map, tile, player)
-              : canBuildForestTemple(map, tile, player);
+              : kind === 'farm'
+                ? canBuildFarm(map, tile, player)
+                : kind === 'granary'
+                  ? canBuildGranary(map, tile, player)
+                  : canBuildForestTemple(map, tile, player);
       if (!ok) continue;
       out.push({ key: kind, label, disabled: !canAfford(player.resources, BUILDING_COSTS[kind]), onClick: () => gameController.buildSelectedBuilding(kind) });
     }
@@ -137,6 +143,9 @@ export function toolbarSpecs(): ToolbarSpec[] {
     }
     if (unit.type === 'trapper' && unit.shipLevel === undefined && trapCells(map, tile).length > 0) {
       out.push({ key: 'thorn-trap', label: t('action.buildTrap'), disabled: !idle || !canAfford(player.resources, TRAP_COST), onClick: () => gameController.placeTrap() });
+    }
+    if (canBurnBuilding(tile, unit) && tile.building) {
+      out.push({ key: `burn-${tile.building.kind}`, label: t(tile.building.kind === 'farm' ? 'action.burnFarm' : 'action.burnGranary'), disabled: false, onClick: () => gameController.burnSelected() });
     }
     if (unit.type === 'stormcaller' && stormEligible(map, unit)) {
       out.push({ key: 'storm', label: t('action.storm'), disabled: !idle, onClick: () => gameController.stormSelected() });

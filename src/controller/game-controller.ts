@@ -34,7 +34,7 @@ import { welcomeDismissed } from '../storage/settings';
 import { sfx } from '../sound/sfx';
 import { SeededRandom } from '../util/random';
 import { setAiLogging, aiLoggingEnabled } from '../game/ai';
-import { CameraController } from './camera-controller';
+import { CameraController, CAMERA_FOLLOW_MS } from './camera-controller';
 import { damagePreviewVictim } from './damage-preview';
 import { HoldTimer } from './hold-timer';
 import { type Viewport } from '../render/tile-signature';
@@ -688,7 +688,7 @@ class GameController {
       x: this.app.screen.width / 2 - world.x * camera.scale,
       y: this.mapHeight() / 2 - world.y * camera.scale,
     };
-    await camera.animateTo(target);
+    await camera.animateTo(target, true, CAMERA_FOLLOW_MS);
   }
 
   private centerOnStartVillage(): void {
@@ -1048,6 +1048,17 @@ class GameController {
     this.sendCommand({ type: 'build', q: selection.q, r: selection.r, kind });
   }
 
+  /** The selected unit burns the enemy farm/granary it stands on. */
+  burnSelected(): void {
+    const store = useGameStore.getState();
+    if (store.aiActive) return;
+    const selection = store.selection;
+    if (!selection || selection.kind !== 'unit' || !this.sim) return;
+    const unit = tileAt(this.sim.map, selection.q, selection.r)?.unit;
+    if (!unit) return;
+    this.sendCommand({ type: 'burn', unitId: unit.id });
+  }
+
   repairSelectedBuilding(): void {
     const store = useGameStore.getState();
     if (store.aiActive) return;
@@ -1128,6 +1139,7 @@ class GameController {
       stone: local.resources.stone + RESOURCE_CHEAT_AMOUNT,
       money: local.resources.money + RESOURCE_CHEAT_AMOUNT,
       ore: local.resources.ore + RESOURCE_CHEAT_AMOUNT,
+      food: local.resources.food + RESOURCE_CHEAT_AMOUNT,
     };
     this.syncStore();
     this.saveGame();

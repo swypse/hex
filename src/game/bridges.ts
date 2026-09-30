@@ -5,7 +5,7 @@ import { tileAt } from './selection';
 import { hasSkill } from './skills';
 import { isWaterType } from './tile-types';
 
-export const BRIDGE_COST: Resources = { wood: 10, stone: 5, money: 15, ore: 0 };
+export const BRIDGE_COST: Resources = { wood: 10, stone: 5, money: 15, ore: 0, food: 0 };
 
 /** Each axis is a pair of opposite hex neighbours of the water tile. */
 const AXES: { dir: BridgeDir; offsets: { q: number; r: number }[] }[] = [

@@ -155,7 +155,7 @@ describe('spawnableTypesFor', () => {
   function playerOf(tribe: Tribe, index = 0): import('../src/game/players').Player {
     return {
       index, tribe, isHuman: true, name: 'p',
-      resources: { wood: 100, stone: 100, money: 100, ore: 100 },
+      resources: { wood: 100, stone: 100, money: 100, ore: 100, food: 20 },
       score: 0, kills: 0, skills: [], isActive: true,
     };
   }

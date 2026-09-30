@@ -22,7 +22,7 @@ function makeHost(width = 1280, height = 800): UIHost {
 function player(index: number, tribe: Tribe, name: string, isHuman: boolean): Player {
   return {
     index, tribe, isHuman, name,
-    resources: { wood: 0, stone: 0, money: 0, ore: 0 },
+    resources: { wood: 0, stone: 0, money: 0, ore: 0, food: 20 },
     score: 0, kills: 0, skills: [], isActive: true,
   };
 }

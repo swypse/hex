@@ -1,6 +1,7 @@
 import { planAiActions, logAiTurnStart, aiLoggingEnabled, formatAiAction, type AiActionMarker } from './ai';
 import type { AiAction } from './ai-types';
-import { buildingIncome, buildBuilding, buildBuildingIgnoringSkill, canUsePort, repairBuilding, destroyBuilding, builderBuildable, type BuilderBuildKind } from './buildings';
+import { applyFood } from './food';
+import { buildingIncome, buildBuilding, burnBuilding, buildBuildingIgnoringSkill, canUsePort, repairBuilding, destroyBuilding, builderBuildable, type BuilderBuildKind } from './buildings';
 import { captureVillage, setCaptureReady, villageIncomeTotal } from './capture';
 import { attackableTargets, missChanceFor, performAttack, performSiege } from './combat';
 import { buildBridge, buildBridgeIgnoringSkill } from './bridges';
@@ -13,7 +14,7 @@ import { hexDistance, hexNeighbors } from './hex';
 import type { GameMap, MapTile } from './map-gen';
 import type { Player } from './players';
 import { PlayerStats } from './score';
-import { canAfford, moneyCost, pay, villageUpgradeCost } from './resources';
+import { canAfford, moneyCost, pay, START_RESOURCES, villageUpgradeCost } from './resources';
 import { awardScore, awardTempleScores, CAPTURE_SCORE, COMBO_SCORE, EMPTY_STATS, KILL_SCORE, PIRATE_KILL_SCORE, SKILL_SCORE, UPGRADE_SCORE } from './score';
 import { hasSkill, openSkill as applySkill, randomUnopenedSkill, SkillId } from './skills';
 import { evaluateAchievements, awardAchievementScores, currentlyMetIds, type AchievementId } from './achievements';
@@ -39,6 +40,7 @@ export type Command =
   | { type: 'build'; q: number; r: number; kind: BuildingKind | 'bridge'; unitId?: string }
   | { type: 'repair'; q: number; r: number }
   | { type: 'destroyBuilding'; q: number; r: number }
+  | { type: 'burn'; unitId: string }
   | { type: 'buildWall'; q: number; r: number }
   | { type: 'buildRoad'; q: number; r: number }
   | { type: 'buildBridge'; q: number; r: number }
@@ -68,6 +70,7 @@ export const PREDICTABLE_COMMAND_TYPES: ReadonlySet<Command['type']> = new Set([
   'build',
   'repair',
   'destroyBuilding',
+  'burn',
   'buildWall',
   'buildRoad',
   'buildBridge',
@@ -122,6 +125,10 @@ export class Simulator {
   }
 
   static fromSnapshot(snap: GameStateSnapshot): Simulator {
+    // Saves from before the food resource have no food stock: start them full.
+    for (const p of snap.players) {
+      if (typeof p.resources.food !== 'number') p.resources.food = START_RESOURCES.food;
+    }
     const sim = new Simulator(snap.map, snap.players, snap.mode);
     sim.turn = snap.turn;
     sim.currentPlayerIndex = snap.currentPlayerIndex;
@@ -186,6 +193,9 @@ export class Simulator {
         break;
       case 'destroyBuilding':
         ok = this.doDestroyBuilding(cmd.q, cmd.r);
+        break;
+      case 'burn':
+        ok = this.doBurn(cmd.unitId);
         break;
       case 'buildWall':
         ok = this.doBuildWall(cmd.q, cmd.r);
@@ -784,6 +794,19 @@ export class Simulator {
     return true;
   }
 
+  /** A unit standing on an enemy farm or granary burns it, spending its whole turn. */
+  private doBurn(unitId: string): boolean {
+    const unit = this.findUnit(unitId);
+    if (!unit || unit.owner !== this.currentPlayerIndex) return false;
+    const tile = tileAt(this.map, unit.q, unit.r);
+    if (!tile) return false;
+    const kind = tile.building?.kind;
+    if (kind !== 'farm' && kind !== 'granary') return false;
+    if (!burnBuilding(tile, unit)) return false;
+    this.emit({ type: 'burned', unitId, kind, q: tile.q, r: tile.r, playerIndex: unit.owner });
+    return true;
+  }
+
   private growTemples(): void {
     for (const t of this.map.tiles) {
       const b = t.building;
@@ -1226,6 +1249,9 @@ export class Simulator {
       case 'trap':
         ok = this.doBuildTrap(a.unitId, a.q, a.r);
         break;
+      case 'burn':
+        ok = this.doBurn(a.unitId);
+        break;
       case 'builderBuild':
         ok = this.doBuildWithUnit(a.unitId, a.q, a.r, a.kind);
         break;
@@ -1487,6 +1513,23 @@ export class Simulator {
       player.resources.wood += b.wood;
       player.resources.stone += b.stone;
       player.resources.ore += b.ore;
+    }
+    this.applyFoodForAll();
+  }
+
+  /** Round-end food: farms feed, villages eat, starving villages hurt their units. */
+  private applyFoodForAll(): void {
+    for (const player of this.players) {
+      if (!player.isActive) continue;
+      for (const report of applyFood(this.map, player)) {
+        this.emit({
+          type: 'starvation',
+          q: report.village.q,
+          r: report.village.r,
+          playerIndex: player.index,
+          units: report.units,
+        });
+      }
     }
   }
 

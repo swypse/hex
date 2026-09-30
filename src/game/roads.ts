@@ -7,7 +7,7 @@ import { hasSkill } from './skills';
 import { isWaterType } from './tile-types';
 import { portWaterClusterJumps } from './water-roads';
 
-export const ROAD_COST: Resources = { wood: 5, stone: 2, money: 10, ore: 0 };
+export const ROAD_COST: Resources = { wood: 5, stone: 2, money: 10, ore: 0, food: 0 };
 
 function isRoadNode(t: MapTile, owner: number): boolean {
   if (t.roadOwner === owner) return true;

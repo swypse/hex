@@ -2,7 +2,7 @@ import { GameMap, MapTile } from './map-gen';
 import { Player } from './players';
 import { canAfford, pay } from './resources';
 import { hasSkill } from './skills';
-import { makeUnit, UNIT_TYPES, UnitType } from './units';
+import { makeUnit, unitSpawnCost, UNIT_TYPES, UnitType } from './units';
 import { unitsInVillage, villageCapacity } from './village';
 import { TRIBE_SPECIAL_UNIT } from './tribes';
 
@@ -30,7 +30,7 @@ export function spawnUnit(
   } else if (Object.values(TRIBE_SPECIAL_UNIT).includes(type)) {
     return false;
   }
-  const cost = { wood: UNIT_TYPES[type].priceWood, stone: 0, money: UNIT_TYPES[type].price, ore: UNIT_TYPES[type].priceOre };
+  const cost = unitSpawnCost(type);
   if (!canAfford(player.resources, cost)) return false;
 
   player.resources = pay(player.resources, cost);

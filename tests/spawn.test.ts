@@ -20,7 +20,7 @@ function makeVillageTile(q: number, r: number, owner: number, level: number): Ma
 }
 
 function makePlayer(index: number, money: number): Player {
-  return { index, tribe: 0, isHuman: index === 0, name: `p${index}`, resources: { wood: 5, stone: 5, money, ore: 0 }, score: 0, kills: 0, skills: [], isActive: true };
+  return { index, tribe: 0, isHuman: index === 0, name: `p${index}`, resources: { wood: 5, stone: 5, money, ore: 0, food: 20 }, score: 0, kills: 0, skills: [], isActive: true };
 }
 
 function makeMap(): GameMap {

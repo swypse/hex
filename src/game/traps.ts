@@ -8,7 +8,7 @@ export interface TrapState {
   placedTurn: number;
 }
 
-export const TRAP_COST: Resources = { wood: 0, stone: 0, money: 5, ore: 3 };
+export const TRAP_COST: Resources = { wood: 0, stone: 0, money: 5, ore: 3, food: 0 };
 export const TRAP_TURNS = 10;
 export const TRAP_ATTACK = 30;
 

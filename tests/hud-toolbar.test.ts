@@ -52,7 +52,7 @@ describe('HudToolbar build actions', () => {
     map = generateMap(2, 42);
     const players = buildPlayers(0, 1, new SeededRandom(1));
     players[0]!.skills.push('forestry', 'smithery', 'water');
-    players[0]!.resources = { wood: 100, stone: 100, money: 500, ore: 100 };
+    players[0]!.resources = { wood: 100, stone: 100, money: 500, ore: 100, food: 20 };
     const sim = new Simulator(map, players, 'capture');
     sim.startGame();
     sim.drainEvents();
@@ -178,7 +178,7 @@ describe('HudToolbar build actions', () => {
 
   it('pulses the end turn button when no action is available anywhere', () => {
     const store = useGameStore.getState();
-    store.players[0]!.resources = { wood: 0, stone: 0, money: 0, ore: 0 };
+    store.players[0]!.resources = { wood: 0, stone: 0, money: 0, ore: 0, food: 20 };
     store.players[0]!.skills = [];
     for (const t of map.tiles) {
       if (t.unit && t.unit.owner === 0) {
@@ -196,7 +196,7 @@ describe('HudToolbar build actions', () => {
 
   it('does not pulse the end turn button while an action remains', () => {
     const store = useGameStore.getState();
-    store.players[0]!.resources = { wood: 0, stone: 0, money: 100, ore: 0 };
+    store.players[0]!.resources = { wood: 0, stone: 0, money: 100, ore: 0, food: 20 };
     store.players[0]!.skills = [];
     store.setSelection(null);
     store.setTutorial(false);
@@ -221,7 +221,7 @@ describe('HudToolbar tutorial build highlights', () => {
     map = generateMap(2, 42);
     const players = buildPlayers(0, 1, new SeededRandom(1));
     players[0]!.skills.push('forestry', 'smithery');
-    players[0]!.resources = { wood: 100, stone: 100, money: 500, ore: 100 };
+    players[0]!.resources = { wood: 100, stone: 100, money: 500, ore: 100, food: 20 };
     const sim = new Simulator(map, players, 'capture');
     sim.startGame();
     sim.drainEvents();

@@ -42,7 +42,7 @@ function knight(id: string, owner: number, q: number, r: number): Unit {
 function player(money: number, skills: Player['skills'] = []): Player {
   return {
     index: 1, tribe: Tribe.Villagers, isHuman: false, name: 'AI',
-    resources: { wood: 5, stone: 5, money, ore: 5 },
+    resources: { wood: 5, stone: 5, money, ore: 5, food: 20 },
     score: 0, kills: 0, skills, isActive: true,
   };
 }
@@ -429,9 +429,21 @@ describe('AI patterns', () => {
       tile(0, 0, { owner: 1, level: 1, captureReady: false }, null, 1),
       tile(1, 0, null, warrior('ai1', 1, 1, 0)),
     );
-    const actions = findPattern('economy-opening').evaluate(ctx(map, player(100), new SeededRandom(1)));
+    const small = player(100);
+    small.resources.wood = 10; // enough left for a farm after the upgrade
+    const actions = findPattern('economy-opening').evaluate(ctx(map, small, new SeededRandom(1)));
     expect(actions).not.toBeNull();
     expect(actions![0]!.type).toBe('upgrade');
+  });
+
+  it('economy-opening keeps the wood and stone of the first farm', () => {
+    const map: GameMap = { radius: 4, tiles: [], spawns: [] };
+    map.tiles.push(
+      tile(0, 0, { owner: 1, level: 1, captureReady: false }, null, 1),
+      tile(1, 0, null, warrior('ai1', 1, 1, 0)),
+    );
+    const poor = player(100); // wood 5: an upgrade (2 wood) would leave less than a farm needs
+    expect(findPattern('economy-opening').evaluate(ctx(map, poor, new SeededRandom(1)))?.[0]?.type).not.toBe('upgrade');
   });
 
   it('bestSpawnableUnitType offers catapult only with the skill and resources', () => {

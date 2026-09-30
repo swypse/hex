@@ -38,6 +38,8 @@ export interface Settlement {
   capital?: boolean;
   /** Built wall: units inside gain bonus defense. */
   wall?: boolean;
+  /** True after a turn end in which the village could not feed its units. */
+  starving?: boolean;
   /** Villagers composite-village block choices (see `SettlementBuild`). */
   build?: SettlementBuild;
 }
@@ -49,8 +51,10 @@ export interface Bridge {
 }
 
 export interface Building {
-  kind: 'sawmill' | 'mine' | 'port' | 'temple' | 'forestTemple';
+  kind: 'sawmill' | 'mine' | 'port' | 'temple' | 'forestTemple' | 'farm' | 'granary';
   level: number;
+  /** Granary only: food stored (0 at creation, +1 per adjacent farm each turn). */
+  food?: number;
   bornTurn?: number;
   /** Remaining hp after catapult siege damage; `undefined` = full (2). */
   hp?: number;

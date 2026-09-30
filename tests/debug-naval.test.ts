@@ -22,7 +22,7 @@ describe('Debug naval hunt', () => {
     tileAt(map, 0, 0)!.unit = ship;
     const player: Player = {
       index: 1, tribe: Tribe.Villagers, isHuman: false, name: 'AI',
-      resources: { wood: 0, stone: 0, money: 100, ore: 0 },
+      resources: { wood: 0, stone: 0, money: 100, ore: 0, food: 20 },
       score: 0, kills: 0, skills: ['water', 'navigation'], isActive: true,
     };
     const actions = planAiActions(map, player, new SeededRandom(1), 'capture');

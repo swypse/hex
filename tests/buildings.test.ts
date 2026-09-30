@@ -44,7 +44,7 @@ function player(money: number, skills: SkillId[] = []): import('../src/game/play
     tribe: Tribe.Villagers,
     isHuman: true,
     name: 'p',
-    resources: { wood: 0, stone: 0, money, ore: 0 },
+    resources: { wood: 0, stone: 0, money, ore: 0, food: 20 },
     isActive: true,
     score: 0,
     kills: 0,
@@ -594,13 +594,13 @@ describe('building hp and repair', () => {
   it('repairBuilding charges 2w/2s/2o/3m and restores full hp', () => {
     const map: GameMap = { radius: 2, tiles: [], spawns: [] };
     const p = player(3);
-    p.resources = { wood: 2, stone: 2, ore: 2, money: 3 };
+    p.resources = { wood: 2, stone: 2, ore: 2, money: 3, food: 20 };
     const building = tile(0, 0, TileType.GrasslandLand, 0, null, { kind: 'mine', level: 1, hp: 1 });
-    expect(REPAIR_COST).toEqual({ wood: 2, stone: 2, ore: 2, money: 3 });
+    expect(REPAIR_COST).toEqual({ wood: 2, stone: 2, ore: 2, money: 3, food: 0 });
     expect(repairBuilding(map, building, p)).toBe(true);
     expect(building.building!.hp).toBeUndefined();
     expect(buildingHp(building.building)).toBe(2);
-    expect(p.resources).toEqual({ wood: 0, stone: 0, ore: 0, money: 0 });
+    expect(p.resources).toEqual({ wood: 0, stone: 0, ore: 0, money: 0, food: 20 });
   });
 
   it('repairBuilding refuses when unaffordable', () => {
@@ -609,7 +609,7 @@ describe('building hp and repair', () => {
     const building = tile(0, 0, TileType.GrasslandLand, 0, null, { kind: 'mine', level: 1, hp: 1 });
     expect(repairBuilding(map, building, poor)).toBe(false);
     expect(buildingHp(building.building)).toBe(1);
-    expect(poor.resources).toEqual({ wood: 0, stone: 0, ore: 0, money: 0 });
+    expect(poor.resources).toEqual({ wood: 0, stone: 0, ore: 0, money: 0, food: 20 });
   });
 });
 
@@ -617,7 +617,7 @@ describe('building destroy', () => {
   it('destroyBuilding demolishes an owned building for 5 money', () => {
     const map: GameMap = { radius: 2, tiles: [], spawns: [] };
     const p = player(5);
-    p.resources = { wood: 2, stone: 2, ore: 2, money: 5 };
+    p.resources = { wood: 2, stone: 2, ore: 2, money: 5, food: 20 };
     const b = tile(0, 0, TileType.GrasslandLand, 0, null, { kind: 'mine', level: 1 });
     expect(DESTROY_BUILDING_COST).toBe(5);
     expect(destroyBuilding(map, b, p)).toBe(true);
@@ -628,13 +628,13 @@ describe('building destroy', () => {
   it('destroyBuilding refuses foreign or unaffordable buildings', () => {
     const map: GameMap = { radius: 2, tiles: [], spawns: [] };
     const foreign = player(5);
-    foreign.resources = { wood: 2, stone: 2, ore: 2, money: 5 };
+    foreign.resources = { wood: 2, stone: 2, ore: 2, money: 5, food: 20 };
     const other = tile(0, 0, TileType.GrasslandLand, 1, null, { kind: 'mine', level: 1 });
     expect(destroyBuilding(map, other, foreign)).toBe(false);
     expect(other.building).not.toBeNull();
 
     const poor = player(2);
-    poor.resources = { wood: 2, stone: 2, ore: 2, money: 2 };
+    poor.resources = { wood: 2, stone: 2, ore: 2, money: 2, food: 20 };
     const own = tile(1, 0, TileType.GrasslandLand, 0, null, { kind: 'mine', level: 1 });
     expect(destroyBuilding(map, own, poor)).toBe(false);
     expect(own.building).not.toBeNull();

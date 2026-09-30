@@ -60,7 +60,7 @@ function player(score = 0): Player {
     tribe: Tribe.Villagers,
     isHuman: true,
     name: 'p',
-    resources: { wood: 0, stone: 0, money: 0, ore: 0 },
+    resources: { wood: 0, stone: 0, money: 0, ore: 0, food: 20 },
     isActive: true,
     score,
     kills: 0,
@@ -209,7 +209,7 @@ describe('scoreBreakdown', () => {
     );
     const p: Player = {
       index: 0, tribe: Tribe.Villagers, isHuman: true, name: 'p',
-      resources: { wood: 0, stone: 0, money: 0, ore: 0 },
+      resources: { wood: 0, stone: 0, money: 0, ore: 0, food: 20 },
       score: 25 + 30 + 50 + 20 + 15 + 15 + 20 + 40,
       kills: 2, skills: ['swordsman'], isActive: true,
       stats: { killedUnits: 3, pirateKills: 1, villagesCaptured: 1, villageUpgrades: 1, knightCombos: 0, enemyShipsKilled: 0, shipsCapturedByPirates: 0, bonusesCollected: 0, tribesEliminated: 0, skillsOpened: 0 },
@@ -258,7 +258,7 @@ describe('gameOverRows', () => {
 
     const p: Player = {
       index: 0, tribe: Tribe.Villagers, isHuman: true, name: 'p',
-      resources: { wood: 0, stone: 0, money: 0, ore: 0 },
+      resources: { wood: 0, stone: 0, money: 0, ore: 0, food: 20 },
       // Award-stock total: 2 normal kills + 1 pirate kill + 2 combos + 1 capture
       // + 2 upgrades + 1 skill + temples (15 + 20).
       score: 2 * KILL_SCORE + PIRATE_KILL_SCORE + 2 * COMBO_SCORE + CAPTURE_SCORE + 2 * UPGRADE_SCORE + SKILL_SCORE + 15 + 20,
@@ -312,7 +312,7 @@ describe('gameOverRows', () => {
     const map: GameMap = { radius: 1, tiles: [], spawns: [] };
     const p: Player = {
       index: 0, tribe: Tribe.Cats, isHuman: true, name: 'p',
-      resources: { wood: 0, stone: 0, money: 0, ore: 0 },
+      resources: { wood: 0, stone: 0, money: 0, ore: 0, food: 20 },
       score: SKILL_SCORE, kills: 0, skills: ['shields', 'science'], isActive: true,
       stats: { ...EMPTY_STATS, skillsOpened: 1 },
     };

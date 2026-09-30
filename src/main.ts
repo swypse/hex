@@ -4,6 +4,7 @@ import { readJoinCode, setPendingJoin } from './net/join-link';
 import { ScreenManager } from './ui/screen-manager';
 import { gameController } from './controller/game-controller';
 import { enableSizedFonts, loadBitmapFonts } from './ui/kit/bitmap-fonts';
+import { sfx } from './sound/sfx';
 import { preventCanvasContextMenu } from './prevent-canvas-context-menu';
 import { initErrorReporter } from './error-reporter';
 import { installRenderGate, markDirty } from './render/render-gate';
@@ -45,6 +46,7 @@ async function boot(): Promise<void> {
   ]);
   await loadBitmapFonts();
   enableSizedFonts();
+  sfx.preload();
   const app = new Application();
   const format = preferredCanvasFormat();
   await app.init({

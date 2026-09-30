@@ -1,8 +1,20 @@
+import { RAGE_BONUS, RAGE_THRESHOLD_PCT } from './abilities';
 import { canCounterAttack, COMBAT_SCALE, MISS_CHANCE } from './combat';
 import { SKILLS, skillCost, type SkillId } from './skills';
 import { UNIT_TYPES, type UnitType } from './units';
 
 export const PLAYABLE_UNITS: UnitType[] = ['warrior', 'rider', 'archer', 'swordsman', 'shield', 'catapult', 'knight', 'stalker', 'builder', 'banner', 'berserker', 'trapper', 'stormcaller', 'stunner'];
+
+/** Combat-role units: the roster whose duel results decide the balance verdict.
+ *  Utility specials (stalker, builder, banner) are judged on their abilities. */
+export const CORE_COMBAT: UnitType[] = ['warrior', 'rider', 'archer', 'swordsman', 'shield', 'catapult', 'knight', 'berserker', 'trapper', 'stormcaller', 'stunner'];
+
+/** Utility units that are expected to lose duels; their value is the ability. */
+export const UTILITY_UNITS: UnitType[] = ['stalker', 'builder', 'banner'];
+
+/** Win-rate thresholds shared by the flags and the report. */
+export const WIN_THRESHOLD = 0.6;
+export const LOSS_THRESHOLD = 0.4;
 
 /** Exchange rates used to convert resource costs into money for cost-efficiency
  *  analysis (tunable; see combat-balance.md). */
@@ -95,26 +107,82 @@ export interface DuelResult {
  *  (`movePoints / 10` hexes per turn, min 1) and may attack in the same turn it
  *  closes. Damage mirrors the live combat formula (see resolveCombat); `rng`
  *  drives the 10% miss roll (pass `() => 1` for the deterministic pass). */
+export interface StrikeContext {
+  /** Flat attack bonus (banner aura); rage is derived from the attacker's hp. */
+  bonus?: number;
+  /** A stealthed stalker's first strike ignores the defender's defense. */
+  ignoreDefense?: boolean;
+  /** Attack distance of this exchange (defender counters only if it reaches). */
+  distance: number;
+}
+
+/** True while a berserker is at/below the rage hp threshold. */
+export function isRaging(type: UnitType, hp: number, maxHp: number): boolean {
+  return type === 'berserker' && hp <= maxHp * RAGE_THRESHOLD_PCT;
+}
+
+/** One directed hit, mirroring `resolveCombat` + `performAttack` (miss roll
+ *  excluded): attack force vs defense force, shield counter x2, raging
+ *  berserkers do not counter, land catapults never counter. */
+export function strike(
+  attType: UnitType,
+  defType: UnitType,
+  att: UnitStats,
+  def: UnitStats,
+  attHp: number,
+  defHp: number,
+  ctx: StrikeContext,
+): { dmg: number; counter: number } {
+  const rage = isRaging(attType, attHp, att.maxHp) ? RAGE_BONUS : 0;
+  const attack = att.attack + rage + (ctx.bonus ?? 0);
+  const defense = ctx.ignoreDefense ? 0 : (def.defense ?? 0);
+  const attackForce = (attack * attHp) / att.maxHp;
+  const defenseForce = (defense * defHp) / def.maxHp;
+  const total = attackForce + defenseForce;
+  if (total <= 0) return { dmg: 0, counter: 0 };
+  const dmg = Math.round((attackForce / total) * attack * COMBAT_SCALE);
+  const canCounter =
+    ctx.distance <= def.attackDistance && canCounterAttackType(defType) && !isRaging(defType, defHp, def.maxHp);
+  // A shield's counter-attack is doubled in the real combat formula too.
+  const counterMult = defType === 'shield' ? 2 : 1;
+  const counter = canCounter ? Math.round((defenseForce / total) * defense * COMBAT_SCALE * counterMult) : 0;
+  return { dmg, counter };
+}
+
+export interface DuelOptions {
+  /** Starting distance in hexes; defaults to the longer of the two ranges
+   *  (the ranged unit starts with the target walking into its range). */
+  startDist?: number;
+}
+
+/** Simulated 1v1. Models: closing speed (move / 10 hexes per turn), ranged free
+ *  volleys, catapults unable to fire in a turn they moved, berserker rage
+ *  (+attack, no counters) and stalker first-strike (ignores defense). Banner
+ *  aura and the knight's extra attack need allies / several targets and only
+ *  exist in the skirmish sim (`balance-skirmish.ts`). */
 export function duel(
   a: UnitType,
   b: UnitType,
   rng: () => number = () => 1,
   maxRounds = 100,
   overrides?: Partial<Record<UnitType, Partial<UnitStats>>>,
+  opts: DuelOptions = {},
 ): DuelResult {
   const A = statsFor(a, overrides);
   const B = statsFor(b, overrides);
   const ra = A.attackDistance;
   const rb = B.attackDistance;
-  let dist = Math.max(ra, rb);
+  let dist = opts.startDist ?? Math.max(ra, rb);
   let hpA = A.maxHp;
   let hpB = B.maxHp;
   let turnsA = 0;
   let turnsB = 0;
+  let firstA = true;
+  let firstB = true;
 
   const step = (move: number): number => Math.max(1, Math.floor(move / 10));
 
-  /** Resolve one directed attack; mirrors the game formula exactly. */
+  /** Resolve one directed attack (with the miss roll). */
   const resolve = (
     attType: UnitType,
     defType: UnitType,
@@ -123,27 +191,26 @@ export function duel(
     attHp: number,
     defHp: number,
     distance: number,
+    first: boolean,
   ): { dmg: number; counter: number } => {
     if (rng() < MISS_CHANCE) return { dmg: 0, counter: 0 };
-    const attackForce = (att.attack * attHp) / att.maxHp;
-    const defenseForce = ((def.defense ?? 0) * defHp) / def.maxHp;
-    const total = attackForce + defenseForce;
-    if (total <= 0) return { dmg: 0, counter: 0 };
-    const dmg = Math.round((attackForce / total) * att.attack * COMBAT_SCALE);
-    const canCounter = distance <= def.attackDistance && canCounterAttackType(defType);
-    // A shield's counter-attack is doubled in the real combat formula too
-    // (resolveCombat), so the report's duels stay accurate.
-    const counterMult = defType === 'shield' ? 2 : 1;
-    const counter = canCounter ? Math.round((defenseForce / total) * (def.defense ?? 0) * COMBAT_SCALE * counterMult) : 0;
-    return { dmg, counter };
+    return strike(attType, defType, att, def, attHp, defHp, {
+      distance,
+      ignoreDefense: attType === 'stalker' && first,
+    });
   };
 
   for (let round = 0; round < maxRounds; round++) {
-    // A's turn: close while out of range, then attack.
+    // A's turn: close while out of range, then attack (a catapult that moved cannot fire).
     turnsA += 1;
-    if (dist > ra) dist = Math.max(ra, dist - step(A.movePoints));
-    if (dist <= ra) {
-      const hitA = resolve(a, b, A, B, hpA, hpB, dist);
+    let movedA = false;
+    if (dist > ra) {
+      dist = Math.max(ra, dist - step(A.movePoints));
+      movedA = true;
+    }
+    if (dist <= ra && !(movedA && a === 'catapult')) {
+      const hitA = resolve(a, b, A, B, hpA, hpB, dist, firstA);
+      firstA = false;
       hpB -= hitA.dmg;
       if (hpB <= 0) return { winner: a, turnsForA: turnsA, turnsForB: turnsB, hpA, hpB: 0 };
       hpA -= hitA.counter;
@@ -152,9 +219,14 @@ export function duel(
 
     // B's turn.
     turnsB += 1;
-    if (dist > rb) dist = Math.max(rb, dist - step(B.movePoints));
-    if (dist <= rb) {
-      const hitB = resolve(b, a, B, A, hpB, hpA, dist);
+    let movedB = false;
+    if (dist > rb) {
+      dist = Math.max(rb, dist - step(B.movePoints));
+      movedB = true;
+    }
+    if (dist <= rb && !(movedB && b === 'catapult')) {
+      const hitB = resolve(b, a, B, A, hpB, hpA, dist, firstB);
+      firstB = false;
       hpA -= hitB.dmg;
       if (hpA <= 0) return { winner: b, turnsForA: turnsA, turnsForB: turnsB, hpA: 0, hpB };
       hpB -= hitB.counter;
@@ -332,4 +404,41 @@ export class Mulberry32 {
     x ^= x + Math.imul(x ^ (x >>> 7), x | 61);
     return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
   }
+}
+
+export interface Dominance {
+  type: UnitType;
+  /** Opponents (in `roster`) this unit beats at >= WIN_THRESHOLD. */
+  beats: UnitType[];
+  /** Opponents that beat this unit at >= WIN_THRESHOLD. */
+  beatenBy: UnitType[];
+  /** Mean symmetrised win-rate over `roster` (self excluded). */
+  meanWin: number;
+}
+
+/** Per-unit dominance figures over a roster (defaults to the core combat
+ *  units, so the mean is not inflated by utility units that lose to all). */
+export function dominance(duels: Duels, roster: UnitType[] = CORE_COMBAT): Dominance[] {
+  return roster.map((type) => {
+    const others = roster.filter((o) => o !== type);
+    const rates = others.map((o) => symWin(duels, type, o));
+    return {
+      type,
+      beats: others.filter((_, i) => rates[i]! >= WIN_THRESHOLD),
+      beatenBy: others.filter((_, i) => rates[i]! <= LOSS_THRESHOLD),
+      meanWin: rates.reduce((x, y) => x + y, 0) / Math.max(1, rates.length),
+    };
+  });
+}
+
+/** Super-strong: nothing counters it and it beats most of the roster. */
+export function superStrong(dom: Dominance[], roster: UnitType[] = CORE_COMBAT): Dominance[] {
+  const minWins = Math.ceil(((roster.length - 1) * 2) / 3);
+  return dom.filter((d) => d.beatenBy.length === 0 && d.beats.length >= minWins);
+}
+
+/** Super-weak: beats nothing and loses to most of the roster. */
+export function superWeak(dom: Dominance[], roster: UnitType[] = CORE_COMBAT): Dominance[] {
+  const minLosses = Math.ceil(((roster.length - 1) * 2) / 3);
+  return dom.filter((d) => d.beats.length === 0 && d.beatenBy.length >= minLosses);
 }

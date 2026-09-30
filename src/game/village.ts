@@ -1,13 +1,13 @@
 import { claimTileForVillage } from './claim';
 import { exploreAround } from './explore';
 import { hexDistance } from './hex';
-import { canAfford, pay } from './resources';
+import { canAfford, pay, type Resources } from './resources';
 import { hasSkill } from './skills';
 import type { Player } from './players';
 import { GameMap, MapTile, SettlementBuild, VillageBlockVariant } from './map-gen';
 import { villageColumnMiddleCount, VillageBuildSide } from './village-build';
 
-export const WALL_COST = { money: 20, wood: 0, stone: 15, ore: 5 };
+export const WALL_COST: Resources = { money: 20, wood: 0, stone: 15, ore: 5, food: 0 };
 
 export function canBuildWall(tile: MapTile, player: Player): boolean {
   const s = tile.settlement;
@@ -99,6 +99,8 @@ export function buildingsInVillage(map: GameMap, villageTile: MapTile): number {
   let count = 0;
   for (const t of map.tiles) {
     if (!t.building || !t.claimedByVillage) continue;
+    // Farms and granaries are land improvements: they never use a building slot.
+    if (t.building.kind === 'farm' || t.building.kind === 'granary') continue;
     if (`${t.claimedByVillage.q},${t.claimedByVillage.r}` === villageKey) count++;
   }
   return count;

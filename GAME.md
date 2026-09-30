@@ -47,7 +47,7 @@ freshly spawned unit must wait until the next turn.
 | Swordsman | 10          | 40     | 16      | 1            | 80 | 10 money + 2 ore           |
 | Shield    | 10          | 7      | 20      | 1            | 80 | 8 money + 2 ore            |
 | Catapult  | 10          | 50     | 0       | 4            | 30 | 15 money + 10 wood + 3 ore |
-| Knight    | 30          | 46     | 12      | 1            | 70 | 14 money + 5 ore           |
+| Knight    | 30          | 40     | 12      | 1            | 70 | 14 money + 5 ore           |
 
 ### Special units
 
@@ -58,10 +58,10 @@ its own artwork and its own spawn-popup icon (`action-spawn-<type>`).
 |-------------|------------|------|--------|-------|----|---------|------------------|
 | Stalker     | Cats       | 20   | 10     | 1     | 20 | 0       | 9 money + 2 ore  |
 | Builder     | Villagers  | 8    | 10     | 1     | 40 | 0       | 15 money         |
-| Banner      | Warriors   | 8    | 20     | 1     | 30 | 0       | 7 money + 2 ore  |
-| Berserker   | Barbarians | 10   | 26     | 1     | 50 | 8       | 11 money + 3 ore |
-| Trapper     | Forest     | 10   | 20     | 1     | 40 | 8       | 9 money + 2 ore  |
-| Stormcaller | Aqua       | 20   | 20     | 1     | 40 | 8       | 9 money + 2 ore  |
+| Banner      | Warriors   | 8    | 10     | 1     | 30 | 0       | 7 money + 2 ore  |
+| Berserker   | Barbarians | 10   | 26     | 1     | 50 | 8       | 10 money + 2 ore |
+| Trapper     | Forest     | 10   | 20     | 1     | 44 | 8       | 6 money + 2 ore  |
+| Stormcaller | Aqua       | 20   | 20     | 1     | 44 | 8       | 6 money + 2 ore  |
 | Stunner     | Sand       | 8    | 20     | 2     | 40 | 10      | 7 money + 2 ore  |
 
 - **Stalker (stealth)** — Spawned visible. Its first move after spawning enables stealth: it becomes invisible to every
@@ -245,7 +245,7 @@ whole game.
 | Water temples | 2     | Water    | Future water temple features                                                            |
 | Forestry      | 1     | —        | Allows building factories on owned land near forests                                    |
 | Forest temple | 2     | Forestry | Future forest temple features                                                           |
-| Science       | 1     | —        | Allows advanced research; cuts the owner's attack miss chance to 5%                     |
+| Science       | 1     | —        | Allows advanced research; cuts the owner's attack miss chance to 5%; farms yield 4 food |
 | Catapult      | 2     | Science  | Allows spawning catapult units (15 money + 10 wood + 3 ore)                             |
 | Roads         | 2     | Forestry | Allows building roads between villages                                                  |
 | Shields       | 1     | —        | Allows spawning shield units                                                            |
@@ -253,6 +253,8 @@ whole game.
 | Riding        | 1     | —        | Allows spawning rider units                                                             |
 | Bridges       | 2     | Riding   | Allows building bridges across water (10 wood + 15 money + 5 stone)                     |
 | Knights       | 2     | Riding   | Allows spawning knight units (14 money + 5 ore)                                         |
+| Agriculture   | 1     | —        | Allows building farms (15 money + 5 wood + 2 stone)                                     |
+| Granary       | 2     | Agriculture | Allows building granaries next to farms (20 money + 10 wood + 10 stone)              |
 
 ## Buildings
 
@@ -266,10 +268,12 @@ support only as many buildings as its level allows: level 1 → 1, level 2 → 2
 | Mine     | 15 money                   | Smithery     | mountain tile                              | +1 stone and +1 ore per level (+1 stone and +1 ore with Geology)                 |
 | Port     | 10 wood + 30 money + 2 ore | Water        | owned water tile adjacent to your own land | none; used to create and upgrade ships                                           |
 | Temple   | 10 stone + 30 money        | Water temple | water tile                                 | none; grows +1 level every 2 turns (max 4); awards 10/15/20/25 score at game end |
+| Farm     | 15 money + 5 wood + 2 stone | Agriculture | own empty land tile (no forest, mountain or water; a road is fine) with no enemy unit on it | +3 food per round (+4 with Science) |
+| Granary  | 20 money + 10 wood + 10 stone | Granary    | own empty land tile next to one of your farms, no enemy unit on it | stores food: starts at 0, +1 per adjacent farm each round |
 
 ## Resources
 
-Four resources: **money**, **wood**, **stone**, **ore**. Starting amounts: 3 wood, 2 stone, 8 money, 0 ore.
+Five resources: **money**, **wood**, **stone**, **ore**, **food**. Starting amounts: 3 wood, 2 stone, 8 money, 0 ore, 40 food.
 
 Income is collected at the end of each round, after all players have taken their turns:
 
@@ -279,6 +283,28 @@ Income is collected at the end of each round, after all players have taken their
 - **Wood** — from factories (see Buildings); also from the *Extract forest* action.
 - **Stone** — from mines (+1 with Geology).
 - **Ore** — from mines (+1 with Geology); used for swordsmen and ports.
+- **Food** — from farms (see Food below); eaten by units. The resource bar shows the stock and, in brackets, the net
+  change per round (farm production minus unit upkeep).
+
+### Food
+
+Every unit raised by a village (its `spawnVillage`) eats food each round: warrior, archer, rider 1; shield 2; swordsman,
+knight, catapult and every tribe special unit 3 (pirates and units with no home village eat nothing).
+
+At the end of each round (after income), for every player:
+
+1. Each granary gains +1 food per adjacent own farm.
+2. Each village's balance is `food from farms on its territory − upkeep of its units`. Surpluses go to the shared stock.
+   Farms (and granaries) stop working while an enemy unit stands on their village.
+3. A village with a deficit draws it from the shared stock (smallest deficits first), then from the granaries on its
+   territory. If that is not enough the village is **starving**: every unit it raised loses 5 HP (never below 1) and
+   the map shows a red "Starvation" label under the village name. The state clears the first round the village is fed.
+
+Farms and granaries are land improvements: they do not use a village's building slots. Catapults destroy them like other
+buildings (2 hp), and an enemy unit standing on one can **burn** it (Burn farm / Burn granary): the building is
+destroyed at once and the unit's whole turn is spent (it may move onto the tile first, but not attack or heal before).
+The selected-cell panel shows the village's food balance, its granaries' stored food, and a red line while starving;
+a selected farm shows its yield and a selected granary shows its stored food.
 
 ## Map
 
