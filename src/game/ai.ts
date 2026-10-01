@@ -532,7 +532,10 @@ function bestAvailableAction(
     const income = buildingIncome(map, player);
     const wanted: SkillId[] = [];
     if (player.resources.wood < BUILDING_COSTS.farm.wood && income.wood === 0) wanted.push('forestry');
-    if (player.resources.stone < BUILDING_COSTS.farm.stone && income.stone === 0) wanted.push('climbing', 'smithery');
+    // Roads (and granaries) need stone: a planned road link with no stone in
+    // sight also heads for the mine skills.
+    const stoneNeeded = foodPlan.roads.length > 0 ? ROAD_COST.stone : BUILDING_COSTS.farm.stone;
+    if (player.resources.stone < stoneNeeded && income.stone === 0) wanted.push('climbing', 'smithery');
     for (const id of wanted) {
       if (hasSkill(player, id) || state.opened.has(id)) continue;
       foodSkillReserve = skillCost(id, player.skills.length);

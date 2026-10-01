@@ -253,7 +253,7 @@ whole game.
 | Riding        | 1     | —        | Allows spawning rider units                                                             |
 | Bridges       | 2     | Riding   | Allows building bridges across water (10 wood + 15 money + 5 stone)                     |
 | Knights       | 2     | Riding   | Allows spawning knight units (14 money + 5 ore)                                         |
-| Agriculture   | 1     | —        | Allows building farms (15 money + 5 wood + 2 stone)                                     |
+| Agriculture   | 1     | —        | Allows building farms (15 money + 5 wood)                                              |
 | Granary       | 2     | Agriculture | Allows building granaries next to farms (20 money + 10 wood + 10 stone)              |
 
 ## Buildings
@@ -268,7 +268,7 @@ support only as many buildings as its level allows: level 1 → 1, level 2 → 2
 | Mine     | 15 money                   | Smithery     | mountain tile                              | +1 stone and +1 ore per level (+1 stone and +1 ore with Geology)                 |
 | Port     | 10 wood + 30 money + 2 ore | Water        | owned water tile adjacent to your own land | none; used to create and upgrade ships                                           |
 | Temple   | 10 stone + 30 money        | Water temple | water tile                                 | none; grows +1 level every 2 turns (max 4); awards 10/15/20/25 score at game end |
-| Farm     | 15 money + 5 wood + 2 stone | Agriculture | own empty land tile (no forest, mountain or water; a road is fine) with no enemy unit on it | +2 food per round (+3 with Science) |
+| Farm     | 15 money + 5 wood | Agriculture | own empty land tile (no forest, mountain or water; a road is fine) with no enemy unit on it | +2 food per round (+3 with Science) |
 | Granary  | 20 money + 10 wood + 10 stone | Granary    | own empty land tile next to one of your farms, no enemy unit on it | stores up to 50 food that adjacent farms did not need; starts at 0 |
 
 ## Resources

@@ -131,7 +131,7 @@ export function buildingHelpLines(map: GameMap, tile: MapTile): string[] {
     case 'farm': {
       return [
         t('help.building.farm.produce', { food: FARM_FOOD, science: FARM_FOOD_SCIENCE }),
-        t('help.building.farm.skill', { money: BUILDING_COSTS.farm.money, wood: BUILDING_COSTS.farm.wood, stone: BUILDING_COSTS.farm.stone }),
+        t('help.building.farm.skill', { money: BUILDING_COSTS.farm.money, wood: BUILDING_COSTS.farm.wood }),
         t('help.building.farm.place'),
       ];
     }

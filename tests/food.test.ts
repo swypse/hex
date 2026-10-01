@@ -122,15 +122,15 @@ describe('farms', () => {
     expect(canBuildFarm(map, t, p)).toBe(true);
   });
 
-  it('cost 15 money, 5 wood and 2 stone and do not use a village building slot', () => {
+  it('cost 15 money and 5 wood (no stone) and do not use a village building slot', () => {
     const { map, p, village: v } = setup();
     p.skills.push('agriculture');
-    expect(BUILDING_COSTS.farm).toEqual({ money: 15, wood: 5, stone: 2, ore: 0, food: 0 });
+    expect(BUILDING_COSTS.farm).toEqual({ money: 15, wood: 5, stone: 0, ore: 0, food: 0 });
     const before = { ...p.resources };
     expect(buildBuilding(map, tileAt(map, 1, 0)!, 'farm', p)).toBe(true);
     expect(p.resources.money).toBe(before.money - 15);
     expect(p.resources.wood).toBe(before.wood - 5);
-    expect(p.resources.stone).toBe(before.stone - 2);
+    expect(p.resources.stone).toBe(before.stone);
     expect(tileAt(map, 1, 0)!.building).toEqual({ kind: 'farm', level: 1 });
     expect(buildingsInVillage(map, v)).toBe(0);
   });
@@ -478,6 +478,10 @@ describe('AI food planning', () => {
 
   it('prefers roads to a surplus village over a farm when the gap is a single tile', () => {
     const { map, p } = setupNetwork(false);
+    const extra = tileAt(map, 3, -2)!; // a second farm: the surplus village has more than a farm's worth
+    extra.ownedBy = 0;
+    extra.claimedByVillage = { q: 3, r: 0 };
+    extra.building = { kind: 'farm', level: 1 };
     p.skills.push('agriculture', 'roads');
     tileAt(map, 1, 0)!.roadOwner = 0; // only (2,0) is missing
     addUnit(map, 'swordsman', 0, 1);

@@ -62,7 +62,7 @@ export const BUILDING_COSTS: Record<BuildingKind, Resources> = {
   port: { wood: 10, stone: 0, money: 30, ore: 2, food: 0 },
   temple: { wood: 0, stone: 10, money: 30, ore: 0, food: 0 },
   forestTemple: { wood: 0, stone: 10, money: 30, ore: 0, food: 0 },
-  farm: { wood: 5, stone: 2, money: 15, ore: 0, food: 0 },
+  farm: { wood: 5, stone: 0, money: 15, ore: 0, food: 0 },
   granary: { wood: 10, stone: 10, money: 20, ore: 0, food: 0 },
 };
 

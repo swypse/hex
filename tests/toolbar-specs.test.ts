@@ -451,7 +451,7 @@ describe('toolbarSpecs', () => {
     const spec = toolbarSpecs().find((a) => a.key === 'farm');
     expect(spec).toBeDefined();
     expect(spec!.disabled).toBe(false);
-    players[0]!.resources.stone = 1;
+    players[0]!.resources.wood = 4;
     expect(toolbarSpecs().find((a) => a.key === 'farm')!.disabled).toBe(true);
   });
 
