@@ -2,6 +2,7 @@ import { Axial, axialKey, hexNeighbors, hexToPixel } from '../game/hex';
 import { GameMap, MapTile } from '../game/map-gen';
 import { portDirection } from '../game/buildings';
 import { isExploredFor } from '../game/explore';
+import { adjacentFarmCount } from '../game/food';
 
 export interface Viewport {
   x: number;
@@ -11,6 +12,12 @@ export interface Viewport {
   height: number;
   /** 0 = default fit view, 1 = fully zoomed out; used to hide detail text. */
   zoomOut?: number;
+}
+
+/** Adjacent own farms of a granary, clamped to the available art (1..6). */
+export function granaryFarmCount(map: GameMap, tile: MapTile): number {
+  if (tile.ownedBy === null) return 1;
+  return Math.min(6, Math.max(1, adjacentFarmCount(map, tile, tile.ownedBy)));
 }
 
 export function tileSignature(
@@ -53,6 +60,7 @@ export function tileSignature(
     tile.building ? tile.building.kind : '',
     tile.building?.kind === 'port' ? (portDirection(map, tile) ?? '-') : '',
     tile.building?.kind === 'temple' || tile.building?.kind === 'forestTemple' ? String(tile.building.level) : '',
+    tile.building?.kind === 'granary' ? String(granaryFarmCount(map, tile)) : '',
     tile.bottle ? tile.bottle.bornTurn : '',
     tile.trap ? `t${tile.trap.owner}` : '',
     tile.roadOwner ?? '-',

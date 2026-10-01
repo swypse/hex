@@ -282,10 +282,29 @@ class GameController {
       newly.forEach((tribeId, i) => {
         const tribe = tribeById(tribeId);
         if (!tribe) return;
+        if (i === 0) this.centerOnMetTribe(tribeId);
         setTimeout(() => useGameStore.getState().setCenterMessage(t('msg.meetTribe', { tribe: tribe.name }), `${tribe.code}-icon.png`), i * 1100);
       });
     }
     this.knownTribeIds = new Set<number>([...this.knownTribeIds, ...current]);
+  }
+
+  /** Centers the camera on a unit or village of a just-met tribe that the local player has explored. */
+  private centerOnMetTribe(tribeId: number): void {
+    if (!this.app || !this.sim) return;
+    const local = useGameStore.getState().localPlayerIndex;
+    const sim = this.sim;
+    const ownedByTribe = (owner: number | null | undefined): boolean =>
+      owner !== null && owner !== undefined && owner >= 0 && sim.players[owner]?.tribe === tribeId;
+    const found = sim.map.tiles.find((tile) => isExploredFor(tile, local) && (ownedByTribe(tile.unit?.owner) || ownedByTribe(tile.settlement?.owner)));
+    if (!found) return;
+    const world = hexToPixel(found, HEX_SIZE);
+    const camera = this.getCamera();
+    void camera.animateTo(
+      { x: this.app.screen.width / 2 - world.x * camera.scale, y: this.mapHeight() / 2 - world.y * camera.scale },
+      true,
+      CAMERA_FOLLOW_MS,
+    );
   }
 
   adoptSnapshot(snap: GameStateSnapshot): void {

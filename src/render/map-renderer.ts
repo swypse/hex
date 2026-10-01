@@ -33,7 +33,7 @@ import {
 import { type TextureSet, type TileTexture } from './texture-factory';
 import { villageTextureFor, villageOwnerTribe } from './village-texture';
 import { acquireVillageBuildTexture, releaseVillageBuildTexture } from './village-build-texture';
-import { tileSignature, tileInView, type Viewport } from './tile-signature';
+import { tileSignature, tileInView, granaryFarmCount, type Viewport } from './tile-signature';
 import { t } from '../i18n';
 import { Tooltip } from '../ui/kit/tooltip';
 import { THEME } from '../ui/kit/theme';
@@ -188,6 +188,10 @@ export class MapView {
   private bounceSprite: Sprite | null = null;
   private bounceBaseY = 0;
   private hexBounceRemove: (() => void) | null = null;
+  /** Last drawn adjacent-farm count of each visible granary, to bounce it when
+   *  a farm built/destroyed next to it swaps its texture. */
+  private granaryFarms = new Map<string, number>();
+  private granaryBounceKeys = new Set<string>();
   private hexBounceSprites: { obj: Sprite | Graphics; baseY: number; delay: number }[] = [];
   /** The current selected-hex border parts (top in the tile el, bottom in the
    *  container); they bounce together with the hex on selection. */
@@ -316,6 +320,8 @@ export class MapView {
     this.graphicsPool = [];
     this.textPool = [];
     this.tileViews.clear();
+    this.granaryFarms.clear();
+    this.granaryBounceKeys.clear();
     this.dealAnchors.clear();
     this.overlayItems.length = 0;
     this.hpBars.clear();
@@ -497,6 +503,7 @@ export class MapView {
     this.startExclamationAnimation();
     this.startFireAnimation();
     this.updateSelectedBounce(selection);
+    this.bounceChangedGranaries();
     this.updateSelectedGlow(selection, hiddenUnitIds, localPlayerIndex, players);
     this.damageBadges.render(players, localPlayerIndex);
   }
@@ -680,8 +687,18 @@ export class MapView {
     this.syncSprite(tv, 'wallSprite', wallTex?.texture ?? null, p.x, y - 2, wallTex?.anchorY ?? 0.5);
     if (tv.wallSprite) tv.wallSprite.visible = explored;
 
+    const tileKey = axialKey(tile);
+    if (explored && tile.building?.kind === 'granary') {
+      const farms = granaryFarmCount(this.map!, tile);
+      const prevFarms = this.granaryFarms.get(tileKey);
+      this.granaryFarms.set(tileKey, farms);
+      if (prevFarms !== undefined && prevFarms !== farms) this.granaryBounceKeys.add(tileKey);
+    } else {
+      this.granaryFarms.delete(tileKey);
+    }
+
     const buildingIsPort = tile.building !== null && tile.building.kind === 'port';
-    const buildingTileTex = tile.building !== null && !buildingIsPort ? this.buildingTexture(tile.building) : null;
+    const buildingTileTex = tile.building !== null && !buildingIsPort ? this.buildingTexture(tile) : null;
     const portTex = buildingIsPort ? this.portTileTexture(tile) : null;
     this.syncSprite(tv, 'buildingSprite', tile.building
       ? buildingIsPort
@@ -930,7 +947,8 @@ export class MapView {
   }
 
   /** Sprite texture of a non-port building. */
-  private buildingTexture(b: NonNullable<MapTile['building']>): TileTexture {
+  private buildingTexture(tile: MapTile): TileTexture {
+    const b = tile.building!;
     const tx = this.textures;
     switch (b.kind) {
       case 'sawmill':
@@ -938,7 +956,7 @@ export class MapView {
       case 'farm':
         return tx.farmTexture;
       case 'granary':
-        return tx.granaryTexture;
+        return tx.granaryTextures[granaryFarmCount(this.map!, tile)]!;
       case 'temple':
         return tx.templeTextures[b.level as 1 | 2 | 3 | 4];
       case 'forestTemple':
@@ -1458,6 +1476,19 @@ export class MapView {
       entries.push({ obj: part.g, baseY: part.g.position.y, delay: 0 });
     }
     this.runHexBounce(entries);
+  }
+
+  /** Plays the selected-hex bounce on granaries whose texture just changed. */
+  private bounceChangedGranaries(): void {
+    if (this.granaryBounceKeys.size === 0) return;
+    const entries: { obj: Sprite | Graphics; baseY: number; delay: number }[] = [];
+    for (const key of this.granaryBounceKeys) {
+      const tv = this.tileViews.get(key);
+      if (!tv) continue;
+      for (const sprite of this.hexSurfaceSprites(tv)) entries.push({ obj: sprite, baseY: sprite.position.y, delay: 0 });
+    }
+    this.granaryBounceKeys.clear();
+    if (entries.length > 0) this.runHexBounce(entries);
   }
 
   bounceHex(q: number, r: number): void {

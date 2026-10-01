@@ -4,13 +4,15 @@ import { makeLabel } from './label';
 import { makeSkillIcon, SKILL_ICON_FILES } from './skill-icons';
 import { THEME } from './theme';
 
+const PRICE_FONT_SIZE = 14;
+
 interface SkillMedallionOpts {
   skill: SkillId;
   opened: boolean;
   /** Text in the top-right badge: the money price, or a checkmark when opened.
    *  Opened medallions omit the badge circle entirely (the orange stroke
-   *  already marks them as researched). */
-  priceText: string;
+   *  already marks them as researched). Omit it to draw no badge at all. */
+  priceText?: string;
   /** Full circle diameter in px (default 40). */
   size?: number;
   /** Glyph bake multiplier for the price text (see `makeLabel`). */
@@ -46,20 +48,20 @@ export function makeSkillMedallion(opts: SkillMedallionOpts): Container {
   const badgeX = Math.round(R * 0.78);
   const badgeY = -Math.round(R * 0.78);
   const badgeR = Math.max(6, Math.round(size * 0.21));
-  if (!opts.opened) {
-    const badge = new Graphics();
-    badge.circle(badgeX, badgeY, badgeR).fill(THEME.skillTree.closedSkillStroke);
-    el.addChild(badge);
-
+  if (!opts.opened && opts.priceText !== undefined) {
     const label = makeLabel(opts.priceText, {
-      fontSize: Math.max(8, Math.round(size * 0.26)),
+      fontSize: PRICE_FONT_SIZE,
       fill: THEME.white,
-      fontWeight: '800',
       bake: opts.textBake,
     });
     label.anchor.set(0.5, 0.5);
     label.position.set(badgeX, badgeY);
-    el.addChild(label);
+
+    // Grow the badge when the text (e.g. a 3-digit price) would not fit.
+    const r = Math.max(badgeR, Math.ceil(Math.max(label.width, label.height) / 2) + 2);
+    const badge = new Graphics();
+    badge.circle(badgeX, badgeY, r).fill(THEME.skillTree.closedSkillStroke);
+    el.addChild(badge, label);
   }
 
   return el;

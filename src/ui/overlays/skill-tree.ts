@@ -11,12 +11,14 @@ import { type UIHost } from '../host';
 import { Button } from '../kit/button';
 import { makeLabel } from '../kit/label';
 import { Popup } from '../kit/popup';
+import { makeRichLabel } from '../kit/rich-label';
+import { makeIcon } from '../kit/icon';
 import { makeIconChip } from '../kit/tribe-chip';
 import { HudResourcePanel } from '../hud/hud-resource-panel';
 import { makeSkillMedallion } from '../kit/skill-medallion';
 import { THEME } from '../kit/theme';
 
-const RING_SPACING = 110;
+const RING_SPACING = 150;
 /** The tree is magnified up to the max zoom: bake its text that many times
  *  larger so it stays sharp when zoomed all the way in. */
 const TREE_TEXT_BAKE = 3;
@@ -375,7 +377,7 @@ export class SkillTree {
       ring.addChild(line);
     }
 
-    const rootChip = makeIconChip(`${tribe.code}-icon.png`, 60, { bgColor: 0xffffff, border: { width: 4, color: THEME.skillTree.openedSkillStroke, alignment: 0 } });
+    const rootChip = makeIconChip(`${tribe.code}-icon.png`, 40, { bgColor: 0xffffff, border: { width: 4, color: THEME.skillTree.openedSkillStroke, alignment: 0 } });
     rootChip.position.set(CX, CY);
     ring.addChild(rootChip);
 
@@ -384,8 +386,8 @@ export class SkillTree {
       const opened = hasSkill(human, id);
       if (!opened && highlight.has(id)) {
         const halo = new Graphics();
-        halo.circle(pos.x, pos.y, 33).stroke({ width: 5, color: 0xffd700, alpha: 0.95 });
-        halo.circle(pos.x, pos.y, 38).stroke({ width: 2, color: 0xffd700, alpha: 0.5 });
+        halo.circle(pos.x, pos.y, 43).stroke({ width: 5, color: 0xffd700, alpha: 0.95 });
+        halo.circle(pos.x, pos.y, 48).stroke({ width: 2, color: 0xffd700, alpha: 0.5 });
         ring.addChild(halo);
       }
       // Skill nodes are intentionally not Pixi-interactive: panning, zooming
@@ -396,7 +398,7 @@ export class SkillTree {
         skill: id,
         opened,
         priceText: opened ? '\u2713' : String(skillCost(id, human.skills.length)),
-        size: 56,
+        size: 72,
         textBake: TREE_TEXT_BAKE,
       });
       medallion.position.set(pos.x, pos.y);
@@ -408,7 +410,7 @@ export class SkillTree {
         bake: TREE_TEXT_BAKE,
       });
       name.anchor.set(0.5, 0.5);
-      name.position.set(pos.x, pos.y + 50);
+      name.position.set(pos.x, pos.y + 58);
       node.addChild(name);
       ring.addChild(node);
     }
@@ -489,32 +491,31 @@ export class SkillTree {
     const medallion = makeSkillMedallion({
       skill: id,
       opened,
-      priceText: opened ? '\u2713' : String(skillCost(id, human.skills.length)),
       size: 48,
     });
     medallion.position.set(coverW - 10 - 24, 10 + 24);
     cover.addChild(medallion);
     content.addChild(cover);
     y = coverH + 8;
-    const desc = makeLabel(info.description, {
-      fontSize: 14,
-      fill: 0xcccccc,
-      wordWrap: true,
-      wordWrapWidth: popup.contentWidth,
-    });
+    const desc = makeRichLabel(info.description, { fontSize: 14, fill: 0xcccccc, width: popup.contentWidth });
     desc.position.set(0, y);
     content.addChild(desc);
     y += desc.height + 12;
 
-    const stateText = opened ? t('skill.opened') : t('skill.cost', { cost: skillCost(id, human.skills.length) });
-    const state = makeLabel(stateText, {
-      fontSize: 14,
-      fill: 0xeeeeee,
-      wordWrap: true,
-      wordWrapWidth: popup.contentWidth
-    });
-    state.position.set(0, y);
-    content.addChild(state);
+    if (opened) {
+      const state = makeLabel(t('skill.opened'), { fontSize: 14, fill: 0xeeeeee, wordWrap: true, wordWrapWidth: popup.contentWidth });
+      state.position.set(0, y);
+      content.addChild(state);
+    } else {
+      const label = makeLabel(t('skill.costLabel'), { fontSize: 14, fill: 0xeeeeee });
+      label.position.set(0, y);
+      const coin = makeIcon('gold-32', 18);
+      coin.anchor.set(0, 0.5);
+      coin.position.set(label.width + 6, y + label.height / 2);
+      const price = makeLabel(String(skillCost(id, human.skills.length)), { fontSize: 14, fill: 0xeeeeee });
+      price.position.set(coin.x + 22, y);
+      content.addChild(label, coin, price);
+    }
 
     this.el.addChild(popup.el);
     this.detailPopup = popup;

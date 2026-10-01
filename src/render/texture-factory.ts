@@ -71,6 +71,10 @@ const FOREST_TEMPLE_TILE_FILES: Record<1 | 2 | 3 | 4, string> = {
   4: 'forest-temple-4',
 };
 
+/** Granary tile art by adjacent farm count (1..6); 0 farms reuses the 1-farm art. */
+export const GRANARY_MAX_FARMS = 6;
+const granaryTileFile = (farms: number): string => (farms <= 1 ? 'granary' : `granary-${farms}`);
+
 const IMAGE_HEX_W = 254;
 const IMAGE_H = 448;
 const IMAGE_HEX_CENTER_Y = 316;
@@ -95,7 +99,8 @@ export interface TextureSet {
   sawmillTexture: TileTexture;
   mineTexture: TileTexture;
   farmTexture: TileTexture;
-  granaryTexture: TileTexture;
+  /** Indexed by adjacent farm count, 1..GRANARY_MAX_FARMS (index 0 unused). */
+  granaryTextures: TileTexture[];
   bridgeTextures: Record<BridgeDir, TileTexture>;
   portTextures: Record<PortDirection, TileTexture>;
   freePortTexture: Texture;
@@ -426,8 +431,11 @@ export async function createTextures(
     makeUnitImageTexture(app, buildingTileTexture('mine'), hexSize) ?? blankTile(0.5);
   const farmTexture =
     makeUnitImageTexture(app, buildingTileTexture('farm'), hexSize) ?? blankTile(0.5);
-  const granaryTexture =
-    makeUnitImageTexture(app, buildingTileTexture('granary'), hexSize) ?? blankTile(0.5);
+  const granaryTextures: TileTexture[] = [];
+  for (let n = 0; n <= GRANARY_MAX_FARMS; n++) {
+    granaryTextures[n] =
+      makeUnitImageTexture(app, buildingTileTexture(granaryTileFile(n)), hexSize) ?? blankTile(0.5);
+  }
   const bridgeTextures = {} as Record<BridgeDir, TileTexture>;
   for (const dir of Object.keys(BRIDGE_TILE_FILES) as BridgeDir[]) {
     const img = buildingTileTexture(BRIDGE_TILE_FILES[dir]);
@@ -494,7 +502,7 @@ export async function createTextures(
     sawmillTexture,
     mineTexture,
     farmTexture,
-    granaryTexture,
+    granaryTextures,
     bridgeTextures,
     portTextures,
     freePortTexture,

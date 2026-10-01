@@ -37,7 +37,7 @@ function buildTextures(map: GameMap): TextureSet {
     sawmillTexture: tileTex(50, 50),
     mineTexture: tileTex(50, 50),
     farmTexture: tileTex(50, 50),
-    granaryTexture: tileTex(50, 50),
+    granaryTextures: Array.from({ length: 7 }, () => tileTex(50, 50)),
     portTextures: { e: unitTex, ne: unitTex, nw: unitTex, w: unitTex, sw: unitTex, se: unitTex },
     bridgeTextures: { nw: unitTex, ne: unitTex, we: unitTex },
     freePortTexture: tex(40, 40),
