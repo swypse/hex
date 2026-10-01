@@ -115,6 +115,7 @@ export function isEnemySiegeTarget(t: MapTile, attackerOwner: number): boolean {
   if (t.settlement && t.settlement.owner !== null && t.settlement.owner !== attackerOwner) return true;
   if (t.building && t.ownedBy !== null && t.ownedBy !== attackerOwner) return true;
   if (t.bridge !== undefined && t.bridge !== null && t.bridge.owner !== attackerOwner) return true;
+  if (t.roadOwner !== null && t.roadOwner !== undefined && t.roadOwner !== attackerOwner) return true;
   return false;
 }
 
@@ -123,7 +124,7 @@ interface SiegeOutcome {
   /** The structure destroyed on a hit: a village level, its wall, a building,
    *  or a bridge. `null` when nothing was hit (or a building was merely
    *  damaged, not destroyed). */
-  destroyed: 'village' | 'wall' | 'building' | 'bridge' | null;
+  destroyed: 'village' | 'wall' | 'building' | 'bridge' | 'road' | null;
   /** Remaining hp of a building hit by the volley (undefined for non-building
    *  or non-damaging hits). */
   buildingHp?: number;
@@ -132,7 +133,8 @@ interface SiegeOutcome {
 /** A catapult volley against a structure tile. Misses apply the same chance as
  *  a regular attack; a hit destroys the target's outermost defence layer:
  *  a built wall first, then the village itself (downgrade -1 level, min 1),
- *  or removes a standalone building / bridge outright. No counter-attack. */
+ *  or removes a standalone building / bridge / road outright (a building on the
+ *  same tile goes before its road). No counter-attack. */
 export function performSiege(catapult: Unit, target: MapTile, rng: () => number = Math.random, missChance: number = MISS_CHANCE): SiegeOutcome {
   catapult.hasAttacked = true;
   if (rng() < missChance) {
@@ -163,6 +165,11 @@ export function performSiege(catapult: Unit, target: MapTile, rng: () => number 
     target.bridge = null;
     target.roadOwner = null;
     return { missed: false, destroyed: 'bridge' };
+  }
+  // A road is hit last: a building on the same tile is destroyed first.
+  if (target.roadOwner !== null && target.roadOwner !== undefined && target.roadOwner !== catapult.owner) {
+    target.roadOwner = null;
+    return { missed: false, destroyed: 'road' };
   }
   // A free/unclaimed structure: the volley still resolves (marks the catapult
   // as attacked) but has no effect.
@@ -213,6 +220,8 @@ export function chooseBestSiegeTarget(map: GameMap, unit: Unit, playerIndex = 0)
       s = 150;
     } else if (t.bridge !== undefined && t.bridge !== null) {
       s = 80;
+    } else {
+      s = 60; // a road
     }
     const dist = hexDistance({ q: unit.q, r: unit.r }, t);
     s += shipAttackDistance(unit) - dist;

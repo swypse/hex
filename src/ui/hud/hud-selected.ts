@@ -3,7 +3,7 @@ import { Circle, Container, Graphics, Rectangle, Text } from 'pixi.js';
 import { gameController } from '../../controller/game-controller';
 import { TRIBES } from '../../game/tribes';
 import { isForestType, isMountainType, isWaterType, TILE_TYPE_NAMES } from '../../game/tile-types';
-import { UNIT_TYPE_NAMES, unitMaintenance, type Unit } from '../../game/units';
+import { UNIT_TYPE_NAMES, unitFoodEaten, unitMaintenance, type Unit } from '../../game/units';
 import { unitCanAct } from '../../game/unit-actions';
 import { tileAt } from '../../game/selection';
 import { attackDamage } from '../../game/combat';
@@ -12,7 +12,7 @@ import { activeBuffs, VILLAGE_DEFENSE } from '../../game/buffs';
 import { isShip } from '../../game/ship';
 import { villageCapacity, villageBuildingLimit, buildingsInVillage, unitsInVillage } from '../../game/village';
 import { villageIncome, VILLAGE_CONNECTION_BONUS } from '../../game/capture';
-import { adjacentFarmCount, farmYield, GRANARY_FOOD_PER_FARM, STARVATION_DAMAGE, villageFood, villageGranaries } from '../../game/food';
+import { farmYield, GRANARY_CAPACITY, STARVATION_DAMAGE, villageFood, villageGranaries } from '../../game/food';
 import { villageUpgradeCost } from '../../game/resources';
 import { buildingYield, buildingHp, canPlaceFoodBuilding, BUILDING_MAX_HP, BUILDING_NAMES, DESTROY_BUILDING_COST } from '../../game/buildings';
 import { TRAP_TURNS } from '../../game/traps';
@@ -154,6 +154,7 @@ export class HudSelected implements Widget {
           { icon: 'attack-32', value: rageBonus > 0 ? `${attackDamage(unit)} +${rageBonus}` : String(attackDamage(unit)) },
           { icon: 'def-32', value: String(unit.defense ?? 0) },
           { icon: 'gold-32', value: String(unitMaintenance(unit)) },
+          ...(unitFoodEaten(unit) > 0 ? [{ icon: 'food-32', value: `-${unitFoodEaten(unit)}` }] : []),
         ],
       };
       lines.push(''); // placeholder — the unit line renders as a composite icon row
@@ -202,10 +203,17 @@ export class HudSelected implements Widget {
       }
       if (settlement.owner === human.index) {
         const food = villageFood(map, tile, human);
-        lines.push(t('hud.selected.foodBalance', { production: food.production, upkeep: food.upkeep, balance: signed(food.balance) }));
+        lines.push(
+          t(food.networkSize > 1 ? 'hud.selected.foodNetwork' : 'hud.selected.foodBalance', {
+            production: food.production,
+            upkeep: food.upkeep,
+            balance: signed(food.balance),
+            n: food.networkSize,
+          }),
+        );
         bolds.push(false);
         if (villageGranaries(map, tile).length > 0) {
-          lines.push(t('hud.selected.villageGranary', { food: food.granaryFood }));
+          lines.push(t('hud.selected.villageGranary', { food: food.granaryFood, cap: villageGranaries(map, tile).length * GRANARY_CAPACITY }));
           bolds.push(false);
         }
       }
@@ -257,8 +265,7 @@ export class HudSelected implements Widget {
       lines.push('');
       bolds.push(true);
       if (b.kind === 'granary') {
-        const farms = tile.ownedBy !== null ? adjacentFarmCount(map, tile, tile.ownedBy) : 0;
-        lines.push(t('hud.selected.granaryFood', { food: b.food ?? 0, gain: farms * GRANARY_FOOD_PER_FARM }));
+        lines.push(t('hud.selected.granaryFood', { food: b.food ?? 0, cap: GRANARY_CAPACITY }));
         bolds.push(false);
       }
     }

@@ -84,6 +84,8 @@ export function captureVillage(
       t.claimedByVillage.r === villageTile.r
     ) {
       t.ownedBy = capturer.owner;
+      // Food stored in a captured granary is lost.
+      if (t.building?.kind === 'granary') t.building.food = 0;
     }
   }
 

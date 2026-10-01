@@ -3,7 +3,6 @@ import { Container } from 'pixi.js';
 import { gameController } from '../../controller/game-controller';
 import { villageIncomeTotal } from '../../game/capture';
 import { buildingIncome } from '../../game/buildings';
-import { foodNetIncome } from '../../game/food';
 import { useGameStore } from '../../store/game-store';
 import { markDirty } from '../../render/render-gate';
 import { type UIHost, type Widget } from '../host';
@@ -47,16 +46,15 @@ export class HudResourcePanel implements Widget {
     this.el.position.set(cx - this.measured / 2, 0);
   };
 
-  private resources(): { money: number; wood: number; stone: number; ore: number; food: number; moneyIncome: number; foodNet: number; building: { wood: number; stone: number; ore: number } } {
+  private resources(): { money: number; wood: number; stone: number; ore: number; food: number; moneyIncome: number; building: { wood: number; stone: number; ore: number } } {
     const s = useGameStore.getState();
     const human = s.players[s.localPlayerIndex];
     const map = gameController.getMap();
     const zero = { wood: 0, stone: 0, ore: 0 };
-    if (!human) return { money: 0, wood: 0, stone: 0, ore: 0, food: 0, moneyIncome: 0, foodNet: 0, building: zero };
+    if (!human) return { money: 0, wood: 0, stone: 0, ore: 0, food: 0, moneyIncome: 0, building: zero };
     const moneyIncome = map ? villageIncomeTotal(map, human.index) : 0;
     const building = map ? buildingIncome(map, human) : zero;
-    const foodNet = map ? foodNetIncome(map, human) : 0;
-    return { money: human.resources.money, wood: human.resources.wood, stone: human.resources.stone, ore: human.resources.ore, food: human.resources.food, moneyIncome, foodNet, building };
+    return { money: human.resources.money, wood: human.resources.wood, stone: human.resources.stone, ore: human.resources.ore, food: human.resources.food, moneyIncome, building };
   }
 
   private update(): void {
@@ -64,7 +62,7 @@ export class HudResourcePanel implements Widget {
     const r = this.resources();
     // The change key includes the incomes too, so income-only changes (spawn,
     // capture, death, skill, building) redraw even when the amounts don't move.
-    const key = [r.money, r.wood, r.stone, r.ore, r.food, r.foodNet, r.moneyIncome, r.building.wood, r.building.stone, r.building.ore].join(',');
+    const key = [r.money, r.wood, r.stone, r.ore, r.food, r.moneyIncome, r.building.wood, r.building.stone, r.building.ore].join(',');
     if (key === this.lastKey) return;
     this.lastKey = key;
     markDirty();
@@ -77,13 +75,15 @@ export class HudResourcePanel implements Widget {
     const padSide = 6;
     const padTop = 10;
     const cy = padTop + iconSize / 2;
+    // Food is only the starting reserve; once it is spent the row disappears.
+    // Farm and granary food is shown per village in the selected-cell panel.
     const rows = [
       { key: 'money', icon: 'gold-32', value: `${r.money}`, income: r.moneyIncome > 0 ? ` (+${r.moneyIncome})` : '' },
       { key: 'wood', icon: 'wood-32', value: `${r.wood}`, income: r.building.wood > 0 ? ` (+${r.building.wood})` : '' },
       { key: 'stone', icon: 'stone-32', value: `${r.stone}`, income: r.building.stone > 0 ? ` (+${r.building.stone})` : '' },
       { key: 'ore', icon: 'ore-32', value: `${r.ore}`, income: r.building.ore > 0 ? ` (+${r.building.ore})` : '' },
-      { key: 'food', icon: 'food-32', value: `${r.food}`, income: r.foodNet > 0 ? ` (+${r.foodNet})` : r.foodNet < 0 ? ` (${r.foodNet})` : '' },
-    ];
+      { key: 'food', icon: 'food-32', value: `${r.food}`, income: '' },
+    ].filter((row) => row.key !== 'food' || r.food > 0);
 
     let x = padSide;
     for (const row of rows) {
@@ -120,7 +120,7 @@ export class HudResourcePanel implements Widget {
     if (!this.host) return;
     const r = this.resources();
     const info = RESOURCE_TOOLTIPS[resource];
-    const income = resource === 'money' ? r.moneyIncome : resource === 'food' ? r.foodNet : r.building[resource];
+    const income = resource === 'money' ? r.moneyIncome : resource === 'food' ? 0 : r.building[resource];
     const amount = r[resource];
     if (this.popup) {
       this.popup.destroy();

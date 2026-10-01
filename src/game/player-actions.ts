@@ -15,6 +15,7 @@ import {
   canBuildFarm,
   canBuildGranary,
   canBurnBuilding,
+  canBurnRoad,
   BUILDING_COSTS,
 } from './buildings';
 import { canBuildRoad, ROAD_COST, villageConnectedNodes } from './roads';
@@ -41,7 +42,8 @@ export function hasAnyAvailableAction(map: GameMap, player: Player, turn: number
         (canMove(unit) && reachableTargets(map, unit, undefined, canClimb, canDock, player.index).length > 0) ||
         (canAttack(unit) && attackableTargets(map, unit, player.index).length > 0) ||
         canHeal(unit) ||
-        canBurnBuilding(tile, unit)
+        canBurnBuilding(tile, unit) ||
+        canBurnRoad(tile, unit)
       ) {
         return true;
       }

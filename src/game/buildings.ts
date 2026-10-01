@@ -178,6 +178,31 @@ export function canBurnBuilding(tile: MapTile, unit: Unit): boolean {
   return (unit.stunTurns ?? 0) < 1;
 }
 
+/** Whether `unit` may destroy the enemy road it stands on: it must not have
+ *  moved, attacked or healed this turn (the action takes the whole turn), and a
+ *  burnable enemy food building on the tile has to go first. */
+export function canBurnRoad(tile: MapTile, unit: Unit): boolean {
+  if (tile.unit !== unit) return false;
+  if (tile.roadOwner === null || tile.roadOwner === undefined || tile.roadOwner === unit.owner) return false;
+  if (unit.owner < 0 || unit.shipLevel !== undefined) return false;
+  if (unit.hasMoved || unit.hasAttacked || unit.hasHealed) return false;
+  if ((unit.stunTurns ?? 0) >= 1) return false;
+  const foodFirst = isFoodBuilding(tile.building) && tile.ownedBy !== null && tile.ownedBy !== undefined && tile.ownedBy !== unit.owner;
+  return !foodFirst;
+}
+
+/** Destroys the road (and a bridge carrying it) under the unit and spends its
+ *  whole turn. */
+export function burnRoad(tile: MapTile, unit: Unit): boolean {
+  if (!canBurnRoad(tile, unit)) return false;
+  tile.roadOwner = null;
+  tile.bridge = null;
+  unit.hasMoved = true;
+  unit.hasAttacked = true;
+  unit.hasHealed = true;
+  return true;
+}
+
 /** Destroys the food building under the unit and spends its whole turn. */
 export function burnBuilding(tile: MapTile, unit: Unit): boolean {
   if (!canBurnBuilding(tile, unit)) return false;

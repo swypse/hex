@@ -7,7 +7,8 @@ import { Player } from './players';
 import { canAfford, moneyCost, pay, villageUpgradeCost, type Resources } from './resources';
 import { canOpenSkill, hasSkill, skillCost, SkillId } from './skills';
 import { reachableTargets, tileAt } from './selection';
-import { foodNetIncome, foodPressure, canSustainUnit, eatsFarmMaterials } from './food';
+import { foodNetworkStates, networkStateOfTile, foodPressure, canSustainUnit, eatsFarmMaterials } from './food';
+import { planFoodFixes } from './ai-food';
 import { canHeal, unitSpawnCost, UNIT_TYPES, Unit } from './units';
 import { SeededRandom } from '../util/random';
 import { buildingsInVillage, villageBuildingLimit } from './village';
@@ -127,6 +128,10 @@ export function formatAiAction(a: AiAction): string {
     case 'builderBuild':
       return `builderBuild ${a.unitId} ${a.kind} (${a.q},${a.r})`;
   }
+}
+
+function axialKeyOf(t: { q: number; r: number }): string {
+  return key(t.q, t.r);
 }
 
 function key(q: number, r: number): string {
@@ -293,7 +298,7 @@ function bestAvailableAction(
           const reserveOk = urgent || freeVillageToGrab || after.money >= directivesReserve(directives, difficulty);
           // A unit the food stock cannot carry would only starve: hold back
           // unless the village itself is in danger.
-          const foodOk = urgent || canSustainUnit(map, player, type);
+          const foodOk = urgent || canSustainUnit(map, player, type, 6, v);
           if (reserveOk && foodOk) {
             candidates.push({ score: (urgent ? 500 : 250) + jitter(), action: { type: 'spawn', q: v.q, r: v.r, unitType: type } });
           }
@@ -426,6 +431,22 @@ function bestAvailableAction(
     }
   }
 
+  // Food is planned per network of connected villages: each starving network
+  // either gets a farm or a road to a network with a surplus, whichever is
+  // cheaper per food gained.
+  const foodStates = foodNetworkStates(map, player);
+  const foodPlan = planFoodFixes(map, player, foodStates);
+  for (const { tile, pressure } of foodPlan.roads) {
+    if (state.built.has(key(tile.q, tile.r))) continue;
+    if (!canBuildRoad(map, tile, player)) continue;
+    candidates.push({ score: (pressure === 'urgent' ? 650 : 450) + jitter(), action: { type: 'buildRoad', q: tile.q, r: tile.r } });
+  }
+  for (const { tile, pressure } of foodPlan.ports) {
+    if (state.built.has(key(tile.q, tile.r))) continue;
+    if (!canBuildPort(map, tile, player) || !canAfford(player.resources, BUILDING_COSTS.port)) continue;
+    candidates.push({ score: (pressure === 'urgent' ? 650 : 450) + jitter(), action: { type: 'build', q: tile.q, r: tile.r, kind: 'port' } });
+  }
+
   for (const tile of map.tiles) {
     if (tile.ownedBy !== player.index) continue;
     if (state.built.has(key(tile.q, tile.r))) continue;
@@ -438,12 +459,13 @@ function bestAvailableAction(
       candidates.push({ score: 500 + jitter(), action: { type: 'build', q: tile.q, r: tile.r, kind: 'mine' } });
     }
     if (canBuildFarm(map, tile, player) && canAfford(player.resources, BUILDING_COSTS.farm)) {
-      const pressure = foodPressure(map, player);
-      const net = foodNetIncome(map, player);
-      const farmScore = pressure === 'urgent' ? 650 : pressure === 'low' ? 450 : net < 2 ? 260 : 0;
+      const net = networkStateOfTile(foodStates, tile);
+      const roadFirst = net !== undefined && foodPlan.linkFirst.has(axialKeyOf(net.villages[0]!));
+      const pressure = net?.pressure ?? foodPressure(map, player);
+      const farmScore = roadFirst ? 0 : pressure === 'urgent' ? 650 : pressure === 'low' ? 450 : (net?.balance ?? 0) < 2 ? 260 : 0;
       if (farmScore > 0) candidates.push({ score: farmScore + jitter(), action: { type: 'build', q: tile.q, r: tile.r, kind: 'farm' } });
     }
-    if (canBuildGranary(map, tile, player) && canAfford(player.resources, BUILDING_COSTS.granary) && foodNetIncome(map, player) >= 0) {
+    if (canBuildGranary(map, tile, player) && canAfford(player.resources, BUILDING_COSTS.granary) && (networkStateOfTile(foodStates, tile)?.balance ?? 0) > 0) {
       candidates.push({ score: 120 + jitter(), action: { type: 'build', q: tile.q, r: tile.r, kind: 'granary' } });
     }
     if (canBuildPort(map, tile, player) && canAfford(player.resources, BUILDING_COSTS.port)) {

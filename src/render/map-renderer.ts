@@ -7,6 +7,7 @@ import {
 } from '../game/hex';
 import { tileMapByKey, type GameMap, type MapTile } from '../game/map-gen';
 import { bridgeCoastOffsets } from '../game/bridges';
+import { GRANARY_CAPACITY } from '../game/food';
 import { portDirection, buildingHp, BUILDING_MAX_HP } from '../game/buildings';
 import { Player } from '../game/players';
 import { Selection } from '../game/selection';
@@ -117,6 +118,8 @@ interface HpBarSpec {
   label: string;
   dim: boolean;
   bonus: number;
+  /** The unit gets too little food: show a red S before the hp text. */
+  starving?: boolean;
 }
 
 /** A persistent unit/building hp bar: a white 62x12 box holding an orange
@@ -132,6 +135,8 @@ interface HpBarEntry {
   labelBg: Graphics;
   bonusIcon: Sprite | null;
   bonusText: BitmapText | null;
+  /** Red "S" on black before the hp text of a starving unit. */
+  starveTag: { text: BitmapText; bg: Graphics } | null;
   greenW: number;
   ghostW: number;
   greenAnim: { from: number; to: number; start: number } | null;
@@ -375,6 +380,7 @@ export class MapView {
     const hpBarSpecs: HpBarSpec[] = [];
     const buildingHpBarSpecs: HpBarSpec[] = [];
     const labels: { tile: MapTile; owner: number; el: Container; world: { x: number; y: number } }[] = [];
+    const granaryLabels: { tile: MapTile; owner: number; world: { x: number; y: number } }[] = [];
     const exclamations: { el: Container; world: { x: number; y: number } }[] = [];
     const shipBobs: { sprite: Sprite; key: string; baseY: number }[] = [];
 
@@ -407,6 +413,7 @@ export class MapView {
             label: `${hp}/${maxHp}${unit.owner === localPlayerIndex && localTurn && canAct ? ' •' : ''}${stunned ? ' stunned' : ''}${raging ? ' rage' : ''}`,
             dim: unit.owner === localPlayerIndex && (!localTurn || !canAct),
             bonus: attackBonus(unit, map),
+            starving: unit.starving === true,
           });
         }
         if (unit.type === 'pirate' || unit.shipLevel !== undefined) {
@@ -447,8 +454,11 @@ export class MapView {
           tile,
           owner: tile.settlement.owner,
           el: new Container(),
-          world: { x: p.x, y: y + this.hexSize * 0.35 + 15 }
+          world: { x: p.x, y: y + this.hexSize * 0.35 + 5 }
         });
+      }
+      if (tile.building?.kind === 'granary' && tile.ownedBy !== null && tile.ownedBy !== undefined && explored && !detailHidden) {
+        granaryLabels.push({ tile, owner: tile.ownedBy, world: { x: p.x, y: y + this.hexSize * 0.35 + 5 } });
       }
       if (tile.settlement && tile.settlement.captureReady && tile.unit && tile.unit.owner !== tile.settlement.owner && explored) {
         const el = new Container();
@@ -487,6 +497,7 @@ export class MapView {
       this.addVillageLabel(l.tile, l.owner, l.el, l.world, players);
       this.addUnitMirror(l.tile);
     }
+    for (const g of granaryLabels) this.addGranaryLabel(g.tile, g.owner, g.world, players);
     // HP bars come after village labels so a unit's bar + text always render on
     // top of a village name label on the same tile.
     this.syncHpBars([...hpBarSpecs, ...buildingHpBarSpecs]);
@@ -502,7 +513,7 @@ export class MapView {
     this.startShipBob();
     this.startExclamationAnimation();
     this.startFireAnimation();
-    this.updateSelectedBounce(selection);
+    this.updateSelectedBounce(selection, localPlayerIndex);
     this.bounceChangedGranaries();
     this.updateSelectedGlow(selection, hiddenUnitIds, localPlayerIndex, players);
     this.damageBadges.render(players, localPlayerIndex);
@@ -1432,7 +1443,7 @@ export class MapView {
     this.bounceSprite = null;
   }
 
-  private updateSelectedBounce(selection: Selection | null): void {
+  private updateSelectedBounce(selection: Selection | null, localPlayerIndex: number): void {
     if (!this.map) return;
     const key = selection ? axialKey(selection) : '';
     if (key === this.lastBouncedKey) return;
@@ -1460,6 +1471,22 @@ export class MapView {
             sprites.push(s);
             delayed.add(s);
           }
+        }
+      }
+    }
+    // Selecting own village also lifts the hexes (and units) of the units it
+    // raised, so it is clear at a glance which units belong to it.
+    if (tile?.settlement && tile.settlement.owner === localPlayerIndex) {
+      for (const t of this.map.tiles) {
+        const sv = t.unit?.spawnVillage;
+        if (!t.unit || t.unit.owner !== localPlayerIndex || !sv || sv.q !== tile.q || sv.r !== tile.r) continue;
+        const unitView = this.tileViews.get(axialKey(t));
+        if (!unitView) continue;
+        const group = this.hexSurfaceSprites(unitView);
+        if (unitView.unitSprite && !unitView.unitSprite.destroyed && unitView.unitSprite.visible) group.push(unitView.unitSprite);
+        for (const s of group) {
+          sprites.push(s);
+          delayed.add(s);
         }
       }
     }
@@ -2013,6 +2040,7 @@ export class MapView {
       labelBg,
       bonusIcon,
       bonusText,
+      starveTag: null,
       // A bar is born at the unit's actual hp, not full: a unit that already
       // shows damage (e.g. 20/40) must not render a 100% bar until something
       // else changes.
@@ -2037,6 +2065,37 @@ export class MapView {
       bar.label.height,
     ).fill({ color: 0x000000, alpha });
     this.hpLabelHeight = bar.label.height;
+    this.updateStarveTag(bar, spec, alpha);
+  }
+
+  /** Keeps the red "S" starvation tag before the hp text in sync with the unit. */
+  private updateStarveTag(bar: HpBarEntry, spec: HpBarSpec, alpha: number): void {
+    if (!spec.starving) {
+      if (bar.starveTag) {
+        bar.starveTag.text.parent?.removeChild(bar.starveTag.text);
+        bar.starveTag.bg.parent?.removeChild(bar.starveTag.bg);
+        bar.starveTag.text.destroy();
+        bar.starveTag.bg.destroy();
+        bar.starveTag = null;
+      }
+      return;
+    }
+    if (!bar.starveTag) {
+      const text = this.takeText('S', { fontSize: 13, fill: 0xff4d4d, fontFamily: FONT_REGULAR });
+      text.anchor.set(1, 1);
+      text.zIndex = 1;
+      const bg = this.takeGraphics();
+      bg.zIndex = 0;
+      bar.el.addChild(bg);
+      bar.el.addChild(text);
+      bar.starveTag = { text, bg };
+    }
+    const { text, bg } = bar.starveTag;
+    const right = bar.label.x - bar.label.width / 2 - 4;
+    text.position.set(right, bar.label.y);
+    bg.clear()
+      .rect(right - text.width - 2, bar.label.y - bar.label.height, text.width + 4, bar.label.height)
+      .fill({ color: 0x000000, alpha });
   }
 
   private drawHpBars(bar: HpBarEntry): void {
@@ -2263,6 +2322,34 @@ export class MapView {
     this.overlay.addChild(mirror);
     this.unitMirrors.push(mirror);
     this.mirroredKeys.add(axialKey(tile));
+  }
+
+  /** Stored food of a granary (`food/capacity`) in the village name style: white
+   *  text on a plate in the owner's tribe colour. */
+  private addGranaryLabel(tile: MapTile, owner: number, world: { x: number; y: number }, players: Player[]): void {
+    const tribe = players[owner] ? tribeById(players[owner]!.tribe) : undefined;
+    if (!tribe) return;
+    const el = new Container();
+    const label = this.takeText(`${tile.building?.food ?? 0}/${GRANARY_CAPACITY}`, {
+      fontSize: VILLAGE_LABEL_FONT_SIZE,
+      fill: 0xffffff,
+      fontFamily: FONT_REGULAR,
+    });
+    label.anchor.set(0.5, 0.5);
+    label.zIndex = 1;
+    const padX = 4;
+    const bg = this.takeGraphics();
+    bg.zIndex = 0;
+    bg.roundRect(-label.width / 2 - padX, -label.height / 2 - 1, label.width + padX * 2, label.height + 2, 2).fill(
+      territoryColor(tribe, this.knownOwners.has(owner)),
+    );
+    el.sortableChildren = true;
+    el.zIndex = OVERLAY_Z_VILLAGE_LABEL;
+    el.addChild(bg);
+    el.addChild(label);
+    el.position.set(world.x, world.y);
+    this.overlay.addChild(el);
+    this.overlayItems.push({ el, world });
   }
 
   private addVillageLabel(

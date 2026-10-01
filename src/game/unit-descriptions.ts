@@ -1,4 +1,4 @@
-import { UNIT_TYPE_NAMES, UNIT_TYPES, Unit, UnitType, unitMaintenance } from './units';
+import { UNIT_TYPE_NAMES, UNIT_TYPES, Unit, UnitType, unitFoodEaten, unitMaintenance } from './units';
 import { SHIP_ATTACK, SHIP_ATTACK_DISTANCE, SHIP_MOVE_POINTS, SHIP_UPGRADE_COST, shipMovePoints } from './ship';
 import { t } from '../i18n';
 
@@ -58,7 +58,7 @@ interface UnitHelpStat {
   text: string;
 }
 
-/** The five stat rows shown in the unit info popup, using current ship-level
+/** The stat rows (a sixth, food eaten, only for units that eat) shown in the unit info popup, using current ship-level
  *  values when the unit is a ship (movement/attack/upkeep by level). */
 export function unitHelpStats(unit: Unit): UnitHelpStat[] {
   const movement = unit.shipLevel !== undefined ? shipMovePoints(unit) : UNIT_TYPES[unit.type].movePoints;
@@ -66,12 +66,14 @@ export function unitHelpStats(unit: Unit): UnitHelpStat[] {
   const hp = UNIT_TYPES[unit.type].maxHp;
   const upkeep = unitMaintenance(unit);
   const defense = unit.defense ?? 0;
+  const food = unitFoodEaten(unit);
   return [
     { icon: 'move-32', text: t('help.stat.movement', { n: movement }) },
     { icon: 'attack-32', text: t('help.stat.attack', { n: attack }) },
     { icon: 'hp-32', text: t('help.stat.hp', { n: hp }) },
     { icon: 'gold-32', text: t('help.stat.upkeep', { n: upkeep }) },
     { icon: 'def-32', text: t('help.stat.defense', { n: defense }) },
+    ...(food > 0 ? [{ icon: 'food-32', text: t('help.stat.food', { n: food }) }] : []),
   ];
 }
 

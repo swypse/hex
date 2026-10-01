@@ -75,6 +75,14 @@ describe('unit help stat rows', () => {
     expect(rows.find((r) => r.icon === 'gold-32')!.text).toBe('3 upkeep');
   });
 
+  it('adds a food row only for units raised by a village', () => {
+    const u = unit('swordsman');
+    expect(unitHelpStats(u).some((r) => r.icon === 'food-32')).toBe(false);
+    u.spawnVillage = { q: 0, r: 0 };
+    const rows = unitHelpStats(u);
+    expect(rows[rows.length - 1]).toEqual({ icon: 'food-32', text: 'Eats 3 food per round' });
+  });
+
   it('reports zero upkeep for a pirate', () => {
     const rows = unitHelpStats(unit('pirate'));
     expect(rows.find((r) => r.icon === 'gold-32')!.text).toBe('0 upkeep');

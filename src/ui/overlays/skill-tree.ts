@@ -103,8 +103,8 @@ export class SkillTree {
   mount(host: UIHost, root: Container): void {
     this.host = host;
     this.fitScale = Math.min(host.app.screen.width / 900, host.app.screen.height / 760, 1);
-    // Open the tree at 1.8x zoom, keeping the ring centred on the screen.
-    this.zoom = 1.8;
+    // Open the tree at 1.3x zoom, keeping the ring centred on the screen.
+    this.zoom = 1.3;
     const scale = this.fitScale * this.zoom;
     this.pan = {
       x: host.app.screen.width / 2 - CX * scale,

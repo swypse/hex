@@ -357,6 +357,15 @@ export class EventPresenter {
           case 'trapPlaced':
             this.host.render();
             break;
+          case 'roadBurned': {
+            this.host.render();
+            const roadTile = tileAt(sim.map, e.q, e.r);
+            if (e.owner === local && e.playerIndex !== local) {
+              useGameStore.getState().setCenterMessage(t('msg.roadBurned'));
+            }
+            if (roadTile && isExploredFor(roadTile, local)) this.host.mapView()?.bounceHex(e.q, e.r);
+            break;
+          }
           case 'burned': {
             this.host.render();
             const victim = tileAt(sim.map, e.q, e.r)?.ownedBy;

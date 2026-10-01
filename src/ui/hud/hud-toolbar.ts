@@ -31,6 +31,7 @@ const ICON_ACTIONS: Record<string, string> = {
   granary: 'granary',
   'burn-farm': 'burn-farm',
   'burn-granary': 'burn-granary',
+  'burn-road': 'burn-road',
   road: 'road',
   bridge: 'bridge',
   bonus: 'bonus',

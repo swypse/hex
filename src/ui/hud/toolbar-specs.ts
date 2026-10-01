@@ -3,7 +3,7 @@ import { gameController } from '../../controller/game-controller';
 import { useGameStore } from '../../store/game-store';
 import { tileAt } from '../../game/selection';
 import { canAfford, moneyCost, villageUpgradeCost } from '../../game/resources';
-import { canBuildSawmill, canBuildFarm, canBuildGranary, canBurnBuilding, canBuildForestTemple, canBuildMine, canBuildPort, canBuildTemple, BUILDING_COSTS, canRepairBuilding, REPAIR_COST, canAffordAnyBuilderBuild } from '../../game/buildings';
+import { canBuildSawmill, canBuildFarm, canBuildGranary, canBurnBuilding, canBurnRoad, canBuildForestTemple, canBuildMine, canBuildPort, canBuildTemple, BUILDING_COSTS, canRepairBuilding, REPAIR_COST, canAffordAnyBuilderBuild } from '../../game/buildings';
 import { canHeal, canDisband, disbandCost, hasPirateDeal, PIRATE_DEAL_COST, UNIT_TYPES, UNIT_TYPE_NAMES } from '../../game/units';
 import { SHIP_UPGRADE_COST, canUpgradeShip } from '../../game/ship';
 import { unitsInVillage, villageCapacity, canBuildWall, WALL_COST } from '../../game/village';
@@ -146,6 +146,9 @@ export function toolbarSpecs(): ToolbarSpec[] {
     }
     if (canBurnBuilding(tile, unit) && tile.building) {
       out.push({ key: `burn-${tile.building.kind}`, label: t(tile.building.kind === 'farm' ? 'action.burnFarm' : 'action.burnGranary'), disabled: false, onClick: () => gameController.burnSelected() });
+    }
+    if (canBurnRoad(tile, unit)) {
+      out.push({ key: 'burn-road', label: t('action.burnRoad'), disabled: false, onClick: () => gameController.burnRoadSelected() });
     }
     if (unit.type === 'stormcaller' && stormEligible(map, unit)) {
       out.push({ key: 'storm', label: t('action.storm'), disabled: !idle, onClick: () => gameController.stormSelected() });

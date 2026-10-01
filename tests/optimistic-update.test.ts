@@ -33,6 +33,7 @@ describe('predictable command types', () => {
       'buildRoad',
       'buildWall',
       'burn',
+      'burnRoad',
       'capture',
       'deal',
       'destroyBuilding',

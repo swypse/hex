@@ -89,6 +89,8 @@ export interface Unit {
   firstMoveStealthDone?: boolean;
   /** Turns the unit is stunned; >= 1 means it cannot act. */
   stunTurns?: number;
+  /** Set while the unit gets less food than it eats (it takes starvation damage). */
+  starving?: boolean;
 }
 
 export const UNIT_MOVE_POINTS: Record<UnitType, number> = {
@@ -188,6 +190,11 @@ const UNIT_FOOD_UPKEEP: Record<UnitType, number> = {
 /** Per-turn food upkeep of a unit type. */
 export function unitFoodUpkeep(type: UnitType): number {
   return UNIT_FOOD_UPKEEP[type];
+}
+
+/** Food a concrete unit eats per round: nothing when it has no home village. */
+export function unitFoodEaten(unit: Pick<Unit, 'type' | 'spawnVillage'>): number {
+  return unit.spawnVillage ? UNIT_FOOD_UPKEEP[unit.type] : 0;
 }
 
 /** Money upkeep a ship costs its home village each turn, by ship level. */

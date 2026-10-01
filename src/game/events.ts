@@ -19,7 +19,7 @@ export interface AttackUnitPre {
 export type GameEvent =
   | { type: 'unitMoved'; unitId: string; from: Axial; path: Axial[]; to: Axial; shipLevel?: 1 | 2 | 3 }
   | { type: 'attack'; attackerId: string; targetId: string; attackerIndex: number; targetIndex: number; attackerTile: Axial; targetTile: Axial; attackerDamage: number; targetDamage: number; missed: boolean; attackerDied: boolean; targetDied: boolean; attackerPre?: AttackUnitPre; targetPre?: AttackUnitPre }
-  | { type: 'siege'; attackerId: string; attackerIndex: number; targetIndex: number; targetTile: Axial; missed: boolean; destroyed: 'village' | 'wall' | 'building' | 'bridge' | null; buildingHp?: number }
+  | { type: 'siege'; attackerId: string; attackerIndex: number; targetIndex: number; targetTile: Axial; missed: boolean; destroyed: 'village' | 'wall' | 'building' | 'bridge' | 'road' | null; buildingHp?: number }
   | { type: 'spawned'; unitType: UnitType; q: number; r: number; playerIndex: number }
   | { type: 'captured'; q: number; r: number; oldOwner: number | null; newOwner: number; ownerDied: boolean }
   | { type: 'villageUpgraded'; q: number; r: number; level: number; playerIndex: number }
@@ -48,6 +48,7 @@ export type GameEvent =
   | { type: 'stealthRevealed'; unitId: string; q: number; r: number }
   | { type: 'stalkerSpotted'; unitId: string; villageQ: number; villageR: number }
   | { type: 'trapPlaced'; q: number; r: number; playerIndex: number }
+  | { type: 'roadBurned'; unitId: string; q: number; r: number; playerIndex: number; owner: number }
   | { type: 'burned'; unitId: string; kind: 'farm' | 'granary'; q: number; r: number; playerIndex: number }
   | { type: 'starvation'; q: number; r: number; playerIndex: number; units: { q: number; r: number; damage: number }[] }
   | { type: 'trapTriggered'; q: number; r: number; targetId: string; damage: number; attackerIndex: number }

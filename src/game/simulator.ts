@@ -1,7 +1,7 @@
 import { planAiActions, logAiTurnStart, aiLoggingEnabled, formatAiAction, type AiActionMarker } from './ai';
 import type { AiAction } from './ai-types';
-import { applyFood } from './food';
-import { buildingIncome, buildBuilding, burnBuilding, buildBuildingIgnoringSkill, canUsePort, repairBuilding, destroyBuilding, builderBuildable, type BuilderBuildKind } from './buildings';
+import { applyFood, refreshStarving } from './food';
+import { buildingIncome, buildBuilding, burnBuilding, burnRoad, buildBuildingIgnoringSkill, canUsePort, repairBuilding, destroyBuilding, builderBuildable, type BuilderBuildKind } from './buildings';
 import { captureVillage, setCaptureReady, villageIncomeTotal } from './capture';
 import { attackableTargets, missChanceFor, performAttack, performSiege } from './combat';
 import { buildBridge, buildBridgeIgnoringSkill } from './bridges';
@@ -41,6 +41,7 @@ export type Command =
   | { type: 'repair'; q: number; r: number }
   | { type: 'destroyBuilding'; q: number; r: number }
   | { type: 'burn'; unitId: string }
+  | { type: 'burnRoad'; unitId: string }
   | { type: 'buildWall'; q: number; r: number }
   | { type: 'buildRoad'; q: number; r: number }
   | { type: 'buildBridge'; q: number; r: number }
@@ -71,6 +72,7 @@ export const PREDICTABLE_COMMAND_TYPES: ReadonlySet<Command['type']> = new Set([
   'repair',
   'destroyBuilding',
   'burn',
+  'burnRoad',
   'buildWall',
   'buildRoad',
   'buildBridge',
@@ -168,8 +170,28 @@ export class Simulator {
     this.emit({ type: 'turnStarted', playerIndex: 0, turn: this.turn });
   }
 
+  /** Farms + granaries and units on the map: changes whenever food supply or
+   *  demand does (built, destroyed, spawned, disbanded or killed), plus village
+   *  owners (a capture moves farms, granaries and upkeep between players) and
+   *  roads/ports (they join or split food networks). */
+  private foodSignature(): string {
+    let buildings = 0;
+    let units = 0;
+    let owners = '';
+    let roads = 0;
+    for (const t of this.map.tiles) {
+      if (t.settlement) owners += `${t.settlement.owner ?? '-'}`;
+      if (t.roadOwner !== null && t.roadOwner !== undefined) roads++;
+      if (t.building?.kind === 'port') roads++;
+      if (t.building?.kind === 'farm' || t.building?.kind === 'granary') buildings++;
+      if (t.unit) units++;
+    }
+    return `${buildings},${units},${owners},${roads}`;
+  }
+
   applyCommand(cmd: Command): boolean {
     let ok = false;
+    const foodBefore = this.foodSignature();
     switch (cmd.type) {
       case 'move':
         ok = this.doMove(cmd.unitId, cmd.q, cmd.r);
@@ -196,6 +218,9 @@ export class Simulator {
         break;
       case 'burn':
         ok = this.doBurn(cmd.unitId);
+        break;
+      case 'burnRoad':
+        ok = this.doBurnRoad(cmd.unitId);
         break;
       case 'buildWall':
         ok = this.doBuildWall(cmd.q, cmd.r);
@@ -255,6 +280,12 @@ export class Simulator {
       case 'forfeit':
         ok = this.doForfeit(cmd.playerIndex);
         break;
+    }
+    // A farm or granary, or a unit (a mouth to feed), appeared or disappeared:
+    // re-evaluate starving villages.
+    const foodChanged = this.foodSignature() !== foodBefore;
+    if (ok && cmd.type !== 'endTurn' && foodChanged) {
+      for (const player of this.players) if (player.isActive) refreshStarving(this.map, player);
     }
     this.syncDiscoveries();
     if (ok && !this.gameOver) this.evaluateAchievementsForAll();
@@ -588,6 +619,7 @@ export class Simulator {
       const targetIndex =
         target.settlement ? target.settlement.owner ?? PIRATE_OWNER
         : target.bridge !== null && target.bridge !== undefined ? target.bridge.owner
+        : target.roadOwner !== null && target.roadOwner !== undefined && target.roadOwner !== attacker.owner && !(target.building && target.ownedBy !== null && target.ownedBy !== attacker.owner) ? target.roadOwner
         : target.ownedBy !== null ? target.ownedBy ?? PIRATE_OWNER
         : PIRATE_OWNER;
       const outcome = performSiege(attacker, target, this.rng, missChanceFor(attackerPlayer));
@@ -791,6 +823,18 @@ export class Simulator {
     const player = this.currentPlayer;
     if (!destroyBuilding(this.map, tile, player)) return false;
     this.emit({ type: 'buildingDestroyed', q, r, playerIndex: player.index });
+    return true;
+  }
+
+  /** A unit standing on an enemy road destroys it, spending its whole turn. */
+  private doBurnRoad(unitId: string): boolean {
+    const unit = this.findUnit(unitId);
+    if (!unit || unit.owner !== this.currentPlayerIndex) return false;
+    const tile = tileAt(this.map, unit.q, unit.r);
+    if (!tile) return false;
+    const owner = tile.roadOwner;
+    if (owner === null || owner === undefined || !burnRoad(tile, unit)) return false;
+    this.emit({ type: 'roadBurned', unitId, q: tile.q, r: tile.r, playerIndex: unit.owner, owner });
     return true;
   }
 

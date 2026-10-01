@@ -1078,6 +1078,17 @@ class GameController {
     this.sendCommand({ type: 'burn', unitId: unit.id });
   }
 
+  /** The selected unit destroys the enemy road it stands on. */
+  burnRoadSelected(): void {
+    const store = useGameStore.getState();
+    if (store.aiActive) return;
+    const selection = store.selection;
+    if (!selection || selection.kind !== 'unit' || !this.sim) return;
+    const unit = tileAt(this.sim.map, selection.q, selection.r)?.unit;
+    if (!unit) return;
+    this.sendCommand({ type: 'burnRoad', unitId: unit.id });
+  }
+
   repairSelectedBuilding(): void {
     const store = useGameStore.getState();
     if (store.aiActive) return;
