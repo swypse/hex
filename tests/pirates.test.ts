@@ -414,3 +414,102 @@ describe('Pirates', () => {
     expect(turnEvents.some((e) => e.type === 'pirateCapture')).toBe(true);
   });
 });
+
+describe('Pirate target tribes', () => {
+  type PirateInternals = { pirateTargetTile(u: Unit): ReturnType<typeof tileAt> | null };
+
+  function setup(playerCount: number): { sim: Simulator; pirate: Unit; internals: PirateInternals } {
+    const map = makeWaterMap(5);
+    const players = buildPlayers(Tribe.Villagers, playerCount - 1, new SeededRandom(1));
+    // One unit per tribe on land, at growing distance from the pirate at the edge.
+    const spots: [number, number][] = [[0, 0], [1, 0], [2, 0], [3, 0]];
+    players.forEach((p, i) => {
+      const [q, r] = spots[i]!;
+      tileAt(map, q, r)!.unit = makeUnit(`u${i}`, p.index, 'warrior', q, r);
+    });
+    const pirate = makePirate('pirate-1', 5, 0);
+    tileAt(map, 5, 0)!.unit = pirate;
+    const sim = new Simulator(map, players, 'turns30', { rng: () => 0.5 });
+    sim.startGame();
+    return { sim, pirate, internals: sim as unknown as PirateInternals };
+  }
+
+  const targetOwner = (internals: PirateInternals, pirate: Unit): number | undefined => {
+    internals.pirateTargetTile(pirate);
+    return pirate.pirateTarget;
+  };
+
+  it('hunts the nearest tribe first and sticks to it until it has attacked three times', () => {
+    const { pirate, internals } = setup(4);
+    expect(targetOwner(internals, pirate)).toBe(3);
+    pirate.pirateAttacks = 2;
+    expect(targetOwner(internals, pirate)).toBe(3);
+  });
+
+  it('after three attacks it picks another tribe that is not among its last two', () => {
+    const { pirate, internals } = setup(4);
+    expect(targetOwner(internals, pirate)).toBe(3);
+    pirate.pirateAttacks = 3;
+    expect(targetOwner(internals, pirate)).toBe(2);
+    expect(pirate.pirateAttacks).toBe(0);
+    pirate.pirateAttacks = 3;
+    // tribes 3 and 2 are remembered: the choice is between 0 and 1, nearest 1
+    expect(targetOwner(internals, pirate)).toBe(1);
+    expect(pirate.pirateTribes).toEqual([2, 1]);
+    pirate.pirateAttacks = 3;
+    // the first tribe (3) may come back only now, after two cycles
+    expect(targetOwner(internals, pirate)).toBe(3);
+    expect(pirate.pirateTribes).toEqual([1, 3]);
+  });
+
+  it('can return to the first tribe after two attack cycles', () => {
+    const { pirate, internals } = setup(4);
+    internals.pirateTargetTile(pirate); // 3
+    for (const expected of [2, 1]) {
+      pirate.pirateAttacks = 3;
+      expect(targetOwner(internals, pirate)).toBe(expected);
+    }
+    pirate.pirateAttacks = 3;
+    expect(targetOwner(internals, pirate)).toBe(3); // 3 is nearer than 0
+  });
+
+  it('with two players it just alternates between the tribes', () => {
+    const { pirate, internals } = setup(2);
+    expect(targetOwner(internals, pirate)).toBe(1);
+    for (const expected of [0, 1, 0]) {
+      pirate.pirateAttacks = 3;
+      expect(targetOwner(internals, pirate)).toBe(expected);
+    }
+  });
+
+  it('switches at once when its tribe has no units left', () => {
+    const { sim, pirate, internals } = setup(4);
+    expect(targetOwner(internals, pirate)).toBe(3);
+    tileAt(sim.map, 3, 0)!.unit = null;
+    expect(targetOwner(internals, pirate)).toBe(2);
+  });
+
+  it('counts every attack and then turns to the new tribe, moving toward it', () => {
+    const { sim, pirate } = setup(4);
+    const act = (sim as unknown as { pirateAct(u: Unit): void }).pirateAct.bind(sim);
+    // in range of tribe 3's unit: three attacks on it
+    const map = sim.map;
+    tileAt(map, 5, 0)!.unit = null;
+    tileAt(map, 4, 0)!.terrain = TileType.Water;
+    tileAt(map, 4, 0)!.unit = pirate;
+    pirate.q = 4;
+    pirate.r = 0;
+    for (let i = 0; i < 3; i++) {
+      pirate.hp = PIRATE_HP;
+      tileAt(map, 3, 0)!.unit!.hp = 9999;
+      act(pirate);
+    }
+    expect(pirate.pirateTarget).toBe(3);
+    expect(pirate.pirateAttacks).toBe(3);
+    act(pirate);
+    expect(pirate.pirateTarget).toBe(2); // the nearest tribe that is not tribe 3
+    expect(pirate.pirateTribes).toEqual([3, 2]);
+    // tribe 2's unit is 2 hexes from the pirate: it is attacked, counting from zero again
+    expect(pirate.pirateAttacks).toBe(1);
+  });
+});

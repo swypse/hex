@@ -91,6 +91,12 @@ export interface Unit {
   stunTurns?: number;
   /** Set while the unit gets less food than it eats (it takes starvation damage). */
   starving?: boolean;
+  /** Pirate: the player (tribe) it is currently hunting. */
+  pirateTarget?: number;
+  /** Pirate: attacks made on the current target tribe. */
+  pirateAttacks?: number;
+  /** Pirate: the last tribes it hunted (at most two, newest last); a new target is never taken from it. */
+  pirateTribes?: number[];
 }
 
 export const UNIT_MOVE_POINTS: Record<UnitType, number> = {

@@ -88,6 +88,11 @@ export const PREDICTABLE_COMMAND_TYPES: ReadonlySet<Command['type']> = new Set([
   'storm',
 ]);
 
+/** Attacks a pirate makes on one tribe before it turns to another. */
+const PIRATE_ATTACKS_PER_TRIBE = 3;
+/** How many of its latest target tribes a pirate remembers (never re-picked). */
+const PIRATE_TRIBE_MEMORY = 2;
+
 export class Simulator {
   readonly map: GameMap;
   players: Player[];
@@ -1340,14 +1345,62 @@ export class Simulator {
     this.emit({ type: 'pirateSpawned', q: spot.q, r: spot.r });
   }
 
+  /** Whether the pirate may hunt this tribe: it is alive, has a unit on the map
+   *  and no pirate deal. */
+  private pirateCanHunt(pirate: Unit, owner: number): boolean {
+    const player = this.players[owner];
+    if (!player || !player.isActive || hasPirateDeal(pirate, owner)) return false;
+    return this.map.tiles.some((t) => t.unit && t.unit.owner === owner);
+  }
+
+  /** Picks the tribe a pirate hunts next: the nearest one that is not among its
+   *  last two targets. When every candidate is on that list (two players, or
+   *  few tribes left) it takes any other tribe. */
+  private pickPirateTribe(pirate: Unit): number | undefined {
+    const recent = pirate.pirateTribes ?? [];
+    const eligible = this.players.map((p) => p.index).filter((i) => i !== pirate.pirateTarget && this.pirateCanHunt(pirate, i));
+    const fresh = eligible.filter((i) => !recent.includes(i));
+    const pool = fresh.length > 0 ? fresh : eligible;
+    let best: number | undefined;
+    let bestDist = Infinity;
+    for (const i of pool) {
+      const tile = this.nearestPlayerUnitTo(pirate, i);
+      const d = tile ? hexDistance(pirate, tile) : Infinity;
+      if (d < bestDist) {
+        bestDist = d;
+        best = i;
+      }
+    }
+    if (best === undefined && pirate.pirateTarget !== undefined && this.pirateCanHunt(pirate, pirate.pirateTarget)) {
+      return pirate.pirateTarget; // the only tribe left: keep hunting it
+    }
+    return best;
+  }
+
+  /** The tile of the unit a pirate goes for. A pirate hunts one tribe at a time
+   *  and switches to another after PIRATE_ATTACKS_PER_TRIBE attacks (or when
+   *  its tribe is gone). */
+  private pirateTargetTile(pirate: Unit): MapTile | null {
+    const spent = (pirate.pirateAttacks ?? 0) >= PIRATE_ATTACKS_PER_TRIBE;
+    if (pirate.pirateTarget === undefined || spent || !this.pirateCanHunt(pirate, pirate.pirateTarget)) {
+      const next = this.pickPirateTribe(pirate);
+      if (next === undefined) return null;
+      if (next !== pirate.pirateTarget) pirate.pirateTribes = [...(pirate.pirateTribes ?? []), next].slice(-PIRATE_TRIBE_MEMORY);
+      pirate.pirateTarget = next;
+      pirate.pirateAttacks = 0;
+    }
+    return this.nearestPlayerUnitTo(pirate, pirate.pirateTarget);
+  }
+
   private pirateAct(unit: Unit): void {
-    const target = this.nearestPlayerUnitTo(unit);
+    const target = this.pirateTargetTile(unit);
     if (!target) {
       this.pirateMoveRandom(unit);
       return;
     }
     const dist = hexDistance(unit, target);
     if (dist <= unit.attackDistance) {
+      unit.pirateAttacks = (unit.pirateAttacks ?? 0) + 1;
       const isShip = target.unit && target.unit.shipLevel !== undefined && target.unit.owner >= 0;
       // Ships can only be captured from an adjacent hex.
       if (isShip && dist === 1) {
@@ -1426,11 +1479,12 @@ export class Simulator {
     this.emit({ type: 'unitMoved', unitId: unit.id, from, path: steps, to });
   }
 
-  private nearestPlayerUnitTo(unit: Unit): MapTile | null {
+  private nearestPlayerUnitTo(unit: Unit, owner?: number): MapTile | null {
     let best: MapTile | null = null;
     let bestDist = Infinity;
     for (const t of this.map.tiles) {
       if (!t.unit || t.unit.owner < 0) continue;
+      if (owner !== undefined && t.unit.owner !== owner) continue;
       if (hasPirateDeal(unit, t.unit.owner)) continue;
       const d = hexDistance(unit, t);
       if (d < bestDist) {

@@ -120,8 +120,12 @@ its own artwork and its own spawn-popup icon (`action-spawn-<type>`).
   again until the next turn.
 - **Pirates:** neutral units that belong to no tribe. From turn 7 onward, on every odd turn, there is a 15% chance a
   pirate spawns on an edge water cell. Pirates have 50 move points on sea only, attack 15 at range 3, defense 5 and 80
-  HP. If any pirate is on the map, they take their turn after all players, attacking the nearest player unit (ship or
-  land) or moving toward it. A pirate adjacent to a ship tries to **capture** it with a 25% success chance: on success
+  HP. If any pirate is on the map, they take their turn after all players. Each pirate hunts one tribe at a time (the one
+  with the nearest unit when it appears): it attacks that tribe's nearest unit (ship or land) or moves toward it. After
+  **3 attacks** on the same tribe it picks another tribe and heads for that tribe's units. It remembers its last two
+  target tribes and never picks from them, so it can come back to the first tribe only after two attack cycles; with two
+  players it simply switches to the other tribe. A pirate also switches when its tribe has no units left or has a deal
+  with it. A pirate adjacent to a ship tries to **capture** it with a 25% success chance: on success
   the ship becomes a pirate ship (keeping its HP and damage); on failure the pirate loses 2 HP and the ship loses 1 HP.
   Killing a pirate gives 30 points.
 - **Bottles:** floating message-in-a-bottle treasures. Every third turn there is a 10% chance a bottle floats onto a
