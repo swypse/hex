@@ -2,7 +2,7 @@ import { axialKey, hexNeighbors } from './hex';
 import { GameMap, MapTile, tileMapByKey } from './map-gen';
 import { Player } from './players';
 import { Resources } from './resources';
-import { canAffordAt, payAt } from './stock';
+import { canAffordAt, payAt, villagesJoinedBy } from './stock';
 import { tileAt } from './selection';
 import { hasSkill } from './skills';
 import { isIceType, isWaterType } from './tile-types';
@@ -121,7 +121,7 @@ export function canBuildRoad(
 ): boolean {
   if (!hasSkill(player, 'roads')) return false;
   if (!canBuildRoadHere(map, tile, player, connectedNodes)) return false;
-  return canAffordAt(map, player, tile, ROAD_COST);
+  return canAffordAt(map, player, tile, ROAD_COST, villagesJoinedBy(map, player.index, tile));
 }
 
 /** Terrain/ownership preconditions for a road on this tile, without requiring
@@ -151,7 +151,7 @@ export function canBuildRoadHere(
 
 export function buildRoad(map: GameMap, tile: MapTile, player: Player): boolean {
   if (!canBuildRoad(map, tile, player)) return false;
-  if (!payAt(map, player, tile, ROAD_COST)) return false;
+  if (!payAt(map, player, tile, ROAD_COST, villagesJoinedBy(map, player.index, tile))) return false;
   tile.roadOwner = player.index;
   return true;
 }

@@ -407,7 +407,8 @@ describe('starving state on capture', () => {
   it('capturing a village re-evaluates it for its new owner', () => {
     const { map, p } = setup();
     const target = tileAt(map, 0, 3)!;
-    target.settlement = { owner: 1, level: 1, captureReady: true };
+    // Some wood but no food: not "empty", so the capture grants no starting stock.
+    target.settlement = { owner: 1, level: 1, captureReady: true, stock: { wood: 1, stone: 0, ore: 0, food: 0 } };
     target.ownedBy = 1;
     target.claimedByVillage = { q: 0, r: 3 };
     const cap = makeUnit('cap', 0, 'warrior', 0, 3); // becomes the village's unit: 1 food a round

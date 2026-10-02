@@ -288,11 +288,13 @@ village starts with nothing.
 Who pays for what: an action done in or on a village's territory (a building, repair, spawn, village upgrade, wall, port
 or ship upgrade, bridge, road, trap) draws its wood, stone, ore and food from that village's network, taking from the
 village itself first and then from the rest of the network (most developed first). On land no village claims, the
-nearest own village pays. Skills, disbanding and pirate deals cost money only. An action is available only if the money
+nearest own village pays. A road also draws on the networks it joins: the materials of every own village linked to
+the new tile's neighbouring villages, roads and ports count, after the paying village's own network. Skills, disbanding and pirate deals cost money only. An action is available only if the money
 and the network's materials cover it.
 
 A **captured** village keeps its stock, so the captor gets it, and a captured village's granaries keep their food for
-the captor. A village captured empty has none.
+the captor. A village captured with nothing in stock (a free village, or an enemy one that ran dry) starts like a
+capital: 3 wood, 2 stone, 0 ore and 25 food (no money).
 
 Income is collected at the end of each round, after all players have taken their turns:
 

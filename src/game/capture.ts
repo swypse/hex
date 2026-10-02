@@ -2,6 +2,8 @@ import { GameMap, MapTile } from './map-gen';
 import { Unit, unitMaintenance } from './units';
 import { villageCapacity, unitsInVillage, exploreVillageSight } from './village';
 import { isVillageRoadConnected } from './roads';
+import { START_STOCK } from './resources';
+import { readStock, stockOf } from './stock';
 
 export function setCaptureReady(villageTile: MapTile, ready: boolean): void {
   if (villageTile.settlement) {
@@ -87,6 +89,10 @@ export function captureVillage(
       t.ownedBy = capturer.owner;
     }
   }
+
+  // A village captured with nothing in stock starts like a capital (no money).
+  const held = readStock(villageTile);
+  if (Object.values(held).every((n) => n === 0)) Object.assign(stockOf(villageTile), START_STOCK);
 
   exploreVillageSight(map, villageTile, capturer.owner);
 

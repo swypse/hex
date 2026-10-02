@@ -1,4 +1,4 @@
-import { axialKey, hexDistance } from './hex';
+import { axialKey, hexDistance, hexNeighbors } from './hex';
 import type { GameMap, MapTile } from './map-gen';
 import type { Player } from './players';
 import type { Resources, Stock } from './resources';
@@ -109,27 +109,78 @@ export function payerVillage(map: GameMap, ownerIndex: number, tile: MapTile): M
   return best;
 }
 
+/** Own villages whose networks a new road/port node on `tile` would join: the
+ *  villages in the components of its neighbouring own villages, roads and ports. */
+export function villagesJoinedBy(map: GameMap, ownerIndex: number, tile: MapTile): MapTile[] {
+  const byKey = tileMapByKey(map);
+  const comps = roadNetworkComponents(map, ownerIndex);
+  const out: MapTile[] = [];
+  for (const n of hexNeighbors(tile)) {
+    const k = axialKey(n);
+    const comp = comps.find((c) => c.has(k));
+    if (!comp) continue;
+    for (const ck of comp) {
+      const t = byKey.get(ck);
+      if (t?.settlement?.owner === ownerIndex && !out.includes(t)) out.push(t);
+    }
+  }
+  return out;
+}
+
+/** The villages whose stock pays for something at `where`: the payer village's
+ *  network first, then the networks of `joined` villages. */
+function payPool(map: GameMap, payer: MapTile, joined: MapTile[]): MapTile[] {
+  const pool = villageNetwork(map, payer);
+  for (const j of joined) {
+    for (const v of villageNetwork(map, j)) if (!pool.includes(v)) pool.push(v);
+  }
+  return pool;
+}
+
+function poolStock(pool: MapTile[]): Stock {
+  const total = emptyStock();
+  for (const v of pool) {
+    const s = readStock(v);
+    for (const k of KEYS) total[k] += s[k];
+  }
+  return total;
+}
+
 /** Whether `player` can pay `cost` for something done on `where`: the money
- *  from the player, the materials from the payer village's network. */
-export function canAffordAt(map: GameMap, player: Player, where: MapTile, cost: Resources): boolean {
+ *  from the player, the materials from the payer village's network (plus the
+ *  networks of `joined` villages, for a road that links them). */
+export function canAffordAt(
+  map: GameMap,
+  player: Player,
+  where: MapTile,
+  cost: Resources,
+  joined: MapTile[] = [],
+): boolean {
   if (player.resources.money < cost.money) return false;
   const needsStock = KEYS.some((k) => cost[k] > 0);
   if (!needsStock) return true;
   const village = payerVillage(map, player.index, where);
   if (!village) return false;
-  const have = networkStock(map, village);
+  const have = poolStock(payPool(map, village, joined));
   return KEYS.every((k) => have[k] >= cost[k]);
 }
 
 /** Charges `cost` for something done on `where`. Materials come from the payer
- *  village first, then from the rest of its network (most developed first).
- *  Returns false, changing nothing, when it cannot be afforded. */
-export function payAt(map: GameMap, player: Player, where: MapTile, cost: Resources): boolean {
-  if (!canAffordAt(map, player, where, cost)) return false;
+ *  village first, then from the rest of its network (most developed first),
+ *  then from the `joined` villages' networks. Returns false, changing nothing,
+ *  when it cannot be afforded. */
+export function payAt(
+  map: GameMap,
+  player: Player,
+  where: MapTile,
+  cost: Resources,
+  joined: MapTile[] = [],
+): boolean {
+  if (!canAffordAt(map, player, where, cost, joined)) return false;
   player.resources.money -= cost.money;
   const village = payerVillage(map, player.index, where);
   if (!village) return true;
-  const pool = villageNetwork(map, village);
+  const pool = payPool(map, village, joined);
   for (const k of KEYS) {
     let left = cost[k];
     for (const v of pool) {

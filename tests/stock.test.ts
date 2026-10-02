@@ -7,6 +7,7 @@ import { Tribe } from '../src/game/tribes';
 import { TileType } from '../src/game/tile-types';
 import { SeededRandom } from '../src/util/random';
 import { Simulator } from '../src/game/simulator';
+import { buildRoad, canBuildRoad } from '../src/game/roads';
 import { captureVillage } from '../src/game/capture';
 import { applyFood } from '../src/game/food';
 import { BUILDING_COSTS, buildBuilding, buildingIncomeByVillage, networkBuildingIncome } from '../src/game/buildings';
@@ -215,7 +216,7 @@ describe('capturing a village', () => {
     expect(granary.building!.food).toBe(30);
   });
 
-  it('a village captured empty starts with no stock', () => {
+  it('a village captured empty gets the capital starting stock, but no money', () => {
     const map = makeTestMap(4);
     const village = tileAt(map, 0, 0)!;
     village.settlement = { owner: null, level: 1, captureReady: true };
@@ -223,7 +224,83 @@ describe('capturing a village', () => {
     const capturer = makeUnit('c', 0, 'warrior', 0, 0);
     village.unit = capturer;
     captureVillage(map, village, capturer);
-    expect(readStock(village)).toEqual({ wood: 0, stone: 0, ore: 0, food: 0 });
+    expect(readStock(village)).toEqual(START_STOCK);
+  });
+
+  it('an enemy village with an all-zero stock also gets the starting stock', () => {
+    const map = makeTestMap(4);
+    const village = tileAt(map, 0, 0)!;
+    village.settlement = { owner: 1, level: 1, captureReady: true, stock: { wood: 0, stone: 0, ore: 0, food: 0 } };
+    village.claimedByVillage = { q: 0, r: 0 };
+    const capturer = makeUnit('c', 0, 'warrior', 0, 0);
+    village.unit = capturer;
+    captureVillage(map, village, capturer);
+    expect(readStock(village)).toEqual(START_STOCK);
+  });
+
+  it('the starting stock is a copy, not shared between villages', () => {
+    const map = makeTestMap(4);
+    const village = tileAt(map, 0, 0)!;
+    village.settlement = { owner: null, level: 1, captureReady: true };
+    village.claimedByVillage = { q: 0, r: 0 };
+    const capturer = makeUnit('c', 0, 'warrior', 0, 0);
+    village.unit = capturer;
+    captureVillage(map, village, capturer);
+    addStock(village, { wood: -3 });
+    expect(START_STOCK.wood).toBe(3);
+  });
+});
+
+describe('road paid by the networks it joins', () => {
+  /** A (0,0) holds the wood and is linked by roads (1,0),(2,0); B (4,0) is
+   *  empty and unlinked. Tile (3,0) lies in B's territory next to both. */
+  function roadScene() {
+    const s = scene(false);
+    for (const q of [1, 2]) {
+      const t = tileAt(s.map, q, 0)!;
+      t.roadOwner = 0;
+      t.ownedBy = 0;
+    }
+    const target = tileAt(s.map, 3, 0)!;
+    target.ownedBy = 0;
+    target.claimedByVillage = { q: 4, r: 0 };
+    s.p.skills = ['forestry', 'roads'];
+    return { ...s, target };
+  }
+
+  it('is paid from the connected village when the claiming village is empty', () => {
+    const { map, a, b, p, target } = roadScene();
+    addStock(a, { wood: 5, stone: 2 });
+    expect(canBuildRoad(map, target, p)).toBe(true);
+    expect(buildRoad(map, target, p)).toBe(true);
+    expect(readStock(a)).toEqual({ wood: 0, stone: 0, ore: 0, food: 0 });
+    expect(readStock(b)).toEqual({ wood: 0, stone: 0, ore: 0, food: 0 });
+    expect(p.resources.money).toBe(40);
+  });
+
+  it('takes the claiming village stock first, then the joined network', () => {
+    const { map, a, b, p, target } = roadScene();
+    addStock(b, { wood: 2, stone: 2 });
+    addStock(a, { wood: 4 });
+    expect(buildRoad(map, target, p)).toBe(true);
+    expect(readStock(b)).toEqual({ wood: 0, stone: 0, ore: 0, food: 0 });
+    expect(readStock(a).wood).toBe(1);
+  });
+
+  it('is refused when the joined networks together cannot pay', () => {
+    const { map, a, p, target } = roadScene();
+    addStock(a, { wood: 4, stone: 2 });
+    expect(canBuildRoad(map, target, p)).toBe(false);
+    expect(buildRoad(map, target, p)).toBe(false);
+    expect(readStock(a).wood).toBe(4);
+    expect(p.resources.money).toBe(50);
+  });
+
+  it('does not use the stock of a network the tile does not touch', () => {
+    const { map, a, p, target } = roadScene();
+    tileAt(map, 2, 0)!.roadOwner = null;
+    addStock(a, { wood: 5, stone: 2 });
+    expect(canBuildRoad(map, target, p)).toBe(false);
   });
 });
 
