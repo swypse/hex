@@ -4,7 +4,7 @@ import { Player } from './players';
 import { canAfford, pay, Resources } from './resources';
 import { tileAt } from './selection';
 import { hasSkill } from './skills';
-import { isWaterType } from './tile-types';
+import { isIceType, isWaterType } from './tile-types';
 import { portWaterClusterJumps } from './water-roads';
 
 export const ROAD_COST: Resources = { wood: 5, stone: 2, money: 10, ore: 0, food: 0 };
@@ -107,7 +107,7 @@ export function canBuildRoadHere(
   // Roads may only cross the player's own or unclaimed territory, never an
   // enemy's.
   if (tile.ownedBy !== null && tile.ownedBy !== player.index) return false;
-  if (isWaterType(tile.terrain)) return false;
+  if (isWaterType(tile.terrain) || isIceType(tile.terrain)) return false;
   if (tile.settlement !== null) return false;
   if (tile.building !== null && tile.building.kind === 'port') return false;
   if (tile.unit !== null && tile.unit.owner !== player.index) return false;

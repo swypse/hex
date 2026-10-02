@@ -63,6 +63,12 @@ describe('coastWaterBrightness', () => {
     expect(coastWaterBrightness(open, find)).toBe(1);
   });
 
+  it('does not brighten water that only touches ice', () => {
+    const iceMap = new Map<string, { terrain: TileType }>([['1,0', { terrain: TileType.Ice }]]);
+    const findIce = (q: number, r: number) => iceMap.get(`${q},${r}`) as MapTile | undefined;
+    expect(coastWaterBrightness(water, findIce)).toBe(1);
+  });
+
   it('keeps land tiles at factor 1', () => {
     expect(coastWaterBrightness(land, find)).toBe(1);
   });

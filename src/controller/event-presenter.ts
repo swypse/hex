@@ -69,6 +69,7 @@ const INSTANT_EVENTS: ReadonlySet<GameEvent['type']> = new Set<GameEvent['type']
   'skillOpened',
   'shipUpgraded',
   'shipReverted',
+  'seasonChanged',
   'scoreFly',
   'knightCombo',
   'achievementUnlocked',
@@ -423,6 +424,25 @@ export class EventPresenter {
               await this.spawnProjectile(from, to, tex, 26);
             }
             if (!e.missed) this.host.render();
+            break;
+          }
+          case 'seasonChanged': {
+            this.host.render();
+            const store = useGameStore.getState();
+            // Units lost to melting ice (and pirate ships lost to freezing)
+            // are already gone from the sim: play their death burst in place.
+            const lost = [...e.killed, ...e.removed.map((p) => ({ q: p.q, r: p.r }))];
+            let burst = false;
+            for (const k of lost) {
+              const kt = tileAt(sim.map, k.q, k.r);
+              if (kt && isExploredFor(kt, local)) {
+                this.spawnDeath(kt);
+                burst = true;
+              }
+            }
+            if (burst) await sleep(COMBAT_DEATH_GAP_MS);
+            if (e.killed.some((k) => k.owner === local)) store.setCenterMessage(t('msg.iceMelted'));
+            else if (e.landed.some((l) => l.owner === local)) store.setCenterMessage(t('msg.iceLanded'));
             break;
           }
           case 'turnStarted':

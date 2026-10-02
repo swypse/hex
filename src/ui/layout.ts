@@ -9,6 +9,8 @@ export const ACTION_TOOLBAR_MAX_WIDTH = 600;
 export const SCORE_PAD = 8;
 export const SCORE_TOP_OFFSET = 20;
 export const SCORE_CHIP_RADIUS = 20;
+/** Vertical centre of the score text (and the season label), below the resource panel row. */
+export const SCORE_TEXT_Y = 48;
 /** Gap between the chip bottom and the score text below it. */
 export const SCORE_TEXT_CHIP_GAP = 6;
 /** Height of the score text (font size) below the chip. */

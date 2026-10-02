@@ -3,14 +3,16 @@ import {
 } from 'pixi.js';
 import { axialKey, HEX_TILT, hexNeighbors } from '../game/hex';
 import { tileMapByKey, type BridgeDir, type GameMap, type MapTile } from '../game/map-gen';
-import { isWaterType, TileType, TILE_TYPE_COLORS } from '../game/tile-types';
+import { isSolidGround, isWaterType, TileType, TILE_TYPE_COLORS } from '../game/tile-types';
 import { TRIBES, Tribe } from '../game/tribes';
 import { UnitType, UNIT_IMAGE_FILES, UNIT_TYPES } from '../game/units';
 import { PortDirection } from '../game/buildings';
 import { shadeColor } from '../util/color';
 import { tileElevation } from './elevation';
 import { ensureCanvasResource } from './image-texture';
-import { ensureTerrainAtlas, terrainFrameTexture, TERRAIN_TILE_FILES, TERRAIN_FOG_FILE } from './terrain-atlas';
+import type { Season } from '../game/season';
+import { countIceTiles } from '../game/ice';
+import { ensureTerrainAtlas, terrainFrameTexture, terrainTileTexture, TERRAIN_TILE_FILES, TERRAIN_FOG_FILE } from './terrain-atlas';
 import { buildingTileTexture, ensureBuildingsAtlas } from './buildings-atlas';
 import { ensureTribeAtlas, tribeTileTexture } from './tribe-atlas';
 import { ensureActionButtonAtlas, actionButtonFrameTexture } from '../ui/kit/action-button-icons';
@@ -40,6 +42,7 @@ const TERRAIN_SIDE_COLORS: Partial<Record<TileType, { left: number; right: numbe
   [TileType.RainforestForest]: { left: 0x859f1f, right: 0x1f3c08 },
   [TileType.RainforestMountain]: { left: 0x859f1f, right: 0x1f3c08 },
   [TileType.Water]: { left: 0x1f63a1, right: 0x174167 },
+  [TileType.Ice]: { left: 0x8fb8d0, right: 0x6f93ad },
 };
 
 const BRIDGE_TILE_FILES: Record<BridgeDir, string> = {
@@ -85,6 +88,10 @@ export interface TileTexture {
 }
 
 export interface TextureSet {
+  /** Season the terrain tile textures were baked for (spring when absent). */
+  season?: Season;
+  /** Number of ice tiles on the map when baked (0 when absent). */
+  iceTiles?: number;
   tileTextures: Map<string, TileTexture>;
   fogTextures: Map<string, TileTexture>;
   fogTopTexture: TileTexture;
@@ -149,7 +156,7 @@ export function coastWaterBrightness(
   if (!isWaterType(tile.terrain)) return 1;
   for (const n of hexNeighbors(tile)) {
     const nbr = findNeighbor(n.q, n.r);
-    if (nbr && !isWaterType(nbr.terrain)) return COAST_WATER_BRIGHTNESS;
+    if (nbr && isSolidGround(nbr.terrain)) return COAST_WATER_BRIGHTNESS;
   }
   return 1;
 }
@@ -256,11 +263,11 @@ function loadImageTexture(url: string): Promise<Texture | null> {
   });
 }
 
-async function loadTileImages(): Promise<Map<string, Texture>> {
+async function loadTileImages(season: Season): Promise<Map<string, Texture>> {
   await ensureTerrainAtlas();
   const map = new Map<string, Texture>();
   for (const [key, frameKey] of Object.entries(TERRAIN_TILE_FILES)) {
-    const tex = terrainFrameTexture(frameKey);
+    const tex = terrainTileTexture(frameKey, season);
     if (tex) map.set(key, tex);
   }
   const fog = terrainFrameTexture(TERRAIN_FOG_FILE);
@@ -333,8 +340,10 @@ export async function createTextures(
   hexSize = 40,
   /** Tribes present in this game. Only their atlases are loaded. */
   activeTribes: ReadonlySet<Tribe> = new Set(TRIBES.map((t) => t.id)),
+  /** Season whose terrain tile variants are baked. */
+  season: Season = 'spring',
 ): Promise<TextureSet> {
-  const images = await loadTileImages();
+  const images = await loadTileImages(season);
   await ensureBuildingsAtlas();
   const tileTextures = new Map<string, TileTexture>();
   const fogTextures = new Map<string, TileTexture>();
@@ -487,6 +496,8 @@ export async function createTextures(
     await service.ensureLoaded();
   }
   return {
+    season,
+    iceTiles: countIceTiles(map),
     tileTextures,
     fogTextures,
     fogTopTexture: getTileTexture('fog', TileType.Water, 0, fogImage, 0x7a7a7a, 'topface'),

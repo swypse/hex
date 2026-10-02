@@ -3,7 +3,7 @@ import { Player } from './players';
 import { canAfford, pay, Resources } from './resources';
 import { tileAt } from './selection';
 import { hasSkill } from './skills';
-import { isWaterType } from './tile-types';
+import { isSolidGround, isWaterType } from './tile-types';
 
 export const BRIDGE_COST: Resources = { wood: 10, stone: 5, money: 15, ore: 0, food: 0 };
 
@@ -16,7 +16,7 @@ const AXES: { dir: BridgeDir; offsets: { q: number; r: number }[] }[] = [
 
 function isLandShore(map: GameMap, tile: MapTile, offset: { q: number; r: number }): boolean {
   const t = tileAt(map, tile.q + offset.q, tile.r + offset.r);
-  return t !== undefined && !isWaterType(t.terrain);
+  return t !== undefined && isSolidGround(t.terrain);
 }
 
 export function bridgeDirFor(map: GameMap, tile: MapTile): BridgeDir | null {

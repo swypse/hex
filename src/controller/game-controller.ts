@@ -26,6 +26,8 @@ import { TRIBES, Tribe, tribeById } from '../game/tribes';
 import { MapView, ZOOM_DETAIL_HIDE, type OverlayItem } from '../render/map-renderer';
 import { pickTileAt } from '../render/tile-pick';
 import { markDirty } from '../render/render-gate';
+import { seasonForTurn } from '../game/season';
+import { countIceTiles } from '../game/ice';
 import { createTextures, destroyTextureSet } from '../render/texture-factory';
 import { useGameStore, confirmLeaveGame } from '../store/game-store';
 import { saveRepository } from '../storage/save-game';
@@ -68,6 +70,8 @@ class GameController {
   private edgeLayerTarget: Container | null = null;
   private sim: Simulator | null = null;
   private textures: Awaited<ReturnType<typeof createTextures>> | null = null;
+  private seasonRebake = false;
+  private unsubSeason: (() => void) | null = null;
   private mapView: MapView | null = null;
   private overlayItems: OverlayItem[] = [];
   private reachableKeys = new Set<string>();
@@ -105,6 +109,13 @@ class GameController {
     this.app = app;
     this.mapRoot = root;
     this.edgeLayerTarget = edgeLayerTarget;
+    let lastTurn = useGameStore.getState().turn;
+    this.unsubSeason?.();
+    this.unsubSeason = useGameStore.subscribe((s) => {
+      if (s.turn === lastTurn) return;
+      lastTurn = s.turn;
+      this.syncTerrainTextures();
+    });
     const token = ++this.initToken;
     const pending = useGameStore.getState().pendingSnapshot;
     const startIntro = pending !== null || this.startVillageIntroPending;
@@ -119,7 +130,7 @@ class GameController {
     if (this.sim) {
       this.applyFitToScreen();
       useGameStore.getState().setTexturesLoading(true);
-      void createTextures(app, this.sim.map, HEX_SIZE * this.getCamera().qualityFactor, new Set(this.sim.players.map((p) => p.tribe))).then((textures) => {
+      void createTextures(app, this.sim.map, HEX_SIZE * this.getCamera().qualityFactor, new Set(this.sim.players.map((p) => p.tribe)), seasonForTurn(this.sim.turn)).then((textures) => {
         if (token === this.initToken) useGameStore.getState().setTexturesLoading(false);
         if (token !== this.initToken || !this.mapRoot) return;
         this.replaceTextures(textures);
@@ -139,7 +150,39 @@ class GameController {
     }
   }
 
+  /** Rebakes the terrain textures when the displayed season or the set of ice
+   *  tiles no longer matches what they were baked for. The store's turn (not
+   *  sim.turn) drives the season so it follows the presented turn; the ice
+   *  count catches a snapshot adopted after the season already changed. */
+  private syncTerrainTextures = (): void => {
+    if (!this.app || !this.sim || !this.textures || !this.mapView) return;
+    if (this.seasonRebake) return;
+    const season = seasonForTurn(useGameStore.getState().turn);
+    const ice = countIceTiles(this.sim.map);
+    if ((this.textures.season ?? 'spring') === season && (this.textures.iceTiles ?? 0) === ice) return;
+    this.seasonRebake = true;
+    const token = this.initToken;
+    const hexSize = HEX_SIZE * this.getCamera().qualityFactor;
+    void createTextures(this.app, this.sim.map, hexSize, new Set(this.sim.players.map((p) => p.tribe)), season)
+      .then((textures) => {
+        if (token !== this.initToken || !this.app || !this.mapRoot) {
+          destroyTextureSet(textures);
+          return;
+        }
+        this.replaceTextures(textures);
+        this.render();
+      })
+      .catch((e) => console.error('[season] texture rebake failed', e))
+      .finally(() => {
+        this.seasonRebake = false;
+        // The turn or map may have changed again while baking.
+        if (token === this.initToken) this.syncTerrainTextures();
+      });
+  };
+
   shutdown(): void {
+    this.unsubSeason?.();
+    this.unsubSeason = null;
     this.cancelDamagePreviewHold();
     this.damagePreviewShown = false;
     this.mapView?.hideDamagePreview();
@@ -313,6 +356,7 @@ class GameController {
     this.syncKnownTribes(true);
     this.hiddenUnitIds.clear();
     if (this.app) this.render();
+    this.syncTerrainTextures();
   }
 
   saveGame(): void {
@@ -400,7 +444,7 @@ class GameController {
       }
       if (this.glContextLost()) return;
       const hexSize = HEX_SIZE * this.getCamera().qualityFactor;
-      const textures = await createTextures(this.app, this.sim.map, hexSize, new Set(this.sim.players.map((p) => p.tribe)));
+      const textures = await createTextures(this.app, this.sim.map, hexSize, new Set(this.sim.players.map((p) => p.tribe)), seasonForTurn(this.sim.turn));
       if (token !== this.initToken || !this.app || !this.mapRoot) return;
       this.overlayItems = [];
       this.replaceTextures(textures);
@@ -503,7 +547,7 @@ class GameController {
     store.setSelection({ kind: 'unit', q: start.q, r: start.r });
     if (this.app) {
       this.applyFitToScreen();
-      this.replaceTextures(await createTextures(this.app, map, HEX_SIZE * this.getCamera().qualityFactor, new Set(this.sim!.players.map((p) => p.tribe))));
+      this.replaceTextures(await createTextures(this.app, map, HEX_SIZE * this.getCamera().qualityFactor, new Set(this.sim!.players.map((p) => p.tribe)), seasonForTurn(this.sim!.turn)));
     }
     this.render();
     this.centerOnStartVillage();

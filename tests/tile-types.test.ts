@@ -11,8 +11,9 @@ import {
 } from '../src/game/tile-types';
 
 describe('tile types', () => {
-  it('defines all 17 tile types', () => {
-    expect(ALL_TILE_TYPES).toHaveLength(17);
+  it('defines all 18 tile types', () => {
+    expect(ALL_TILE_TYPES).toHaveLength(18);
+    expect(ALL_TILE_TYPES).toContain(TileType.Ice);
     expect(ALL_TILE_TYPES).toContain(TileType.Water);
     expect(ALL_TILE_TYPES).toContain(TileType.Settlement);
   });

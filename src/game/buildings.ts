@@ -3,7 +3,7 @@ import { GameMap, MapTile } from './map-gen';
 import { Player } from './players';
 import { canAfford, moneyCost, pay, Resources } from './resources';
 import { hasSkill } from './skills';
-import { isForestType, isLandType, isMountainType, isWaterType } from './tile-types';
+import { isForestType, isLandType, isMountainType, isSolidGround, isWaterType } from './tile-types';
 import { buildingsInVillage, villageBuildingLimit } from './village';
 import { villageEnemyOccupied } from './capture';
 import type { Unit } from './units';
@@ -115,7 +115,7 @@ export function canBuildPort(map: GameMap, tile: MapTile, player: Player): boole
   // board it; a water tile in the middle of a lake or at the map edge cannot.
   return hexNeighbors(tile).some((n) => {
     const t = neighborTile(map, n);
-    return t !== undefined && t.ownedBy === player.index && !isWaterType(t.terrain);
+    return t !== undefined && t.ownedBy === player.index && isSolidGround(t.terrain);
   });
 }
 
@@ -234,7 +234,7 @@ export function canBuildKindIgnoringSkill(
     if (!isWaterType(tile.terrain)) return false;
     return hexNeighbors(tile).some((n) => {
       const t = neighborTile(map, n);
-      return t !== undefined && t.ownedBy === player.index && !isWaterType(t.terrain);
+      return t !== undefined && t.ownedBy === player.index && isSolidGround(t.terrain);
     });
   }
   // sawmill
@@ -312,7 +312,7 @@ export function portDirection(map: GameMap, tile: MapTile): PortDirection | null
   const owner = tile.ownedBy;
   const home = tile.claimedByVillage ? axialKey(tile.claimedByVillage) : null;
   const ownedShore = (n: MapTile): boolean =>
-    n.ownedBy === owner && !isWaterType(n.terrain);
+    n.ownedBy === owner && isSolidGround(n.terrain);
   const ownShoreDir = (sameVillageOnly: boolean): PortDirection | null => {
     for (const { d, o } of PORT_DIRECTION_VECTORS) {
       const n = neighborTile(map, { q: tile.q + o.q, r: tile.r + o.r });

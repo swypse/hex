@@ -27,6 +27,8 @@ import { knownTribesFor } from './discovery';
 import { isWaterType, TileType } from './tile-types';
 import { BOTTLE_HEAL, BOTTLE_MONEY, bottleCollectableFor, collectExpiredBottles, randomBottleEffectKind, touchBottle, trySpawnBottle } from './bottles';
 import { canPlaceTrapOn, trapAlive, trapDamage, TRAP_COST } from './traps';
+import { seasonForTurn } from './season';
+import { freezeCoast, thawIce } from './ice';
 import { stormDamage, stormEligible, stormTargetShips } from './storm';
 import { upgradeVillage, buildWall as applyWall, canBuildWall, WALL_COST } from './village';
 import { SeededRandom } from '../util/random';
@@ -1201,6 +1203,7 @@ export class Simulator {
         this.runPirateTurn();
         this.applyIncome();
         this.turn += 1;
+        this.applySeasonChange();
         this.runBottleTurn();
         this.growTemples();
         this.sweepTraps();
@@ -1221,6 +1224,21 @@ export class Simulator {
       this.decrementStunsFor(next);
       this.emit({ type: 'turnStarted', playerIndex: next, turn: this.turn });
       return;
+    }
+  }
+
+  /** On entering winter coast water freezes; on leaving it the ice melts. */
+  private applySeasonChange(): void {
+    const season = seasonForTurn(this.turn);
+    if (season === seasonForTurn(this.turn - 1)) return;
+    if (season === 'winter') {
+      const r = freezeCoast(this.map);
+      this.emit({ type: 'seasonChanged', season, frozen: r.frozen, thawed: [], landed: r.landed, removed: r.removed, killed: [] });
+    } else if (season === 'spring') {
+      const r = thawIce(this.map);
+      this.emit({ type: 'seasonChanged', season, frozen: [], thawed: r.thawed, landed: [], removed: [], killed: r.killed });
+    } else {
+      this.emit({ type: 'seasonChanged', season, frozen: [], thawed: [], landed: [], removed: [], killed: [] });
     }
   }
 

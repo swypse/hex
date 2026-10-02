@@ -1,6 +1,6 @@
 import { hexNeighbors } from './hex';
 import { GameMap, MapTile } from './map-gen';
-import { isWaterType } from './tile-types';
+import { isIceType, isWaterType } from './tile-types';
 import { Resources } from './resources';
 
 export interface TrapState {
@@ -16,7 +16,7 @@ export const TRAP_ATTACK = 30;
  *  tiles, as long as each is non-water, unoccupied, has no village/building
  *  and no existing trap. Ownership no longer matters. */
 export function canPlaceTrapOn(tile: MapTile, trapperTile: MapTile): boolean {
-  if (isWaterType(tile.terrain)) return false;
+  if (isWaterType(tile.terrain) || isIceType(tile.terrain)) return false;
   const isOwnTile = tile.q === trapperTile.q && tile.r === trapperTile.r;
   if (!isOwnTile && !hexNeighbors(trapperTile).some((n) => n.q === tile.q && n.r === tile.r)) return false;
   if (tile.unit && !isOwnTile) return false;

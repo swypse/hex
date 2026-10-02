@@ -4,6 +4,7 @@ import { UnitType } from './units';
 import type { BonusKind } from './bonus';
 import type { AchievementId } from './achievements';
 import type { BottleEffect } from './bottles';
+import type { Season } from './season';
 
 export type BuildingKind = 'sawmill' | 'mine' | 'port' | 'temple' | 'forestTemple' | 'farm' | 'granary';
 
@@ -55,6 +56,7 @@ export type GameEvent =
   | { type: 'storm'; unitId: string; q: number; r: number; targets: { q: number; r: number; damage: number }[] }
   | { type: 'stunShot'; attackerId: string; targetId: string; attackerTile: Axial; targetTile: Axial; missed: boolean; stunned: boolean }
   | { type: 'achievementUnlocked'; playerIndex: number; achievement: AchievementId }
+  | { type: 'seasonChanged'; season: Season; frozen: Axial[]; thawed: Axial[]; landed: { unitId: string; owner: number }[]; removed: Axial[]; killed: { unitId: string; q: number; r: number; owner: number }[] }
   | { type: 'turnStarted'; playerIndex: number; turn: number }
   | { type: 'aiTurn'; playerIndex: number }
   | { type: 'aiTakeover'; playerIndex: number }

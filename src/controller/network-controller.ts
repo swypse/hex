@@ -15,6 +15,7 @@ import { useGameStore } from '../store/game-store';
 import { loadSettings, welcomeDismissed } from '../storage/settings';
 import { SeededRandom } from '../util/random';
 import { GameMode } from '../game/game-mode';
+import { seasonForTurn } from '../game/season';
 import { createTextures, TextureSet } from '../render/texture-factory';
 import { activeMatchStore } from '../storage/active-match';
 
@@ -425,7 +426,7 @@ export class NetworkController {
     const app = this.host.app();
     if (app) {
       this.host.applyFitToScreen();
-      this.host.setTextures(await createTextures(app, map, 40 * this.host.cameraQualityFactor(), new Set((this.host.sim()?.players ?? []).map((p) => p.tribe))));
+      this.host.setTextures(await createTextures(app, map, 40 * this.host.cameraQualityFactor(), new Set((this.host.sim()?.players ?? []).map((p) => p.tribe)), seasonForTurn(this.host.sim()?.turn ?? 1)));
     }
     this.host.render();
     this.host.centerOnStartVillage();

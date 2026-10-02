@@ -17,6 +17,8 @@ export enum TileType {
   RainforestMountain,
   Water,
   Settlement,
+  /** Winter coast water: walkable like land, melts back to Water in spring. */
+  Ice,
 }
 
 export const ALL_TILE_TYPES: TileType[] = [
@@ -37,6 +39,7 @@ export const ALL_TILE_TYPES: TileType[] = [
   TileType.RainforestMountain,
   TileType.Water,
   TileType.Settlement,
+  TileType.Ice,
 ];
 
 const LAND_TYPES = [
@@ -77,6 +80,16 @@ export function isWaterType(t: TileType): boolean {
   return t === TileType.Water;
 }
 
+export function isIceType(t: TileType): boolean {
+  return t === TileType.Ice;
+}
+
+/** Solid shore: neither water nor ice (ice melts, so it never counts as a
+ *  shore for ports, bridges or roads). */
+export function isSolidGround(t: TileType): boolean {
+  return t !== TileType.Water && t !== TileType.Ice;
+}
+
 export const TILE_TYPE_COLORS: Record<TileType, number> = {
   [TileType.GrasslandLand]: 0xD6EB9C,
   [TileType.GrasslandForest]: 0x9FB864,
@@ -95,6 +108,7 @@ export const TILE_TYPE_COLORS: Record<TileType, number> = {
   [TileType.RainforestMountain]: 0x6E8D50,
   [TileType.Water]: 0x2E77BB,
   [TileType.Settlement]: 0xd8c9a3,
+  [TileType.Ice]: 0xcfe8f5,
 };
 
 export const TILE_TYPE_NAMES: Record<TileType, string> = {
@@ -115,4 +129,5 @@ export const TILE_TYPE_NAMES: Record<TileType, string> = {
   [TileType.RainforestMountain]: t('tile.RainforestMountain'),
   [TileType.Water]: t('tile.Water'),
   [TileType.Settlement]: t('tile.Settlement'),
+  [TileType.Ice]: t('tile.Ice'),
 };

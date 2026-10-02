@@ -7,6 +7,7 @@ import { type ScreenController, type UIHost, type Widget } from '../host';
 import { HudScore } from '../hud/hud-score';
 import { HudPlayers } from '../hud/hud-players';
 import { HudLoading } from '../hud/hud-loading';
+import { HudSeason } from '../hud/hud-season';
 import { HudTurn } from '../hud/hud-turn';
 import { HudResourcePanel } from '../hud/hud-resource-panel';
 import { HudSelected } from '../hud/hud-selected';
@@ -84,6 +85,7 @@ export class GameScreen implements ScreenController {
       scoreHud(),
       new HudPlayers(),
       new HudTurn(),
+      new HudSeason(),
       new HudWatchExit(),
       new HudResourcePanel(),
       new HudSelected(),
