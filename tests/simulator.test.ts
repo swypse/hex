@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { makeTestMap, tileAt, makeUnit } from './helpers/test-map';
+import { makeTestMap, tileAt, makeUnit, giveResources } from './helpers/test-map';
 import { Simulator } from '../src/game/simulator';
 import { buildPlayers } from '../src/game/players';
 import { Tribe } from '../src/game/tribes';
@@ -229,8 +229,8 @@ describe('Simulator commands', () => {
     water.ownedBy = 0;
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
     players[0]!.skills = ['waterTemples'];
-    players[0]!.resources = { wood: 0, stone: 10, money: 30, ore: 0, food: 20 };
-    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    giveResources(map, players[0]!, { wood: 0, stone: 10, money: 30, ore: 0, food: 20 });
+    const sim = new Simulator(map, players, 'turns30', { rng: () => 0.5 });
     sim.startGame();
     sim.drainEvents();
     expect(sim.applyCommand({ type: 'build', q: 1, r: 0, kind: 'temple' })).toBe(true);
@@ -266,8 +266,8 @@ describe('Simulator commands', () => {
     forest.ownedBy = 0;
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
     players[0]!.skills = ['forestTemple'];
-    players[0]!.resources = { wood: 0, stone: 10, money: 30, ore: 0, food: 20 };
-    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    giveResources(map, players[0]!, { wood: 0, stone: 10, money: 30, ore: 0, food: 20 });
+    const sim = new Simulator(map, players, 'turns30', { rng: () => 0.5 });
     sim.startGame();
     sim.drainEvents();
     expect(sim.applyCommand({ type: 'build', q: 1, r: 0, kind: 'forestTemple' })).toBe(true);
@@ -652,7 +652,7 @@ describe('build bridge command', () => {
     tileAt(map, 1, 0)!.terrain = TileType.Water;
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
     players[0]!.skills.push('bridges');
-    players[0]!.resources = { wood: 100, stone: 100, money: 100, ore: 0, food: 20 };
+    giveResources(map, players[0]!, { wood: 100, stone: 100, money: 100, ore: 0, food: 20 });
     const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
     sim.startGame();
     sim.drainEvents();
@@ -668,7 +668,7 @@ describe('build bridge command', () => {
     const map = makeTestMap();
     tileAt(map, 1, 0)!.terrain = TileType.Water;
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
-    players[0]!.resources = { wood: 100, stone: 100, money: 100, ore: 0, food: 20 };
+    giveResources(map, players[0]!, { wood: 100, stone: 100, money: 100, ore: 0, food: 20 });
     const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
     sim.startGame();
     sim.drainEvents();

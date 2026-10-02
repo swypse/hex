@@ -1,7 +1,7 @@
 import { planAiActions, logAiTurnStart, aiLoggingEnabled, formatAiAction, type AiActionMarker } from './ai';
 import type { AiAction } from './ai-types';
 import { applyFood, refreshStarving } from './food';
-import { buildingIncome, buildBuilding, burnBuilding, burnRoad, buildBuildingIgnoringSkill, canUsePort, repairBuilding, destroyBuilding, builderBuildable, type BuilderBuildKind } from './buildings';
+import { buildingIncomeByVillage, buildBuilding, burnBuilding, burnRoad, buildBuildingIgnoringSkill, canUsePort, repairBuilding, destroyBuilding, builderBuildable, type BuilderBuildKind } from './buildings';
 import { captureVillage, setCaptureReady, villageIncomeTotal } from './capture';
 import { attackableTargets, missChanceFor, performAttack, performSiege } from './combat';
 import { buildBridge, buildBridgeIgnoringSkill } from './bridges';
@@ -14,7 +14,8 @@ import { hexDistance, hexNeighbors } from './hex';
 import type { GameMap, MapTile } from './map-gen';
 import type { Player } from './players';
 import { PlayerStats } from './score';
-import { canAfford, moneyCost, pay, START_RESOURCES, villageUpgradeCost } from './resources';
+import { START_RESOURCES, villageUpgradeCost } from './resources';
+import { addStock, migrateLegacyResources, payAt } from './stock';
 import { awardScore, awardTempleScores, CAPTURE_SCORE, COMBO_SCORE, EMPTY_STATS, KILL_SCORE, PIRATE_KILL_SCORE, SKILL_SCORE, UPGRADE_SCORE } from './score';
 import { hasSkill, openSkill as applySkill, randomUnopenedSkill, SkillId } from './skills';
 import { evaluateAchievements, awardAchievementScores, currentlyMetIds, type AchievementId } from './achievements';
@@ -130,16 +131,21 @@ export class Simulator {
     this.winnerIndex = null;
     this.expectedTurns = quickCaptureTurnsCount(players.length);
     this.bonusAwarded = false;
+    this.map.season = seasonForTurn(this.turn);
+    migrateLegacyResources(map, players);
     this.ensureAchievementBaseline();
   }
 
   static fromSnapshot(snap: GameStateSnapshot): Simulator {
-    // Saves from before the food resource have no food stock: start them full.
+    // Saves from before per-village stock keep wood/stone/ore/food on the
+    // player (very old ones have no food at all: start them full); the
+    // constructor moves them into the capital.
     for (const p of snap.players) {
-      if (typeof p.resources.food !== 'number') p.resources.food = START_RESOURCES.food;
+      if (typeof p.resources.wood === 'number' && typeof p.resources.food !== 'number') p.resources.food = START_RESOURCES.food;
     }
     const sim = new Simulator(snap.map, snap.players, snap.mode);
     sim.turn = snap.turn;
+    sim.map.season = seasonForTurn(sim.turn);
     sim.currentPlayerIndex = snap.currentPlayerIndex;
     sim.gameOver = snap.gameOver;
     sim.winnerIndex = snap.winnerIndex;
@@ -529,8 +535,7 @@ export class Simulator {
     const target = tileAt(this.map, q, r);
     if (!target) return false;
     if (!canPlaceTrapOn(target, tile)) return false;
-    if (!canAfford(player.resources, TRAP_COST)) return false;
-    player.resources = pay(player.resources, TRAP_COST);
+    if (!payAt(this.map, player, tile, TRAP_COST)) return false;
     target.trap = { owner: unit.owner, placedTurn: this.turn };
     this.consumeUnitTurn(unit);
     this.emit({ type: 'trapPlaced', q, r, playerIndex: player.index });
@@ -897,8 +902,7 @@ export class Simulator {
     if (!tile?.settlement || tile.settlement.owner !== this.currentPlayerIndex) return false;
     const player = this.currentPlayer;
     const cost = villageUpgradeCost(tile.settlement.level);
-    if (!canAfford(player.resources, cost)) return false;
-    player.resources = pay(player.resources, cost);
+    if (!payAt(this.map, player, tile, cost)) return false;
     upgradeVillage(this.map, tile, this.rng);
     awardScore(player, UPGRADE_SCORE);
     this.statsOf(player).villageUpgrades += 1;
@@ -911,8 +915,8 @@ export class Simulator {
     const tile = tileAt(this.map, q, r);
     if (!tile?.settlement) return false;
     const player = this.currentPlayer;
-    if (!canBuildWall(tile, player)) return false;
-    if (!applyWall(tile, player)) return false;
+    if (!canBuildWall(this.map, tile, player)) return false;
+    if (!applyWall(this.map, tile, player)) return false;
     this.emit({ type: 'wallBuilt', q, r, playerIndex: player.index });
     return true;
   }
@@ -922,7 +926,7 @@ export class Simulator {
     if (!unit || unit.owner !== this.currentPlayerIndex) return false;
     const tile = tileAt(this.map, unit.q, unit.r)!;
     const player = this.currentPlayer;
-    if (upgradeShip(unit, tile, player)) {
+    if (upgradeShip(this.map, unit, tile, player)) {
       exploreUnitPath(this.map, [{ q: unit.q, r: unit.r }], unit, unit.owner);
       this.emit({ type: 'shipUpgraded', unitId, level: unit.shipLevel!, playerIndex: player.index });
       return true;
@@ -958,8 +962,8 @@ export class Simulator {
     if (!canDisband(unit)) return false;
     const player = this.players[unit.owner]!;
     const cost = disbandCost(unit);
-    if (!canAfford(player.resources, moneyCost(cost))) return false;
-    player.resources = pay(player.resources, moneyCost(cost));
+    if (player.resources.money < cost) return false;
+    player.resources.money -= cost;
     const q = tile.q;
     const r = tile.r;
     // A disbanded unit no longer stands on the village, so any capture
@@ -976,9 +980,8 @@ export class Simulator {
     if (!unit || unit.type !== 'pirate') return false;
     const player = this.currentPlayer;
     if (hasPirateDeal(unit, player.index)) return false;
-    const cost = moneyCost(PIRATE_DEAL_COST);
-    if (!canAfford(player.resources, cost)) return false;
-    player.resources = pay(player.resources, cost);
+    if (player.resources.money < PIRATE_DEAL_COST) return false;
+    player.resources.money -= PIRATE_DEAL_COST;
     (unit.paidBy ??= []).push(player.index);
     this.emit({ type: 'pirateDeal', unitId: unit.id, q: unit.q, r: unit.r, playerIndex: player.index });
     return true;
@@ -1048,9 +1051,9 @@ export class Simulator {
         this.emitScoreFly(player.index, 15, tile);
         return { kind: 'money' };
       case 'resources':
-        player.resources.wood += 10;
-        player.resources.stone += 5;
-        player.resources.ore += 5;
+        // The materials go to the village nearest to the bonus.
+        const nearest = findClosestVillage(this.map, tile, player.index);
+        if (nearest) addStock(nearest, { wood: 10, stone: 5, ore: 5 });
         return { kind: 'resources' };
       case 'villageUpgrade': {
         const village = findClosestVillage(this.map, tile, player.index);
@@ -1230,6 +1233,7 @@ export class Simulator {
   /** On entering winter coast water freezes; on leaving it the ice melts. */
   private applySeasonChange(): void {
     const season = seasonForTurn(this.turn);
+    this.map.season = season;
     if (season === seasonForTurn(this.turn - 1)) return;
     if (season === 'winter') {
       const r = freezeCoast(this.map);
@@ -1318,6 +1322,9 @@ export class Simulator {
         break;
       case 'burn':
         ok = this.doBurn(a.unitId);
+        break;
+      case 'burnRoad':
+        ok = this.doBurnRoad(a.unitId);
         break;
       case 'builderBuild':
         ok = this.doBuildWithUnit(a.unitId, a.q, a.r, a.kind);
@@ -1625,10 +1632,7 @@ export class Simulator {
   private applyIncome(): void {
     for (const player of this.players) {
       player.resources.money += villageIncomeTotal(this.map, player.index);
-      const b = buildingIncome(this.map, player);
-      player.resources.wood += b.wood;
-      player.resources.stone += b.stone;
-      player.resources.ore += b.ore;
+      for (const [village, income] of buildingIncomeByVillage(this.map, player)) addStock(village, income);
     }
     this.applyFoodForAll();
   }

@@ -1,6 +1,5 @@
 import { t } from '../i18n';
 import type { Player } from './players';
-import { canAfford, moneyCost, pay } from './resources';
 
 export type SkillId =
   | 'climbing'
@@ -179,12 +178,12 @@ export function canOpenSkill(player: Player, id: SkillId): boolean {
   if (hasSkill(player, id)) return false;
   const info = SKILLS[id];
   if (info.parent && !hasSkill(player, info.parent)) return false;
-  return canAfford(player.resources, moneyCost(skillCost(id, player.skills.length)));
+  return player.resources.money >= skillCost(id, player.skills.length);
 }
 
 export function openSkill(player: Player, id: SkillId): boolean {
   if (!canOpenSkill(player, id)) return false;
-  player.resources = pay(player.resources, moneyCost(skillCost(id, player.skills.length)));
+  player.resources.money -= skillCost(id, player.skills.length);
   player.skills.push(id);
   return true;
 }

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { generateMap, type GameMap } from '../src/game/map-gen';
 import { makeTestMap, tileAt, makeUnit } from './helpers/test-map';
+import { readStock } from '../src/game/stock';
 import { Simulator } from '../src/game/simulator';
 import { buildPlayers } from '../src/game/players';
 import { Tribe } from '../src/game/tribes';
@@ -190,13 +191,13 @@ describe('bonus claiming (simulator)', () => {
   it('resources bonus adds wood, stone, ore', () => {
     const { map, target, players, sim } = makeSim('resources');
     sim.applyCommand({ type: 'endTurn' });
-    const wood = players[0]!.resources.wood;
-    const stone = players[0]!.resources.stone;
-    const ore = players[0]!.resources.ore;
+    // The materials go to the village nearest to the bonus.
+    const village = tileAt(map, 0, 0)!;
+    const before = { ...readStock(village) };
     expect(sim.applyCommand({ type: 'claimBonus' })).toBe(true);
-    expect(players[0]!.resources.wood).toBe(wood + 10);
-    expect(players[0]!.resources.stone).toBe(stone + 5);
-    expect(players[0]!.resources.ore).toBe(ore + 5);
+    expect(readStock(village).wood).toBe(before.wood + 10);
+    expect(readStock(village).stone).toBe(before.stone + 5);
+    expect(readStock(village).ore).toBe(before.ore + 5);
   });
 
   it('villageUpgrade bonus upgrades the closest village for free', () => {

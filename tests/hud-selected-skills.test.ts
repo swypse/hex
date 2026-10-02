@@ -64,7 +64,7 @@ describe('HudSelected skill unlock hints', () => {
       screen: 'game',
       players,
       localPlayerIndex: 0,
-      selection: { kind: 'terrain', q: tile.q, r: tile.r },
+      selection: { kind: 'tile', q: tile.q, r: tile.r },
       tutorial: false,
       tutorialStep: null,
     });

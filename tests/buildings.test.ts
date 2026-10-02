@@ -52,6 +52,16 @@ function player(money: number, skills: SkillId[] = []): import('../src/game/play
   };
 }
 
+/** A village of player 0 holding `stock`, added away from the test tiles: it
+ *  pays the materials of whatever the test builds. */
+function addVillage(map: GameMap, stock: Partial<Record<'wood' | 'stone' | 'ore' | 'food', number>> = {}): MapTile {
+  const village = tile(9, 9, TileType.GrasslandLand, 0, {
+    owner: 0, level: 1, captureReady: false, stock: { wood: 0, stone: 0, ore: 0, food: 0, ...stock },
+  });
+  map.tiles.push(village);
+  return village;
+}
+
 // (1,0),(1,-1),(0,-1),(-1,0),(-1,1),(0,1) are the neighbors of (0,0).
 
 describe('canBuildSawmill', () => {
@@ -183,12 +193,11 @@ describe('buildBuilding', () => {
     const water = tile(0, 0, TileType.Water, 0);
     map.tiles.push(water, tile(1, 0, TileType.GrasslandLand, 0));
     const p = player(100, ['water']);
-    p.resources.wood = 10;
-    p.resources.ore = 2;
+    const village = addVillage(map, { wood: 10, ore: 2 });
     expect(buildBuilding(map, water, 'port', p)).toBe(true);
     expect(p.resources.money).toBe(70);
-    expect(p.resources.wood).toBe(0);
-    expect(p.resources.ore).toBe(0);
+    expect(village.settlement!.stock!.wood).toBe(0);
+    expect(village.settlement!.stock!.ore).toBe(0);
     expect(water.building).toEqual({ kind: 'port', level: 1 });
   });
 
@@ -197,10 +206,10 @@ describe('buildBuilding', () => {
     const water = tile(0, 0, TileType.Water, 0);
     map.tiles.push(water);
     const p = player(100, ['waterTemples']);
-    p.resources.stone = 10;
+    const village = addVillage(map, { stone: 10 });
     expect(buildBuilding(map, water, 'temple', p)).toBe(true);
     expect(p.resources.money).toBe(70);
-    expect(p.resources.stone).toBe(0);
+    expect(village.settlement!.stock!.stone).toBe(0);
     expect(water.building).toEqual({ kind: 'temple', level: 1 });
   });
 
@@ -478,10 +487,10 @@ describe('buildBuilding forest temple', () => {
     const forest = tile(0, 0, TileType.GrasslandForest, 0);
     map.tiles.push(forest);
     const p = player(100, ['forestTemple']);
-    p.resources.stone = 10;
+    const village = addVillage(map, { stone: 10 });
     expect(buildBuilding(map, forest, 'forestTemple', p)).toBe(true);
     expect(p.resources.money).toBe(70);
-    expect(p.resources.stone).toBe(0);
+    expect(village.settlement!.stock!.stone).toBe(0);
     expect(forest.building).toEqual({ kind: 'forestTemple', level: 1 });
   });
 });
@@ -594,22 +603,25 @@ describe('building hp and repair', () => {
   it('repairBuilding charges 2w/2s/2o/3m and restores full hp', () => {
     const map: GameMap = { radius: 2, tiles: [], spawns: [] };
     const p = player(3);
-    p.resources = { wood: 2, stone: 2, ore: 2, money: 3, food: 20 };
+    const village = addVillage(map, { wood: 2, stone: 2, ore: 2, food: 20 });
     const building = tile(0, 0, TileType.GrasslandLand, 0, null, { kind: 'mine', level: 1, hp: 1 });
     expect(REPAIR_COST).toEqual({ wood: 2, stone: 2, ore: 2, money: 3, food: 0 });
     expect(repairBuilding(map, building, p)).toBe(true);
     expect(building.building!.hp).toBeUndefined();
     expect(buildingHp(building.building)).toBe(2);
-    expect(p.resources).toEqual({ wood: 0, stone: 0, ore: 0, money: 0, food: 20 });
+    expect(p.resources.money).toBe(0);
+    expect(village.settlement!.stock).toEqual({ wood: 0, stone: 0, ore: 0, food: 20 });
   });
 
   it('repairBuilding refuses when unaffordable', () => {
     const map: GameMap = { radius: 2, tiles: [], spawns: [] };
     const poor = player(0);
+    const village = addVillage(map, { food: 20 });
     const building = tile(0, 0, TileType.GrasslandLand, 0, null, { kind: 'mine', level: 1, hp: 1 });
     expect(repairBuilding(map, building, poor)).toBe(false);
     expect(buildingHp(building.building)).toBe(1);
-    expect(poor.resources).toEqual({ wood: 0, stone: 0, ore: 0, money: 0, food: 20 });
+    expect(poor.resources.money).toBe(0);
+    expect(village.settlement!.stock).toEqual({ wood: 0, stone: 0, ore: 0, food: 20 });
   });
 });
 

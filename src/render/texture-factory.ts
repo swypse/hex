@@ -92,6 +92,8 @@ export interface TextureSet {
   season?: Season;
   /** Number of ice tiles on the map when baked (0 when absent). */
   iceTiles?: number;
+  /** Render textures baked for this set; freed by destroyTextureSet. */
+  ownedTextures?: Texture[];
   tileTextures: Map<string, TileTexture>;
   fogTextures: Map<string, TileTexture>;
   fogTopTexture: TileTexture;
@@ -343,6 +345,18 @@ export async function createTextures(
   /** Season whose terrain tile variants are baked. */
   season: Season = 'spring',
 ): Promise<TextureSet> {
+  // Every texture baked with generateTexture lives on the GPU until destroyed;
+  // collect them so destroyTextureSet can free them when the set is replaced.
+  const owned: Texture[] = [];
+  const bakeApp = {
+    renderer: {
+      generateTexture: (opts: Parameters<Application['renderer']['generateTexture']>[0]): Texture => {
+        const tex = app.renderer.generateTexture(opts);
+        owned.push(tex);
+        return tex;
+      },
+    },
+  } as unknown as Application;
   const images = await loadTileImages(season);
   await ensureBuildingsAtlas();
   const tileTextures = new Map<string, TileTexture>();
@@ -365,7 +379,7 @@ export async function createTextures(
     const cacheKey = `${layer}|${terrain}|${heightPx}|${anchor}|${brightness}`;
     const cached = textureCache.get(cacheKey);
     if (cached) return cached;
-    const tex = composeHexTexture(app, hexSize, heightPx, img, fill, {
+    const tex = composeHexTexture(bakeApp, hexSize, heightPx, img, fill, {
       walls: anchor === 'base',
       anchor,
       sideColors: opts?.sideColors,
@@ -417,8 +431,8 @@ export async function createTextures(
       if (type === 'pirate') continue;
       const frameKey = UNIT_IMAGE_FILES[tribe.id][type].replace(/\.png$/, '');
       const img = tribeTileTexture(tribe.code, frameKey);
-      perTribe[type] = makeUnitImageTexture(app, img, hexSize) ?? blankTile(1);
-      glowFor.set(perTribe[type].texture, makeUnitGlowTexture(app, perTribe[type]));
+      perTribe[type] = makeUnitImageTexture(bakeApp, img, hexSize) ?? blankTile(1);
+      glowFor.set(perTribe[type].texture, makeUnitGlowTexture(bakeApp, perTribe[type]));
     }
     unitTextures[tribe.id] = perTribe;
   }
@@ -430,45 +444,45 @@ export async function createTextures(
     for (const level of [1, 2, 3] as const) {
       const suffix = level === 1 ? 'ship' : `ship-${level}`;
       const img = tribeTileTexture(tribe.code, `${tribe.code}-${suffix}`);
-      shipTextures[tribe.id][level] = makeUnitImageTexture(app, img, hexSize) ?? blankTile(0.5);
-      glowFor.set(shipTextures[tribe.id][level].texture, makeUnitGlowTexture(app, shipTextures[tribe.id][level]));
+      shipTextures[tribe.id][level] = makeUnitImageTexture(bakeApp, img, hexSize) ?? blankTile(0.5);
+      glowFor.set(shipTextures[tribe.id][level].texture, makeUnitGlowTexture(bakeApp, shipTextures[tribe.id][level]));
     }
   }
   const sawmillTexture =
-    makeUnitImageTexture(app, buildingTileTexture('sawmill'), hexSize) ?? blankTile(0.5);
+    makeUnitImageTexture(bakeApp, buildingTileTexture('sawmill'), hexSize) ?? blankTile(0.5);
   const mineTexture =
-    makeUnitImageTexture(app, buildingTileTexture('mine'), hexSize) ?? blankTile(0.5);
+    makeUnitImageTexture(bakeApp, buildingTileTexture('mine'), hexSize) ?? blankTile(0.5);
   const farmTexture =
-    makeUnitImageTexture(app, buildingTileTexture('farm'), hexSize) ?? blankTile(0.5);
+    makeUnitImageTexture(bakeApp, buildingTileTexture('farm'), hexSize) ?? blankTile(0.5);
   const granaryTextures: TileTexture[] = [];
   for (let n = 0; n <= GRANARY_MAX_FARMS; n++) {
     granaryTextures[n] =
-      makeUnitImageTexture(app, buildingTileTexture(granaryTileFile(n)), hexSize) ?? blankTile(0.5);
+      makeUnitImageTexture(bakeApp, buildingTileTexture(granaryTileFile(n)), hexSize) ?? blankTile(0.5);
   }
   const bridgeTextures = {} as Record<BridgeDir, TileTexture>;
   for (const dir of Object.keys(BRIDGE_TILE_FILES) as BridgeDir[]) {
     const img = buildingTileTexture(BRIDGE_TILE_FILES[dir]);
     bridgeTextures[dir] =
-      makeUnitImageTexture(app, img, hexSize) ?? blankTile(0.5);
+      makeUnitImageTexture(bakeApp, img, hexSize) ?? blankTile(0.5);
   }
   const portTextures = {} as Record<PortDirection, TileTexture>;
   for (const dir of Object.keys(PORT_TILE_FILES) as PortDirection[]) {
     const img = buildingTileTexture(PORT_TILE_FILES[dir]);
     portTextures[dir] =
-      makeUnitImageTexture(app, img, hexSize) ?? blankTile(0.5);
+      makeUnitImageTexture(bakeApp, img, hexSize) ?? blankTile(0.5);
   }
   const freePortTexture = Texture.EMPTY;
   const templeTextures = {} as Record<1 | 2 | 3 | 4, TileTexture>;
   for (const lvl of [1, 2, 3, 4] as const) {
     const img = buildingTileTexture(TEMPLE_TILE_FILES[lvl]);
     templeTextures[lvl] =
-      makeUnitImageTexture(app, img, hexSize) ?? blankTile(0.5);
+      makeUnitImageTexture(bakeApp, img, hexSize) ?? blankTile(0.5);
   }
   const forestTempleTextures = {} as Record<1 | 2 | 3 | 4, TileTexture>;
   for (const lvl of [1, 2, 3, 4] as const) {
     const img = buildingTileTexture(FOREST_TEMPLE_TILE_FILES[lvl]);
     forestTempleTextures[lvl] =
-      makeUnitImageTexture(app, img, hexSize) ?? blankTile(0.5);
+      makeUnitImageTexture(bakeApp, img, hexSize) ?? blankTile(0.5);
   }
   await ensureIcons32Atlas();
   const villageConnectedTexture = icons32FrameTexture('village-connected-32');
@@ -482,12 +496,12 @@ export async function createTextures(
   const wallImg = buildingTileTexture('wall');
   // Bake the wall at the same hex image-scale as villages/units so its on-map
   // footprint always matches the tile, regardless of the camera quality factor.
-  const wallTexture = wallImg ? makeUnitImageTexture(app, wallImg, hexSize) : null;
+  const wallTexture = wallImg ? makeUnitImageTexture(bakeApp, wallImg, hexSize) : null;
   const trapImg = buildingTileTexture('trap');
-  const trapTexture = trapImg ? makeUnitImageTexture(app, trapImg, hexSize) : null;
+  const trapTexture = trapImg ? makeUnitImageTexture(bakeApp, trapImg, hexSize) : null;
   const pirateTexture =
-    makeUnitImageTexture(app, terrainFrameTexture('pirates-ship'), hexSize) ?? blankTile(0.5);
-  glowFor.set(pirateTexture.texture, makeUnitGlowTexture(app, pirateTexture));
+    makeUnitImageTexture(bakeApp, terrainFrameTexture('pirates-ship'), hexSize) ?? blankTile(0.5);
+  glowFor.set(pirateTexture.texture, makeUnitGlowTexture(bakeApp, pirateTexture));
   const villageBuilds: Partial<Record<Tribe, VillageBuildTextureService>> = {};
   for (const [tribe, prefix] of [[Tribe.Cats, 'cats'], [Tribe.Villagers, 'villagers'], [Tribe.Warriors, 'warriors'], [Tribe.Aqua, 'aqua'], [Tribe.Forest, 'forest'], [Tribe.Sand, 'sand'], [Tribe.Barbarians, 'barbarians']] as const) {
     if (!activeTribes.has(tribe)) continue;
@@ -498,16 +512,17 @@ export async function createTextures(
   return {
     season,
     iceTiles: countIceTiles(map),
+    ownedTextures: owned,
     tileTextures,
     fogTextures,
     fogTopTexture: getTileTexture('fog', TileType.Water, 0, fogImage, 0x7a7a7a, 'topface'),
     villageBuilds,
     freeVillageTexture:
-      makeUnitImageTexture(app, buildingTileTexture('village-empty'), hexSize) ?? blankTile(1),
+      makeUnitImageTexture(bakeApp, buildingTileTexture('village-empty'), hexSize) ?? blankTile(1),
     bonusTexture:
-      makeUnitImageTexture(app, terrainFrameTexture('bonus'), hexSize) ?? blankTile(1),
+      makeUnitImageTexture(bakeApp, terrainFrameTexture('bonus'), hexSize) ?? blankTile(1),
     bottleTexture:
-      makeUnitImageTexture(app, terrainFrameTexture('bottle-on-water'), hexSize) ?? blankTile(0.5),
+      makeUnitImageTexture(bakeApp, terrainFrameTexture('bottle-on-water'), hexSize) ?? blankTile(0.5),
     unitTextures,
     pirateTexture,
     sawmillTexture,
@@ -536,7 +551,15 @@ export async function createTextures(
  *  village-build services (each village upgrade / owner switch creates new
  *  baked composites; the old ones must be destroyed once the set is discarded,
  *  e.g. on game teardown or re-bake after context loss). */
-export function destroyTextureSet(textures: TextureSet): void {
+export function destroyTextureSet(textures: TextureSet, opts: { contextLost?: boolean } = {}): void {
+  // After a GL context loss the baked textures' GPU data is already gone; the
+  // JS objects are simply dropped instead of being destroyed through Pixi.
+  if (!opts.contextLost) {
+    for (const tex of textures.ownedTextures ?? []) {
+      if (!tex.destroyed) tex.destroy(true);
+    }
+  }
+  textures.ownedTextures = [];
   const builds = textures.villageBuilds;
   if (!builds) return;
   for (const service of Object.values(builds)) service?.destroy();

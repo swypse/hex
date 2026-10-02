@@ -44,6 +44,7 @@ export type AiAction =
   | { type: 'storm'; unitId: string }
   | { type: 'trap'; unitId: string; q: number; r: number }
   | { type: 'burn'; unitId: string }
+  | { type: 'burnRoad'; unitId: string }
   | { type: 'builderBuild'; unitId: string; q: number; r: number; kind: BuilderBuildKind }
   | { type: 'openSkill'; skill: SkillId };
 

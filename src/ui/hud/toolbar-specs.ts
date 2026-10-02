@@ -2,7 +2,8 @@ import { t } from '../../i18n';
 import { gameController } from '../../controller/game-controller';
 import { useGameStore } from '../../store/game-store';
 import { tileAt } from '../../game/selection';
-import { canAfford, moneyCost, villageUpgradeCost } from '../../game/resources';
+import { villageUpgradeCost } from '../../game/resources';
+import { canAffordAt } from '../../game/stock';
 import { canBuildSawmill, canBuildFarm, canBuildGranary, canBurnBuilding, canBurnRoad, canBuildForestTemple, canBuildMine, canBuildPort, canBuildTemple, BUILDING_COSTS, canRepairBuilding, REPAIR_COST, canAffordAnyBuilderBuild } from '../../game/buildings';
 import { canHeal, canDisband, disbandCost, hasPirateDeal, PIRATE_DEAL_COST, UNIT_TYPES, UNIT_TYPE_NAMES } from '../../game/units';
 import { SHIP_UPGRADE_COST, canUpgradeShip } from '../../game/ship';
@@ -52,7 +53,7 @@ export function toolbarSpecs(): ToolbarSpec[] {
         out.push({ key: 'spawn', label: t('ui.spawn'), disabled: false, onClick: () => useGameStore.getState().setOverlay({ kind: 'spawn' }) });
       }
       const cost = villageUpgradeCost(settlement.level);
-      const upgradeDisabled = !canAfford(player.resources, cost);
+      const upgradeDisabled = !canAffordAt(map, player, tile, cost);
       if (!upgradeDisabled) {
         out.push({
           key: 'upgrade',
@@ -62,7 +63,7 @@ export function toolbarSpecs(): ToolbarSpec[] {
         });
       }
     }
-    if (settlement && settlement.owner === player.index && canBuildWall(tile, player)) {
+    if (settlement && settlement.owner === player.index && canBuildWall(map, tile, player)) {
       out.push({
         key: 'wall',
         label: t('action.buildWall', { stone: WALL_COST.stone, money: WALL_COST.money, ore: WALL_COST.ore }),
@@ -77,7 +78,7 @@ export function toolbarSpecs(): ToolbarSpec[] {
       out.push({
         key: 'repair',
         label: t('action.repairBuilding', { wood: REPAIR_COST.wood, stone: REPAIR_COST.stone, ore: REPAIR_COST.ore, money: REPAIR_COST.money }),
-        disabled: !canAfford(player.resources, REPAIR_COST),
+        disabled: !canAffordAt(map, player, tile, REPAIR_COST),
         onClick: () => gameController.repairSelectedBuilding(),
       });
     }
@@ -105,13 +106,13 @@ export function toolbarSpecs(): ToolbarSpec[] {
                   ? canBuildGranary(map, tile, player)
                   : canBuildForestTemple(map, tile, player);
       if (!ok) continue;
-      out.push({ key: kind, label, disabled: !canAfford(player.resources, BUILDING_COSTS[kind]), onClick: () => gameController.buildSelectedBuilding(kind) });
+      out.push({ key: kind, label, disabled: !canAffordAt(map, player, tile, BUILDING_COSTS[kind]), onClick: () => gameController.buildSelectedBuilding(kind) });
     }
     if (canBuildRoad(map, tile, player)) {
-      out.push({ key: 'road', label: t('ui.buildroad5w2s10m'), disabled: !canAfford(player.resources, ROAD_COST), onClick: () => gameController.buildSelectedRoad() });
+      out.push({ key: 'road', label: t('ui.buildroad5w2s10m'), disabled: !canAffordAt(map, player, tile, ROAD_COST), onClick: () => gameController.buildSelectedRoad() });
     }
     if (canBuildBridge(map, tile, player)) {
-      out.push({ key: 'bridge', label: t('ui.buildbridge10w5s15m'), disabled: !canAfford(player.resources, BRIDGE_COST), onClick: () => gameController.buildSelectedBridge() });
+      out.push({ key: 'bridge', label: t('ui.buildbridge10w5s15m'), disabled: !canAffordAt(map, player, tile, BRIDGE_COST), onClick: () => gameController.buildSelectedBridge() });
     }
   }
 
@@ -121,7 +122,7 @@ export function toolbarSpecs(): ToolbarSpec[] {
     }
     if (unit.shipLevel !== undefined && unit.shipLevel < 3) {
       const cost = SHIP_UPGRADE_COST[(unit.shipLevel + 1) as 2 | 3];
-      const upgradable = canUpgradeShip(unit, tile, player);
+      const upgradable = canUpgradeShip(map, unit, tile, player);
       const ore = cost.ore > 0 ? ` + ${cost.ore} ${t('action.oreWord')}` : '';
       out.push({ key: 'upgrade-ship', label: t('action.upgradeShip', { money: cost.money, wood: cost.wood, ore }), disabled: !upgradable, onClick: () => gameController.upgradeSelectedShip() });
     }
@@ -130,7 +131,7 @@ export function toolbarSpecs(): ToolbarSpec[] {
       out.push({
         key: 'disband',
         label: t('action.disband', { name: UNIT_TYPE_NAMES[unit.type], cost: disbandCostMoney }),
-        disabled: !canAfford(player.resources, moneyCost(disbandCostMoney)),
+        disabled: player.resources.money < disbandCostMoney,
         onClick: () => gameController.disbandSelectedUnit(),
       });
     }
@@ -138,11 +139,11 @@ export function toolbarSpecs(): ToolbarSpec[] {
     if (unit.type === 'stalker' && !unit.isStealthed && unit.shipLevel === undefined && idle && adjacentEnemyVillages(map, tile, player.index).length === 0) {
       out.push({ key: 'stealth', label: t('action.enableStealth'), disabled: false, onClick: () => gameController.enableStealthSelected() });
     }
-    if (unit.type === 'builder' && unit.shipLevel === undefined && canAffordAnyBuilderBuild(player.resources)) {
+    if (unit.type === 'builder' && unit.shipLevel === undefined && canAffordAnyBuilderBuild(map, player, tile)) {
       out.push({ key: 'build', label: t('action.build'), disabled: !idle, onClick: () => useGameStore.getState().setOverlay({ kind: 'builderBuild' }) });
     }
     if (unit.type === 'trapper' && unit.shipLevel === undefined && trapCells(map, tile).length > 0) {
-      out.push({ key: 'thorn-trap', label: t('action.buildTrap'), disabled: !idle || !canAfford(player.resources, TRAP_COST), onClick: () => gameController.placeTrap() });
+      out.push({ key: 'thorn-trap', label: t('action.buildTrap'), disabled: !idle || !canAffordAt(map, player, tile, TRAP_COST), onClick: () => gameController.placeTrap() });
     }
     if (canBurnBuilding(tile, unit) && tile.building) {
       out.push({ key: `burn-${tile.building.kind}`, label: t(tile.building.kind === 'farm' ? 'action.burnFarm' : 'action.burnGranary'), disabled: false, onClick: () => gameController.burnSelected() });
@@ -160,7 +161,7 @@ export function toolbarSpecs(): ToolbarSpec[] {
     out.push({
       key: 'deal',
       label: dealt ? t('action.pirateDealActive') : t('action.dealWithPirates', { money: PIRATE_DEAL_COST }),
-      disabled: dealt || !canAfford(player.resources, moneyCost(PIRATE_DEAL_COST)),
+      disabled: dealt || player.resources.money < PIRATE_DEAL_COST,
       visibleWhenDisabled: true,
       onClick: () => gameController.dealWithSelectedPirate(),
     });

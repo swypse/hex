@@ -2,7 +2,10 @@ import { t } from '../../i18n';
 import { Container } from 'pixi.js';
 import { gameController } from '../../controller/game-controller';
 import { villageIncomeTotal } from '../../game/capture';
-import { buildingIncome } from '../../game/buildings';
+import { networkBuildingIncome } from '../../game/buildings';
+import { tileAt } from '../../game/selection';
+import { networkStock, villageNetwork, villageOfTile } from '../../game/stock';
+import type { MapTile } from '../../game/map-gen';
 import { useGameStore } from '../../store/game-store';
 import { markDirty } from '../../render/render-gate';
 import { type UIHost, type Widget } from '../host';
@@ -46,15 +49,44 @@ export class HudResourcePanel implements Widget {
     this.el.position.set(cx - this.measured / 2, 0);
   };
 
-  private resources(): { money: number; wood: number; stone: number; ore: number; food: number; moneyIncome: number; building: { wood: number; stone: number; ore: number } } {
+  /** Money is the player's own; wood, stone, ore and food are those of the
+   *  selected village's network. `village` is null (and the materials hidden)
+   *  while no tile of one of the player's villages is selected. */
+  private resources(): {
+    money: number;
+    wood: number;
+    stone: number;
+    ore: number;
+    food: number;
+    moneyIncome: number;
+    building: { wood: number; stone: number; ore: number };
+    village: MapTile | null;
+    networkSize: number;
+  } {
     const s = useGameStore.getState();
     const human = s.players[s.localPlayerIndex];
     const map = gameController.getMap();
     const zero = { wood: 0, stone: 0, ore: 0 };
-    if (!human) return { money: 0, wood: 0, stone: 0, ore: 0, food: 0, moneyIncome: 0, building: zero };
+    const none = { money: 0, wood: 0, stone: 0, ore: 0, food: 0, moneyIncome: 0, building: zero, village: null, networkSize: 0 };
+    if (!human) return none;
     const moneyIncome = map ? villageIncomeTotal(map, human.index) : 0;
-    const building = map ? buildingIncome(map, human) : zero;
-    return { money: human.resources.money, wood: human.resources.wood, stone: human.resources.stone, ore: human.resources.ore, food: human.resources.food, moneyIncome, building };
+    const base = { ...none, money: human.resources.money, moneyIncome };
+    if (!map || !s.selection) return base;
+    const selected = tileAt(map, s.selection.q, s.selection.r);
+    if (!selected) return base;
+    const village = villageOfTile(map, human.index, selected);
+    if (!village) return base;
+    const stock = networkStock(map, village);
+    return {
+      ...base,
+      wood: stock.wood,
+      stone: stock.stone,
+      ore: stock.ore,
+      food: stock.food,
+      building: networkBuildingIncome(map, human, village),
+      village,
+      networkSize: villageNetwork(map, village).length,
+    };
   }
 
   private update(): void {
@@ -62,7 +94,7 @@ export class HudResourcePanel implements Widget {
     const r = this.resources();
     // The change key includes the incomes too, so income-only changes (spawn,
     // capture, death, skill, building) redraw even when the amounts don't move.
-    const key = [r.money, r.wood, r.stone, r.ore, r.food, r.moneyIncome, r.building.wood, r.building.stone, r.building.ore].join(',');
+    const key = [r.money, r.village ? `${r.village.q}:${r.village.r}` : '-', r.networkSize, r.wood, r.stone, r.ore, r.food, r.moneyIncome, r.building.wood, r.building.stone, r.building.ore].join(',');
     if (key === this.lastKey) return;
     this.lastKey = key;
     markDirty();
@@ -75,15 +107,17 @@ export class HudResourcePanel implements Widget {
     const padSide = 6;
     const padTop = 10;
     const cy = padTop + iconSize / 2;
-    // Food is only the starting reserve; once it is spent the row disappears.
-    // Farm and granary food is shown per village in the selected-cell panel.
+    // Money always shows. The materials are the selected village network's, so
+    // they only show while a tile of one of your villages is selected. Food is
+    // the villages' reserve; once it is spent the row disappears (farm and
+    // granary food is shown per village in the selected-cell panel).
     const rows = [
       { key: 'money', icon: 'gold-32', value: `${r.money}`, income: r.moneyIncome > 0 ? ` (+${r.moneyIncome})` : '' },
       { key: 'wood', icon: 'wood-32', value: `${r.wood}`, income: r.building.wood > 0 ? ` (+${r.building.wood})` : '' },
       { key: 'stone', icon: 'stone-32', value: `${r.stone}`, income: r.building.stone > 0 ? ` (+${r.building.stone})` : '' },
       { key: 'ore', icon: 'ore-32', value: `${r.ore}`, income: r.building.ore > 0 ? ` (+${r.building.ore})` : '' },
       { key: 'food', icon: 'food-32', value: `${r.food}`, income: '' },
-    ].filter((row) => row.key !== 'food' || r.food > 0);
+    ].filter((row) => row.key === 'money' || (r.village !== null && (row.key !== 'food' || r.food > 0)));
 
     let x = padSide;
     for (const row of rows) {
@@ -134,6 +168,8 @@ export class HudResourcePanel implements Widget {
       onClose: () => this.closePopup(),
     });
     const lines = [t('res.collect.' + resource)];
+    if (resource !== 'money' && r.networkSize > 1) lines.push(t('res.shared', { n: r.networkSize }));
+    else if (resource !== 'money') lines.push(t('res.sharedOne'));
     if (info.requiredFor.length > 0) lines.push(t('res.required', { text: info.requiredFor }));
     let y = 0;
     for (const line of lines) {

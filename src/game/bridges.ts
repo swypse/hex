@@ -1,6 +1,7 @@
 import { GameMap, MapTile, type BridgeDir } from './map-gen';
 import { Player } from './players';
-import { canAfford, pay, Resources } from './resources';
+import { Resources } from './resources';
+import { payAt } from './stock';
 import { tileAt } from './selection';
 import { hasSkill } from './skills';
 import { isSolidGround, isWaterType } from './tile-types';
@@ -65,9 +66,8 @@ export function buildBridgeIgnoringSkill(map: GameMap, tile: MapTile, player: Pl
 }
 
 function payAndPlaceBridge(map: GameMap, tile: MapTile, player: Player): boolean {
-  if (!canAfford(player.resources, BRIDGE_COST)) return false;
   const dir = bridgeDirFor(map, tile)!;
-  player.resources = pay(player.resources, BRIDGE_COST);
+  if (!payAt(map, player, tile, BRIDGE_COST)) return false;
   tile.bridge = { owner: player.index, dir };
   tile.roadOwner = player.index;
   return true;

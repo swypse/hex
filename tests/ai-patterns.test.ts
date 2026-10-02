@@ -5,6 +5,7 @@ import { Tribe } from '../src/game/tribes';
 import { Player } from '../src/game/players';
 import { Unit } from '../src/game/units';
 import { SeededRandom } from '../src/util/random';
+import { migrateLegacyResources } from '../src/game/stock';
 import { AI_PATTERNS, AiPatternContext, bestSpawnableUnitType, enemyCanAttackNext, enemyCanReach, guardGarrisonAttack, nearestEnemyDistanceFrom } from '../src/game/ai-patterns';
 import { AiPlannerState } from '../src/game/ai-types';
 import { analyzeSituation } from '../src/game/ai-situation';
@@ -55,6 +56,8 @@ function state(): AiPlannerState {
 }
 
 function ctx(map: GameMap, player: Player, rng: SeededRandom): AiPatternContext {
+  // The player's literal wood/stone/ore/food sit in its capital, like a loaded game.
+  migrateLegacyResources(map, [player]);
   return { map, player, rng, state: state() };
 }
 
@@ -447,14 +450,18 @@ describe('AI patterns', () => {
   });
 
   it('bestSpawnableUnitType offers catapult only with the skill and resources', () => {
-    const rich = player(100);
-    rich.resources.wood = 20;
-    rich.resources.ore = 5;
-    expect(bestSpawnableUnitType(rich, 'offense')).not.toBe('catapult');
-    const skilled = player(100, ['catapult']);
-    skilled.resources.wood = 20;
-    skilled.resources.ore = 5;
-    expect(bestSpawnableUnitType(skilled, 'offense')).toBe('catapult');
+    const villageMap = (): { map: GameMap; village: MapTile } => {
+      const village = tile(0, 0, { owner: 1, level: 1, captureReady: false, stock: { wood: 20, stone: 5, ore: 5, food: 20 } }, null, 1);
+      return { map: { radius: 4, tiles: [village], spawns: [] }, village };
+    };
+    const noSkill = villageMap();
+    expect(bestSpawnableUnitType(player(100), 'offense', noSkill.map, noSkill.village)).not.toBe('catapult');
+    const skilled = villageMap();
+    expect(bestSpawnableUnitType(player(100, ['catapult']), 'offense', skilled.map, skilled.village)).toBe('catapult');
+    // The village's own wood and ore decide: an empty village cannot afford it.
+    const broke = villageMap();
+    broke.village.settlement!.stock = { wood: 0, stone: 0, ore: 0, food: 20 };
+    expect(bestSpawnableUnitType(player(100, ['catapult']), 'offense', broke.map, broke.village)).not.toBe('catapult');
   });
 
   it('reinforce-endangered-village sends the closest unit to an endangered empty village', () => {
@@ -726,6 +733,8 @@ describe('AI special unit patterns', () => {
     map.tiles.push(
       tile(0, 0, null, { id: 'tp', owner: 1, type: 'trapper', q: 0, r: 0, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 40, attack: 20, attackDistance: 1, spawnVillage: null }, 1),
       tile(1, 0, null, null, 1),
+      // A village of the AI pays the trap's ore.
+      tile(3, 0, { owner: 1, level: 1, captureReady: false }, null, 1),
     );
     map.tiles[1]!.exploredBy = []; // (1,0) unexplored → (0,0) is a frontier cell.
     const actions = findPattern('trapper-lay').evaluate(ctx(map, player(100), new SeededRandom(1)));
@@ -762,7 +771,9 @@ describe('AI special unit patterns', () => {
       stance: 'defend' as const, enemies: [], dangers: [], endangered: true, frontTarget: null,
       freeVillages: [], ownPower: 1, enemyPower: 1, navalThreat: true, navalEnemies: [], nearestNaval: null,
     };
-    const context = { map, player: { ...player(100), tribe: Tribe.Aqua }, rng: new SeededRandom(1), state: state(), situation };
+    const aqua = { ...player(100), tribe: Tribe.Aqua };
+    migrateLegacyResources(map, [aqua]);
+    const context = { map, player: aqua, rng: new SeededRandom(1), state: state(), situation };
     const actions = findPattern('spawn-special-unit').evaluate(context);
     expect(actions).toEqual([{ type: 'spawn', q: 0, r: 0, unitType: 'stormcaller' }]);
   });

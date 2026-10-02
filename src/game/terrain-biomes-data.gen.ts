@@ -57,9 +57,15 @@ export const TERRAIN_BIOME_ATLASES: Record<string, TerrainBiomeAtlas> = {
     cellW: 256,
     cellH: 448,
     frames: {
-      'taiga-forest-spring': { x: 0, y: 0, w: 256, h: 448 },
-      'taiga-land-spring': { x: 256, y: 0, w: 256, h: 448 },
-      'taiga-mountain-spring': { x: 512, y: 0, w: 256, h: 448 },
+      'taiga-forest-autumn': { x: 0, y: 0, w: 256, h: 448 },
+      'taiga-forest-spring': { x: 256, y: 0, w: 256, h: 448 },
+      'taiga-forest-summer': { x: 512, y: 0, w: 256, h: 448 },
+      'taiga-forest-winter': { x: 0, y: 448, w: 256, h: 448 },
+      'taiga-land-autumn': { x: 256, y: 448, w: 256, h: 448 },
+      'taiga-land-spring': { x: 512, y: 448, w: 256, h: 448 },
+      'taiga-land-summer': { x: 0, y: 896, w: 256, h: 448 },
+      'taiga-land-winter': { x: 256, y: 896, w: 256, h: 448 },
+      'taiga-mountain-spring': { x: 512, y: 896, w: 256, h: 448 },
     },
   },
   rainforest: {

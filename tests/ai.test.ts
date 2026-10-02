@@ -8,6 +8,14 @@ import { Tribe } from '../src/game/tribes';
 import { Unit } from '../src/game/units';
 import { SeededRandom } from '../src/util/random';
 import { SKILLS, type SkillId } from '../src/game/skills';
+import { migrateLegacyResources } from '../src/game/stock';
+
+/** Moves the legacy-literal materials of a test player into its capital before planning. */
+function fund<T extends import('../src/game/players').Player>(map: import('../src/game/map-gen').GameMap, player: T): T {
+  migrateLegacyResources(map, [player]);
+  return player;
+}
+
 
 function makeTile(
   q: number,
@@ -49,7 +57,10 @@ function aiPlayer(): import('../src/game/players').Player {
 
 function makeAiMap(): GameMap {
   const village = makeTile(0, 0, 1, { owner: 1, level: 1, captureReady: false });
-  const warrior = makeTile(0, 0, 1, { owner: 1, level: 1, captureReady: false }, makeWarrior('w1', 1, 0, 0));
+  // Two tiles share the hex (the village and the warrior standing on it); the
+  // map index keeps the last one, so both hold the starting food.
+  const warrior = makeTile(0, 0, 1, { owner: 1, level: 1, captureReady: false, stock: { wood: 0, stone: 0, ore: 0, food: 20 } }, makeWarrior('w1', 1, 0, 0));
+  village.settlement!.stock = { wood: 0, stone: 0, ore: 0, food: 20 };
   const target = makeTile(1, 0, null);
   return { radius: 4, tiles: [village, warrior, target], spawns: [] };
 }
@@ -57,7 +68,7 @@ function makeAiMap(): GameMap {
 function planSeeds(map: GameMap, player: import('../src/game/players').Player, seeds: number): AiAction[] {
   const all: AiAction[] = [];
   for (let seed = 1; seed <= seeds; seed++) {
-    all.push(...planAiActions(map, player, new SeededRandom(seed)));
+    all.push(...planAiActions(map, fund(map, player), new SeededRandom(seed)));
   }
   return all;
 }
@@ -146,7 +157,7 @@ describe('planAiActions', () => {
       makeTile(1, 0),
       makeTile(2, 0, 0, null, makeWarrior('enemy', 0, 2, 0)),
     );
-    const actions = planAiActions(map, aiPlayer(), new SeededRandom(1));
+    const actions = planAiActions(map, fund(map, aiPlayer()), new SeededRandom(1));
     const move = actions.find((a) => a.type === 'move');
     const attack = actions.find((a) => a.type === 'attack');
     expect(move).toBeDefined();
@@ -162,7 +173,7 @@ describe('planAiActions', () => {
       makeTile(2, 0),
       makeTile(3, 0, 0, null, makeRider('enemy', 0, 3, 0)),
     );
-    const actions = planAiActions(map, aiPlayer(), new SeededRandom(1));
+    const actions = planAiActions(map, fund(map, aiPlayer()), new SeededRandom(1));
     expect(actions.some((a) => a.type === 'move')).toBe(false);
   });
 
@@ -203,7 +214,7 @@ describe('planAiActions', () => {
       makeTile(1, 0, null, { owner: null, level: 1, captureReady: false }),
       makeTile(2, 0),
     );
-    const actions = planAiActions(map, aiPlayer(), new SeededRandom(1));
+    const actions = planAiActions(map, fund(map, aiPlayer()), new SeededRandom(1));
     const move = actions.find((a) => a.type === 'move');
     expect(move).toBeDefined();
     if (move && move.type === 'move') {
@@ -296,7 +307,7 @@ describe('planAiActions', () => {
     );
     const player = { ...aiPlayer(), difficulty: 'easy' as const, resources: { wood: 5, stone: 5, money: 100, ore: 0, food: 20 } };
     const plans: AiAction[][] = [];
-    for (let seed = 1; seed <= 20; seed++) plans.push(planAiActions(map, player, new SeededRandom(seed)));
+    for (let seed = 1; seed <= 20; seed++) plans.push(planAiActions(map, fund(map, player), new SeededRandom(seed)));
     for (const plan of plans) {
       if (plan.some((a) => a.type === 'attack' && a.unitId === 'g')) {
         expect(plan.some((a) => a.type === 'spawn' && a.q === 0 && a.r === 0)).toBe(true);
@@ -310,10 +321,12 @@ describe('AI bridge building', () => {
     const tiles = [makeTile(0, 0, 1), makeTile(1, 0, null), makeTile(2, 0, 1, { owner: null, level: 1, captureReady: false })];
     tiles[1]!.terrain = TileType.Water;
     const map: GameMap = { radius: 4, tiles, spawns: [] };
+    // The shore tile is a village of the AI: it holds the bridge's materials.
+    tiles[0]!.settlement = { owner: 1, level: 1, captureReady: false, capital: true };
     const p = aiPlayer();
     p.skills = Object.keys(SKILLS) as SkillId[];
     p.resources = { wood: 100, stone: 100, money: 100, ore: 0, food: 20 };
-    const actions = planAiActions(map, p, new SeededRandom(1));
+    const actions = planAiActions(map, fund(map, p), new SeededRandom(1));
     expect(actions.some((a) => a.type === 'buildBridge')).toBe(true);
   });
 });

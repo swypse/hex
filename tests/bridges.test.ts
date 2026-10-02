@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { makeTestMap, tileAt, makeUnit } from './helpers/test-map';
+import { makeTestMap, tileAt, makeUnit, giveResources } from './helpers/test-map';
 import { GameMap } from '../src/game/map-gen';
 import { TileType } from '../src/game/tile-types';
 import { Player } from '../src/game/players';
@@ -113,13 +113,14 @@ describe('buildBridge', () => {
   it('pays the cost and stamps the bridge plus road owner', () => {
     const map = weGap();
     const p = player(['bridges']);
-    const before = { ...p.resources };
+    const village = giveResources(map, p, { wood: 100, stone: 100 })!;
+    const before = { money: p.resources.money, ...village.settlement!.stock! };
     expect(buildBridge(map, tileAt(map, 1, 0)!, p)).toBe(true);
     expect(tileAt(map, 1, 0)!.bridge).toEqual({ owner: 0, dir: 'we' });
     expect(tileAt(map, 1, 0)!.roadOwner).toBe(0);
-    expect(p.resources.wood).toBe(before.wood - BRIDGE_COST.wood);
+    expect(village.settlement!.stock!.wood).toBe(before.wood - BRIDGE_COST.wood);
     expect(p.resources.money).toBe(before.money - BRIDGE_COST.money);
-    expect(p.resources.stone).toBe(before.stone - BRIDGE_COST.stone);
+    expect(village.settlement!.stock!.stone).toBe(before.stone - BRIDGE_COST.stone);
   });
 
   it('fails without the skill, with too little money, or on a land tile', () => {

@@ -9,7 +9,8 @@ import { SeededRandom } from '../src/util/random';
 import { isEnemySiegeTarget, performSiege } from '../src/game/combat';
 import { planFoodFixes } from '../src/game/ai-food';
 import { Simulator } from '../src/game/simulator';
-import { START_RESOURCES } from '../src/game/resources';
+import { START_RESOURCES, START_STOCK } from '../src/game/resources';
+import { generateMap } from '../src/game/map-gen';
 import { unitFoodUpkeep, type UnitType } from '../src/game/units';
 import { buildingsInVillage } from '../src/game/village';
 import { SKILLS } from '../src/game/skills';
@@ -50,8 +51,18 @@ function setup(): { map: GameMap; p: Player; village: MapTile } {
       t.claimedByVillage = { q: 0, r: 0 };
     }
   }
-  p.resources = { ...START_RESOURCES, money: 100, wood: 100, stone: 100 };
+  p.resources = { money: 100 };
+  village.settlement.stock = { wood: 100, stone: 100, ore: 0, food: START_RESOURCES.food };
   return { map, p, village };
+}
+
+/** The food held by the test village at (0,0). */
+function foodOf(map: GameMap): number {
+  return tileAt(map, 0, 0)!.settlement!.stock!.food;
+}
+
+function setFood(map: GameMap, n: number): void {
+  tileAt(map, 0, 0)!.settlement!.stock!.food = n;
 }
 
 function addUnit(map: GameMap, type: UnitType, q: number, r: number, owner = 0, home: { q: number; r: number } | null = { q: 0, r: 0 }): void {
@@ -61,9 +72,14 @@ function addUnit(map: GameMap, type: UnitType, q: number, r: number, owner = 0, 
 }
 
 describe('food resource', () => {
-  it('starts every player with 40 food', () => {
-    expect(START_RESOURCES.food).toBe(40);
-    expect(buildPlayers(Tribe.Villagers, 1, new SeededRandom(1))[0]!.resources.food).toBe(40);
+  it('gives every capital 25 food at the start; money alone stays with the player', () => {
+    expect(START_RESOURCES.food).toBe(25);
+    expect(START_STOCK.food).toBe(25);
+    expect(buildPlayers(Tribe.Villagers, 1, new SeededRandom(1))[0]!.resources).toEqual({ money: START_RESOURCES.money + 8 });
+    const map = generateMap(2, 1);
+    const capitals = map.tiles.filter((t) => t.settlement?.capital);
+    expect(capitals).toHaveLength(2);
+    for (const c of capitals) expect(c.settlement!.stock).toEqual(START_STOCK);
   });
 
   it('defines the unit food upkeep table', () => {
@@ -126,11 +142,11 @@ describe('farms', () => {
     const { map, p, village: v } = setup();
     p.skills.push('agriculture');
     expect(BUILDING_COSTS.farm).toEqual({ money: 15, wood: 5, stone: 0, ore: 0, food: 0 });
-    const before = { ...p.resources };
+    const before = { money: p.resources.money, ...v.settlement!.stock! };
     expect(buildBuilding(map, tileAt(map, 1, 0)!, 'farm', p)).toBe(true);
     expect(p.resources.money).toBe(before.money - 15);
-    expect(p.resources.wood).toBe(before.wood - 5);
-    expect(p.resources.stone).toBe(before.stone);
+    expect(v.settlement!.stock!.wood).toBe(before.wood - 5);
+    expect(v.settlement!.stock!.stone).toBe(before.stone);
     expect(tileAt(map, 1, 0)!.building).toEqual({ kind: 'farm', level: 1 });
     expect(buildingsInVillage(map, v)).toBe(0);
   });
@@ -141,6 +157,26 @@ describe('farms', () => {
     p.skills.push('science');
     expect(farmYield(p)).toBe(FARM_FOOD_SCIENCE);
     expect([FARM_FOOD, FARM_FOOD_SCIENCE]).toEqual([2, 3]);
+  });
+
+  it('yield 0 food in winter, even with Science', () => {
+    const { map, p } = setup();
+    map.season = 'winter';
+    expect(farmYield(p, map)).toBe(0);
+    p.skills.push('science');
+    expect(farmYield(p, map)).toBe(0);
+    map.season = 'summer';
+    expect(farmYield(p, map)).toBe(FARM_FOOD_SCIENCE);
+  });
+
+  it('give nothing to granaries in winter', () => {
+    const { map, p } = setup();
+    map.season = 'winter';
+    const g = tileAt(map, 1, 0)!;
+    g.building = { kind: 'granary', level: 1, food: 5 };
+    tileAt(map, 1, -1)!.building = { kind: 'farm', level: 1 };
+    applyFood(map, p);
+    expect(g.building!.food).toBe(5);
   });
 });
 
@@ -200,22 +236,22 @@ describe('granaries', () => {
 
   it('farm food without a granary is lost and the starting reserve is untouched', () => {
     const { map, p } = setup();
-    p.resources.food = 10;
+    setFood(map, 10);
     tileAt(map, 1, 0)!.building = { kind: 'farm', level: 1 };
     addUnit(map, 'warrior', 0, 1);
     applyFood(map, p);
-    expect(p.resources.food).toBe(10);
+    expect(foodOf(map)).toBe(10);
   });
 
   it('a deficit drains granaries first, then the starting reserve', () => {
     const { map, p } = setup();
-    p.resources.food = 10;
+    setFood(map, 10);
     const g = tileAt(map, 1, 0)!;
     g.building = { kind: 'granary', level: 1, food: 2 };
     addUnit(map, 'swordsman', 0, 1); // 3
     applyFood(map, p);
     expect(g.building!.food).toBe(0);
-    expect(p.resources.food).toBe(9);
+    expect(foodOf(map)).toBe(9);
   });
 });
 
@@ -240,15 +276,15 @@ describe('village food balance and starvation', () => {
 
   it('deficits are paid from the starting reserve', () => {
     const { map, p } = setup();
-    p.resources.food = 10;
+    setFood(map, 10);
     addUnit(map, 'warrior', 0, 1);
     expect(applyFood(map, p)).toEqual([]);
-    expect(p.resources.food).toBe(9);
+    expect(foodOf(map)).toBe(9);
   });
 
   it('a village that cannot feed its units starves: each unit loses 10 hp', () => {
     const { map, p, village: v } = setup();
-    p.resources.food = 0;
+    setFood(map, 0);
     addUnit(map, 'warrior', 0, 1);
     addUnit(map, 'swordsman', -1, 1);
     addUnit(map, 'archer', 1, -1, 0, null); // not raised here: untouched
@@ -259,18 +295,18 @@ describe('village food balance and starvation', () => {
     expect(tileAt(map, -1, 1)!.unit!.hp).toBe(80 - STARVATION_DAMAGE);
     expect(tileAt(map, 1, -1)!.unit!.hp).toBe(40);
     expect(reports[0]!.units).toHaveLength(2);
-    expect(p.resources.food).toBe(0);
+    expect(foodOf(map)).toBe(0);
   });
 
   it('marks units that get too little food as starving and clears it once fed', () => {
     const { map, p } = setup();
-    p.resources.food = 1;
+    setFood(map, 1);
     addUnit(map, 'warrior', 0, 1); // fed from the reserve (swordsman-first order: same cost)
     addUnit(map, 'archer', -1, 1);
     applyFood(map, p);
     const flags = [tileAt(map, 0, 1)!.unit!.starving, tileAt(map, -1, 1)!.unit!.starving];
     expect(flags.filter(Boolean)).toHaveLength(1);
-    p.resources.food = 10;
+    setFood(map, 10);
     applyFood(map, p);
     expect(tileAt(map, 0, 1)!.unit!.starving).toBeFalsy();
     expect(tileAt(map, -1, 1)!.unit!.starving).toBeFalsy();
@@ -278,21 +314,21 @@ describe('village food balance and starvation', () => {
 
   it('starvation never drops a unit below 1 hp and clears once the village is fed again', () => {
     const { map, p, village: v } = setup();
-    p.resources.food = 0;
+    setFood(map, 0);
     addUnit(map, 'warrior', 0, 1);
     tileAt(map, 0, 1)!.unit!.hp = 3;
     applyFood(map, p);
     expect(tileAt(map, 0, 1)!.unit!.hp).toBe(1);
     expect(v.settlement!.starving).toBe(true);
-    p.resources.food = 5;
+    setFood(map, 5);
     applyFood(map, p);
     expect(v.settlement!.starving).toBe(false);
-    expect(p.resources.food).toBe(4);
+    expect(foodOf(map)).toBe(4);
   });
 
   it('a starving village eats from its granaries before it starves', () => {
     const { map, p, village: v } = setup();
-    p.resources.food = 0;
+    setFood(map, 0);
     tileAt(map, 1, 0)!.building = { kind: 'granary', level: 1, food: 5 };
     addUnit(map, 'swordsman', 0, 1); // 3 per round
     expect(applyFood(map, p)).toEqual([]);
@@ -306,12 +342,12 @@ describe('village food balance and starvation', () => {
   it('pressure and sustainability helpers reflect the stock and the balance', () => {
     const { map, p } = setup();
     expect(foodPressure(map, p)).toBe('none');
-    p.resources.food = 2;
+    setFood(map, 2);
     addUnit(map, 'swordsman', 0, 1);
     expect(foodPressure(map, p)).toBe('urgent');
-    p.resources.food = 50;
+    setFood(map, 50);
     expect(canSustainUnit(map, p, 'swordsman')).toBe(true);
-    p.resources.food = 4;
+    setFood(map, 4);
     expect(canSustainUnit(map, p, 'swordsman')).toBe(false);
   });
 });
@@ -320,7 +356,7 @@ describe('starving state refresh', () => {
   it('building or destroying a farm updates the village starving flag at once', () => {
     const { map, p, village: v } = setup();
     p.skills.push('agriculture');
-    p.resources.food = 0;
+    setFood(map, 0);
     addUnit(map, 'warrior', 0, 1);
     const sim = new Simulator(map, [p], 'capture', { rng: () => 0.5 });
     sim.startGame();
@@ -337,7 +373,7 @@ describe('starving state refresh', () => {
 describe('starving state on spawn', () => {
   it('spawning a unit a village cannot feed shows starvation at once', () => {
     const { map, p, village: v } = setup();
-    p.resources.food = 0;
+    setFood(map, 0);
     const sim = new Simulator(map, [p], 'capture', { rng: () => 0.5 });
     sim.startGame();
     sim.drainEvents();
@@ -350,7 +386,7 @@ describe('starving state on spawn', () => {
 describe('starving state on unit death', () => {
   it('killing a unit clears starvation once the village can feed the rest', () => {
     const { map, p, village: v } = setup();
-    p.resources.food = 1; // feeds one warrior, not two
+    setFood(map, 1); // feeds one warrior, not two
     addUnit(map, 'warrior', 0, 1);
     addUnit(map, 'warrior', -1, 1);
     const enemy = buildPlayers(Tribe.Villagers, 2, new SeededRandom(1))[1]!;
@@ -376,7 +412,7 @@ describe('starving state on capture', () => {
     target.claimedByVillage = { q: 0, r: 3 };
     const cap = makeUnit('cap', 0, 'warrior', 0, 3); // becomes the village's unit: 1 food a round
     target.unit = cap;
-    p.resources.food = 0;
+    setFood(map, 0);
     const sim = new Simulator(map, [p], 'capture', { rng: () => 0.5 });
     sim.startGame();
     sim.drainEvents();
@@ -400,7 +436,7 @@ function setupNetwork(connect: boolean): { map: GameMap; p: Player; a: MapTile; 
   }
   tileAt(map, 3, -1)!.building = { kind: 'farm', level: 1 };
   if (connect) for (const [q, r] of [[1, 0], [2, 0]] as const) tileAt(map, q, r)!.roadOwner = 0;
-  p.resources.food = 0;
+  setFood(map, 0);
   return { map, p, a, b };
 }
 
@@ -424,7 +460,7 @@ describe('food networks', () => {
   it('a unit short of food loses the missing share of the starvation damage', () => {
     const { map, p } = setupNetwork(true);
     tileAt(map, 3, -1)!.building = null;
-    p.resources.food = 2;
+    setFood(map, 2);
     addUnit(map, 'swordsman', 0, 1); // needs 3, gets 2: 1/3 of 10 hp, rounded
     applyFood(map, p);
     expect(tileAt(map, 0, 1)!.unit!.hp).toBe(80 - 3);
@@ -434,7 +470,7 @@ describe('food networks', () => {
     const { map, p, a, b } = setupNetwork(true);
     tileAt(map, 3, -1)!.building = null;
     b.settlement!.level = 2;
-    p.resources.food = 3;
+    setFood(map, 3);
     addUnit(map, 'warrior', 0, 1); // village A (level 1)
     addUnit(map, 'warrior', 2, 1, 0, { q: 3, r: 0 }); // village B (level 2), fed first
     addUnit(map, 'swordsman', 3, -2, 0, { q: 3, r: 0 }); // B's hungriest unit, fed before B's warrior
@@ -455,7 +491,8 @@ describe('food networks', () => {
     const sim = new Simulator(map, [p], 'capture', { rng: () => 0.5 });
     sim.startGame();
     sim.drainEvents();
-    p.resources = { ...START_RESOURCES, money: 100, wood: 100, stone: 100, food: 0 };
+    p.resources = { money: 100 };
+    tileAt(map, 0, 0)!.settlement!.stock = { wood: 100, stone: 100, ore: 0, food: 0 };
     tileAt(map, 1, 0)!.roadOwner = 0;
     expect(sim.applyCommand({ type: 'buildRoad', q: 2, r: 0 })).toBe(true);
     expect(a.settlement!.starving).toBe(false);
@@ -667,7 +704,7 @@ describe('destroying roads', () => {
 describe('round end', () => {
   it('the simulator runs the food step and reports starvation', () => {
     const { map, p } = setup();
-    p.resources.food = 0;
+    setFood(map, 0);
     addUnit(map, 'warrior', 0, 1);
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
     players[0] = p;
@@ -680,13 +717,28 @@ describe('round end', () => {
     expect(tileAt(map, 0, 1)!.unit!.hp).toBeLessThan(50);
   });
 
-  it('old saves without a food stock get the starting food', () => {
-    const { map } = setup();
+  it('old saves without a food stock get the starting food in the capital', () => {
+    const { map, village } = setup();
+    village.settlement!.capital = true;
+    village.settlement!.stock = undefined;
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
-    delete (players[0]!.resources as Partial<typeof players[0]['resources']>).food;
+    players[0]!.resources = { money: 7, wood: 4, stone: 3, ore: 2 };
     const sim = Simulator.fromSnapshot({
       map, players, mode: 'capture', turn: 1, currentPlayerIndex: 0, gameOver: false, winnerIndex: null, expectedTurns: 10, bonusAwarded: false,
     });
-    expect(sim.players[0]!.resources.food).toBe(40);
+    expect(village.settlement!.stock).toEqual({ wood: 4, stone: 3, ore: 2, food: START_RESOURCES.food });
+    expect(sim.players[0]!.resources).toEqual({ money: 7 });
+  });
+
+  it('old saves keep the player-wide materials and food in the capital', () => {
+    const { map, village } = setup();
+    village.settlement!.capital = true;
+    village.settlement!.stock = undefined;
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    players[0]!.resources = { money: 7, wood: 9, stone: 8, ore: 6, food: 11 };
+    Simulator.fromSnapshot({
+      map, players, mode: 'capture', turn: 1, currentPlayerIndex: 0, gameOver: false, winnerIndex: null, expectedTurns: 10, bonusAwarded: false,
+    });
+    expect(village.settlement!.stock).toEqual({ wood: 9, stone: 8, ore: 6, food: 11 });
   });
 });

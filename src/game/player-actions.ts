@@ -5,7 +5,8 @@ import { reachableTargets } from './selection';
 import { attackableTargets } from './combat';
 import { hasSkill, canOpenSkill, SKILLS } from './skills';
 import { unitsInVillage, villageCapacity, canBuildWall } from './village';
-import { canAfford, villageUpgradeCost } from './resources';
+import { villageUpgradeCost } from './resources';
+import { canAffordAt } from './stock';
 import {
   canBuildSawmill,
   canBuildMine,
@@ -69,8 +70,8 @@ export function hasAnyAvailableAction(map: GameMap, player: Player, turn: number
     ) {
       return true;
     }
-    if (canAfford(player.resources, villageUpgradeCost(tile.settlement.level))) return true;
-    if (canBuildWall(tile, player)) return true;
+    if (canAffordAt(map, player, tile, villageUpgradeCost(tile.settlement.level))) return true;
+    if (canBuildWall(map, tile, player)) return true;
   }
 
   for (const id of Object.keys(SKILLS) as (keyof typeof SKILLS)[]) {
@@ -83,15 +84,15 @@ export function hasAnyAvailableAction(map: GameMap, player: Player, turn: number
 
   const roadConnected = villageConnectedNodes(map, player.index);
   for (const tile of map.tiles) {
-    if (canBuildSawmill(map, tile, player) && canAfford(player.resources, BUILDING_COSTS.sawmill)) return true;
-    if (canBuildMine(map, tile, player) && canAfford(player.resources, BUILDING_COSTS.mine)) return true;
-    if (canBuildPort(map, tile, player) && canAfford(player.resources, BUILDING_COSTS.port)) return true;
-    if (canBuildTemple(map, tile, player) && canAfford(player.resources, BUILDING_COSTS.temple)) return true;
-    if (canBuildForestTemple(map, tile, player) && canAfford(player.resources, BUILDING_COSTS.forestTemple)) return true;
-    if (canBuildFarm(map, tile, player) && canAfford(player.resources, BUILDING_COSTS.farm)) return true;
-    if (canBuildGranary(map, tile, player) && canAfford(player.resources, BUILDING_COSTS.granary)) return true;
+    if (canBuildSawmill(map, tile, player) && canAffordAt(map, player, tile, BUILDING_COSTS.sawmill)) return true;
+    if (canBuildMine(map, tile, player) && canAffordAt(map, player, tile, BUILDING_COSTS.mine)) return true;
+    if (canBuildPort(map, tile, player) && canAffordAt(map, player, tile, BUILDING_COSTS.port)) return true;
+    if (canBuildTemple(map, tile, player) && canAffordAt(map, player, tile, BUILDING_COSTS.temple)) return true;
+    if (canBuildForestTemple(map, tile, player) && canAffordAt(map, player, tile, BUILDING_COSTS.forestTemple)) return true;
+    if (canBuildFarm(map, tile, player) && canAffordAt(map, player, tile, BUILDING_COSTS.farm)) return true;
+    if (canBuildGranary(map, tile, player) && canAffordAt(map, player, tile, BUILDING_COSTS.granary)) return true;
     if (canBuildRoad(map, tile, player, roadConnected)) return true;
-    if (canBuildBridge(map, tile, player) && canAfford(player.resources, BRIDGE_COST)) return true;
+    if (canBuildBridge(map, tile, player) && canAffordAt(map, player, tile, BRIDGE_COST)) return true;
   }
 
   return false;

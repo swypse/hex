@@ -1,5 +1,6 @@
 // Packs the 32px icons (src/assets/32/*.png) into a single compressed atlas
-// PNG plus a generated manifest. The source files are never modified.
+// PNG (icons separated by a transparent gap) plus a generated manifest. The
+// source files are never modified.
 // Run with: npm run pack:icons-32
 import { readFileSync, writeFileSync, readdirSync } from 'node:fs';
 import { URL } from 'node:url';
@@ -11,6 +12,10 @@ export const MANIFEST_URL = new URL('../src/game/icons32-atlas-data.gen.ts', imp
 
 export const ICONS32_COLS = 4;
 export const ICONS32_CELL = 32;
+/** Transparent pixels kept around every icon so linear sampling (scaling,
+ *  sub-pixel placement) never picks up a neighbouring icon's edge pixels. */
+export const ICONS32_GAP = 2;
+const PITCH = ICONS32_CELL + 2 * ICONS32_GAP;
 export const ICONS32_ATLAS_FILE = 'icons-32-atlas.png';
 
 /** Permanent, sorted order of the source icon base names (e.g. 'water-protection-32'). */
@@ -26,16 +31,16 @@ export function generateIcons32Atlas(sourceDir = SOURCE_DIR_URL, cols = ICONS32_
     .sort();
   const cells = order.length;
   const rows = Math.ceil(cells / cols);
-  const width = cols * ICONS32_CELL;
-  const height = rows * ICONS32_CELL;
+  const width = cols * PITCH;
+  const height = rows * PITCH;
   const rgba = Buffer.alloc(width * height * 4); // zero = fully transparent
   const frames = {};
 
   order.forEach((base, i) => {
     const col = i % cols;
     const row = Math.floor(i / cols);
-    const x = col * ICONS32_CELL;
-    const y = row * ICONS32_CELL;
+    const x = col * PITCH + ICONS32_GAP;
+    const y = row * PITCH + ICONS32_GAP;
     const src = readFileSync(new URL(`${base}.png`, sourceDir));
     const icon = decodePng(src);
     if (icon.width !== ICONS32_CELL || icon.height !== ICONS32_CELL) {

@@ -1,10 +1,11 @@
-import { buildingIncome, canBuildFarm, canBuildGranary, canBurnBuilding, canBuildSawmill, canBuildForestTemple, canBuildMine, canBuildPort, canBuildTemple, BUILDING_COSTS } from './buildings';
+import { networkBuildingIncome, canBuildFarm, canBuildGranary, canBurnBuilding, canBurnRoad, canBuildSawmill, canBuildForestTemple, canBuildMine, canBuildPort, canBuildTemple, BUILDING_COSTS } from './buildings';
 import { hexDistance, hexNeighbors } from './hex';
 import { canBuildBridge, bridgeCoastOffsets, bridgeDirFor, BRIDGE_COST } from './bridges';
-import { canBuildRoad, villageConnectedNodes, ROAD_COST } from './roads';
+import { canBuildRoad, roadCutSplits, villageConnectedNodes, ROAD_COST } from './roads';
 import { GameMap, MapTile } from './map-gen';
 import { Player } from './players';
-import { canAfford, moneyCost, pay, villageUpgradeCost, type Resources } from './resources';
+import { moneyCost, villageUpgradeCost, type Resources } from './resources';
+import { canAffordAt, networkStock, payerVillage, totalStock } from './stock';
 import { canOpenSkill, hasSkill, skillCost, SkillId } from './skills';
 import { reachableTargets, tileAt } from './selection';
 import { foodNetworkStates, networkStateOfTile, foodPressure, canSustainUnit, eatsFarmMaterials } from './food';
@@ -125,10 +126,17 @@ export function formatAiAction(a: AiAction): string {
       return `trap ${a.unitId} -> (${a.q},${a.r})`;
     case 'burn':
       return `burn ${a.unitId}`;
+    case 'burnRoad':
+      return `burnRoad ${a.unitId}`;
     case 'builderBuild':
       return `builderBuild ${a.unitId} ${a.kind} (${a.q},${a.r})`;
   }
 }
+
+/** Score of destroying the only road linking two enemy villages (above a normal attack, below burning a food building). */
+const ROAD_CUT_SCORE = 4200;
+/** Score of destroying any other enemy road: only when nothing better is available. */
+const ROAD_BURN_IDLE_SCORE = 120;
 
 function axialKeyOf(t: { q: number; r: number }): string {
   return key(t.q, t.r);
@@ -259,7 +267,7 @@ function bestAvailableAction(
   for (const v of map.tiles) {
     if (!v.settlement || v.settlement.owner !== player.index) continue;
     const k = key(v.q, v.r);
-    if (!state.upgraded.has(k) && canAfford(player.resources, villageUpgradeCost(v.settlement.level))) {
+    if (!state.upgraded.has(k) && canAffordAt(map, player, v, villageUpgradeCost(v.settlement.level))) {
       const front = nearestEnemyDistanceFrom(map, player.index, v) <= 4;
       const level = v.settlement!.level;
       const boost = hasPendingMineSlot(map, player, v) ? 260 : level <= 2 && !front ? 90 : 0;
@@ -288,14 +296,14 @@ function bestAvailableAction(
               : situation?.stance === 'settle' && freeVillageToGrab
                 ? 'scout'
                 : 'offense';
-      const type = bestSpawnableUnitType(player, prefer, map);
+      const type = bestSpawnableUnitType(player, prefer, map, v);
       if (type) {
         const cost = unitSpawnCost(type);
-        if (canAfford(player.resources, cost)) {
-          const after = pay(player.resources, cost);
+        if (canAffordAt(map, player, v, cost)) {
+          const afterMoney = player.resources.money - cost.money;
           // An economy goal keeps money in reserve for mines/skills, but a
           // free-village grab is expansion income and always worth the spend.
-          const reserveOk = urgent || freeVillageToGrab || after.money >= directivesReserve(directives, difficulty);
+          const reserveOk = urgent || freeVillageToGrab || afterMoney >= directivesReserve(directives, difficulty);
           // A unit the food stock cannot carry would only starve: hold back
           // unless the village itself is in danger.
           const foodOk = urgent || canSustainUnit(map, player, type, 6, v);
@@ -318,6 +326,16 @@ function bestAvailableAction(
     if (canBurnBuilding(t, unit)) {
       candidates.push({ score: 4500 + jitter(), action: { type: 'burn', unitId: unit.id } });
       continue;
+    }
+    if (canBurnRoad(t, unit)) {
+      // A road that is the only link between two villages is worth cutting
+      // ahead of a normal attack (it splits their food network); any other
+      // enemy road only fills an otherwise idle turn.
+      const splits = roadCutSplits(map, t);
+      candidates.push({
+        score: (splits > 0 ? ROAD_CUT_SCORE + 100 * Math.min(splits, 3) : ROAD_BURN_IDLE_SCORE) + jitter(),
+        action: { type: 'burnRoad', unitId: unit.id },
+      });
     }
     const attackTile = chooseBestAttack(map, unit, unit.owner);
     if (attackTile && !isSupportUnit(unit) && unit.type !== 'stalker' && (!difficulty || !difficulty.checkTrades || !mustering(directives) || tradeIsFavorable(unit, attackTile))) {
@@ -443,42 +461,42 @@ function bestAvailableAction(
   }
   for (const { tile, pressure } of foodPlan.ports) {
     if (state.built.has(key(tile.q, tile.r))) continue;
-    if (!canBuildPort(map, tile, player) || !canAfford(player.resources, BUILDING_COSTS.port)) continue;
+    if (!canBuildPort(map, tile, player) || !canAffordAt(map, player, tile, BUILDING_COSTS.port)) continue;
     candidates.push({ score: (pressure === 'urgent' ? 650 : 450) + jitter(), action: { type: 'build', q: tile.q, r: tile.r, kind: 'port' } });
   }
 
   for (const tile of map.tiles) {
     if (tile.ownedBy !== player.index) continue;
     if (state.built.has(key(tile.q, tile.r))) continue;
-    if (canBuildSawmill(map, tile, player) && canAfford(player.resources, BUILDING_COSTS.sawmill)) {
+    if (canBuildSawmill(map, tile, player) && canAffordAt(map, player, tile, BUILDING_COSTS.sawmill)) {
       if (!reserveLastSlotForMine(map, player, tile)) {
         candidates.push({ score: 360 + jitter(), action: { type: 'build', q: tile.q, r: tile.r, kind: 'sawmill' } });
       }
     }
-    if (canBuildMine(map, tile, player) && canAfford(player.resources, BUILDING_COSTS.mine)) {
+    if (canBuildMine(map, tile, player) && canAffordAt(map, player, tile, BUILDING_COSTS.mine)) {
       candidates.push({ score: 500 + jitter(), action: { type: 'build', q: tile.q, r: tile.r, kind: 'mine' } });
     }
-    if (canBuildFarm(map, tile, player) && canAfford(player.resources, BUILDING_COSTS.farm)) {
+    if (canBuildFarm(map, tile, player) && canAffordAt(map, player, tile, BUILDING_COSTS.farm)) {
       const net = networkStateOfTile(foodStates, tile);
       const roadFirst = net !== undefined && foodPlan.linkFirst.has(axialKeyOf(net.villages[0]!));
       const pressure = net?.pressure ?? foodPressure(map, player);
       const farmScore = roadFirst ? 0 : pressure === 'urgent' ? 650 : pressure === 'low' ? 450 : (net?.balance ?? 0) < 2 ? 260 : 0;
       if (farmScore > 0) candidates.push({ score: farmScore + jitter(), action: { type: 'build', q: tile.q, r: tile.r, kind: 'farm' } });
     }
-    if (canBuildGranary(map, tile, player) && canAfford(player.resources, BUILDING_COSTS.granary) && (networkStateOfTile(foodStates, tile)?.balance ?? 0) > 0) {
+    if (canBuildGranary(map, tile, player) && canAffordAt(map, player, tile, BUILDING_COSTS.granary) && (networkStateOfTile(foodStates, tile)?.balance ?? 0) > 0) {
       candidates.push({ score: 120 + jitter(), action: { type: 'build', q: tile.q, r: tile.r, kind: 'granary' } });
     }
-    if (canBuildPort(map, tile, player) && canAfford(player.resources, BUILDING_COSTS.port)) {
+    if (canBuildPort(map, tile, player) && canAffordAt(map, player, tile, BUILDING_COSTS.port)) {
       if (!reserveLastSlotForMine(map, player, tile) || situation?.navalThreat) {
         candidates.push({ score: (200 * buildScale) + jitter(), action: { type: 'build', q: tile.q, r: tile.r, kind: 'port' } });
       }
     }
-    if (canBuildTemple(map, tile, player) && canAfford(player.resources, BUILDING_COSTS.temple)) {
+    if (canBuildTemple(map, tile, player) && canAffordAt(map, player, tile, BUILDING_COSTS.temple)) {
       if (!reserveLastSlotForMine(map, player, tile)) {
         candidates.push({ score: (200 * buildScale) + jitter(), action: { type: 'build', q: tile.q, r: tile.r, kind: 'temple' } });
       }
     }
-    if (canBuildForestTemple(map, tile, player) && canAfford(player.resources, BUILDING_COSTS.forestTemple)) {
+    if (canBuildForestTemple(map, tile, player) && canAffordAt(map, player, tile, BUILDING_COSTS.forestTemple)) {
       if (!reserveLastSlotForMine(map, player, tile)) {
         candidates.push({ score: (200 * buildScale) + jitter(), action: { type: 'build', q: tile.q, r: tile.r, kind: 'forestTemple' } });
       }
@@ -505,7 +523,7 @@ function bestAvailableAction(
   for (const tile of map.tiles) {
     if (state.built.has(key(tile.q, tile.r))) continue;
     if (!canBuildBridge(map, tile, player)) continue;
-    if (!canAfford(player.resources, BRIDGE_COST)) continue;
+    if (!canAffordAt(map, player, tile, BRIDGE_COST)) continue;
     // While a naval threat is active, spend on the naval response instead.
     if (situation?.navalThreat) continue;
     const touchesOwnNetwork = hexNeighbors(tile).some((n) => {
@@ -529,13 +547,19 @@ function bestAvailableAction(
   // Money the AI must keep to afford the food-path skill it is waiting for.
   let foodSkillReserve = 0;
   if (hasSkill(player, 'agriculture') && foodPressure(map, player) !== 'none') {
-    const income = buildingIncome(map, player);
     const wanted: SkillId[] = [];
-    if (player.resources.wood < BUILDING_COSTS.farm.wood && income.wood === 0) wanted.push('forestry');
     // Roads (and granaries) need stone: a planned road link with no stone in
     // sight also heads for the mine skills.
     const stoneNeeded = foodPlan.roads.length > 0 ? ROAD_COST.stone : BUILDING_COSTS.farm.stone;
-    if (player.resources.stone < stoneNeeded && income.stone === 0) wanted.push('climbing', 'smithery');
+    // Judged per hungry network: its own wood/stone and the income of the
+    // buildings feeding it.
+    for (const net of foodStates.filter((n) => n.pressure !== 'none')) {
+      const home = net.villages[0]!;
+      const have = networkStock(map, home);
+      const income = networkBuildingIncome(map, player, home);
+      if (have.wood < BUILDING_COSTS.farm.wood && income.wood === 0 && !wanted.includes('forestry')) wanted.push('forestry');
+      if (have.stone < stoneNeeded && income.stone === 0 && !wanted.includes('climbing')) wanted.push('climbing', 'smithery');
+    }
     for (const id of wanted) {
       if (hasSkill(player, id) || state.opened.has(id)) continue;
       foodSkillReserve = skillCost(id, player.skills.length);
@@ -576,14 +600,16 @@ function bestAvailableAction(
       const cost = discretionaryCost(map, player, first);
       if (!cost) continue;
       // Wood and stone trickle in slowly: never spend below one farm's worth.
-      if (eatsFarmMaterials(map, player, cost)) {
+      if (eatsFarmMaterials(map, player, cost, actionVillage(map, player, first))) {
         candidates.splice(i, 1);
         continue;
       }
       // When money is the only thing missing for the farm, save it too (an
       // urgent defensive spawn still goes ahead).
       const urgentSpawn = first.type === 'spawn' && candidates[i]!.score >= 500;
-      const materialsReady = hasSkill(player, 'agriculture') && player.resources.wood >= BUILDING_COSTS.farm.wood && player.resources.stone >= BUILDING_COSTS.farm.stone;
+      const home = actionVillage(map, player, first);
+      const have = home ? networkStock(map, home) : totalStock(map, player.index);
+      const materialsReady = hasSkill(player, 'agriculture') && have.wood >= BUILDING_COSTS.farm.wood && have.stone >= BUILDING_COSTS.farm.stone;
       const reserve = foodSkillReserve > 0 ? foodSkillReserve : materialsReady ? BUILDING_COSTS.farm.money : 0;
       if (reserve > 0 && !urgentSpawn && player.resources.money - cost.money < reserve) candidates.splice(i, 1);
     }
@@ -604,6 +630,16 @@ function bestAvailableAction(
 
 /** Resources a discretionary action spends (null for actions that never
  *  compete with the first farm: mines, food buildings, food skills, moves). */
+/** The village whose network pays for a planned action (undefined when the
+ *  action is not tied to a tile). */
+function actionVillage(map: GameMap, player: Player, a: AiAction): MapTile | undefined {
+  if ('q' in a && 'r' in a && typeof a.q === 'number' && typeof a.r === 'number') {
+    const tile = tileAt(map, a.q, a.r);
+    return (tile && payerVillage(map, player.index, tile)) ?? undefined;
+  }
+  return undefined;
+}
+
 function discretionaryCost(map: GameMap, player: Player, a: AiAction): Resources | null {
   switch (a.type) {
     case 'upgrade': {
@@ -665,6 +701,7 @@ function markUsed(state: AiPlannerState, action: AiAction): void {
     case 'storm':
     case 'trap':
     case 'burn':
+    case 'burnRoad':
       state.acted.add(action.unitId);
       break;
     case 'builderBuild':

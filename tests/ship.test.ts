@@ -3,7 +3,8 @@ import { Tribe } from '../src/game/tribes';
 import { Player } from '../src/game/players';
 import { Unit } from '../src/game/units';
 import { makeUnit } from '../src/game/units';
-import { MapTile } from '../src/game/map-gen';
+import { GameMap, MapTile } from '../src/game/map-gen';
+import { migrateLegacyResources, totalStock } from '../src/game/stock';
 import { TileType } from '../src/game/tile-types';
 import {
   canUpgradeShip,
@@ -42,6 +43,24 @@ function tile(ownedBy: number | null): MapTile {
     q: 0, r: 0, terrain: TileType.Water, settlement: null, building: null,
     unit: null, ownedBy, claimedByVillage: null,
   };
+}
+
+/** A map holding `t` and a village of the player that holds the player's
+ *  (legacy-literal) materials. */
+function mapFor(p: Player, t: MapTile): GameMap {
+  const village: MapTile = {
+    q: 5, r: 5, terrain: TileType.GrasslandLand, settlement: { owner: p.index, level: 1, captureReady: false, capital: true },
+    building: null, unit: null, ownedBy: p.index, claimedByVillage: null,
+  };
+  const map: GameMap = { radius: 6, tiles: [t, village], spawns: [] };
+  migrateLegacyResources(map, [p]);
+  return map;
+}
+
+/** `canUpgradeShip` for a ship on a cell owned by `ownedBy`. */
+function canUpgrade(u: Unit, ownedBy: number | null, p: Player): boolean {
+  const t = tile(ownedBy);
+  return canUpgradeShip(mapFor(p, t), u, t, p);
 }
 
 describe('ship', () => {
@@ -86,22 +105,24 @@ describe('ship', () => {
   });
 
   it('canUpgradeShip requires a ship below level 3, on an owned cell, with the cost', () => {
-    expect(canUpgradeShip(unit(), tile(0), player(100, 10))).toBe(false);
-    expect(canUpgradeShip(unit({ shipLevel: 3 }), tile(0), player(100, 10))).toBe(false);
-    expect(canUpgradeShip(unit({ shipLevel: 1 }), tile(1), player(100, 10))).toBe(false);
-    expect(canUpgradeShip(unit({ shipLevel: 1 }), tile(0), player(7, 4))).toBe(false);
-    expect(canUpgradeShip(unit({ shipLevel: 1 }), tile(0), player(8, 4))).toBe(true);
-    expect(canUpgradeShip(unit({ shipLevel: 2 }), tile(0), player(16, 8, 1))).toBe(false);
-    expect(canUpgradeShip(unit({ shipLevel: 2 }), tile(0), player(16, 8, 2))).toBe(true);
+    expect(canUpgrade(unit(), 0, player(100, 10))).toBe(false);
+    expect(canUpgrade(unit({ shipLevel: 3 }), 0, player(100, 10))).toBe(false);
+    expect(canUpgrade(unit({ shipLevel: 1 }), 1, player(100, 10))).toBe(false);
+    expect(canUpgrade(unit({ shipLevel: 1 }), 0, player(7, 4))).toBe(false);
+    expect(canUpgrade(unit({ shipLevel: 1 }), 0, player(8, 4))).toBe(true);
+    expect(canUpgrade(unit({ shipLevel: 2 }), 0, player(16, 8, 1))).toBe(false);
+    expect(canUpgrade(unit({ shipLevel: 2 }), 0, player(16, 8, 2))).toBe(true);
   });
 
   it('upgradeShip pays and levels up without blocking actions', () => {
     const u = unit({ shipLevel: 1, hasMoved: false, hasAttacked: false });
     const p = player(10, 5);
-    expect(upgradeShip(u, tile(0), p)).toBe(true);
+    const t = tile(0);
+    const map = mapFor(p, t);
+    expect(upgradeShip(map, u, t, p)).toBe(true);
     expect(u.shipLevel).toBe(2);
     expect(p.resources.money).toBe(2);
-    expect(p.resources.wood).toBe(1);
+    expect(totalStock(map, 0).wood).toBe(1);
     expect(u.hasMoved).toBe(false);
     expect(u.hasAttacked).toBe(false);
   });
@@ -109,11 +130,13 @@ describe('ship', () => {
   it('upgradeShip pays ore for level 3', () => {
     const u = unit({ shipLevel: 2 });
     const p = player(20, 10, 2);
-    expect(upgradeShip(u, tile(0), p)).toBe(true);
+    const t = tile(0);
+    const map = mapFor(p, t);
+    expect(upgradeShip(map, u, t, p)).toBe(true);
     expect(u.shipLevel).toBe(3);
     expect(p.resources.money).toBe(4);
-    expect(p.resources.wood).toBe(2);
-    expect(p.resources.ore).toBe(0);
+    expect(totalStock(map, 0).wood).toBe(2);
+    expect(totalStock(map, 0).ore).toBe(0);
   });
 
   it('keeps the crew defense when a unit becomes a ship', () => {

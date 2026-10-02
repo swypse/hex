@@ -249,7 +249,7 @@ whole game.
 | Water temples | 2     | Water    | Future water temple features                                                            |
 | Forestry      | 1     | —        | Allows building factories on owned land near forests                                    |
 | Forest temple | 2     | Forestry | Future forest temple features                                                           |
-| Science       | 1     | —        | Allows advanced research; cuts the owner's attack miss chance to 5%; farms yield 3 food |
+| Science       | 1     | —        | Allows advanced research; cuts the owner's attack miss chance to 5%; farms yield 3 food (0 in winter) |
 | Catapult      | 2     | Science  | Allows spawning catapult units (15 money + 10 wood + 3 ore)                             |
 | Roads         | 2     | Forestry | Allows building roads between villages                                                  |
 | Shields       | 1     | —        | Allows spawning shield units                                                            |
@@ -272,24 +272,43 @@ support only as many buildings as its level allows: level 1 → 1, level 2 → 2
 | Mine     | 15 money                   | Smithery     | mountain tile                              | +1 stone and +1 ore per level (+1 stone and +1 ore with Geology)                 |
 | Port     | 10 wood + 30 money + 2 ore | Water        | owned water tile adjacent to your own land | none; used to create and upgrade ships                                           |
 | Temple   | 10 stone + 30 money        | Water temple | water tile                                 | none; grows +1 level every 2 turns (max 4); awards 10/15/20/25 score at game end |
-| Farm     | 15 money + 5 wood | Agriculture | own empty land tile (no forest, mountain or water; a road is fine) with no enemy unit on it | +2 food per round (+3 with Science) |
+| Farm     | 15 money + 5 wood | Agriculture | own empty land tile (no forest, mountain or water; a road is fine) with no enemy unit on it | +2 food per round (+3 with Science); 0 in winter |
 | Granary  | 20 money + 10 wood + 10 stone | Granary    | own empty land tile next to one of your farms, no enemy unit on it | stores up to 50 food that adjacent farms did not need; starts at 0 |
 
 ## Resources
 
-Five resources: **money**, **wood**, **stone**, **ore**, **food**. Starting amounts: 3 wood, 2 stone, 8 money, 0 ore, 40 food.
+Five resources: **money**, **wood**, **stone**, **ore**, **food**. **Money belongs to the player.** Wood, stone, ore and
+food are held by **villages**: each village keeps its own stock, and the villages of one road/port network (the same
+network as food, below) pool their stock — anything built, spawned or upgraded can use what the whole network holds. A
+village with no road or port connection can use only its own stock; there are no other transfers.
+
+Starting amounts: 8 money for the player; the capital starts with 3 wood, 2 stone, 0 ore and 25 food. Every other
+village starts with nothing.
+
+Who pays for what: an action done in or on a village's territory (a building, repair, spawn, village upgrade, wall, port
+or ship upgrade, bridge, road, trap) draws its wood, stone, ore and food from that village's network, taking from the
+village itself first and then from the rest of the network (most developed first). On land no village claims, the
+nearest own village pays. Skills, disbanding and pirate deals cost money only. An action is available only if the money
+and the network's materials cover it.
+
+A **captured** village keeps its stock, so the captor gets it, and a captured village's granaries keep their food for
+the captor. A village captured empty has none.
 
 Income is collected at the end of each round, after all players have taken their turns:
 
 - **Money** — each owned village produces `max(0, 3 + level × 2 − upkeep)`, where upkeep is the maintenance of the units
   the village raised: warrior 1, archer/shield/rider 2, swordsman 3, knight 4, catapult 5 per turn; ships cost 2 / 3 / 4
   per turn by level. Income never goes below 0.
-- **Wood** — from factories (see Buildings); also from the *Extract forest* action.
+- **Wood** — from factories (see Buildings); also from the *Extract forest* action. Each building adds to the village
+  claiming its tile.
 - **Stone** — from mines (+1 with Geology).
 - **Ore** — from mines (+1 with Geology); used for swordsmen and ports.
-- **Food** — from farms (see Food below); eaten by units. The resource bar shows only the starting food reserve (no
-  income figure) and hides the food entry once the reserve is spent. Food status is shown per village in the
-  selected-cell panel.
+- **Food** — from farms (see Food below); eaten by units. The food a village itself holds (the capital starts with 25)
+  is a reserve spent only when the network's farms and granaries cannot feed its units.
+
+The resource bar always shows the player's money (and its income). Wood, stone, ore and food show the stock and income
+of the **selected village's network** — select the village or any tile of its territory; with nothing of your villages
+selected only money is shown. Food status is shown per village in the selected-cell panel.
 
 ### Food
 
@@ -304,18 +323,18 @@ At the end of each round (after income), for every player and every food network
 
 1. Units are fed village by village, the most developed village first (highest level, then by name), and inside a
    village unit by unit, the hungriest first (3-food units, then shields, then 1-food units; equal units in a fixed
-   order). They eat from the network's farms (yield 2, 3 with Science), farms **not** adjacent to a granary first, then
+   order). They eat from the network's farms (yield 2, 3 with Science; 0 in winter), farms **not** adjacent to a granary first, then
    farms adjacent to a granary.
 2. Food left on a farm adjacent to a granary is stored in that granary (the emptiest adjacent one first). A granary
    holds at most **50**; overflow is lost. Food left on a farm with no adjacent granary is lost: farms never accumulate.
-3. A unit still short of food eats from the network's granaries (fullest first), then the starting food reserve
-   (`resources.food`, only ever shrinks), then the player's other granaries. Networks with the smaller shortage are
-   served first.
+3. A unit still short of food eats from the network's granaries (fullest first), then from the food its villages hold
+   (the capital's starting 25, and anything else a village holds; it only ever shrinks). Nothing is taken from other
+   networks. Networks with the smaller shortage are served first.
 4. A unit that still got less than it needs loses the missing share of **10 HP** (rounded, never below 1 HP): a 3-food
    unit that got 2 loses 3 HP, one that got nothing loses 10. Its home village is **starving** and the map shows a red
    "Starvation" label under the village name. The state clears the first round every unit of the village is fed.
 
-A destroyed, burned or captured granary discards its stored food.
+A destroyed or burned granary discards its stored food; a captured one keeps it for the captor.
 
 Farms and granaries are land improvements: they do not use a village's building slots. Catapults destroy them like other
 buildings (2 hp), and an enemy unit standing on one can **burn** it (Burn farm / Burn granary): the building is
@@ -323,10 +342,24 @@ destroyed at once and the unit's whole turn is spent (it may move onto the tile 
 An enemy unit standing on a road may also **destroy** it (Destroy road): the road (and a bridge carrying it) disappears
 and the unit's whole turn is spent, so the action is unavailable once the unit has moved, attacked or healed that turn.
 A farm or granary on the same tile has to be burned first. Catapults can target enemy roads too; on a tile that also
-holds a destroyable building the building is hit first, the road last. Cutting roads splits food networks.
+holds a destroyable building the building is hit first, the road last. Cutting roads splits food networks. The AI also destroys roads with a unit standing on one (without having moved that turn): a road that is the only link between two enemy villages is cut ahead of a normal attack, any other road only when the unit has nothing better to do.
 
 The selected-cell panel shows the village's food balance, its granaries' stored food, and a red line while starving;
 a selected farm shows its yield and a selected granary shows its stored food as N/50.
+
+## Seasons
+
+The game starts in spring. The seasons cycle Spring → Summer → Autumn → Winter and each lasts **6 turns** (turns 1-6
+spring, 7-12 summer, 13-18 autumn, 19-24 winter, then spring again). The HUD shows the season and the turn within it
+(e.g. "Spring 2/6"). Seasons change the terrain textures (a tile without a texture for the season keeps its spring one).
+
+- **Winter — ice.** When winter begins every water tile next to land that holds no port or
+  bridge freezes into **ice**. Ice is walkable like land (same move cost) but cannot hold roads, traps or buildings and
+  never counts as shore for ports and bridges. A ship on a tile that freezes lands and becomes a normal land unit; a
+  pirate ship on it disappears. Ships cannot sail through ice.
+- **Winter — farms.** Farms produce **0 food** in winter. Granaries keep their stock, and the starting food reserve can
+  still be used.
+- **Spring — thaw.** When spring begins all ice melts back into water, and every unit still standing on ice is lost.
 
 ## Map
 

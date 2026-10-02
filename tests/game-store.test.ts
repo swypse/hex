@@ -47,9 +47,9 @@ describe('gameStore', () => {
   it('setSelection and setAiActive update state', () => {
     const store = useGameStore;
     store.getState().setAiActive(true);
-    store.getState().setSelection({ kind: 'terrain', q: 1, r: 2 });
+    store.getState().setSelection({ kind: 'tile', q: 1, r: 2 });
     expect(store.getState().aiActive).toBe(true);
-    expect(store.getState().selection).toEqual({ kind: 'terrain', q: 1, r: 2 });
+    expect(store.getState().selection).toEqual({ kind: 'tile', q: 1, r: 2 });
   });
 
   it('setLocalPlayerIndex updates localPlayerIndex', () => {

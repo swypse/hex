@@ -3,6 +3,7 @@ import { GameMap, MapTile, Settlement } from '../src/game/map-gen';
 import { Player } from '../src/game/players';
 import { TileType } from '../src/game/tile-types';
 import { villageCapacity, unitsInVillage } from '../src/game/village';
+import { stockOf } from '../src/game/stock';
 import { spawnUnit } from '../src/game/spawn';
 import { Tribe, TRIBE_SPECIAL_UNIT } from '../src/game/tribes';
 
@@ -20,11 +21,13 @@ function makeVillageTile(q: number, r: number, owner: number, level: number): Ma
 }
 
 function makePlayer(index: number, money: number): Player {
-  return { index, tribe: 0, isHuman: index === 0, name: `p${index}`, resources: { wood: 5, stone: 5, money, ore: 0, food: 20 }, score: 0, kills: 0, skills: [], isActive: true };
+  return { index, tribe: 0, isHuman: index === 0, name: `p${index}`, resources: { money }, score: 0, kills: 0, skills: [], isActive: true };
 }
 
 function makeMap(): GameMap {
-  return { radius: 4, tiles: [makeVillageTile(0, 0, 0, 1)], spawns: [] };
+  const village = makeVillageTile(0, 0, 0, 1);
+  village.settlement!.stock = { wood: 5, stone: 5, ore: 0, food: 20 };
+  return { radius: 4, tiles: [village], spawns: [] };
 }
 
 describe('villageCapacity', () => {
@@ -61,13 +64,13 @@ describe('spawnUnit', () => {
     const map = makeMap();
     const village = map.tiles[0]!;
     const player = makePlayer(0, 10);
-    player.resources.ore = 3;
+    stockOf(village).ore = 3;
     player.skills = ['shields'];
     expect(spawnUnit(map, village, 'shield', player)).toBe(true);
     expect(village.unit!.type).toBe('shield');
     expect(village.unit!.hp).toBe(80);
     expect(player.resources.money).toBe(2);
-    expect(player.resources.ore).toBe(1);
+    expect(stockOf(village).ore).toBe(1);
   });
 
   it('rejects shield spawn without the Shields skill', () => {
@@ -131,15 +134,15 @@ describe('spawnUnit', () => {
     const map = makeMap();
     const village = map.tiles[0]!;
     const noSkill = makePlayer(0, 20);
-    noSkill.resources.ore = 3;
+    stockOf(village).ore = 3;
     expect(spawnUnit(map, village, 'swordsman', noSkill)).toBe(false);
     expect(village.unit).toBeNull();
     const skilled = makePlayer(0, 20);
-    skilled.resources.ore = 3;
+    stockOf(village).ore = 3;
     skilled.skills = ['swordsman'];
     expect(spawnUnit(map, village, 'swordsman', skilled)).toBe(true);
     expect(skilled.resources.money).toBe(10);
-    expect(skilled.resources.ore).toBe(1);
+    expect(stockOf(village).ore).toBe(1);
     expect(village.unit!.type).toBe('swordsman');
   });
 
@@ -147,19 +150,19 @@ describe('spawnUnit', () => {
     const map = makeMap();
     const village = map.tiles[0]!;
     const noSkill = makePlayer(0, 40);
-    noSkill.resources.wood = 20;
-    noSkill.resources.ore = 5;
+    stockOf(village).wood = 20;
+    stockOf(village).ore = 5;
     expect(spawnUnit(map, village, 'catapult', noSkill)).toBe(false);
     expect(village.unit).toBeNull();
     const skilled = makePlayer(0, 40);
-    skilled.resources.wood = 20;
-    skilled.resources.ore = 5;
+    stockOf(village).wood = 20;
+    stockOf(village).ore = 5;
     skilled.skills = ['catapult'];
     expect(spawnUnit(map, village, 'catapult', skilled)).toBe(true);
     expect(village.unit!.type).toBe('catapult');
     expect(skilled.resources.money).toBe(25);
-    expect(skilled.resources.wood).toBe(10);
-    expect(skilled.resources.ore).toBe(2);
+    expect(stockOf(village).wood).toBe(10);
+    expect(stockOf(village).ore).toBe(2);
   });
 
   it('rider requires the Riding skill', () => {
@@ -179,16 +182,16 @@ describe('spawnUnit', () => {
     const map = makeMap();
     const village = map.tiles[0]!;
     const noSkill = makePlayer(0, 30);
-    noSkill.resources.ore = 10;
+    stockOf(village).ore = 10;
     expect(spawnUnit(map, village, 'knight', noSkill)).toBe(false);
     expect(village.unit).toBeNull();
     const skilled = makePlayer(0, 30);
-    skilled.resources.ore = 10;
+    stockOf(village).ore = 10;
     skilled.skills = ['knights'];
     expect(spawnUnit(map, village, 'knight', skilled)).toBe(true);
     expect(village.unit!.type).toBe('knight');
     expect(skilled.resources.money).toBe(16);
-    expect(skilled.resources.ore).toBe(5);
+    expect(stockOf(village).ore).toBe(5);
   });
 
   it('gives every spawned unit a unique id even with back-to-back spawns', () => {
@@ -208,7 +211,7 @@ describe('spawnUnit', () => {
     const village = map.tiles[0]!;
     const cats = makePlayer(0, 100);
     cats.tribe = Tribe.Cats;
-    cats.resources.ore = 50;
+    stockOf(village).ore = 50;
     expect(spawnUnit(map, village, 'stalker', cats)).toBe(true);
     expect(village.unit!.type).toBe('stalker');
   });
@@ -218,7 +221,7 @@ describe('spawnUnit', () => {
     const village = map.tiles[0]!;
     const cats = makePlayer(0, 100);
     cats.tribe = Tribe.Cats;
-    cats.resources.wood = 50;
+    stockOf(village).wood = 50;
     expect(spawnUnit(map, village, 'banner', cats)).toBe(false);
     expect(village.unit).toBeNull();
   });
@@ -228,7 +231,7 @@ describe('spawnUnit', () => {
     const village = map.tiles[0]!;
     const warriors = makePlayer(0, 100);
     warriors.tribe = Tribe.Warriors;
-    warriors.resources.ore = 50;
+    stockOf(village).ore = 50;
     expect(spawnUnit(map, village, 'berserker', warriors)).toBe(false);
     expect(village.unit).toBeNull();
   });

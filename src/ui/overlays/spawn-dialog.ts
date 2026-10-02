@@ -3,6 +3,7 @@ import { Container, Graphics } from 'pixi.js';
 import { gameController } from '../../controller/game-controller';
 import { hasSkill } from '../../game/skills';
 import { tileAt } from '../../game/selection';
+import { networkStock } from '../../game/stock';
 import { UNIT_TYPES, UNIT_TYPE_NAMES, type UnitType } from '../../game/units';
 import { TRIBE_SPECIAL_UNIT, TRIBES } from '../../game/tribes';
 import type { Player } from '../../game/players';
@@ -99,13 +100,18 @@ export class SpawnDialog {
       need: info.price,
       have: player.resources.money
     }));
-    if (info.priceWood > 0 && player.resources.wood < info.priceWood) out.push(t('spawn.reasonWood', {
+    // Wood and ore come from the spawning village's network.
+    const map = gameController.getMap();
+    const sel = s.selection;
+    const village = map && sel ? tileAt(map, sel.q, sel.r) : undefined;
+    const stock = map && village?.settlement ? networkStock(map, village) : { wood: 0, stone: 0, ore: 0, food: 0 };
+    if (info.priceWood > 0 && stock.wood < info.priceWood) out.push(t('spawn.reasonWood', {
       need: info.priceWood,
-      have: player.resources.wood
+      have: stock.wood
     }));
-    if (info.priceOre > 0 && player.resources.ore < info.priceOre) out.push(t('spawn.reasonOre', {
+    if (info.priceOre > 0 && stock.ore < info.priceOre) out.push(t('spawn.reasonOre', {
       need: info.priceOre,
-      have: player.resources.ore
+      have: stock.ore
     }));
     if (type === 'rider' && !hasSkill(player, 'riding')) out.push(t('spawn.reasonSkill', { skill: t('skill.riding.name') }));
     if (type === 'knight' && !hasSkill(player, 'knights')) out.push(t('spawn.reasonSkill', { skill: t('skill.knights.name') }));

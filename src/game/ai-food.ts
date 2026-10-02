@@ -200,7 +200,7 @@ export function planFoodFixes(map: GameMap, player: Player, states: FoodNetworkS
     const farmSite = map.tiles.some(
       (t) => t.ownedBy === player.index && t.claimedByVillage && d.keys.has(axialKey(t.claimedByVillage)) && canBuildFarm(map, t, player),
     );
-    const farmRatio = farmSite ? Math.min(deficit, farmYield(player)) / farmCost : 0;
+    const farmRatio = farmSite ? Math.min(deficit, farmYield(player, map)) / farmCost : 0;
 
     let best: { sides: Link[]; ratio: number } | null = null;
     const consider = (sides: Link[], surplus: number): void => {

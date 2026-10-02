@@ -57,7 +57,7 @@ describe('SpawnDialog', () => {
     const players = buildPlayers(Tribe.Cats, 1, new SeededRandom(1));
     (gameController as unknown as { sim: Simulator | null }).sim = new Simulator(map, players, 'capture');
     useGameStore.setState({
-      selection: { kind: 'village', q: 0, r: 0 },
+      selection: { kind: 'tile', q: 0, r: 0 },
       players,
       localPlayerIndex: 0,
       overlay: { kind: 'spawn' },

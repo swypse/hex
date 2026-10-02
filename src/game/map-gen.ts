@@ -1,5 +1,7 @@
 import { allTiles, axialKey, hexDistance, hexNeighbors, ringOf, tilesInRange } from './hex';
 import { generateVillageNames } from './names';
+import type { Season } from './season';
+import { START_STOCK, type Stock } from './resources';
 import { isForestType, isLandType, isMountainType, isWaterType, TileType } from './tile-types';
 import { Biome, BIOME_FOREST, BIOME_LAND, BIOME_MOUNTAIN, generateTerrain } from './biomes';
 import { SeededRandom } from '../util/random';
@@ -42,6 +44,8 @@ export interface Settlement {
   starving?: boolean;
   /** Villagers composite-village block choices (see `SettlementBuild`). */
   build?: SettlementBuild;
+  /** Wood, stone, ore and food held by this village (shared by its road/port network). */
+  stock?: Stock;
 }
 
 export type BridgeDir = 'nw' | 'ne' | 'we';
@@ -95,6 +99,8 @@ export interface Spawn {
 }
 
 export interface GameMap {
+  /** Current season (kept in sync by the simulator); spring when absent. */
+  season?: Season;
   radius: number;
   tiles: MapTile[];
   spawns: Spawn[];
@@ -371,7 +377,7 @@ export function generateMap(playerCount: number, seed: number, size: MapSize = '
 
   for (let p = 0; p < playerCount; p++) {
     const { start, free } = spawns[p]!;
-    tileMap.get(axialKey(start))!.settlement = { owner: p, level: 1, captureReady: false, name: villageNames[p * 2], capital: true };
+    tileMap.get(axialKey(start))!.settlement = { owner: p, level: 1, captureReady: false, name: villageNames[p * 2], capital: true, stock: { ...START_STOCK } };
     tileMap.get(axialKey(free))!.settlement = { owner: null, level: 1, captureReady: false, name: villageNames[p * 2 + 1] };
   }
 

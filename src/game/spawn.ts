@@ -1,6 +1,6 @@
 import { GameMap, MapTile } from './map-gen';
 import { Player } from './players';
-import { canAfford, pay } from './resources';
+import { payAt } from './stock';
 import { hasSkill } from './skills';
 import { makeUnit, unitSpawnCost, UNIT_TYPES, UnitType } from './units';
 import { unitsInVillage, villageCapacity } from './village';
@@ -31,9 +31,8 @@ export function spawnUnit(
     return false;
   }
   const cost = unitSpawnCost(type);
-  if (!canAfford(player.resources, cost)) return false;
+  if (!payAt(map, player, villageTile, cost)) return false;
 
-  player.resources = pay(player.resources, cost);
   villageTile.unit = makeUnit(player.index, type, villageTile.q, villageTile.r, {
     // Date.now() alone collides when several villages spawn in the same
     // millisecond (e.g. one AI turn); the per-game sequence keeps ids unique.

@@ -1,7 +1,8 @@
 import { claimTileForVillage } from './claim';
 import { exploreAround } from './explore';
 import { hexDistance } from './hex';
-import { canAfford, pay, type Resources } from './resources';
+import type { Resources } from './resources';
+import { canAffordAt, payAt } from './stock';
 import { hasSkill } from './skills';
 import type { Player } from './players';
 import { GameMap, MapTile, SettlementBuild, VillageBlockVariant } from './map-gen';
@@ -9,17 +10,17 @@ import { villageColumnMiddleCount, VillageBuildSide } from './village-build';
 
 export const WALL_COST: Resources = { money: 20, wood: 0, stone: 15, ore: 5, food: 0 };
 
-export function canBuildWall(tile: MapTile, player: Player): boolean {
+export function canBuildWall(map: GameMap, tile: MapTile, player: Player): boolean {
   const s = tile.settlement;
   if (!s || s.owner !== player.index || s.wall) return false;
   if (!hasSkill(player, 'defense')) return false;
-  return canAfford(player.resources, WALL_COST);
+  return canAffordAt(map, player, tile, WALL_COST);
 }
 
-export function buildWall(tile: MapTile, player: Player): boolean {
+export function buildWall(map: GameMap, tile: MapTile, player: Player): boolean {
   const s = tile.settlement;
-  if (!canBuildWall(tile, player) || !s) return false;
-  player.resources = pay(player.resources, WALL_COST);
+  if (!canBuildWall(map, tile, player) || !s) return false;
+  if (!payAt(map, player, tile, WALL_COST)) return false;
   s.wall = true;
   return true;
 }

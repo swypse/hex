@@ -61,6 +61,7 @@ export function buildTutorialMap(): GameMap {
     captureReady: false,
     name: t('tutorial.village'),
     capital: true,
+    stock: { wood: 60, stone: 60, ore: 30, food: 20 },
   };
   capital.unit = makeUnit(TUTORIAL_HUMAN, 'warrior', TUTORIAL_CAPITAL.q, TUTORIAL_CAPITAL.r, {
     id: TUTORIAL_START_WARRIOR_ID,
@@ -113,7 +114,7 @@ export function buildTutorialPlayers(): Player[] {
     tribe: Tribe.Villagers,
     isHuman: true,
     name: t('tutorial.you'),
-    resources: { money: 250, wood: 60, stone: 60, ore: 30, food: 20 },
+    resources: { money: 250 },
     score: 0,
     kills: 0,
     skills: [],
@@ -126,7 +127,7 @@ export function buildTutorialPlayers(): Player[] {
     tribe: Tribe.Warriors,
     isHuman: false,
     name: t('tribe.warriors'),
-    resources: { money: 0, wood: 0, stone: 0, ore: 0, food: 0 },
+    resources: { money: 0 },
     score: 0,
     kills: 0,
     skills: [],

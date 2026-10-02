@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { gameController } from '../src/controller/game-controller';
 import { useGameStore } from '../src/store/game-store';
+import { totalStock } from '../src/game/stock';
 import { TRIBES } from '../src/game/tribes';
 import { NetworkController } from '../src/controller/network-controller';
 
@@ -42,13 +43,15 @@ describe('GameController lifecycle', () => {
   it('cheatResources grants +1000 of every resource in single-player', async () => {
     await gameController.startGame(TRIBES[0]!.id, 1, 'capture');
     const sim = gameController.getSim()!;
-    const before = { ...sim.players[0]!.resources };
+    const before = { money: sim.players[0]!.resources.money, ...totalStock(sim.map, 0) };
+    const villages = sim.map.tiles.filter((t) => t.settlement?.owner === 0).length;
     expect(gameController.cheatResources()).toBe(true);
-    const after = sim.players[0]!.resources;
+    const after = { money: sim.players[0]!.resources.money, ...totalStock(sim.map, 0) };
     expect(after.money).toBe(before.money + 1000);
-    expect(after.wood).toBe(before.wood + 1000);
-    expect(after.stone).toBe(before.stone + 1000);
-    expect(after.ore).toBe(before.ore + 1000);
+    // every own village gets the materials
+    expect(after.wood).toBe(before.wood + 1000 * villages);
+    expect(after.stone).toBe(before.stone + 1000 * villages);
+    expect(after.ore).toBe(before.ore + 1000 * villages);
   });
 
   it('cheatResources is refused outside single-player', async () => {
@@ -76,7 +79,7 @@ describe('GameController lifecycle', () => {
   it('does not clear the selected cell when ending the turn', async () => {
     await gameController.startGame(TRIBES[0]!.id, 1, 'capture');
     const store = useGameStore.getState();
-    const selection: import('../src/game/selection').Selection = { kind: 'terrain', q: 2, r: 1 };
+    const selection: import('../src/game/selection').Selection = { kind: 'tile', q: 2, r: 1 };
     store.setSelection(selection);
     gameController.endTurn();
     // The AI turn runs asynchronously; the important regression is that

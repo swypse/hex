@@ -1,3 +1,4 @@
+import { giveResources } from './helpers/test-map';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Simulator } from '../src/game/simulator';
 import { generateMap, type MapTile } from '../src/game/map-gen';
@@ -33,7 +34,7 @@ describe('toolbarSpecs', () => {
   }
 
   function selectCell(tile: MapTile): void {
-    useGameStore.getState().setSelection({ kind: 'terrain', q: tile.q, r: tile.r });
+    useGameStore.getState().setSelection({ kind: 'tile', q: tile.q, r: tile.r });
   }
 
   it('does not offer the extract forest action on a forest tile', () => {
@@ -239,7 +240,7 @@ describe('toolbarSpecs', () => {
     tile.ownedBy = null;
     const store = useGameStore.getState();
     store.setPlayers(store.players.map((p, i) => (i === 0 ? { ...p, skills: ['bridges'] } : p)));
-    useGameStore.getState().setSelection({ kind: 'terrain', q: 1, r: 0 });
+    useGameStore.getState().setSelection({ kind: 'tile', q: 1, r: 0 });
     expect(toolbarSpecs().some((a) => a.key === 'bridge')).toBe(true);
   });
 
@@ -252,7 +253,7 @@ describe('toolbarSpecs', () => {
     tile.settlement = null;
     tile.unit = null;
     tile.ownedBy = null;
-    useGameStore.getState().setSelection({ kind: 'terrain', q: 1, r: 0 });
+    useGameStore.getState().setSelection({ kind: 'tile', q: 1, r: 0 });
     expect(toolbarSpecs().some((a) => a.key === 'bridge')).toBe(false);
   });
 
@@ -346,7 +347,7 @@ describe('toolbarSpecs', () => {
   it('offers enable stealth only for a visible idle stalker', () => {
     const players = useGameStore.getState().players;
     players[0]!.tribe = Tribe.Cats;
-    players[0]!.resources = { wood: 100, stone: 100, money: 100, ore: 100, food: 20 };
+    giveResources(map, players[0]!, { wood: 100, stone: 100, money: 100, ore: 100, food: 20 });
     useGameStore.getState().setPlayers(players);
     const tile = map.tiles.find((t) => t.unit === null)!;
     tile.ownedBy = 0;
@@ -364,7 +365,7 @@ describe('toolbarSpecs', () => {
   it('hides enable stealth when the stalker stands beside an enemy village', () => {
     const players = useGameStore.getState().players;
     players[0]!.tribe = Tribe.Cats;
-    players[0]!.resources = { wood: 100, stone: 100, money: 100, ore: 100, food: 20 };
+    giveResources(map, players[0]!, { wood: 100, stone: 100, money: 100, ore: 100, food: 20 });
     useGameStore.getState().setPlayers(players);
     const tile = map.tiles.find((t) => t.unit === null)!;
     tile.ownedBy = 0;
@@ -381,7 +382,7 @@ describe('toolbarSpecs', () => {
 
   it('offers build only for a builder, and thorn-trap only for a trapper', () => {
     const players = useGameStore.getState().players;
-    players[0]!.resources = { wood: 100, stone: 100, money: 100, ore: 100, food: 20 };
+    giveResources(map, players[0]!, { wood: 100, stone: 100, money: 100, ore: 100, food: 20 });
     useGameStore.getState().setPlayers(players);
     const tile = map.tiles.find((t) => t.unit === null)!;
     tile.ownedBy = 0;
@@ -410,7 +411,7 @@ describe('toolbarSpecs', () => {
 
   it('hides the build action for a builder with no affordable buildable', () => {
     const players = useGameStore.getState().players;
-    players[0]!.resources = { wood: 0, stone: 0, money: 0, ore: 0, food: 20 };
+    giveResources(map, players[0]!, { wood: 0, stone: 0, money: 0, ore: 0, food: 20 });
     useGameStore.getState().setPlayers(players);
     const tile = map.tiles.find((t) => t.unit === null)!;
     tile.ownedBy = 0;
@@ -427,7 +428,7 @@ describe('toolbarSpecs', () => {
   it('does not offer storm when the stormcaller village has no water', () => {
     const players = useGameStore.getState().players;
     players[0]!.tribe = Tribe.Aqua;
-    players[0]!.resources = { wood: 100, stone: 100, money: 100, ore: 100, food: 20 };
+    giveResources(map, players[0]!, { wood: 100, stone: 100, money: 100, ore: 100, food: 20 });
     useGameStore.getState().setPlayers(players);
     const tile = map.tiles.find((t) => t.unit === null)!;
     tile.ownedBy = 0;
@@ -444,14 +445,14 @@ describe('toolbarSpecs', () => {
     const tile = map.tiles.find((t) => t.unit === null && t.terrain === TileType.GrasslandLand && !t.settlement)!;
     tile.ownedBy = 0;
     const players = useGameStore.getState().players;
-    players[0]!.resources = { wood: 5, stone: 2, money: 15, ore: 0, food: 20 };
+    giveResources(map, players[0]!, { wood: 5, stone: 2, money: 15, ore: 0, food: 20 });
     selectCell(tile);
     expect(toolbarSpecs().some((a) => a.key === 'farm')).toBe(false);
     players[0]!.skills.push('agriculture');
     const spec = toolbarSpecs().find((a) => a.key === 'farm');
     expect(spec).toBeDefined();
     expect(spec!.disabled).toBe(false);
-    players[0]!.resources.wood = 4;
+    giveResources(map, players[0]!, { wood: 4 });
     expect(toolbarSpecs().find((a) => a.key === 'farm')!.disabled).toBe(true);
   });
 
@@ -462,7 +463,7 @@ describe('toolbarSpecs', () => {
     farm.ownedBy = 0;
     farm.building = { kind: 'farm', level: 1 };
     const players = useGameStore.getState().players;
-    players[0]!.resources = { wood: 10, stone: 10, money: 20, ore: 0, food: 20 };
+    giveResources(map, players[0]!, { wood: 10, stone: 10, money: 20, ore: 0, food: 20 });
     players[0]!.skills.push('agriculture', 'granary');
     selectCell(tile);
     expect(toolbarSpecs().some((a) => a.key === 'granary')).toBe(true);

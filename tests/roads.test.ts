@@ -7,6 +7,7 @@ import { Unit } from '../src/game/units';
 import { buildRoad, canBuildRoad, ROAD_COST, isVillageRoadConnected } from '../src/game/roads';
 import { SkillId } from '../src/game/skills';
 import { Simulator } from '../src/game/simulator';
+import { migrateLegacyResources, totalStock } from '../src/game/stock';
 import { buildPlayers } from '../src/game/players';
 import { SeededRandom } from '../src/util/random';
 
@@ -39,6 +40,13 @@ function player(money = 100, wood = 10, stone = 10, index = 0, skills: SkillId[]
   };
 }
 
+/** A player whose materials sit in the capital/first village of `map`. */
+function fundedPlayer(map: GameMap, ...args: Parameters<typeof player>): Player {
+  const p = player(...args);
+  migrateLegacyResources(map, [p]);
+  return p;
+}
+
 function mapWith(tiles: MapTile[]): GameMap {
   return { radius: 4, tiles, spawns: [] };
 }
@@ -53,8 +61,8 @@ describe('roads', () => {
       villageTile(0, 0, 0),
       tile(1, 0, TileType.GrasslandLand),
     ]);
-    expect(canBuildRoad(map, map.tiles[1]!, player(100,10,10,0,['forestry','roads']))).toBe(true);
-    expect(buildRoad(map, map.tiles[1]!, player(100,10,10,0,['forestry','roads']))).toBe(true);
+    expect(canBuildRoad(map, map.tiles[1]!, fundedPlayer(map, 100,10,10,0,['forestry','roads']))).toBe(true);
+    expect(buildRoad(map, map.tiles[1]!, fundedPlayer(map, 100,10,10,0,['forestry','roads']))).toBe(true);
     expect(map.tiles[1]!.roadOwner).toBe(0);
   });
 
@@ -64,7 +72,7 @@ describe('roads', () => {
       tile(1, 0, TileType.GrasslandLand, { roadOwner: 0 }),
       tile(2, 0, TileType.GrasslandLand),
     ]);
-    expect(canBuildRoad(map, map.tiles[2]!, player(100,10,10,0,['forestry','roads']))).toBe(true);
+    expect(canBuildRoad(map, map.tiles[2]!, fundedPlayer(map, 100,10,10,0,['forestry','roads']))).toBe(true);
   });
 
   it('does not build a road on enemy territory', () => {
@@ -72,7 +80,7 @@ describe('roads', () => {
       villageTile(0, 0, 0),
       tile(1, 0, TileType.GrasslandLand, { ownedBy: 1 }),
     ]);
-    expect(canBuildRoad(map, map.tiles[1]!, player(100,10,10,0,['forestry','roads']))).toBe(false);
+    expect(canBuildRoad(map, map.tiles[1]!, fundedPlayer(map, 100,10,10,0,['forestry','roads']))).toBe(false);
   });
 
   it('builds a road on own territory', () => {
@@ -80,7 +88,7 @@ describe('roads', () => {
       villageTile(0, 0, 0),
       tile(1, 0, TileType.GrasslandLand, { ownedBy: 0 }),
     ]);
-    expect(canBuildRoad(map, map.tiles[1]!, player(100,10,10,0,['forestry','roads']))).toBe(true);
+    expect(canBuildRoad(map, map.tiles[1]!, fundedPlayer(map, 100,10,10,0,['forestry','roads']))).toBe(true);
   });
 
   it('rejects hexes not adjacent to a village or road', () => {
@@ -88,7 +96,7 @@ describe('roads', () => {
       villageTile(0, 0, 0),
       tile(3, 0, TileType.GrasslandLand),
     ]);
-    expect(canBuildRoad(map, map.tiles[1]!, player(100,10,10,0,['forestry','roads']))).toBe(false);
+    expect(canBuildRoad(map, map.tiles[1]!, fundedPlayer(map, 100,10,10,0,['forestry','roads']))).toBe(false);
   });
 
   it('rejects water, village, building, existing-road, and enemy-occupied hexes', () => {
@@ -100,7 +108,7 @@ describe('roads', () => {
       tile(0, -1, TileType.GrasslandLand, { unit: { id: 'e', owner: 1, type: 'warrior', q: 0, r: -1, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 5, attack: 2, attackDistance: 1, spawnVillage: null } }),
     ]);
     for (const t of [map.tiles[1]!, map.tiles[2]!, map.tiles[3]!, map.tiles[4]!]) {
-      expect(canBuildRoad(map, t, player(100,10,10,0,['forestry','roads']))).toBe(false);
+      expect(canBuildRoad(map, t, fundedPlayer(map, 100,10,10,0,['forestry','roads']))).toBe(false);
     }
   });
 
@@ -116,7 +124,7 @@ describe('roads', () => {
         villageTile(0, 0, 0),
         tile(1, 0, TileType.GrasslandLand, { building }),
       ]);
-      expect(canBuildRoad(map, map.tiles[1]!, player(100, 10, 10, 0, ['forestry', 'roads']))).toBe(true);
+      expect(canBuildRoad(map, map.tiles[1]!, fundedPlayer(map, 100, 10, 10, 0, ['forestry', 'roads']))).toBe(true);
     }
   });
 
@@ -125,7 +133,7 @@ describe('roads', () => {
       villageTile(0, 0, 0),
       tile(1, 0, TileType.GrasslandLand, { building: { kind: 'port', level: 1 } }),
     ]);
-    expect(canBuildRoad(map, map.tiles[1]!, player(100, 10, 10, 0, ['forestry', 'roads']))).toBe(false);
+    expect(canBuildRoad(map, map.tiles[1]!, fundedPlayer(map, 100, 10, 10, 0, ['forestry', 'roads']))).toBe(false);
   });
 
   it('builds a road adjacent to an owned port connected to an own village', () => {
@@ -136,7 +144,7 @@ describe('roads', () => {
       tile(3, 0, TileType.GrasslandLand),
     ]);
     map.tiles[2]!.ownedBy = 0;
-    const p = player(100, 10, 10, 0, ['forestry', 'roads']);
+    const p = fundedPlayer(map, 100, 10, 10, 0, ['forestry', 'roads']);
     expect(canBuildRoad(map, map.tiles[3]!, p)).toBe(true);
     expect(buildRoad(map, map.tiles[3]!, p)).toBe(true);
   });
@@ -147,7 +155,7 @@ describe('roads', () => {
       tile(1, 0, TileType.GrasslandLand),
     ]);
     map.tiles[0]!.ownedBy = 1;
-    expect(canBuildRoad(map, map.tiles[1]!, player(100, 10, 10, 0, ['forestry', 'roads']))).toBe(false);
+    expect(canBuildRoad(map, map.tiles[1]!, fundedPlayer(map, 100, 10, 10, 0, ['forestry', 'roads']))).toBe(false);
   });
 
   it('does not build a road off an orphaned bridge not connected to a village', () => {
@@ -160,7 +168,7 @@ describe('roads', () => {
       })(),
       tile(4, 0, TileType.GrasslandLand),
     ]);
-    expect(canBuildRoad(map, map.tiles[2]!, player(100, 10, 10, 0, ['forestry', 'roads']))).toBe(false);
+    expect(canBuildRoad(map, map.tiles[2]!, fundedPlayer(map, 100, 10, 10, 0, ['forestry', 'roads']))).toBe(false);
   });
 
   it('does not build a road off an orphaned road stub after its village is captured', () => {
@@ -169,7 +177,7 @@ describe('roads', () => {
       tile(1, 0, TileType.GrasslandLand, { roadOwner: 0 }),
       tile(2, 0, TileType.GrasslandLand),
     ]);
-    expect(canBuildRoad(map, map.tiles[2]!, player(100, 10, 10, 0, ['forestry', 'roads']))).toBe(false);
+    expect(canBuildRoad(map, map.tiles[2]!, fundedPlayer(map, 100, 10, 10, 0, ['forestry', 'roads']))).toBe(false);
   });
 
   it('does not build a road when the player owns no villages', () => {
@@ -177,7 +185,7 @@ describe('roads', () => {
       tile(1, 0, TileType.GrasslandLand, { roadOwner: 0 }),
       tile(2, 0, TileType.GrasslandLand),
     ]);
-    expect(canBuildRoad(map, map.tiles[1]!, player(100, 10, 10, 0, ['forestry', 'roads']))).toBe(false);
+    expect(canBuildRoad(map, map.tiles[1]!, fundedPlayer(map, 100, 10, 10, 0, ['forestry', 'roads']))).toBe(false);
   });
 
   it('builds a road off a bridge that is connected to an own village', () => {
@@ -190,15 +198,15 @@ describe('roads', () => {
       })(),
       tile(2, 0, TileType.GrasslandLand),
     ]);
-    expect(canBuildRoad(map, map.tiles[2]!, player(100, 10, 10, 0, ['forestry', 'roads']))).toBe(true);
+    expect(canBuildRoad(map, map.tiles[2]!, fundedPlayer(map, 100, 10, 10, 0, ['forestry', 'roads']))).toBe(true);
   });
 
   it('does not pay when the build is rejected', () => {
     const map = mapWith([villageTile(0, 0, 0), tile(3, 0, TileType.GrasslandLand)]);
-    const p = player(100, 10, 10, 0, ['forestry', 'roads']);
-    const before = p.resources.wood;
+    const p = fundedPlayer(map, 100, 10, 10, 0, ['forestry', 'roads']);
+    const before = totalStock(map, 0).wood;
     expect(buildRoad(map, map.tiles[1]!, p)).toBe(false);
-    expect(p.resources.wood).toBe(before);
+    expect(totalStock(map, 0).wood).toBe(before);
   });
 
   it('requires the Roads skill', () => {
@@ -206,8 +214,8 @@ describe('roads', () => {
       villageTile(0, 0, 0),
       tile(1, 0, TileType.GrasslandLand),
     ]);
-    expect(canBuildRoad(map, map.tiles[1]!, player())).toBe(false);
-    expect(canBuildRoad(map, map.tiles[1]!, player(100, 10, 10, 0, ['forestry', 'roads']))).toBe(true);
+    expect(canBuildRoad(map, map.tiles[1]!, fundedPlayer(map, ))).toBe(false);
+    expect(canBuildRoad(map, map.tiles[1]!, fundedPlayer(map, 100, 10, 10, 0, ['forestry', 'roads']))).toBe(true);
   });
 
   it('simulator buildRoad emits roadBuilt and sets roadOwner', () => {
@@ -375,7 +383,7 @@ describe('bridges as roads', () => {
       tile(2, 0, TileType.GrasslandLand),
     ];
     const map = mapWith(tiles);
-    expect(canBuildRoad(map, map.tiles[2]!, player(100, 10, 10, 0, ['forestry', 'roads']))).toBe(true);
+    expect(canBuildRoad(map, map.tiles[2]!, fundedPlayer(map, 100, 10, 10, 0, ['forestry', 'roads']))).toBe(true);
   });
 
   it('isVillageRoadConnected connects own villages across a bridge', () => {

@@ -1,7 +1,8 @@
 import { axialKey, hexNeighbors } from './hex';
 import { GameMap, MapTile } from './map-gen';
 import { Player } from './players';
-import { canAfford, moneyCost, pay, Resources } from './resources';
+import { moneyCost, Resources } from './resources';
+import { canAffordAt, payAt, payerVillage, villageNetwork } from './stock';
 import { hasSkill } from './skills';
 import { isForestType, isLandType, isMountainType, isSolidGround, isWaterType } from './tile-types';
 import { buildingsInVillage, villageBuildingLimit } from './village';
@@ -76,8 +77,8 @@ export const BUILDER_BUILD_COSTS: Record<BuilderBuildableKind, Resources> = {
 };
 
 /** Whether the given resources cover at least one builder-constructable kind. */
-export function canAffordAnyBuilderBuild(resources: Resources): boolean {
-  return BUILDER_KINDS.some((kind) => canAfford(resources, BUILDER_BUILD_COSTS[kind]));
+export function canAffordAnyBuilderBuild(map: GameMap, player: Player, tile: MapTile): boolean {
+  return BUILDER_KINDS.some((kind) => canAffordAt(map, player, tile, BUILDER_BUILD_COSTS[kind]));
 }
 
 function neighborTile(map: GameMap, n: { q: number; r: number }): MapTile | undefined {
@@ -278,8 +279,8 @@ export const DESTROY_BUILDING_COST = 5;
 export function destroyBuilding(map: GameMap, tile: MapTile, player: Player): boolean {
   if (!tile.building) return false;
   if (tile.ownedBy !== player.index) return false;
-  if (!canAfford(player.resources, moneyCost(DESTROY_BUILDING_COST))) return false;
-  player.resources = pay(player.resources, moneyCost(DESTROY_BUILDING_COST));
+  if (player.resources.money < DESTROY_BUILDING_COST) return false;
+  player.resources.money -= DESTROY_BUILDING_COST;
   tile.building = null;
   return true;
 }
@@ -288,8 +289,7 @@ export function destroyBuilding(map: GameMap, tile: MapTile, player: Player): bo
  *  true when the repair happened (validated + affordable). */
 export function repairBuilding(map: GameMap, tile: MapTile, player: Player): boolean {
   if (!canRepairBuilding(map, tile, player)) return false;
-  if (!canAfford(player.resources, REPAIR_COST)) return false;
-  player.resources = pay(player.resources, REPAIR_COST);
+  if (!payAt(map, player, tile, REPAIR_COST)) return false;
   delete tile.building!.hp;
   return true;
 }
@@ -353,31 +353,25 @@ export function buildBuilding(
                 ? canBuildGranary(map, tile, player)
                 : canBuildForestTemple(map, tile, player);
   if (!allowed) return false;
-  return payAndPlaceBuilding(tile, kind, player);
+  return payAndPlaceBuilding(map, tile, kind, player);
 }
 
 /** Places a building at its cost without re-validating the skill — used by the
  *  Villagers builder, whose eligibility (terrain/territory/slot) was already
  *  checked by `builderBuildable`. */
 export function buildBuildingIgnoringSkill(map: GameMap, tile: MapTile, kind: BuildingKind, player: Player): boolean {
-  return payAndPlaceBuilding(tile, kind, player);
+  return payAndPlaceBuilding(map, tile, kind, player);
 }
 
-function payAndPlaceBuilding(tile: MapTile, kind: BuildingKind, player: Player): boolean {
-  const cost = BUILDING_COSTS[kind];
-  if (!canAfford(player.resources, cost)) return false;
-  player.resources = pay(player.resources, cost);
+function payAndPlaceBuilding(map: GameMap, tile: MapTile, kind: BuildingKind, player: Player): boolean {
+  if (!payAt(map, player, tile, BUILDING_COSTS[kind])) return false;
   tile.building = kind === 'granary' ? { kind, level: 1, food: 0 } : { kind, level: 1 };
   return true;
 }
 
-export function buildingIncome(
-  map: GameMap,
-  player: Player,
-): { wood: number; stone: number; ore: number } {
-  let wood = 0;
-  let stone = 0;
-  let ore = 0;
+/** What each producing building of the player yields per round. */
+function buildingYields(map: GameMap, player: Player): { tile: MapTile; wood: number; stone: number; ore: number }[] {
+  const out: { tile: MapTile; wood: number; stone: number; ore: number }[] = [];
   for (const tile of map.tiles) {
     if (tile.ownedBy !== player.index || !tile.building) continue;
     // Buildings on the territory of a village an enemy unit stands on stop
@@ -389,8 +383,7 @@ export function buildingIncome(
     }
     if (tile.building.kind === 'mine') {
       const bonus = hasSkill(player, 'geology') ? 1 : 0;
-      stone += tile.building.level + bonus;
-      ore += tile.building.level + bonus;
+      out.push({ tile, wood: 0, stone: tile.building.level + bonus, ore: tile.building.level + bonus });
       continue;
     }
     if (tile.building.kind === 'sawmill') {
@@ -398,10 +391,61 @@ export function buildingIncome(
         const t = neighborTile(map, n);
         return t !== undefined && isForestType(t.terrain);
       }).length;
-      wood += tile.building.level * forests;
+      out.push({ tile, wood: tile.building.level * forests, stone: 0, ore: 0 });
     }
   }
-  return { wood, stone, ore };
+  return out;
+}
+
+/** Materials the player's buildings produce per round, by the village that
+ *  receives them (the one claiming the building's tile, else the nearest own
+ *  village). */
+export function buildingIncomeByVillage(
+  map: GameMap,
+  player: Player,
+): Map<MapTile, { wood: number; stone: number; ore: number }> {
+  const out = new Map<MapTile, { wood: number; stone: number; ore: number }>();
+  for (const y of buildingYields(map, player)) {
+    const village = payerVillage(map, player.index, y.tile);
+    if (!village) continue;
+    const cur = out.get(village) ?? { wood: 0, stone: 0, ore: 0 };
+    cur.wood += y.wood;
+    cur.stone += y.stone;
+    cur.ore += y.ore;
+    out.set(village, cur);
+  }
+  return out;
+}
+
+/** Materials the player's buildings produce per round, all villages together. */
+export function buildingIncome(
+  map: GameMap,
+  player: Player,
+): { wood: number; stone: number; ore: number } {
+  const total = { wood: 0, stone: 0, ore: 0 };
+  for (const y of buildingYields(map, player)) {
+    total.wood += y.wood;
+    total.stone += y.stone;
+    total.ore += y.ore;
+  }
+  return total;
+}
+
+/** Materials produced per round for the network `village` belongs to. */
+export function networkBuildingIncome(
+  map: GameMap,
+  player: Player,
+  village: MapTile,
+): { wood: number; stone: number; ore: number } {
+  const members = new Set(villageNetwork(map, village));
+  const total = { wood: 0, stone: 0, ore: 0 };
+  for (const [v, inc] of buildingIncomeByVillage(map, player)) {
+    if (!members.has(v)) continue;
+    total.wood += inc.wood;
+    total.stone += inc.stone;
+    total.ore += inc.ore;
+  }
+  return total;
 }
 
 export function buildingYield(

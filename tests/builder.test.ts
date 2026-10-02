@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { makeTestMap, tileAt, makeUnit } from './helpers/test-map';
+import { makeTestMap, tileAt, makeUnit, giveResources } from './helpers/test-map';
 import { Simulator } from '../src/game/simulator';
 import { buildPlayers } from '../src/game/players';
 import { Tribe } from '../src/game/tribes';
@@ -24,7 +24,7 @@ beforeEach(() => {
   const s = freshVillagersSim();
   sim = s.sim;
   map = s.map;
-  sim.players[0]!.resources = { wood: 100, stone: 100, money: 100, ore: 100, food: 20 };
+  giveResources(sim.map, sim.players[0]!, { wood: 100, stone: 100, money: 100, ore: 100, food: 20 });
 });
 
 function place(owner: number, type: Unit['type'], q: number, r: number, opts: Partial<Unit> = {}): Unit {

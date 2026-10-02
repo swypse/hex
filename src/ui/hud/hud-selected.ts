@@ -2,7 +2,7 @@ import { t } from '../../i18n';
 import { Circle, Container, Graphics, Rectangle, Text } from 'pixi.js';
 import { gameController } from '../../controller/game-controller';
 import { TRIBES } from '../../game/tribes';
-import { isForestType, isMountainType, isWaterType, TILE_TYPE_NAMES } from '../../game/tile-types';
+import { isForestType, isMountainType, isWaterType } from '../../game/tile-types';
 import { UNIT_TYPE_NAMES, unitFoodEaten, unitMaintenance, type Unit } from '../../game/units';
 import { unitCanAct } from '../../game/unit-actions';
 import { tileAt } from '../../game/selection';
@@ -53,7 +53,7 @@ interface IconRow {
   hp?: number;
 }
 
-const HP_SQUARE = 8;
+const HP_SQUARE = 6;
 const HP_SQUARE_GAP = 3;
 const HP_SQUARE_COLOR = 0x49cc5d;
 
@@ -110,14 +110,8 @@ export class HudSelected implements Widget {
 
     this.el.removeChildren().forEach((c) => c.destroy({ children: true }));
 
-    if (this.closed) {
-      this.renderCollapsed();
-      this.layout();
-      return;
-    }
-
-    const lines: string[] = [TILE_TYPE_NAMES[tile.terrain]];
-    const bolds: boolean[] = [false];
+    const lines: string[] = [];
+    const bolds: boolean[] = [];
     // Lines drawn in red (starvation warnings).
     const redLines = new Set<number>();
     let unitLineIndex = -1;
@@ -258,7 +252,7 @@ export class HudSelected implements Widget {
           ...(y.wood > 0 ? [{ icon: 'wood-32', value: String(y.wood) }] : []),
           ...(y.stone > 0 ? [{ icon: 'stone-32', value: String(y.stone) }] : []),
           ...(y.ore > 0 ? [{ icon: 'ore-32', value: String(y.ore) }] : []),
-          ...(b.kind === 'farm' ? [{ icon: 'food-32', value: String(farmYield(owner)) }] : []),
+          ...(b.kind === 'farm' ? [{ icon: 'food-32', value: String(farmYield(owner, gameController.getMap() ?? undefined)) }] : []),
           ...(b.kind === 'granary' ? [{ icon: 'food-32', value: String(b.food ?? 0) }] : []),
         ],
       };
@@ -287,6 +281,18 @@ export class HudSelected implements Widget {
     }
 
     const actions = this.suggestedSkillActions(tile, human);
+
+    // Nothing to show (no unit, village, building, note or helper action): hide
+    // the panel entirely, collapsed icon included.
+    if (lines.length === 0 && actions.length === 0) {
+      this.el.visible = false;
+      return;
+    }
+    if (this.closed) {
+      this.renderCollapsed();
+      this.layout();
+      return;
+    }
 
     const highlightBuildingsLine = s.tutorial && s.tutorialStep === 'upgradeVillage3';
 
@@ -358,6 +364,9 @@ export class HudSelected implements Widget {
       y += rowH[i]!;
     }
     if (actions.length > 0) y += 8;
+    // Action rows get a full-width hit area once the panel width is known, so a
+    // tap beside the icon or text still hits the row instead of the map below.
+    const actionRows: { row: Container; top: number; h: number }[] = [];
     for (const a of actions) {
       const disabled = s.aiActive || !canOpenSkill(human, a.id);
       const highlighted = !!s.tutorial && s.tutorialHighlightSkills.includes(a.id);
@@ -394,6 +403,7 @@ export class HudSelected implements Widget {
       price.position.set(coin.x + 19, cy - price.height / 2);
       row.addChild(label, coin, price);
       this.el.addChild(row);
+      actionRows.push({ row, top: y, h: size + 6 });
       maxW = Math.max(maxW, price.x + price.width);
       y += size + 6;
     }
@@ -415,6 +425,7 @@ export class HudSelected implements Widget {
       label.position.set(10 + size + 8, cy - label.height / 2);
       row.addChild(icon, label);
       this.el.addChild(row);
+      actionRows.push({ row, top: y, h: size + 6 });
       maxW = Math.max(maxW, 10 + size + 8 + label.width);
       y += size + 6;
       this.measured = y + 8;
@@ -453,6 +464,7 @@ export class HudSelected implements Widget {
     bg.position.set(0, 0);
     this.el.addChildAt(shadow, 0);
     this.el.addChildAt(bg, 1);
+    for (const { row, top, h } of actionRows) row.hitArea = new Rectangle(0, top, bgW, h);
 
     for (const row of helpRows) {
       const btn = new Container();

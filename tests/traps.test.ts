@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { makeTestMap, tileAt, makeUnit } from './helpers/test-map';
+import { makeTestMap, tileAt, makeUnit, giveResources } from './helpers/test-map';
 import { Simulator } from '../src/game/simulator';
 import { buildPlayers } from '../src/game/players';
 import { Tribe } from '../src/game/tribes';
@@ -7,6 +7,7 @@ import { SeededRandom } from '../src/util/random';
 import { TileType } from '../src/game/tile-types';
 import { Unit } from '../src/game/units';
 import { trapDamage, TRAP_COST } from '../src/game/traps';
+import { totalStock } from '../src/game/stock';
 
 function freshForestSim() {
   const map = makeTestMap(3);
@@ -25,7 +26,7 @@ beforeEach(() => {
   const s = freshForestSim();
   sim = s.sim;
   map = s.map;
-  sim.players[0]!.resources = { wood: 100, stone: 100, money: 100, ore: 100, food: 20 };
+  giveResources(sim.map, sim.players[0]!, { wood: 100, stone: 100, money: 100, ore: 100, food: 20 });
 });
 
 function place(owner: number, type: Unit['type'], q: number, r: number, opts: Partial<Unit> = {}): Unit {
@@ -47,7 +48,7 @@ describe('trapper traps', () => {
     expect(tileAt(map, 1, 0)!.trap).toMatchObject({ owner: 0, placedTurn: sim.turn });
     expect(findUnit(trapper.id).hasMoved).toBe(true);
     expect(sim.players[0]!.resources.money).toBe(95);
-    expect(sim.players[0]!.resources.ore).toBe(97);
+    expect(totalStock(sim.map, 0).ore).toBe(97);
     expect(TRAP_COST).toEqual({ wood: 0, stone: 0, money: 5, ore: 3, food: 0 });
   });
 

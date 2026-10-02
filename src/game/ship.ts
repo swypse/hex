@@ -1,6 +1,7 @@
 import type { MapTile } from './map-gen';
 import type { Player } from './players';
-import { canAfford, pay } from './resources';
+import type { GameMap } from './map-gen';
+import { canAffordAt, payAt } from './stock';
 import type { Unit } from './units';
 
 export const SHIP_MOVE_POINTS: Record<1 | 2 | 3, number> = { 1: 20, 2: 30, 3: 40 };
@@ -29,17 +30,17 @@ export function shipAttackDistance(unit: Unit): number {
   return SHIP_ATTACK_DISTANCE[unit.shipLevel];
 }
 
-export function canUpgradeShip(unit: Unit, tile: MapTile, player: Player): boolean {
+export function canUpgradeShip(map: GameMap, unit: Unit, tile: MapTile, player: Player): boolean {
   if (unit.shipLevel === undefined || unit.shipLevel >= 3) return false;
   if (tile.ownedBy !== player.index) return false;
   const cost = SHIP_UPGRADE_COST[(unit.shipLevel + 1) as 2 | 3];
-  return canAfford(player.resources, { wood: cost.wood, stone: 0, money: cost.money, ore: cost.ore, food: 0 });
+  return canAffordAt(map, player, tile, { wood: cost.wood, stone: 0, money: cost.money, ore: cost.ore, food: 0 });
 }
 
-export function upgradeShip(unit: Unit, tile: MapTile, player: Player): boolean {
-  if (!canUpgradeShip(unit, tile, player)) return false;
+export function upgradeShip(map: GameMap, unit: Unit, tile: MapTile, player: Player): boolean {
+  if (!canUpgradeShip(map, unit, tile, player)) return false;
   const cost = SHIP_UPGRADE_COST[(unit.shipLevel! + 1) as 2 | 3];
-  player.resources = pay(player.resources, { wood: cost.wood, stone: 0, money: cost.money, ore: cost.ore, food: 0 });
+  if (!payAt(map, player, tile, { wood: cost.wood, stone: 0, money: cost.money, ore: cost.ore, food: 0 })) return false;
   unit.shipLevel = (unit.shipLevel! + 1) as 1 | 2 | 3;
   return true;
 }

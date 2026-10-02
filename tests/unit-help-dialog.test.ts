@@ -165,7 +165,7 @@ describe('UnitHelpDialog', () => {
   it('mounts a building limits popup when an owned village is selected without a unit', () => {
     tileAt(map, 0, 0)!.settlement = { owner: 0, level: 2, captureReady: false, name: 'Omega' };
     useGameStore.setState({
-      selection: { kind: 'village', q: 0, r: 0 },
+      selection: { kind: 'tile', q: 0, r: 0 },
       overlay: { kind: 'buildingLimitHelp' },
     });
     const dialog = new UnitHelpDialog();
@@ -193,7 +193,7 @@ describe('UnitHelpDialog', () => {
     tileAt(map, 0, 0)!.unit = null;
     tileAt(map, 0, 0)!.settlement = { owner: null, level: 1, captureReady: false };
     useGameStore.setState({
-      selection: { kind: 'village', q: 0, r: 0 },
+      selection: { kind: 'tile', q: 0, r: 0 },
       overlay: { kind: 'settlementHelp' },
     });
     const dialog = new UnitHelpDialog();

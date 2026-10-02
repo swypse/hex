@@ -1,6 +1,6 @@
 import { SeededRandom } from '../util/random';
 import { generatePlayerNames } from './names';
-import { Resources, START_RESOURCES } from './resources';
+import { PlayerResources, START_RESOURCES } from './resources';
 import type { SkillId } from './skills';
 import { EMPTY_STATS, type PlayerStats } from './score';
 import type { AchievementId } from './achievements';
@@ -13,7 +13,7 @@ export interface Player {
   tribe: Tribe;
   isHuman: boolean;
   name: string;
-  resources: Resources;
+  resources: PlayerResources;
   score: number;
   kills: number;
   skills: SkillId[];
@@ -31,9 +31,9 @@ export interface Player {
   operation?: AiOperation | null;
 }
 
-function startingResourcesFor(tribe: Tribe): Resources {
+function startingResourcesFor(tribe: Tribe): PlayerResources {
   const info = tribeById(tribe)!;
-  return { ...START_RESOURCES, money: START_RESOURCES.money + (info.startMoneyBonus ?? 0) };
+  return { money: START_RESOURCES.money + (info.startMoneyBonus ?? 0) };
 }
 
 function startingSkillsFor(tribe: Tribe): SkillId[] {

@@ -83,9 +83,8 @@ export function captureVillage(
       t.claimedByVillage.q === villageTile.q &&
       t.claimedByVillage.r === villageTile.r
     ) {
+      // The village's stock and the food in its granaries go to the captor.
       t.ownedBy = capturer.owner;
-      // Food stored in a captured granary is lost.
-      if (t.building?.kind === 'granary') t.building.food = 0;
     }
   }
 

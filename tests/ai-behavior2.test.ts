@@ -7,6 +7,14 @@ import { SeededRandom } from '../src/util/random';
 import { makeTestMap, tileAt, makeUnit } from './helpers/test-map';
 import { TileType } from '../src/game/tile-types';
 import { PIRATE_OWNER, type Unit } from '../src/game/units';
+import { migrateLegacyResources } from '../src/game/stock';
+
+/** Moves the legacy-literal materials of a test player into its capital before planning. */
+function fund<T extends import('../src/game/players').Player>(map: import('../src/game/map-gen').GameMap, player: T): T {
+  migrateLegacyResources(map, [player]);
+  return player;
+}
+
 
 function aiUnit(id: string, q: number, r: number, hp = 50): Unit {
   const u = makeUnit(id, 1, 'warrior', q, r);
@@ -54,7 +62,7 @@ describe('AI grind and capture behaviour', () => {
     humanCap.unit = human;
 
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1), 'normal');
-    const actions = planAiActions(map, players[1]!, new SeededRandom(2), 'capture');
+    const actions = planAiActions(map, fund(map, players[1]!), new SeededRandom(2), 'capture');
     expect(actions).toContainEqual({ type: 'attack', unitId: 'ai1', q: 2, r: 0 });
     expect(actions.some((a) => a.type === 'move' && a.unitId === 'ai1' && a.q === 0 && a.r === 0)).toBe(false);
   });
@@ -73,7 +81,7 @@ describe('AI grind and capture behaviour', () => {
     tileAt(map, 3, 0)!.unit = enemy;
 
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1), 'normal');
-    const actions = planAiActions(map, players[1]!, new SeededRandom(2), 'capture');
+    const actions = planAiActions(map, fund(map, players[1]!), new SeededRandom(2), 'capture');
     const moveOntoVillage = actions.some((a) => a.type === 'move' && a.unitId === 'ai1' && a.q === 2 && a.r === 0);
     const attackFromThere = actions.some((a) => a.type === 'attack' && a.unitId === 'ai1' && a.q === 3 && a.r === 0);
     expect(moveOntoVillage && attackFromThere).toBe(false);
@@ -91,7 +99,7 @@ describe('AI grind and capture behaviour', () => {
     const p = players[1]!;
     p.skills = ['roads'];
     p.resources = { wood: 50, stone: 50, money: 100, ore: 0, food: 20 };
-    const actions = planAiActions(map, p, new SeededRandom(2), 'capture');
+    const actions = planAiActions(map, fund(map, p), new SeededRandom(2), 'capture');
     expect(actions.some((a) => a.type === 'buildRoad' && a.q === 1 && a.r === 0)).toBe(true);
   });
 });

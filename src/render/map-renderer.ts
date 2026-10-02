@@ -1,9 +1,9 @@
 import {
-  Application, BitmapText, Circle, Container, Graphics, ImageSource, Sprite, Texture, type TextStyleOptions, type Ticker
+  Application, BitmapText, Circle, ColorMatrixFilter, Container, Graphics, ImageSource, Sprite, Texture, type TextStyleOptions, type Ticker
 } from 'pixi.js';
 import { FONT_REGULAR, sizedFontFamily } from '../ui/kit/bitmap-fonts';
 import {
-  axialKey, compareTileY, hexCorners, hexDistance, hexEdge, hexEdgeNeighbor, hexToPixel, splitHexBorder
+  axialKey, compareTileY, hexCorners, hexDistance, hexEdge, hexEdgeNeighbor, hexNeighbors, hexToPixel, splitHexBorder
 } from '../game/hex';
 import { tileMapByKey, type GameMap, type MapTile } from '../game/map-gen';
 import { bridgeCoastOffsets } from '../game/bridges';
@@ -37,7 +37,7 @@ import { acquireVillageBuildTexture, releaseVillageBuildTexture } from './villag
 import { tileSignature, tileInView, granaryFarmCount, type Viewport } from './tile-signature';
 import { t } from '../i18n';
 import { Tooltip } from '../ui/kit/tooltip';
-import { THEME } from '../ui/kit/theme';
+import { THEME, contrastTextColor } from '../ui/kit/theme';
 import { icons32FrameTexture } from '../ui/kit/icons32';
 
 /** Diameter of a pirate-deal dot (screen px; the row does not scale with zoom). */
@@ -155,6 +155,17 @@ interface HpBarEntry {
  *  the real unit; map both to the real id's hp bar key. */
 function normalizeHpBarKey(key: string): string {
   return key.startsWith('stage:') ? key.slice('stage:'.length) : key;
+}
+
+let idleFilter: ColorMatrixFilter | null = null;
+
+/** Shared black-and-white filter for buildings that currently produce nothing. */
+function idleBuildingFilter(): ColorMatrixFilter {
+  if (!idleFilter) {
+    idleFilter = new ColorMatrixFilter();
+    idleFilter.desaturate();
+  }
+  return idleFilter;
 }
 
 export class MapView {
@@ -495,9 +506,12 @@ export class MapView {
 
     for (const l of labels) {
       this.addVillageLabel(l.tile, l.owner, l.el, l.world, players);
-      this.addUnitMirror(l.tile);
+      this.addUnitMirrorsAround(l.tile);
     }
-    for (const g of granaryLabels) this.addGranaryLabel(g.tile, g.owner, g.world, players);
+    for (const g of granaryLabels) {
+      this.addGranaryLabel(g.tile, g.owner, g.world, players);
+      this.addUnitMirrorsAround(g.tile);
+    }
     // HP bars come after village labels so a unit's bar + text always render on
     // top of a village name label on the same tile.
     this.syncHpBars([...hpBarSpecs, ...buildingHpBarSpecs]);
@@ -716,7 +730,12 @@ export class MapView {
         ? portTex!.texture
         : buildingTileTex!.texture
       : null, p.x, y, buildingIsPort ? portTex!.anchorY : buildingTileTex?.anchorY ?? 0.5);
-    if (tv.buildingSprite) tv.buildingSprite.visible = explored;
+    if (tv.buildingSprite) {
+      tv.buildingSprite.visible = explored;
+      // A farm that yields nothing (winter) is drawn black and white.
+      const idle = tile.building?.kind === 'farm' && this.map?.season === 'winter';
+      tv.buildingSprite.filters = idle ? [idleBuildingFilter()] : null;
+    }
 
     const bridgeTex = tile.bridge ? this.textures.bridgeTextures[tile.bridge.dir] : null;
     this.syncSprite(tv, 'bridgeSprite', bridgeTex ? bridgeTex.texture : null, p.x, this.bridgeSpriteY(tile, y), bridgeTex?.anchorY ?? 0.5);
@@ -1133,9 +1152,6 @@ export class MapView {
         this.highlights.push(dot);
         this.movePulseParts.push({ g: dot, x: p.x, y, base: dotRadius, color: reachableColor });
         this.revealMarker(key, dot);
-        continue;
-      }
-      if (key === selectedKey && selection && selection.kind === 'unit' && tile.unit) {
         continue;
       }
       if (key !== selectedKey && !attackableKeys.has(key)) continue;
@@ -2296,9 +2312,21 @@ export class MapView {
     this.highlights.push(g);
   }
 
+  /** Mirrors the units on a labelled tile and on its six neighbours: a name
+   *  plate is wider than its hex and hangs below it, so it can cover the unit
+   *  next to it as well as the one standing on the village. */
+  private addUnitMirrorsAround(tile: MapTile): void {
+    this.addUnitMirror(tile);
+    for (const n of hexNeighbors(tile)) {
+      const nt = this.tileIndex.get(axialKey(n));
+      if (nt) this.addUnitMirror(nt);
+    }
+  }
+
   /** Draws the tile's unit again in the overlay, right above the village name
    *  label, so the unit texture is never covered by the name. */
   private addUnitMirror(tile: MapTile): void {
+    if (this.mirroredKeys.has(axialKey(tile))) return;
     const source = this.tileViews.get(axialKey(tile))?.unitSprite;
     if (!tile.unit || !source || !source.visible) return;
     const mirror = new Sprite(source.texture);
@@ -2330,9 +2358,10 @@ export class MapView {
     const tribe = players[owner] ? tribeById(players[owner]!.tribe) : undefined;
     if (!tribe) return;
     const el = new Container();
+    const plateColor = territoryColor(tribe, this.knownOwners.has(owner));
     const label = this.takeText(`${tile.building?.food ?? 0}/${GRANARY_CAPACITY}`, {
       fontSize: VILLAGE_LABEL_FONT_SIZE,
-      fill: 0xffffff,
+      fill: contrastTextColor(plateColor),
       fontFamily: FONT_REGULAR,
     });
     label.anchor.set(0.5, 0.5);
@@ -2340,9 +2369,7 @@ export class MapView {
     const padX = 4;
     const bg = this.takeGraphics();
     bg.zIndex = 0;
-    bg.roundRect(-label.width / 2 - padX, -label.height / 2 - 1, label.width + padX * 2, label.height + 2, 2).fill(
-      territoryColor(tribe, this.knownOwners.has(owner)),
-    );
+    bg.roundRect(-label.width / 2 - padX, -label.height / 2 - 1, label.width + padX * 2, label.height + 2, 2).fill(plateColor);
     el.sortableChildren = true;
     el.zIndex = OVERLAY_Z_VILLAGE_LABEL;
     el.addChild(bg);
@@ -2367,9 +2394,10 @@ export class MapView {
     const icon = connected ? new Sprite(this.textures.villageConnectedTexture!) : null;
     const iconSize = 16;
     const gap = 4;
+    const plateColor = territoryColor(tribe, this.knownOwners.has(owner));
     const label = this.takeText(`${tile.settlement!.name ?? ''} ${count}/${capacity}`.trim(), {
       fontSize: VILLAGE_LABEL_FONT_SIZE,
-      fill: 0xffffff,
+      fill: contrastTextColor(plateColor),
       fontFamily: FONT_REGULAR
     });
     label.anchor.set(0, 0.5);
@@ -2388,7 +2416,7 @@ export class MapView {
     labelBg.zIndex = 0;
     labelBg
       .roundRect(x0 - padX, -label.height / 2 - 1, contentW + padX * 2, label.height + 2, 2)
-      .fill(territoryColor(tribe, this.knownOwners.has(owner)));
+      .fill(plateColor);
 
     label.zIndex = 1;
     if (icon) {

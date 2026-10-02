@@ -1,7 +1,8 @@
 import { axialKey, hexNeighbors } from './hex';
 import { GameMap, MapTile, tileMapByKey } from './map-gen';
 import { Player } from './players';
-import { canAfford, pay, Resources } from './resources';
+import { Resources } from './resources';
+import { canAffordAt, payAt } from './stock';
 import { tileAt } from './selection';
 import { hasSkill } from './skills';
 import { isIceType, isWaterType } from './tile-types';
@@ -62,6 +63,34 @@ export function roadNetworkComponents(
   return components;
 }
 
+/** How many extra village groups destroying the road on `tile` would create:
+ *  0 when the road is not its owner's only link between any two villages (or
+ *  has no owner). Measured on the owner's road/port network. */
+export function roadCutSplits(map: GameMap, tile: MapTile): number {
+  const owner = tile.roadOwner;
+  if (owner === null || owner === undefined) return 0;
+  const villageKeys = map.tiles
+    .filter((t) => t.settlement !== null && t.settlement.owner === owner)
+    .map((t) => axialKey(t));
+  const groups = (): number => {
+    const seen = new Set<number>();
+    const comps = roadNetworkComponents(map, owner);
+    for (const k of villageKeys) {
+      const i = comps.findIndex((c) => c.has(k));
+      seen.add(i);
+    }
+    return seen.size;
+  };
+  const before = groups();
+  const savedBridge = tile.bridge;
+  tile.roadOwner = null;
+  tile.bridge = null;
+  const after = groups();
+  tile.roadOwner = owner;
+  tile.bridge = savedBridge;
+  return Math.max(0, after - before);
+}
+
 /** Tile keys of the player's road/port/bridge nodes that share a component
  *  with at least one of the player's own villages. Only these nodes may be
  *  extended by new roads — an orphaned bridge or a road stub left behind by a
@@ -92,7 +121,7 @@ export function canBuildRoad(
 ): boolean {
   if (!hasSkill(player, 'roads')) return false;
   if (!canBuildRoadHere(map, tile, player, connectedNodes)) return false;
-  return canAfford(player.resources, ROAD_COST);
+  return canAffordAt(map, player, tile, ROAD_COST);
 }
 
 /** Terrain/ownership preconditions for a road on this tile, without requiring
@@ -122,7 +151,7 @@ export function canBuildRoadHere(
 
 export function buildRoad(map: GameMap, tile: MapTile, player: Player): boolean {
   if (!canBuildRoad(map, tile, player)) return false;
-  player.resources = pay(player.resources, ROAD_COST);
+  if (!payAt(map, player, tile, ROAD_COST)) return false;
   tile.roadOwner = player.index;
   return true;
 }

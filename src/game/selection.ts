@@ -6,7 +6,9 @@ import { movePoints as unitMovePoints, Unit } from './units';
 import { tileMoveCost, waterRouteKeys } from './movement-cost';
 import { isMoveStealthed } from './stalker';
 
-type SelectionKind = 'unit' | 'village' | 'terrain';
+/** `tile`: the hex is selected. `unit`: the hex is selected and the unit standing
+ *  on it is armed (move/attack highlights, unit actions, glow). */
+type SelectionKind = 'unit' | 'tile';
 
 export interface Selection {
   kind: SelectionKind;
@@ -32,8 +34,7 @@ export function tileAt(map: GameMap, q: number, r: number): MapTile | undefined 
 export function contentLayers(tile: MapTile): SelectionKind[] {
   const layers: SelectionKind[] = [];
   if (tile.unit) layers.push('unit');
-  if (tile.settlement) layers.push('village');
-  layers.push('terrain');
+  layers.push('tile');
   return layers;
 }
 

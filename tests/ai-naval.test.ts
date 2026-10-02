@@ -9,6 +9,14 @@ import type { Player } from '../src/game/players';
 import { SeededRandom } from '../src/util/random';
 import { PIRATE_OWNER, type Unit } from '../src/game/units';
 import { hexDistance } from '../src/game/hex';
+import { migrateLegacyResources } from '../src/game/stock';
+
+/** Moves the legacy-literal materials of a test player into its capital before planning. */
+function fund<T extends import('../src/game/players').Player>(map: import('../src/game/map-gen').GameMap, player: T): T {
+  migrateLegacyResources(map, [player]);
+  return player;
+}
+
 
 function aiPlayer(over: Partial<Player> = {}): Player {
   return {
@@ -135,7 +143,7 @@ describe('Naval skill priority', () => {
     tileAt(map, 0, 0)!.ownedBy = 1;
     tileAt(map, 0, 0)!.settlement = { owner: 1, level: 1, captureReady: false };
     const player = aiPlayer({ resources: { wood: 0, stone: 0, money: 10, ore: 0, food: 20 } });
-    const actions = planAiActions(map, player, new SeededRandom(1), 'capture');
+    const actions = planAiActions(map, fund(map, player), new SeededRandom(1), 'capture');
     const firstSkill = actions.find((a) => a.type === 'openSkill');
     // Without a threat the economy order leads with an economy skill — the
     // exact first pick is jitter-sensitive, but Water must never be first.
@@ -146,7 +154,8 @@ describe('Naval skill priority', () => {
   it('opens only the naval skill chain while threatened, never economy skills', () => {
     const allowed = new Set(['water', 'navigation', 'science', 'catapult']);
     const player = aiPlayer({ resources: { wood: 0, stone: 0, money: 200, ore: 0, food: 20 } });
-    const actions = planAiActions(coastalMap(), player, new SeededRandom(1), 'capture');
+    const map = coastalMap();
+    const actions = planAiActions(map, fund(map, player), new SeededRandom(1), 'capture');
     for (const a of actions) {
       if (a.type === 'openSkill') expect(allowed.has(a.skill), a.skill).toBe(true);
     }
@@ -168,7 +177,7 @@ describe('Naval port building', () => {
       skills: ['water'],
       resources: { wood: 20, stone: 0, money: 100, ore: 5, food: 20 },
     });
-    const actions = planAiActions(map, player, new SeededRandom(1), 'capture');
+    const actions = planAiActions(map, fund(map, player), new SeededRandom(1), 'capture');
     const build = actions.find((a) => a.type === 'build');
     expect(build).toBeDefined();
     if (build && build.type === 'build') {
@@ -196,7 +205,7 @@ describe('Naval port building', () => {
       skills: ['water'],
       resources: { wood: 20, stone: 0, money: 100, ore: 5, food: 20 },
     });
-    const actions = planAiActions(map, player, new SeededRandom(1), 'capture');
+    const actions = planAiActions(map, fund(map, player), new SeededRandom(1), 'capture');
     const build = actions.find((a) => a.type === 'build');
     expect(build).toBeDefined();
     if (build && build.type === 'build') {
@@ -220,7 +229,7 @@ describe('Naval boarding', () => {
       skills: ['water', 'navigation'],
       resources: { wood: 0, stone: 0, money: 100, ore: 0, food: 20 },
     });
-    const actions = planAiActions(map, player, new SeededRandom(1), 'capture');
+    const actions = planAiActions(map, fund(map, player), new SeededRandom(1), 'capture');
     const board = actions.find((a) => a.type === 'move' && a.unitId === 'crew');
     expect(board).toBeDefined();
     if (board && board.type === 'move') {
@@ -243,7 +252,7 @@ describe('Naval boarding', () => {
       skills: ['water', 'navigation'],
       resources: { wood: 0, stone: 0, money: 100, ore: 0, food: 20 },
     });
-    const actions = planAiActions(map, player, new SeededRandom(1), 'capture');
+    const actions = planAiActions(map, fund(map, player), new SeededRandom(1), 'capture');
     expect(actions.some((a) => a.type === 'move' && a.unitId === 'crew')).toBe(false);
   });
 });
@@ -266,7 +275,7 @@ describe('Naval hunting', () => {
       skills: ['water', 'navigation'],
       resources: { wood: 0, stone: 0, money: 100, ore: 0, food: 20 },
     });
-    const actions = planAiActions(map, player, new SeededRandom(1), 'capture');
+    const actions = planAiActions(map, fund(map, player), new SeededRandom(1), 'capture');
     const moveIdx = actions.findIndex((a) => a.type === 'move' && a.unitId === 'ship1');
     const attackIdx = actions.findIndex((a) => a.type === 'attack' && a.unitId === 'ship1');
     expect(moveIdx).toBeGreaterThanOrEqual(0);
@@ -292,11 +301,14 @@ describe('Naval ship upgrades', () => {
     tileAt(map, 0, 0)!.unit = shipUnit('ship1', 1, 0, 0);
     tileAt(map, 3, 0)!.terrain = TileType.Water;
     tileAt(map, 3, 0)!.unit = pirate('p1', 3, 0);
+    // A village of the AI nearby holds the wood the upgrade costs.
+    tileAt(map, -2, 2)!.settlement = { owner: 1, level: 1, captureReady: false, capital: true };
+    tileAt(map, -2, 2)!.ownedBy = 1;
     const player = aiPlayer({
       skills: ['water', 'navigation'],
       resources: { wood: 10, stone: 0, money: 100, ore: 0, food: 20 },
     });
-    const actions = planAiActions(map, player, new SeededRandom(1), 'capture');
+    const actions = planAiActions(map, fund(map, player), new SeededRandom(1), 'capture');
     const up = actions.find((a) => a.type === 'upgradeShip' && a.unitId === 'ship1');
     expect(up).toBeDefined();
   });
@@ -345,7 +357,7 @@ describe('Naval catapults', () => {
       skills: ['science', 'catapult', 'water'],
       resources: { wood: 100, stone: 0, money: 100, ore: 10, food: 20 },
     });
-    const actions = planAiActions(map, player, new SeededRandom(1), 'capture');
+    const actions = planAiActions(map, fund(map, player), new SeededRandom(1), 'capture');
     expect(actions.some((a) => a.type === 'spawn' && a.unitType === 'catapult')).toBe(true);
   });
 });
@@ -358,7 +370,7 @@ describe('Naval defensive guards', () => {
     tileAt(map, 2, 0)!.terrain = TileType.Water;
     tileAt(map, 2, 0)!.unit = pirate('p1', 2, 0);
     const player = aiPlayer({ resources: { wood: 0, stone: 0, money: 100, ore: 0, food: 20 } });
-    const actions = planAiActions(map, player, new SeededRandom(1), 'capture');
+    const actions = planAiActions(map, fund(map, player), new SeededRandom(1), 'capture');
     expect(actions.some((a) => a.type === 'attack' && a.q === 2 && a.r === 0)).toBe(false);
     const start = hexDistance({ q: 0, r: 0 }, { q: 2, r: 0 });
     for (const a of actions) {
@@ -378,7 +390,7 @@ describe('Naval defensive guards', () => {
       skills: ['shields'],
       resources: { wood: 0, stone: 0, money: 100, ore: 3, food: 20 },
     });
-    const actions = planAiActions(map, player, new SeededRandom(1), 'capture');
+    const actions = planAiActions(map, fund(map, player), new SeededRandom(1), 'capture');
     expect(actions.some((a) => a.type === 'spawn' && a.unitType === 'shield')).toBe(true);
   });
 
@@ -396,7 +408,7 @@ describe('Naval defensive guards', () => {
       skills: ['riding', 'bridges'],
       resources: { wood: 100, stone: 100, money: 100, ore: 0, food: 20 },
     });
-    const actions = planAiActions(map, player, new SeededRandom(1), 'capture');
+    const actions = planAiActions(map, fund(map, player), new SeededRandom(1), 'capture');
     expect(actions.some((a) => a.type === 'buildBridge')).toBe(false);
   });
 
@@ -409,7 +421,7 @@ describe('Naval defensive guards', () => {
       skills: ['riding', 'bridges'],
       resources: { wood: 100, stone: 100, money: 100, ore: 0, food: 20 },
     });
-    const actions = planAiActions(map, player, new SeededRandom(1), 'capture');
+    const actions = planAiActions(map, fund(map, player), new SeededRandom(1), 'capture');
     expect(actions.some((a) => a.type === 'buildBridge')).toBe(false);
   });
 });

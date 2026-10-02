@@ -18,6 +18,7 @@ import { stormEligible } from '../game/storm';
 import { adjacentEnemyVillages, isMoveStealthed } from '../game/stalker';
 import { movePoints, canMove, canAttack, canDisband, makeUnit, PIRATE_OWNER, type Unit, type UnitType } from '../game/units';
 import { cycleSelection, reachableTargets, tileAt } from '../game/selection';
+import { addStock } from '../game/stock';
 import { shouldPromptWatch, type GameMode } from '../game/game-mode';
 import { isExploredFor, initialExplorationFor } from '../game/explore';
 import { exploreVillageSights } from '../game/village';
@@ -64,6 +65,9 @@ const DAMAGE_PREVIEW_HOLD_MS = 500;
  *  otherwise; throttling them to one display frame keeps panning smooth. */
 const VIEWPORT_SYNC_MS = 16;
 
+/** Delay before a replaced TextureSet's GPU textures are freed. */
+const TEXTURE_RELEASE_DELAY_MS = 2000;
+
 class GameController {
   private app: Application | null = null;
   private mapRoot: Container | null = null;
@@ -97,6 +101,8 @@ class GameController {
   private watchingLoopRunning = false;
   /** Set when the WebGL context has been lost but not yet recovered. */
   private contextLost = false;
+  /** Bumped on every GL context loss; a bake that straddles one is blank. */
+  private lossEpoch = 0;
   private damagePreviewHold: HoldTimer | null = null;
   private damagePreviewPress: { x: number; y: number } | null = null;
   private damagePreviewShown = false;
@@ -162,11 +168,18 @@ class GameController {
     if ((this.textures.season ?? 'spring') === season && (this.textures.iceTiles ?? 0) === ice) return;
     this.seasonRebake = true;
     const token = this.initToken;
+    const epoch = this.lossEpoch;
     const hexSize = HEX_SIZE * this.getCamera().qualityFactor;
     void createTextures(this.app, this.sim.map, hexSize, new Set(this.sim.players.map((p) => p.tribe)), season)
       .then((textures) => {
         if (token !== this.initToken || !this.app || !this.mapRoot) {
           destroyTextureSet(textures);
+          return;
+        }
+        // The context dropped while baking: the result is blank. Keep the old
+        // set; context-loss recovery rebuilds everything.
+        if (epoch !== this.lossEpoch) {
+          destroyTextureSet(textures, { contextLost: true });
           return;
         }
         this.replaceTextures(textures);
@@ -208,14 +221,16 @@ class GameController {
   /** Swaps in a freshly baked TextureSet after the previous MapView (which held
    *  the old set) is gone, so the composited village textures of the discarded
    *  set are destroyed as soon as nothing references them. */
-  private replaceTextures(textures: Awaited<ReturnType<typeof createTextures>>): void {
+  private replaceTextures(textures: Awaited<ReturnType<typeof createTextures>>, contextLost = false): void {
     if (this.mapView) {
       this.mapView.destroy();
       this.mapView = null;
     }
     const previous = this.textures;
     this.textures = textures;
-    if (previous && previous !== textures) destroyTextureSet(previous);
+    // Freed a moment later so in-flight animations that still hold a sprite
+    // from the old set do not draw a destroyed texture.
+    if (previous && previous !== textures) setTimeout(() => destroyTextureSet(previous, { contextLost }), TEXTURE_RELEASE_DELAY_MS);
   }
 
   getMap(): GameMap | null {
@@ -399,6 +414,7 @@ class GameController {
    *  rebuild even if the browser never fires `webglcontextrestored`. */
   noteContextLost(): void {
     this.contextLost = true;
+    this.lossEpoch++;
     markDirty();
   }
 
@@ -444,12 +460,24 @@ class GameController {
       }
       if (this.glContextLost()) return;
       const hexSize = HEX_SIZE * this.getCamera().qualityFactor;
-      const textures = await createTextures(this.app, this.sim.map, hexSize, new Set(this.sim.players.map((p) => p.tribe)), seasonForTurn(this.sim.turn));
-      if (token !== this.initToken || !this.app || !this.mapRoot) return;
-      this.overlayItems = [];
-      this.replaceTextures(textures);
-      this.contextLost = false;
-      this.render();
+      // A bake that straddles another loss is blank: bake again (a few times).
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const epoch = this.lossEpoch;
+        const textures = await createTextures(this.app, this.sim.map, hexSize, new Set(this.sim.players.map((p) => p.tribe)), seasonForTurn(this.sim.turn));
+        if (token !== this.initToken || !this.app || !this.mapRoot) return;
+        if (epoch !== this.lossEpoch || this.glContextLost()) {
+          destroyTextureSet(textures, { contextLost: true });
+          for (let i = 0; i < retries && this.glContextLost(); i++) {
+            await new Promise((r) => setTimeout(r, 250));
+          }
+          continue;
+        }
+        this.overlayItems = [];
+        this.replaceTextures(textures, true);
+        this.contextLost = false;
+        this.render();
+        break;
+      }
     } catch (e) {
       // Keep the loss flag set so the next restore/foreground event retries
       // instead of leaving the map blank forever.
@@ -1208,13 +1236,12 @@ class GameController {
     if (store.screen !== 'game' || store.netMode !== 'single') return false;
     const local = this.sim.players[store.localPlayerIndex];
     if (!local) return false;
-    local.resources = {
-      wood: local.resources.wood + RESOURCE_CHEAT_AMOUNT,
-      stone: local.resources.stone + RESOURCE_CHEAT_AMOUNT,
-      money: local.resources.money + RESOURCE_CHEAT_AMOUNT,
-      ore: local.resources.ore + RESOURCE_CHEAT_AMOUNT,
-      food: local.resources.food + RESOURCE_CHEAT_AMOUNT,
-    };
+    local.resources.money += RESOURCE_CHEAT_AMOUNT;
+    // Materials live in villages: every own village gets the amount.
+    for (const t of this.sim.map.tiles) {
+      if (t.settlement?.owner !== local.index) continue;
+      addStock(t, { wood: RESOURCE_CHEAT_AMOUNT, stone: RESOURCE_CHEAT_AMOUNT, ore: RESOURCE_CHEAT_AMOUNT, food: RESOURCE_CHEAT_AMOUNT });
+    }
     this.syncStore();
     this.saveGame();
     return true;

@@ -84,7 +84,7 @@ describe('HudSelected village building constraints', () => {
       screen: 'game',
       players,
       localPlayerIndex: 0,
-      selection: { kind: 'village', q: 0, r: 0 },
+      selection: { kind: 'tile', q: 0, r: 0 },
       tutorial: false,
       tutorialStep: null,
     });
@@ -119,7 +119,7 @@ describe('HudSelected village building constraints', () => {
     expect(texts().some((s) => s.startsWith('Starving!'))).toBe(false);
     const village = tileAt(gameController.getMap()!, 0, 0)!;
     village.settlement!.starving = true;
-    useGameStore.setState({ selection: { kind: 'village', q: 0, r: 0 } });
+    useGameStore.setState({ selection: { kind: 'tile', q: 0, r: 0 } });
     expect(texts().some((s) => s.startsWith('Starving!'))).toBe(true);
   });
 
@@ -129,13 +129,13 @@ describe('HudSelected village building constraints', () => {
     const tile = tileAt(map, 1, 0)!;
     tile.ownedBy = 0;
     const human = useGameStore.getState().players[0]!;
-    useGameStore.setState({ selection: { kind: 'terrain', q: 1, r: 0 } });
+    useGameStore.setState({ selection: { kind: 'tile', q: 1, r: 0 } });
     expect(texts()).toContain('Open Agriculture');
     human.skills.push('agriculture');
     const farm = tileAt(map, 1, -1)!;
     farm.ownedBy = 0;
     farm.building = { kind: 'farm', level: 1 };
-    useGameStore.setState({ selection: { kind: 'terrain', q: 1, r: 0 } });
+    useGameStore.setState({ selection: { kind: 'tile', q: 1, r: 0 } });
     expect(texts()).not.toContain('Open Agriculture');
     expect(texts()).toContain('Open Granary');
   });
@@ -148,7 +148,7 @@ describe('HudSelected village building constraints', () => {
     granary.building = { kind: 'granary', level: 1, food: 7 };
     tileAt(map, 1, -1)!.ownedBy = 0;
     tileAt(map, 1, -1)!.building = { kind: 'farm', level: 1 };
-    useGameStore.setState({ selection: { kind: 'terrain', q: 1, r: 0 } });
+    useGameStore.setState({ selection: { kind: 'tile', q: 1, r: 0 } });
     expect(texts()).toContain('Stored food: 7/50 (collects what adjacent farms do not use)');
   });
 
@@ -350,7 +350,7 @@ describe('HudSelected building produce and bridge info lines', () => {
       screen: 'game',
       players,
       localPlayerIndex: 0,
-      selection: { kind: 'village', q: tile.q, r: tile.r },
+      selection: { kind: 'tile', q: tile.q, r: tile.r },
       tutorial: false,
       tutorialStep: null,
     });
@@ -384,8 +384,8 @@ describe('HudSelected building produce and bridge info lines', () => {
     });
     const squares = hpSquares();
     expect(squares).toHaveLength(2);
-    expect(squares.every((q) => q.w === 8 && q.h === 8)).toBe(true);
-    expect(squares[1]!.x - squares[0]!.x).toBe(11); // 8px square + 3px gap
+    expect(squares.every((q) => q.w === 6 && q.h === 6)).toBe(true);
+    expect(squares[1]!.x - squares[0]!.x).toBe(9); // 6px square + 3px gap
     expect(texts().join('\n')).not.toContain('2/2');
   });
 
@@ -467,7 +467,7 @@ describe('HudSelected connected village income bonus', () => {
       screen: 'game',
       players,
       localPlayerIndex: 0,
-      selection: { kind: 'village', q: 0, r: 0 },
+      selection: { kind: 'tile', q: 0, r: 0 },
       tutorial: false,
       tutorialStep: null,
     });
@@ -735,7 +735,7 @@ describe('HudSelected trap info', () => {
       players,
       localPlayerIndex: 0,
       turn,
-      selection: { kind: 'terrain', q: 0, r: 0 },
+      selection: { kind: 'tile', q: 0, r: 0 },
       tutorial: false,
       tutorialStep: null,
     });
@@ -807,7 +807,7 @@ describe('HudSelected bonus info', () => {
       screen: 'game',
       players,
       localPlayerIndex: 0,
-      selection: { kind: 'terrain', q: 0, r: 0 },
+      selection: { kind: 'tile', q: 0, r: 0 },
       tutorial: false,
       tutorialStep: null,
     });
@@ -846,7 +846,7 @@ describe('HudSelected bonus info', () => {
       screen: 'game',
       players,
       localPlayerIndex: 0,
-      selection: { kind: 'terrain', q: 0, r: 0 },
+      selection: { kind: 'tile', q: 0, r: 0 },
       tutorial: false,
       tutorialStep: null,
     });
@@ -1076,7 +1076,7 @@ describe('HudSelected building destroy and tile extras', () => {
       screen: 'game',
       players,
       localPlayerIndex: 0,
-      selection: { kind: 'village', q, r },
+      selection: { kind: 'tile', q, r },
       tutorial: false,
       tutorialStep: null,
     });

@@ -54,3 +54,24 @@ export function isLightColor(color: number): boolean {
   const b = color & 0xff;
   return 0.299 * r + 0.587 * g + 0.114 * b > 150;
 }
+
+
+function srgbToLinear(channel: number): number {
+  const c = channel / 255;
+  return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+}
+
+/** WCAG relative luminance of a 0xRRGGBB colour (0 = black, 1 = white). */
+export function relativeLuminance(color: number): number {
+  const r = srgbToLinear((color >> 16) & 0xff);
+  const g = srgbToLinear((color >> 8) & 0xff);
+  const b = srgbToLinear(color & 0xff);
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+/** Text colour (white or black) with the better contrast on `background`. */
+export function contrastTextColor(background: number): number {
+  // Black wins once the background is brighter than the point where the
+  // contrast ratios against white and black are equal (luminance ≈ 0.179).
+  return relativeLuminance(background) > 0.179 ? 0x000000 : 0xffffff;
+}

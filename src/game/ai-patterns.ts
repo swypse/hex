@@ -1,6 +1,7 @@
 import { GameMap, MapTile } from './map-gen';
 import { Player } from './players';
-import { canAfford, villageUpgradeCost } from './resources';
+import { villageUpgradeCost } from './resources';
+import { canAffordAt } from './stock';
 import { isWaterType, isMountainType } from './tile-types';
 import { canOpenSkill, hasSkill, SkillId } from './skills';
 import { reachableTargets, tileAt } from './selection';
@@ -255,6 +256,7 @@ export function bestSpawnableUnitType(
   player: Player,
   prefer: SpawnPreference = 'offense',
   map?: GameMap,
+  village?: MapTile,
 ): UnitType | null {
   const candidates: UnitType[] = [];
   for (const type of SPAWN_ORDER[prefer]) {
@@ -265,7 +267,10 @@ export function bestSpawnableUnitType(
     if (type === 'catapult' && !hasSkill(player, 'catapult')) continue;
     if (type === 'shield' && !hasSkill(player, 'shields')) continue;
     const cost = unitSpawnCost(type);
-    if (canAfford(player.resources, cost)) candidates.push(type);
+    // The money is the player's; wood and ore come from the spawning village's
+    // network (without a village only the money can be checked).
+    const affordable = map && village ? canAffordAt(map, player, village, cost) : player.resources.money >= cost.money;
+    if (affordable) candidates.push(type);
   }
   if (candidates.length === 0) return null;
   if (!map || (prefer !== 'offense' && prefer !== 'defense') || !flagsFor(player).composition) return candidates[0]!;
@@ -331,7 +336,7 @@ export function guardGarrisonAttack(
   const garrisonHome = unit.spawnVillage !== null && key(unit.spawnVillage.q, unit.spawnVillage.r) === vk;
   const stayed = unitsInVillage(map, tile) - (garrisonHome ? 1 : 0);
   if (stayed >= villageCapacity(tile.settlement.level)) return { kind: 'hold' };
-  const guardType = bestSpawnableUnitType(player, 'defense', map);
+  const guardType = bestSpawnableUnitType(player, 'defense', map, tile);
   if (!guardType) return { kind: 'hold' };
   return { kind: 'attack', guardType };
 }
@@ -964,7 +969,7 @@ export const AI_PATTERNS: AiPattern[] = [
         if (state.spawned.has(k)) continue;
         if (v.unit) continue;
         if (!landEnemyCanReach(map, v, player.index)) continue;
-        const type = bestSpawnableUnitType(player, 'defense', map);
+        const type = bestSpawnableUnitType(player, 'defense', map, v);
         if (!type) continue;
         return [{ type: 'spawn', q: v.q, r: v.r, unitType: type }];
       }
@@ -1072,7 +1077,7 @@ export const AI_PATTERNS: AiPattern[] = [
         // in the village instead (only when the village can actually spawn it).
         const canClimb = hasSkill(player, 'climbing');
         const canDock = hasSkill(player, 'navigation');
-        const spawnType = bestSpawnableUnitType(player, 'defense', map);
+        const spawnType = bestSpawnableUnitType(player, 'defense', map, t);
         const slotFree = unitsInVillage(map, t) < villageCapacity(t.settlement.level);
         if (spawnType && slotFree) {
           let best: MapTile | null = null;
@@ -1161,7 +1166,7 @@ export const AI_PATTERNS: AiPattern[] = [
         if (!kinds.includes('sawmill')) kinds.push('sawmill');
         kinds.push('port');
         for (const kind of kinds) {
-          if (!canAfford(player.resources, BUILDING_COSTS[kind])) continue;
+          if (!canAffordAt(map, player, t, BUILDING_COSTS[kind])) continue;
           // Already standing where it can build something.
           const local = builderBuildable(map, t, kind, player);
           if (local.length > 0) {
@@ -1204,7 +1209,7 @@ export const AI_PATTERNS: AiPattern[] = [
 
         // Lay a trap now when affordable, on the best cell within reach.
         const spots = trapCells(map, t);
-        if (spots.length > 0 && canAfford(player.resources, TRAP_COST)) {
+        if (spots.length > 0 && canAffordAt(map, player, t, TRAP_COST)) {
           let best: MapTile | null = null;
           let bestScore = -Infinity;
           for (const s of spots) {
@@ -1416,7 +1421,7 @@ export const AI_PATTERNS: AiPattern[] = [
       for (const tile of map.tiles) {
         if (state.built.has(key(tile.q, tile.r))) continue;
         if (!canBuildPort(map, tile, player)) continue;
-        if (!canAfford(player.resources, BUILDING_COSTS.port)) continue;
+        if (!canAffordAt(map, player, tile, BUILDING_COSTS.port)) continue;
         const d = hexDistance(tile, naval.tile);
         if (d < bestDist) {
           bestDist = d;
@@ -1530,7 +1535,7 @@ export const AI_PATTERNS: AiPattern[] = [
         if (!unit || unit.owner !== player.index) continue;
         if (unit.shipLevel === undefined || unit.shipLevel >= 3) continue;
         if (state.acted.has(unit.id) || state.moved.has(unit.id)) continue;
-        if (!canUpgradeShip(unit, t, player)) continue;
+        if (!canUpgradeShip(map, unit, t, player)) continue;
         return [{ type: 'upgradeShip', unitId: unit.id }];
       }
       return null;
@@ -1626,7 +1631,6 @@ export const AI_PATTERNS: AiPattern[] = [
       if (fielded >= cap) return null;
       if (!specialUnitWanted(map, player, situation)) return null;
       const cost = unitSpawnCost(special);
-      if (!canAfford(player.resources, cost)) return null;
       // Pick the village that puts the special unit where it works: the banner
       // next to the army cluster, the builder beside an unbuilt mine, everyone
       // else on the front line.
@@ -1644,6 +1648,7 @@ export const AI_PATTERNS: AiPattern[] = [
         for (const v of map.tiles) {
           if (!v.settlement || v.settlement.owner !== player.index) continue;
           if (v.unit) continue;
+          if (!canAffordAt(map, player, v, cost)) continue;
           const k = key(v.q, v.r);
           if (state.spawned.has(k) || state.occupied.has(k)) continue;
           const enemyDist = nearestEnemyDistanceFrom(map, player.index, v);
@@ -1676,18 +1681,18 @@ export const AI_PATTERNS: AiPattern[] = [
         if (!t.settlement || t.settlement.owner !== player.index) continue;
         const k = key(t.q, t.r);
         if (state.upgraded.has(k)) continue;
-        if (!canAfford(player.resources, villageUpgradeCost(t.settlement.level))) continue;
-        if (eatsFarmMaterials(map, player, villageUpgradeCost(t.settlement.level))) continue;
+        if (!canAffordAt(map, player, t, villageUpgradeCost(t.settlement.level))) continue;
+        if (eatsFarmMaterials(map, player, villageUpgradeCost(t.settlement.level), t)) continue;
         const front = nearestEnemyDistanceFrom(map, player.index, t) <= 4;
         if (front || ownUnits <= 2) return [{ type: 'upgrade', q: t.q, r: t.r }];
       }
       for (const tile of map.tiles) {
         if (tile.ownedBy !== player.index) continue;
         if (state.built.has(key(tile.q, tile.r))) continue;
-        if (canBuildMine(map, tile, player) && canAfford(player.resources, BUILDING_COSTS.mine)) {
+        if (canBuildMine(map, tile, player) && canAffordAt(map, player, tile, BUILDING_COSTS.mine)) {
           return [{ type: 'build', q: tile.q, r: tile.r, kind: 'mine' }];
         }
-        if (canBuildSawmill(map, tile, player) && canAfford(player.resources, BUILDING_COSTS.sawmill)) {
+        if (canBuildSawmill(map, tile, player) && canAffordAt(map, player, tile, BUILDING_COSTS.sawmill)) {
           return [{ type: 'build', q: tile.q, r: tile.r, kind: 'sawmill' }];
         }
       }

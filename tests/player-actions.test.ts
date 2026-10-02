@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { makeTestMap, tileAt, makeUnit } from './helpers/test-map';
+import { makeTestMap, tileAt, makeUnit, giveResources } from './helpers/test-map';
 import { buildPlayers } from '../src/game/players';
 import { SeededRandom } from '../src/util/random';
 import { hasAnyAvailableAction } from '../src/game/player-actions';
@@ -13,7 +13,7 @@ describe('hasAnyAvailableAction', () => {
 
   function broke(p: ReturnType<typeof buildPlayers>): void {
     const target = p[0]!;
-    target.resources = { wood: 0, stone: 0, money: 0, ore: 0, food: 20 };
+    target.resources = { money: 0 };
     target.skills = [];
   }
 
@@ -120,8 +120,8 @@ describe('hasAnyAvailableAction', () => {
     const map = makeTestMap(2);
     const p = players();
     human(p).skills = Object.keys(SKILLS) as (keyof typeof SKILLS)[];
-    human(p).resources = { wood: 100, stone: 100, money: 100, ore: 100, food: 20 };
     tileAt(map, 0, 0)!.settlement = { owner: 0, level: 1, captureReady: false };
+    giveResources(map, human(p), { wood: 100, stone: 100, money: 100, ore: 100, food: 20 });
     expect(hasAnyAvailableAction(map, human(p), 1)).toBe(true);
   });
 
@@ -129,7 +129,7 @@ describe('hasAnyAvailableAction', () => {
     const map = makeTestMap(2);
     const p = players();
     human(p).skills = Object.keys(SKILLS) as (keyof typeof SKILLS)[];
-    human(p).resources = { wood: 100, stone: 100, money: 100, ore: 100, food: 20 };
+    giveResources(map, human(p), { wood: 100, stone: 100, money: 100, ore: 100, food: 20 });
     const tile = tileAt(map, 0, 0)!;
     tile.ownedBy = 0;
     tile.terrain = TileType.GrasslandLand;

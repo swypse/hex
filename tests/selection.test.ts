@@ -69,36 +69,42 @@ describe('tileAt', () => {
 });
 
 describe('contentLayers', () => {
-  it('lists present layers highest priority first', () => {
+  it('lists the armed-unit layer first when a unit stands on the tile', () => {
     const map = makeMap();
-    expect(contentLayers(map.tiles[0]!)).toEqual(['unit', 'terrain']);
-    expect(contentLayers(map.tiles[1]!)).toEqual(['terrain']);
-    expect(contentLayers(map.tiles[3]!)).toEqual(['village', 'terrain']);
+    expect(contentLayers(map.tiles[0]!)).toEqual(['unit', 'tile']);
+    expect(contentLayers(map.tiles[1]!)).toEqual(['tile']);
+    // a village without a unit is just a selected tile
+    expect(contentLayers(map.tiles[3]!)).toEqual(['tile']);
   });
 });
 
 describe('cycleSelection', () => {
-  it('selects highest priority on a fresh tile', () => {
+  it('selects the unit when the tile has one, else just the tile', () => {
     const map = makeMap();
     expect(cycleSelection(null, map.tiles[0]!).kind).toBe('unit');
-    expect(cycleSelection(null, map.tiles[3]!).kind).toBe('village');
+    expect(cycleSelection(null, map.tiles[3]!).kind).toBe('tile');
   });
 
-  it('cycles down on repeated clicks of the same tile', () => {
+  it('toggles the unit between armed and not armed on repeated clicks of the same tile', () => {
     const map = makeMap();
     const first = cycleSelection(null, map.tiles[0]!);
     expect(first.kind).toBe('unit');
     const second = cycleSelection(first, map.tiles[0]!);
-    expect(second.kind).toBe('terrain');
+    expect(second).toEqual({ kind: 'tile', q: 0, r: 0 });
     const third = cycleSelection(second, map.tiles[0]!);
     expect(third.kind).toBe('unit');
   });
 
-  it('resets to highest priority when clicking a different tile', () => {
+  it('keeps a tile without a unit selected on repeated clicks', () => {
     const map = makeMap();
-    const selectedTerrain = { kind: 'terrain' as const, q: 0, r: 0 };
-    const next = cycleSelection(selectedTerrain, map.tiles[3]!);
-    expect(next.kind).toBe('village');
+    const first = cycleSelection(null, map.tiles[1]!);
+    expect(cycleSelection(first, map.tiles[1]!).kind).toBe('tile');
+  });
+
+  it('arms the unit when clicking a different tile that has one', () => {
+    const map = makeMap();
+    const selectedTile = { kind: 'tile' as const, q: 9, r: 9 };
+    expect(cycleSelection(selectedTile, map.tiles[0]!).kind).toBe('unit');
   });
 });
 

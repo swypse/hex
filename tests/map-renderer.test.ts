@@ -1130,7 +1130,7 @@ describe('MapView hp bar anchoring', () => {
       ticker: { add: (): void => {}, remove: (): void => {} },
     } as unknown as Application;
     const v = new MapView(app, textures, HEX, SPRITE_SCALE, 2);
-    const selection: import('../src/game/selection').Selection = { kind: 'terrain', q: 0, r: 0 };
+    const selection: import('../src/game/selection').Selection = { kind: 'tile', q: 0, r: 0 };
     v.update(m, players, selection, new Set(), new Set(), 0, new Set(), {
       x: 400,
       y: 300,
@@ -1146,7 +1146,7 @@ describe('MapView hp bar anchoring', () => {
   });
 
   it('splits the selected border: top part layered in the tile, bottom part above everything', () => {
-    const selection: import('../src/game/selection').Selection = { kind: 'terrain', q: 0, r: 0 };
+    const selection: import('../src/game/selection').Selection = { kind: 'tile', q: 0, r: 0 };
     view.update(map, players, selection, new Set(), new Set(), 0, new Set(), {
       x: 400,
       y: 300,
@@ -1169,7 +1169,7 @@ describe('MapView hp bar anchoring', () => {
   });
 
   it('draws the split selected border as open polylines without a closing segment', () => {
-    const selection: import('../src/game/selection').Selection = { kind: 'terrain', q: 0, r: 0 };
+    const selection: import('../src/game/selection').Selection = { kind: 'tile', q: 0, r: 0 };
     view.update(map, players, selection, new Set(), new Set(), 0, new Set(), {
       x: 400,
       y: 300,
