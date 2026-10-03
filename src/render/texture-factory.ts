@@ -108,6 +108,8 @@ export interface TextureSet {
   sawmillTexture: TileTexture;
   mineTexture: TileTexture;
   farmTexture: TileTexture;
+  /** Black-and-white farm, shown while the farm yields nothing (winter). Baked so no per-frame filter pass is needed. */
+  farmIdleTexture: TileTexture;
   /** Indexed by adjacent farm count, 1..GRANARY_MAX_FARMS (index 0 unused). */
   granaryTextures: TileTexture[];
   bridgeTextures: Record<BridgeDir, TileTexture>;
@@ -310,6 +312,24 @@ function blankTile(anchorY: number): TileTexture {
   return { texture: Texture.EMPTY, anchorY };
 }
 
+/** Bakes a black-and-white copy of a tile texture with identical footprint and anchor. */
+function makeDesaturatedTexture(app: Application, base: TileTexture): TileTexture {
+  if (base.texture === Texture.EMPTY) return base;
+  const container = new Container();
+  const sprite = new Sprite(base.texture);
+  sprite.anchor.set(0.5, base.anchorY);
+  const gray = new ColorMatrixFilter();
+  gray.desaturate();
+  sprite.filters = [gray];
+  container.addChild(sprite);
+  const W = base.texture.width;
+  const H = base.texture.height;
+  const frame = new Rectangle(-W / 2, -base.anchorY * H, W, H);
+  const texture = app.renderer.generateTexture({ target: container, frame, resolution: 1 });
+  container.destroy({ children: true });
+  return { texture, anchorY: base.anchorY };
+}
+
 function makeUnitGlowTexture(app: Application, base: TileTexture): TileTexture {
   const W = base.texture.width;
   const H = base.texture.height;
@@ -454,6 +474,7 @@ export async function createTextures(
     makeUnitImageTexture(bakeApp, buildingTileTexture('mine'), hexSize) ?? blankTile(0.5);
   const farmTexture =
     makeUnitImageTexture(bakeApp, buildingTileTexture('farm'), hexSize) ?? blankTile(0.5);
+  const farmIdleTexture = makeDesaturatedTexture(bakeApp, farmTexture);
   const granaryTextures: TileTexture[] = [];
   for (let n = 0; n <= GRANARY_MAX_FARMS; n++) {
     granaryTextures[n] =
@@ -528,6 +549,7 @@ export async function createTextures(
     sawmillTexture,
     mineTexture,
     farmTexture,
+    farmIdleTexture,
     granaryTextures,
     bridgeTextures,
     portTextures,

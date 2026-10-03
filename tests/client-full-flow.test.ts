@@ -43,6 +43,7 @@ vi.mock('../src/render/texture-factory', async () => {
     sawmillTexture: tileTex(50, 50),
     mineTexture: tileTex(50, 50),
     farmTexture: tileTex(50, 50),
+    farmIdleTexture: tileTex(50, 50),
     granaryTextures: Array.from({ length: 7 }, () => tileTex(50, 50)),
     portTextures: {
       e: tileTex(40, 40, 0.7), ne: tileTex(40, 40, 0.7), nw: tileTex(40, 40, 0.7),

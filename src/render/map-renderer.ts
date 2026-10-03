@@ -1,5 +1,5 @@
 import {
-  Application, BitmapText, Circle, ColorMatrixFilter, Container, Graphics, ImageSource, Sprite, Texture, type TextStyleOptions, type Ticker
+  Application, BitmapText, Circle, Container, Graphics, ImageSource, Sprite, Texture, type TextStyleOptions, type Ticker
 } from 'pixi.js';
 import { FONT_REGULAR, sizedFontFamily } from '../ui/kit/bitmap-fonts';
 import {
@@ -157,17 +157,6 @@ interface HpBarEntry {
  *  the real unit; map both to the real id's hp bar key. */
 function normalizeHpBarKey(key: string): string {
   return key.startsWith('stage:') ? key.slice('stage:'.length) : key;
-}
-
-let idleFilter: ColorMatrixFilter | null = null;
-
-/** Shared black-and-white filter for buildings that currently produce nothing. */
-function idleBuildingFilter(): ColorMatrixFilter {
-  if (!idleFilter) {
-    idleFilter = new ColorMatrixFilter();
-    idleFilter.desaturate();
-  }
-  return idleFilter;
 }
 
 export class MapView {
@@ -734,9 +723,6 @@ export class MapView {
       : null, p.x, y, buildingIsPort ? portTex!.anchorY : buildingTileTex?.anchorY ?? 0.5);
     if (tv.buildingSprite) {
       tv.buildingSprite.visible = explored;
-      // A farm that yields nothing (winter) is drawn black and white.
-      const idle = tile.building?.kind === 'farm' && this.map?.season === 'winter';
-      tv.buildingSprite.filters = idle ? [idleBuildingFilter()] : null;
     }
 
     const bridgeTex = tile.bridge ? this.textures.bridgeTextures[tile.bridge.dir] : null;
@@ -986,7 +972,8 @@ export class MapView {
       case 'sawmill':
         return tx.sawmillTexture;
       case 'farm':
-        return tx.farmTexture;
+        // A farm that yields nothing (winter) uses the pre-baked black-and-white texture.
+        return this.map?.season === 'winter' ? tx.farmIdleTexture : tx.farmTexture;
       case 'granary':
         return tx.granaryTextures[granaryFarmCount(this.map!, tile)]!;
       case 'temple':
