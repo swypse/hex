@@ -41,6 +41,8 @@ import { THEME, contrastTextColor } from '../ui/kit/theme';
 import { icons32FrameTexture } from '../ui/kit/icons32';
 
 /** Diameter of a pirate-deal dot (screen px; the row does not scale with zoom). */
+/** Length of one row's bounce in the season ice wave. */
+const ICE_BOUNCE_MS = 150;
 const PIRATE_DEAL_DOT = 8;
 /** Horizontal gap between pirate-deal dots (screen px). */
 const PIRATE_DEAL_GAP = 4;
@@ -1674,6 +1676,58 @@ export class MapView {
       for (const s of sprites) entries.push({ obj: s, baseY: s.position.y, delay });
     }
     this.runHexBounce(entries);
+  }
+
+  /** Sweeps a selected-hex bounce over the given tiles (water that froze, ice
+   *  that thawed) from the topmost row of the map to the bottom one, staging
+   *  `rowDelayMs` per horizontal row (the first changed row starts at once).
+   *  `onRowDone` runs for a row's tiles when its bounce ends. Resolves after
+   *  the last row is done. */
+  seasonIceWave(
+    tiles: { q: number; r: number }[],
+    onRowDone?: (row: { q: number; r: number }[]) => void,
+    rowDelayMs = 30,
+  ): Promise<void> {
+    if (tiles.length === 0) return Promise.resolve();
+    const rows = new Map<number, { q: number; r: number }[]>();
+    for (const tile of tiles) {
+      const row = rows.get(tile.r);
+      if (row) row.push(tile);
+      else rows.set(tile.r, [tile]);
+    }
+    const topRow = Math.min(...rows.keys());
+    const entries: { obj: Sprite | Graphics; baseY: number; delay: number }[] = [];
+    for (const tile of tiles) {
+      const tv = this.tileViews.get(axialKey(tile));
+      if (!tv) continue;
+      const sprites = this.hexSurfaceSprites(tv);
+      if (tv.unitSprite && !tv.unitSprite.destroyed) sprites.push(tv.unitSprite);
+      const delay = (tile.r - topRow) * rowDelayMs;
+      for (const s of sprites) entries.push({ obj: s, baseY: s.position.y, delay });
+    }
+    this.runHexBounce(entries, ICE_BOUNCE_MS);
+    return new Promise((resolve) => {
+      let left = rows.size;
+      for (const [r, row] of rows) {
+        setTimeout(() => {
+          onRowDone?.(row);
+          if (--left === 0) resolve();
+        }, (r - topRow) * rowDelayMs + ICE_BOUNCE_MS);
+      }
+    });
+  }
+
+  /** Points the terrain sprites of `tiles` at the textures of another bake
+   *  (the new season) without rebuilding the view. */
+  swapTileTextures(tiles: { q: number; r: number }[], textures: TextureSet): void {
+    for (const tile of tiles) {
+      const key = axialKey(tile);
+      const tv = this.tileViews.get(key);
+      const tex = textures.tileTextures.get(key);
+      if (!tv || !tex || tv.terrainSprite.destroyed) continue;
+      tv.terrainSprite.texture = tex.texture;
+      tv.terrainSprite.anchor.set(0.5, tex.anchorY);
+    }
   }
 
   /** The sprites that sit on top of a hex and move with it when its tile is

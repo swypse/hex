@@ -28,7 +28,7 @@ import { knownTribesFor } from './discovery';
 import { isWaterType, TileType } from './tile-types';
 import { BOTTLE_HEAL, BOTTLE_MONEY, bottleCollectableFor, collectExpiredBottles, randomBottleEffectKind, touchBottle, trySpawnBottle } from './bottles';
 import { canPlaceTrapOn, trapAlive, trapDamage, TRAP_COST } from './traps';
-import { seasonForTurn } from './season';
+import { SEASONS, SEASON_LENGTH, Season, seasonForTurn } from './season';
 import { freezeCoast, thawIce } from './ice';
 import { stormDamage, stormEligible, stormTargetShips } from './storm';
 import { upgradeVillage, buildWall as applyWall, canBuildWall, WALL_COST } from './village';
@@ -1231,19 +1231,34 @@ export class Simulator {
   }
 
   /** On entering winter coast water freezes; on leaving it the ice melts. */
-  private applySeasonChange(): void {
+  private applySeasonChange(prev: Season = seasonForTurn(this.turn - 1)): void {
     const season = seasonForTurn(this.turn);
     this.map.season = season;
-    if (season === seasonForTurn(this.turn - 1)) return;
+    if (season === prev) return;
     if (season === 'winter') {
       const r = freezeCoast(this.map);
       this.emit({ type: 'seasonChanged', season, frozen: r.frozen, thawed: [], landed: r.landed, removed: r.removed, killed: [] });
-    } else if (season === 'spring') {
+    } else if (prev === 'winter') {
       const r = thawIce(this.map);
       this.emit({ type: 'seasonChanged', season, frozen: [], thawed: r.thawed, landed: [], removed: [], killed: r.killed });
     } else {
       this.emit({ type: 'seasonChanged', season, frozen: [], thawed: [], landed: [], removed: [], killed: [] });
     }
+  }
+
+  /** Cheat: jumps the turn counter forward to the first turn of the next
+   *  `target` season and applies the change (freezing or thawing the coast).
+   *  Returns false when `target` is already the current season. */
+  forceSeason(target: Season): boolean {
+    const prev = seasonForTurn(this.turn);
+    if (prev === target) return false;
+    const cycle = SEASONS.length * SEASON_LENGTH;
+    const start = SEASONS.indexOf(target) * SEASON_LENGTH + 1;
+    let turn = this.turn - ((this.turn - 1) % cycle) + start - 1;
+    if (turn <= this.turn) turn += cycle;
+    this.turn = turn;
+    this.applySeasonChange(prev);
+    return true;
   }
 
   private runAiTurn(playerIndex: number): void {

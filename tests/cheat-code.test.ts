@@ -50,10 +50,11 @@ describe('cheat code buffer', () => {
   });
 
   it('triggers the win cheat', () => {
-    const buffer = type('win');
+    const buffer = type('winwin');
     expect(buffer).toBe(WIN_CHEAT_WORD);
-    expect(triggeredCheat(type('xxwin'))).toBe(WIN_CHEAT_WORD);
+    expect(triggeredCheat(type('xxwinwin'))).toBe(WIN_CHEAT_WORD);
     expect(cheatCodeTriggered(type('wi'))).toBe(false);
+    expect(triggeredCheat(type('win'))).toBeNull();
   });
 
   it('does not trigger on a partial word', () => {
@@ -74,5 +75,11 @@ describe('cheat code buffer', () => {
     let buffer = '';
     for (let i = 0; i < 300; i++) buffer = advanceCheatBuffer(buffer, 'a');
     expect(buffer.length).toBeLessThanOrEqual(64);
+  });
+
+  it('triggers a season cheat by its name', () => {
+    for (const season of ['spring', 'summer', 'autumn', 'winter']) {
+      expect(triggeredCheat(type(season))).toBe(season);
+    }
   });
 });

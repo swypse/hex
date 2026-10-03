@@ -1750,6 +1750,65 @@ describe('MapView storm water pulse', () => {
   });
 });
 
+describe('MapView season ice wave', () => {
+  it('swaps each row to the new texture when its bounce ends, rows 30ms apart', async () => {
+    vi.useFakeTimers();
+    const app = {
+      screen: { width: 800, height: 600 },
+      ticker: { add: (): void => {}, remove: (): void => {} },
+    } as unknown as Application;
+    const tileAt = (q: number, r: number): MapTile => ({
+      q, r, terrain: TileType.Water, height: 0.1,
+      settlement: null, building: null, roadOwner: null, unit: null,
+      ownedBy: null, claimedByVillage: null, exploredBy: [0],
+    });
+    const m: GameMap = { radius: 4, spawns: [], tiles: [tileAt(0, 0), tileAt(1, 0), tileAt(0, 1), tileAt(0, 2)] };
+    const players: Player[] = [
+      { index: 0, tribe: Tribe.Cats, isHuman: true, name: 'Cats', resources: { ...START_RESOURCES }, score: 0, kills: 0, skills: [], isActive: true },
+    ];
+    const oldTexs = buildTextures(m);
+    const newTexs = buildTextures(m);
+    const v = new MapView(app, oldTexs, HEX, SPRITE_SCALE, 4);
+    try {
+      v.update(m, players, null, new Set(), new Set(), 0, new Set(), { x: 400, y: 300, scale: 1, width: 800, height: 600 });
+      const views = (v as unknown as { tileViews: Map<string, { terrainSprite: Sprite }> }).tileViews;
+      const texOf = (k: string): Texture => views.get(k)!.terrainSprite.texture;
+      const done: number[] = [];
+      const wave = v.seasonIceWave(
+        m.tiles,
+        (row) => {
+          done.push(row[0]!.r);
+          v.swapTileTextures(row, newTexs);
+        },
+      );
+      expect(texOf('0,0')).toBe(oldTexs.tileTextures.get('0,0')!.texture);
+      vi.advanceTimersByTime(149);
+      expect(done).toEqual([]);
+      vi.advanceTimersByTime(1); // row 0 bounce ends at 150ms
+      expect(done).toEqual([0]);
+      expect(texOf('0,0')).toBe(newTexs.tileTextures.get('0,0')!.texture);
+      expect(texOf('1,0')).toBe(newTexs.tileTextures.get('1,0')!.texture);
+      expect(texOf('0,1')).toBe(oldTexs.tileTextures.get('0,1')!.texture);
+      vi.advanceTimersByTime(30);
+      expect(done).toEqual([0, 1]);
+      vi.advanceTimersByTime(30);
+      await wave;
+      expect(done).toEqual([0, 1, 2]);
+    } finally {
+      v.destroy();
+      vi.useRealTimers();
+    }
+  });
+
+  it('resolves at once with no tiles', async () => {
+    const app = { screen: { width: 800, height: 600 }, ticker: { add: (): void => {}, remove: (): void => {} } } as unknown as Application;
+    const m: GameMap = { radius: 4, spawns: [], tiles: [] };
+    const v = new MapView(app, buildTextures(m), HEX, SPRITE_SCALE, 4);
+    await expect(v.seasonIceWave([])).resolves.toBeUndefined();
+    v.destroy();
+  });
+});
+
 describe('MapView road fog visibility', () => {
   let map: GameMap;
   let players: Player[];

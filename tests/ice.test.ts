@@ -133,4 +133,24 @@ describe('season transitions in the simulator', () => {
     sim.applyCommand({ type: 'endTurn' });
     expect(at(m, 1).terrain).toBe(TileType.Water);
   });
+
+  it('forceSeason jumps forward to the next such season, freezing and thawing', () => {
+    const m = strip();
+    const sim = new Simulator(
+      m,
+      [{ index: 0, tribe: 0, isHuman: false, name: 'a', resources: { wood: 0, stone: 0, money: 0, ore: 0, food: 20 }, score: 0, kills: 0, skills: [], isActive: true } as never],
+      'turns30' as never,
+      { disablePirates: true },
+    );
+    expect(sim.forceSeason('spring')).toBe(false);
+    expect(sim.forceSeason('winter')).toBe(true);
+    expect(sim.turn).toBe(19);
+    expect(at(m, 1).terrain).toBe(TileType.Ice);
+    expect(sim.drainEvents().some((e) => e.type === 'seasonChanged' && e.frozen.length === 1)).toBe(true);
+    expect(sim.forceSeason('summer')).toBe(true);
+    expect(sim.turn).toBe(31);
+    expect(seasonForTurn(sim.turn)).toBe('summer');
+    expect(at(m, 1).terrain).toBe(TileType.Water);
+    expect(sim.drainEvents().some((e) => e.type === 'seasonChanged' && e.thawed.length === 1)).toBe(true);
+  });
 });

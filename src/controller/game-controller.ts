@@ -27,7 +27,7 @@ import { TRIBES, Tribe, tribeById } from '../game/tribes';
 import { MapView, ZOOM_DETAIL_HIDE, type OverlayItem } from '../render/map-renderer';
 import { pickTileAt } from '../render/tile-pick';
 import { markDirty } from '../render/render-gate';
-import { seasonForTurn } from '../game/season';
+import { Season, seasonForTurn } from '../game/season';
 import { countIceTiles } from '../game/ice';
 import { createTextures, destroyTextureSet } from '../render/texture-factory';
 import { useGameStore, confirmLeaveGame } from '../store/game-store';
@@ -153,6 +153,56 @@ class GameController {
           if (this.sim) this.contextLost = true;
         }
       });
+    }
+  }
+
+  /** Whether the baked terrain textures no longer match the sim's season / ice. */
+  private terrainTexturesStale(): boolean {
+    if (!this.sim || !this.textures) return false;
+    return (this.textures.season ?? 'spring') !== seasonForTurn(this.sim.turn) || (this.textures.iceTiles ?? 0) !== countIceTiles(this.sim.map);
+  }
+
+  private bakeTerrain(season: Season): ReturnType<typeof createTextures> {
+    const hexSize = HEX_SIZE * this.getCamera().qualityFactor;
+    return createTextures(this.app!, this.sim!.map, hexSize, new Set(this.sim!.players.map((p) => p.tribe)), season);
+  }
+
+  /** Season change that freezes or thaws water: bakes the new terrain in the
+   *  background, bounces the changed water/ice rows top to bottom on the old
+   *  view (each row takes its new texture when its bounce ends), then swaps in
+   *  the new set so every other tile changes at once. Without changed tiles,
+   *  or when the textures are not stale, the normal rebake handles it. */
+  async runSeasonTransition(tiles: { q: number; r: number }[]): Promise<void> {
+    if (tiles.length === 0 || !this.app || !this.sim || !this.textures || !this.mapView) return;
+    if (this.seasonRebake || !this.terrainTexturesStale()) return;
+    this.seasonRebake = true;
+    const token = this.initToken;
+    const epoch = this.lossEpoch;
+    try {
+      const textures = await this.bakeTerrain(seasonForTurn(this.sim.turn));
+      if (token !== this.initToken || !this.app || !this.mapRoot) {
+        destroyTextureSet(textures);
+        return;
+      }
+      if (epoch !== this.lossEpoch) {
+        destroyTextureSet(textures, { contextLost: true });
+        return;
+      }
+      await this.mapView?.seasonIceWave(tiles, (row) => this.mapView?.swapTileTextures(row, textures));
+      if (token !== this.initToken || epoch !== this.lossEpoch) {
+        destroyTextureSet(textures, { contextLost: epoch !== this.lossEpoch });
+        return;
+      }
+      this.replaceTextures(textures);
+      this.render();
+    } catch (e) {
+      console.error('[season] ice transition failed', e);
+    } finally {
+      // No syncTerrainTextures() here: it reads the season from the store's
+      // turn, which only catches up after the events are presented, so it
+      // would rebake the OLD season over the new textures (flicker). The turn
+      // subscription runs it once the store turn matches.
+      this.seasonRebake = false;
     }
   }
 
@@ -672,6 +722,7 @@ class GameController {
         hiddenUnitIds: () => this.hiddenUnitIds,
         camera: () => this.getCamera(),
         render: () => this.render(),
+        runSeasonTransition: (tiles) => this.runSeasonTransition(tiles),
         syncKnownTribes: (notify) => this.syncKnownTribes(notify),
         enqueue: (task) => this.enqueue(task),
         bringCellIntoView: (q, r) => this.bringCellIntoView(q, r),
@@ -1382,6 +1433,23 @@ class GameController {
     this.saveGame();
     this.render();
     return true;
+  }
+
+  /** Cheat (single-player only): jumps to the next `season` and plays the
+   *  change (ice freezing / thawing). Returns true when applied. */
+  cheatSetSeason(season: Season): Promise<boolean> {
+    const store = useGameStore.getState();
+    if (!this.sim || store.screen !== 'game' || store.netMode !== 'single') return Promise.resolve(false);
+    let applied = false;
+    return this.enqueue(async () => {
+      if (!this.sim || this.sim.gameOver) return;
+      const preExplored = this.exploredKeysFor(store.localPlayerIndex);
+      applied = this.sim.forceSeason(season);
+      if (!applied) return;
+      this.saveGame();
+      await this.presentEvents(this.sim.drainEvents(), preExplored);
+      this.syncStore();
+    }).then(() => applied);
   }
 
   /** Cheat: toggles AI decision logging; returns the new on/off state. */

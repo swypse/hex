@@ -135,6 +135,7 @@ export interface EventHost {
   hiddenUnitIds(): Set<string>;
   camera(): CameraController;
   render(): void;
+  runSeasonTransition(tiles: { q: number; r: number }[]): Promise<void>;
   syncKnownTribes(notify: boolean): void;
   enqueue(task: () => Promise<void>): Promise<void>;
   bringCellIntoView(q: number, r: number): Promise<void>;
@@ -429,6 +430,14 @@ export class EventPresenter {
           case 'seasonChanged': {
             this.host.render();
             const store = useGameStore.getState();
+            // Water that froze and ice that thawed bounce top row to bottom.
+            // The render above comes first so a pending selection clear can't
+            // cancel the wave (shared hex-bounce slot).
+            const changed = [...e.frozen, ...e.thawed].filter((c) => {
+              const ct = tileAt(sim.map, c.q, c.r);
+              return ct && isExploredFor(ct, local);
+            });
+            await this.host.runSeasonTransition(changed);
             // Units lost to melting ice (and pirate ships lost to freezing)
             // are already gone from the sim: play their death burst in place.
             const lost = [...e.killed, ...e.removed.map((p) => ({ q: p.q, r: p.r }))];
@@ -1404,7 +1413,7 @@ export class EventPresenter {
     el.zIndex = 10;
     mapRoot.addChild(el);
 
-    const score = makeLabel(`+${EXPLORED_SCORE}`, { fontSize: 16, fill: 0xffffff, fontWeight: '700' });
+    const score = makeLabel(`+${EXPLORED_SCORE}`, { fontSize: 16, fill: 0xffffff, fontWeight: '700', roundPixels: false });
     score.anchor.set(0.5, 0.5);
     const fogH = sprite.height;
     score.position.set(
