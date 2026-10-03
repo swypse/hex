@@ -1,3 +1,4 @@
+import { GameMode } from '@enums';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createSaveRepository } from '../src/storage/save-game';
 import { type StorageService } from '../src/storage/storage-service';
@@ -25,7 +26,7 @@ function sampleSnapshot(): GameStateSnapshot {
       spawns: [],
     },
     players: [{ index: 0, tribe: 0, isHuman: true, name: 'P', resources: { wood: 3, stone: 2, money: 5, ore: 0, food: 20 }, score: 0, kills: 0, skills: [], isActive: true }],
-    mode: 'capture',
+    mode: GameMode.CAPTURE,
     turn: 3,
     currentPlayerIndex: 0,
     gameOver: false,

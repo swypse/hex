@@ -1,14 +1,15 @@
-import { describe, it, expect } from 'vitest';
-import { freezeCoast, thawIce, countIceTiles } from '../src/game/ice';
-import { GameMap, MapTile } from '../src/game/map-gen';
-import { TileType } from '../src/game/tile-types';
-import { makeUnit } from '../src/game/units';
-import { isShip } from '../src/game/ship';
-import { tileMoveCost, TILE_MOVE_COST } from '../src/game/movement-cost';
-import { reachableTargets } from '../src/game/selection';
-import { canBuildRoadHere } from '../src/game/roads';
-import { Simulator } from '../src/game/simulator';
-import { seasonForTurn } from '../src/game/season';
+import { countIceTiles, freezeCoast, thawIce } from '@/game/ice';
+import { GameMap, MapTile } from '@/game/map-gen';
+import { TILE_MOVE_COST, tileMoveCost } from '@/game/movement-cost';
+import { canBuildRoadHere } from '@/game/roads';
+import { seasonForTurn } from '@/game/season';
+import { reachableTargets } from '@/game/selection';
+import { isShip } from '@/game/ship';
+import { Simulator } from '@/game/simulator';
+import { TileType } from '@/game/tile-types';
+import { makeUnit } from '@/game/units';
+import { GameMode } from '@enums';
+import { describe, expect, it } from 'vitest';
 
 function tile(q: number, r: number, terrain: TileType): MapTile {
   return { q, r, terrain, settlement: null, building: null, unit: null, ownedBy: null, claimedByVillage: null };
@@ -119,8 +120,18 @@ describe('season transitions in the simulator', () => {
     const m = strip();
     const sim = new Simulator(
       m,
-      [{ index: 0, tribe: 0, isHuman: false, name: 'a', resources: { wood: 0, stone: 0, money: 0, ore: 0, food: 20 }, score: 0, kills: 0, skills: [], isActive: true } as never],
-      'turns30' as never,
+      [{
+        index: 0,
+        tribe: 0,
+        isHuman: false,
+        name: 'a',
+        resources: { wood: 0, stone: 0, money: 0, ore: 0, food: 20 },
+        score: 0,
+        kills: 0,
+        skills: [],
+        isActive: true
+      } as never],
+      GameMode.TURNS30 as never,
       { disablePirates: true },
     );
     sim.turn = 18;
@@ -138,8 +149,18 @@ describe('season transitions in the simulator', () => {
     const m = strip();
     const sim = new Simulator(
       m,
-      [{ index: 0, tribe: 0, isHuman: false, name: 'a', resources: { wood: 0, stone: 0, money: 0, ore: 0, food: 20 }, score: 0, kills: 0, skills: [], isActive: true } as never],
-      'turns30' as never,
+      [{
+        index: 0,
+        tribe: 0,
+        isHuman: false,
+        name: 'a',
+        resources: { wood: 0, stone: 0, money: 0, ore: 0, food: 20 },
+        score: 0,
+        kills: 0,
+        skills: [],
+        isActive: true
+      } as never],
+      GameMode.TURNS30 as never,
       { disablePirates: true },
     );
     expect(sim.forceSeason('spring')).toBe(false);

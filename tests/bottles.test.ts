@@ -1,3 +1,4 @@
+import { GameMode } from '@enums';
 import { describe, it, expect } from 'vitest';
 import { GameMap, MapTile } from '../src/game/map-gen';
 import { TileType } from '../src/game/tile-types';
@@ -168,7 +169,7 @@ describe('bottles in the simulator', () => {
     const enemies = Math.max(1, playerCount - 1);
     const players = buildPlayers(Tribe.Villagers, enemies, new SeededRandom(1));
     while (players.length > playerCount) players.pop();
-    return new Simulator(map, players, 'capture', { rng, disablePirates: true });
+    return new Simulator(map, players, GameMode.CAPTURE, { rng, disablePirates: true });
   }
 
 it('floats a bottle in each spawn interval turn when the roll wins', () => {

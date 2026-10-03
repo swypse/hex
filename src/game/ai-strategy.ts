@@ -1,16 +1,15 @@
-import { GameMap } from './map-gen';
-import { Player } from './players';
-import { GameMode } from './game-mode';
+import { SeededRandom } from '@/util';
+import { GameMode } from '@enums';
 import { AiDifficultyProfile } from './ai-difficulty';
-import { personalityFor } from './ai-personality';
-import { AiGoalId, AiGoalState, AiStrategyState, AiDirectives } from './ai-types';
+import { flagsFor } from './ai-flags';
+import { AI_PERSONALITIES, personalityFor } from './ai-personality';
 import { AiSituation } from './ai-situation';
-import { SeededRandom } from '../util/random';
+import { AiDirectives, AiGoalId, AiGoalState, AiStrategyState } from './ai-types';
 import { isExploredFor } from './explore';
 import { hexDistance } from './hex';
-import { AI_PERSONALITIES } from './ai-personality';
+import { GameMap } from './map-gen';
+import { Player } from './players';
 import { hasSkill, SkillId } from './skills';
-import { flagsFor } from './ai-flags';
 
 export function goalTargetKey(g: AiGoalState): string {
   return g.target ? `${g.target.q},${g.target.r}` : '';
@@ -98,7 +97,7 @@ function weightedPrimaryScore(
   const production = productionBuildings(map, player);
   let economyScore = (70 - production * 20 + situation.freeVillages.length * 5) * weights.economy + rng.next() * 20;
   let armyScore = (25 + (enemyVillageVisible(map, player) ? 90 : 0) + situation.freeVillages.length * 8 + (situation.ownPower >= situation.enemyPower ? 25 : 0)) * weights.army + rng.next() * 20;
-  if (mode === 'turns30') {
+  if (mode === GameMode.TURNS30) {
     armyScore *= 0.5;
     // The personality's score appetite pushes the primary plan toward the
     // aggressive score race (villages/temples/kills win 30-turn games fast):
@@ -134,7 +133,7 @@ export function updateStrategy(
   if (situation.navalThreat && !hasGoalTyped(next, 'naval')) {
     next.push(makeGoal('naval', 'research', null));
   }
-  if (mode === 'turns30' && !hasGoalTyped(next, 'score')) {
+  if (mode === GameMode.TURNS30 && !hasGoalTyped(next, 'score')) {
     next.push(makeGoal('score', 'race', null));
   }
 
@@ -144,7 +143,7 @@ export function updateStrategy(
     army: personality.goalWeights.army,
     score: personality.goalWeights.score,
   });
-  if (mode === 'turns30' && situation.ownPower < situation.enemyPower * 0.8) {
+  if (mode === GameMode.TURNS30 && situation.ownPower < situation.enemyPower * 0.8) {
     next = next.filter((g) => g.id !== 'economy' && g.id !== 'army');
     if (!hasGoalTyped(next, 'army')) next.push(makeGoal('army', 'choose', null));
   } else if (!current || current.id !== picked) {
@@ -156,6 +155,7 @@ export function updateStrategy(
   state.nextPlanTurn = turn + difficulty.strategy.planIntervalTurns;
   return state;
 }
+
 function economySkillChain(player: Player): SkillId[] | null {
   const chain: SkillId[] = flagsFor(player).militarySkills
     ? ['forestry', 'agriculture', 'climbing', 'smithery', 'swordsman', 'science', 'geology', 'riding', 'knights']
@@ -179,7 +179,10 @@ function countOwnUnitsNear(map: GameMap, player: Player, target: { q: number; r:
   return n;
 }
 
-function nearestOwnVillageTo(map: GameMap, player: Player, target: { q: number; r: number }): { q: number; r: number } | null {
+function nearestOwnVillageTo(map: GameMap, player: Player, target: { q: number; r: number }): {
+  q: number;
+  r: number
+} | null {
   let best: { q: number; r: number } | null = null;
   let bestDist = Infinity;
   for (const t of map.tiles) {
@@ -205,7 +208,14 @@ export function deriveDirectives(
   strategy: AiStrategyState,
 ): AiDirectives {
   const personality = AI_PERSONALITIES[strategy.personalityId as 'aggressive' | 'balanced' | 'builder'] ?? AI_PERSONALITIES.balanced;
-  const d: AiDirectives = { frontTarget: null, muster: null, spawnPlan: [], moneyReserve: 8, skillChain: null, pace: 'normal' };
+  const d: AiDirectives = {
+    frontTarget: null,
+    muster: null,
+    spawnPlan: [],
+    moneyReserve: 8,
+    skillChain: null,
+    pace: 'normal'
+  };
 
   for (const g of [...strategy.goals].sort((a, b) => GOAL_PRIORITY[a.id] - GOAL_PRIORITY[b.id])) {
     if (g.id === 'economy') {

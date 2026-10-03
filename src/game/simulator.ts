@@ -1,39 +1,51 @@
-import { planAiActions, logAiTurnStart, aiLoggingEnabled, formatAiAction, type AiActionMarker } from './ai';
+import { SeededRandom } from '@/util';
+import { GameMode } from '@enums';
+import { type AchievementId, awardAchievementScores, currentlyMetIds, evaluateAchievements } from './achievements';
+import { type AiActionMarker, aiLoggingEnabled, formatAiAction, logAiTurnStart, planAiActions } from './ai';
 import type { AiAction } from './ai-types';
-import { applyFood, refreshStarving } from './food';
-import { buildingIncomeByVillage, buildBuilding, burnBuilding, burnRoad, buildBuildingIgnoringSkill, canUsePort, repairBuilding, destroyBuilding, builderBuildable, type BuilderBuildKind } from './buildings';
-import { captureVillage, setCaptureReady, villageIncomeTotal } from './capture';
-import { attackableTargets, missChanceFor, performAttack, performSiege } from './combat';
+import { bonusEligibleFor, type BonusKind, explorerPath, findClosestVillage, revealExplorerPath } from './bonus';
+import {
+  BOTTLE_HEAL, BOTTLE_MONEY, bottleCollectableFor, collectExpiredBottles, randomBottleEffectKind, touchBottle,
+  trySpawnBottle
+} from './bottles';
 import { buildBridge, buildBridgeIgnoringSkill } from './bridges';
-import { buildRoad } from './roads';
-import { GameEvent, BuildingKind } from './events';
-import { adjacentEnemyVillages } from './stalker';
-import { bonusEligibleFor, explorerPath, findClosestVillage, revealExplorerPath, type BonusKind } from './bonus';
-import { captureWinnerIndex, computeWinner, GameMode, quickCaptureScore, quickCaptureTurnsCount } from './game-mode';
+import {
+  buildBuilding, buildBuildingIgnoringSkill, builderBuildable, type BuilderBuildKind, buildingIncomeByVillage,
+  burnBuilding, burnRoad, canUsePort, destroyBuilding, repairBuilding
+} from './buildings';
+import { captureVillage, villageIncomeTotal } from './capture';
+import { attackableTargets, missChanceFor, performAttack, performSiege } from './combat';
+import { knownTribesFor } from './discovery';
+import { BuildingKind, GameEvent } from './events';
+import { exploreUnitPath } from './explore';
+import { applyFood, refreshStarving } from './food';
+import { captureWinnerIndex, computeWinner, quickCaptureScore, quickCaptureTurnsCount } from './game-mode';
 import { hexDistance, hexNeighbors } from './hex';
+import { freezeCoast, thawIce } from './ice';
 import type { GameMap, MapTile } from './map-gen';
 import type { Player } from './players';
-import { PlayerStats } from './score';
 import { START_RESOURCES, villageUpgradeCost } from './resources';
-import { addStock, migrateLegacyResources, payAt } from './stock';
-import { awardScore, awardTempleScores, CAPTURE_SCORE, COMBO_SCORE, EMPTY_STATS, KILL_SCORE, PIRATE_KILL_SCORE, SKILL_SCORE, UPGRADE_SCORE } from './score';
-import { hasSkill, openSkill as applySkill, randomUnopenedSkill, SkillId } from './skills';
-import { evaluateAchievements, awardAchievementScores, currentlyMetIds, type AchievementId } from './achievements';
+import { buildRoad } from './roads';
+import {
+  awardScore, awardTempleScores, CAPTURE_SCORE, COMBO_SCORE, EMPTY_STATS, KILL_SCORE, PIRATE_KILL_SCORE, PlayerStats,
+  SKILL_SCORE, UPGRADE_SCORE
+} from './score';
+import { Season, SEASON_LENGTH, seasonForTurn, SEASONS } from './season';
+import { moveUnit, pathBetween, reachableTargets, tileAt } from './selection';
 import { gainShipAbility, revertShip, upgradeShip } from './ship';
-import { movePoints, canAttack, canDisband, canHeal, canMove, disbandCost, hasPirateDeal, healUnit, makeUnit, unitMaintenance, PIRATE_DEAL_COST, PIRATE_OWNER, UNIT_TYPES, Unit, UnitType, UNIT_MOVE_POINTS } from './units';
-import { reachableTargets, moveUnit, pathBetween, tileAt } from './selection';
+import { hasSkill, openSkill as applySkill, randomUnopenedSkill, SkillId } from './skills';
 import { spawnUnit } from './spawn';
-import { exploreUnitPath } from './explore';
-import { knownTribesFor } from './discovery';
-import { isWaterType, TileType } from './tile-types';
-import { BOTTLE_HEAL, BOTTLE_MONEY, bottleCollectableFor, collectExpiredBottles, randomBottleEffectKind, touchBottle, trySpawnBottle } from './bottles';
-import { canPlaceTrapOn, trapAlive, trapDamage, TRAP_COST } from './traps';
-import { SEASONS, SEASON_LENGTH, Season, seasonForTurn } from './season';
-import { freezeCoast, thawIce } from './ice';
-import { stormDamage, stormEligible, stormTargetShips } from './storm';
-import { upgradeVillage, buildWall as applyWall, canBuildWall, WALL_COST } from './village';
-import { SeededRandom } from '../util/random';
+import { adjacentEnemyVillages } from './stalker';
 import type { GameStateSnapshot } from './state';
+import { addStock, migrateLegacyResources, payAt } from './stock';
+import { stormDamage, stormEligible, stormTargetShips } from './storm';
+import { isWaterType, TileType } from './tile-types';
+import { canPlaceTrapOn, TRAP_COST, trapAlive, trapDamage } from './traps';
+import {
+  canAttack, canDisband, canHeal, canMove, disbandCost, hasPirateDeal, healUnit, makeUnit, movePoints, PIRATE_DEAL_COST,
+  PIRATE_OWNER, Unit, UNIT_MOVE_POINTS, UNIT_TYPES, UnitType
+} from './units';
+import { buildWall as applyWall, canBuildWall, upgradeVillage } from './village';
 
 export type Command =
   | { type: 'move'; unitId: string; q: number; r: number }
@@ -400,7 +412,10 @@ export class Simulator {
       unit.firstMoveStealthDone = true;
     }
     const from = { q: unit.q, r: unit.r };
-    const path = pathBetween(this.map, from, { q, r }, canClimb, unit.shipLevel !== undefined, canDock, unit.owner, movePoints(unit));
+    const path = pathBetween(this.map, from, {
+      q,
+      r
+    }, canClimb, unit.shipLevel !== undefined, canDock, unit.owner, movePoints(unit));
     const shipLevel = unit.shipLevel;
     const fromTile = tileAt(this.map, from.q, from.r);
     // Walk the path one step at a time: an enemy that steps onto an invisible
@@ -447,7 +462,14 @@ export class Simulator {
       gainShipAbility(unit);
       unit.hasAttacked = true;
     }
-    this.emit({ type: 'unitMoved', unitId, from, path: emitPath, to: { q: resolveTarget.q, r: resolveTarget.r }, shipLevel });
+    this.emit({
+      type: 'unitMoved',
+      unitId,
+      from,
+      path: emitPath,
+      to: { q: resolveTarget.q, r: resolveTarget.r },
+      shipLevel
+    });
     if (trap) this.triggerTrap(unit, trap);
     if (bump) this.revealStalker(bump);
     this.revealSpottedByVillage(unit);
@@ -483,7 +505,14 @@ export class Simulator {
     const damage = trapDamage();
     victim.hp = Math.max(0, victim.hp - damage);
     trapTile.trap = null;
-    this.emit({ type: 'trapTriggered', q: trapTile.q, r: trapTile.r, targetId: victim.id, damage, attackerIndex: this.currentPlayerIndex });
+    this.emit({
+      type: 'trapTriggered',
+      q: trapTile.q,
+      r: trapTile.r,
+      targetId: victim.id,
+      damage,
+      attackerIndex: this.currentPlayerIndex
+    });
     if (victim.hp <= 0) {
       const t = tileAt(this.map, victim.q, victim.r);
       if (t && t.unit === victim) t.unit = null;
@@ -593,7 +622,15 @@ export class Simulator {
     const targetUnit = target.unit;
     if (this.rng() < missChanceFor(player)) {
       attacker.hasAttacked = true;
-      this.emit({ type: 'stunShot', attackerId: unitId, targetId: targetUnit.id, attackerTile, targetTile, missed: true, stunned: false });
+      this.emit({
+        type: 'stunShot',
+        attackerId: unitId,
+        targetId: targetUnit.id,
+        attackerTile,
+        targetTile,
+        missed: true,
+        stunned: false
+      });
       return true;
     }
     const alreadyActed = targetUnit.hasMoved || targetUnit.hasAttacked || targetUnit.hasHealed;
@@ -602,7 +639,15 @@ export class Simulator {
     targetUnit.stunTurns = 2;
     const stunned = (targetUnit.stunTurns ?? 0) >= 1;
     attacker.hasAttacked = true;
-    this.emit({ type: 'stunShot', attackerId: unitId, targetId: targetUnit.id, attackerTile, targetTile, missed: false, stunned });
+    this.emit({
+      type: 'stunShot',
+      attackerId: unitId,
+      targetId: targetUnit.id,
+      attackerTile,
+      targetTile,
+      missed: false,
+      stunned
+    });
     return true;
   }
 
@@ -630,10 +675,10 @@ export class Simulator {
       const attackerPlayer = this.players[attacker.owner]!;
       const targetIndex =
         target.settlement ? target.settlement.owner ?? PIRATE_OWNER
-        : target.bridge !== null && target.bridge !== undefined ? target.bridge.owner
-        : target.roadOwner !== null && target.roadOwner !== undefined && target.roadOwner !== attacker.owner && !(target.building && target.ownedBy !== null && target.ownedBy !== attacker.owner) ? target.roadOwner
-        : target.ownedBy !== null ? target.ownedBy ?? PIRATE_OWNER
-        : PIRATE_OWNER;
+          : target.bridge !== null && target.bridge !== undefined ? target.bridge.owner
+            : target.roadOwner !== null && target.roadOwner !== undefined && target.roadOwner !== attacker.owner && !(target.building && target.ownedBy !== null && target.ownedBy !== attacker.owner) ? target.roadOwner
+              : target.ownedBy !== null ? target.ownedBy ?? PIRATE_OWNER
+                : PIRATE_OWNER;
       const outcome = performSiege(attacker, target, this.rng, missChanceFor(attackerPlayer));
       this.emit({
         type: 'siege',
@@ -658,12 +703,23 @@ export class Simulator {
       const remaining = target.unit.paidBy!.filter((i) => i !== attacker.owner);
       if (remaining.length === 0) delete target.unit.paidBy;
       else target.unit.paidBy = remaining;
-      this.emit({ type: 'pirateDealCanceled', unitId: target.unit.id, q: target.q, r: target.r, playerIndex: attacker.owner });
+      this.emit({
+        type: 'pirateDealCanceled',
+        unitId: target.unit.id,
+        q: target.q,
+        r: target.r,
+        playerIndex: attacker.owner
+      });
     }
     const attackerTilePos = { q: attacker.q, r: attacker.r };
     const targetTilePos = { q: target.q, r: target.r };
     const attackerPre = { type: attacker.type, owner: attacker.owner, shipLevel: attacker.shipLevel, hp: attacker.hp };
-    const targetPre = { type: target.unit.type, owner: target.unit.owner, shipLevel: target.unit.shipLevel, hp: target.unit.hp };
+    const targetPre = {
+      type: target.unit.type,
+      owner: target.unit.owner,
+      shipLevel: target.unit.shipLevel,
+      hp: target.unit.hp
+    };
     const result = performAttack(this.map, attacker, target, this.rng, missChanceFor(attackerPlayer));
     // Attacking always reveals a stealthed stalker (resolved with defense 0 in
     // resolveCombat, which reads isStealthed before this clears it).
@@ -1199,7 +1255,7 @@ export class Simulator {
     if (this.gameOver) return;
     this.autoHealFor(this.currentPlayerIndex);
     let guard = 0;
-    for (;;) {
+    for (; ;) {
       if (guard++ > 64) break;
       const next = (this.currentPlayerIndex + 1) % this.players.length;
       if (next === 0) {
@@ -1237,10 +1293,26 @@ export class Simulator {
     if (season === prev) return;
     if (season === 'winter') {
       const r = freezeCoast(this.map);
-      this.emit({ type: 'seasonChanged', season, frozen: r.frozen, thawed: [], landed: r.landed, removed: r.removed, killed: [] });
+      this.emit({
+        type: 'seasonChanged',
+        season,
+        frozen: r.frozen,
+        thawed: [],
+        landed: r.landed,
+        removed: r.removed,
+        killed: []
+      });
     } else if (prev === 'winter') {
       const r = thawIce(this.map);
-      this.emit({ type: 'seasonChanged', season, frozen: [], thawed: r.thawed, landed: [], removed: [], killed: r.killed });
+      this.emit({
+        type: 'seasonChanged',
+        season,
+        frozen: [],
+        thawed: r.thawed,
+        landed: [],
+        removed: [],
+        killed: r.killed
+      });
     } else {
       this.emit({ type: 'seasonChanged', season, frozen: [], thawed: [], landed: [], removed: [], killed: [] });
     }
@@ -1543,7 +1615,12 @@ export class Simulator {
     const attackerTilePos = { q: attacker.q, r: attacker.r };
     const targetTilePos = { q: targetTile.q, r: targetTile.r };
     const attackerPre = { type: attacker.type, owner: attacker.owner, shipLevel: attacker.shipLevel, hp: attacker.hp };
-    const targetPre = { type: targetUnit.type, owner: targetUnit.owner, shipLevel: targetUnit.shipLevel, hp: targetUnit.hp };
+    const targetPre = {
+      type: targetUnit.type,
+      owner: targetUnit.owner,
+      shipLevel: targetUnit.shipLevel,
+      hp: targetUnit.hp
+    };
     const result = performAttack(this.map, attacker, targetTile, this.rng);
     if (!result.missed && targetUnit.shipLevel !== undefined && targetOwner >= 0) {
       const victim = this.players[targetOwner];
@@ -1682,7 +1759,7 @@ export class Simulator {
   }
 
   private checkEndConditions(): boolean {
-    if (this.mode === 'turns30' && this.turn >= 30) {
+    if (this.mode === GameMode.TURNS30 && this.turn >= 30) {
       awardTempleScores(this.map, this.players);
       awardAchievementScores(this.players);
       this.endGame(computeWinner(this.players, this.map));

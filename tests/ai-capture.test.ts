@@ -1,11 +1,12 @@
-import { describe, it, expect } from 'vitest';
-import { Simulator } from '../src/game/simulator';
-import { buildPlayers } from '../src/game/players';
-import { Tribe } from '../src/game/tribes';
-import { SeededRandom } from '../src/util/random';
-import { makeTestMap, tileAt, makeUnit } from './helpers/test-map';
+import { GameMode } from '@enums';
+import { describe, expect, it } from 'vitest';
 import { hexNeighbors } from '../src/game/hex';
 import { GameMap, MapTile } from '../src/game/map-gen';
+import { buildPlayers } from '../src/game/players';
+import { Simulator } from '../src/game/simulator';
+import { Tribe } from '../src/game/tribes';
+import { SeededRandom } from '../src/util/random';
+import { makeTestMap, makeUnit, tileAt } from './helpers/test-map';
 
 function foggyFreeVillageMap(): { map: GameMap; free: MapTile } {
   const map = makeTestMap(6);
@@ -31,7 +32,7 @@ describe('AI captures free villages', () => {
   it('captures a foggy free village a few tiles from spawn within a bounded number of rounds', () => {
     const { map, free } = foggyFreeVillageMap();
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
-    const sim = new Simulator(map, players, 'turns30', { rng: () => 0.5, aiRng: () => new SeededRandom(2) });
+    const sim = new Simulator(map, players, GameMode.TURNS30, { rng: () => 0.5, aiRng: () => new SeededRandom(2) });
     sim.startGame();
     for (let i = 0; i < 10; i++) sim.applyCommand({ type: 'endTurn' });
     expect(free.settlement!.owner).toBe(1);

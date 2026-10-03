@@ -73,9 +73,15 @@ export const TERRAIN_BIOME_ATLASES: Record<string, TerrainBiomeAtlas> = {
     cellW: 256,
     cellH: 448,
     frames: {
-      'rainforest-forest-spring': { x: 0, y: 0, w: 256, h: 448 },
-      'rainforest-land-spring': { x: 256, y: 0, w: 256, h: 448 },
-      'rainforest-mountain-spring': { x: 512, y: 0, w: 256, h: 448 },
+      'rainforest-forest-autumn': { x: 0, y: 0, w: 256, h: 448 },
+      'rainforest-forest-spring': { x: 256, y: 0, w: 256, h: 448 },
+      'rainforest-forest-summer': { x: 512, y: 0, w: 256, h: 448 },
+      'rainforest-forest-winter': { x: 0, y: 448, w: 256, h: 448 },
+      'rainforest-land-autumn': { x: 256, y: 448, w: 256, h: 448 },
+      'rainforest-land-spring': { x: 512, y: 448, w: 256, h: 448 },
+      'rainforest-land-summer': { x: 0, y: 896, w: 256, h: 448 },
+      'rainforest-land-winter': { x: 256, y: 896, w: 256, h: 448 },
+      'rainforest-mountain-spring': { x: 512, y: 896, w: 256, h: 448 },
     },
   },
 };

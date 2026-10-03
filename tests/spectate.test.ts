@@ -1,3 +1,4 @@
+import { GameMode } from '@enums';
 import { afterEach, describe, expect, it } from 'vitest';
 import { Container, BitmapText } from 'pixi.js';
 import { gameController } from '../src/controller/game-controller';
@@ -23,7 +24,7 @@ describe('spectate reveal', () => {
     const map = makeTestMap(3);
     const players = buildPlayers(Tribe.Villagers, 2, new SeededRandom(1));
     players[0]!.knownTribes = [];
-    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    const sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5 });
     (gameController as unknown as { sim: unknown }).sim = sim;
     useGameStore.setState({ netMode: 'single', localPlayerIndex: 0 });
     (gameController as unknown as { revealMapForLocal(): void }).revealMapForLocal();
@@ -37,9 +38,9 @@ describe('WatchPromptDialog', () => {
   it('shows Watch and Finish buttons', () => {
     const map = makeTestMap(3);
     const players = buildPlayers(Tribe.Villagers, 2, new SeededRandom(1));
-    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    const sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5 });
     (gameController as unknown as { sim: unknown }).sim = sim;
-    useGameStore.setState({ screen: 'game', players, localPlayerIndex: 0, mode: 'capture' });
+    useGameStore.setState({ screen: 'game', players, localPlayerIndex: 0, mode: GameMode.CAPTURE });
     (globalThis as { CanvasRenderingContext2D?: unknown }).CanvasRenderingContext2D = class {};
     (globalThis as { document?: unknown }).document = {
       createElement: () => ({ getContext: () => ({ measureText: (s: string) => ({ width: s.length * 8, actualBoundingBoxLeft: 0, actualBoundingBoxRight: s.length * 8, actualBoundingBoxAscent: 12, actualBoundingBoxDescent: 3 }), width: 0, height: 0 }) }),

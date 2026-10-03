@@ -1,3 +1,4 @@
+import { GameMode } from '@enums';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Application, Container, Graphics, ImageSource, Sprite, Text, Texture } from 'pixi.js';
 import { gameController } from '../src/controller/game-controller';
@@ -134,7 +135,7 @@ let now = 0;
 let realPerfNow: typeof performance.now;
 
 function setup(map: GameMap, players: Player[]): Harness {
-  const sim = new Simulator(map, players, 'capture');
+  const sim = new Simulator(map, players, GameMode.CAPTURE);
   sim.startGame();
   sim.drainEvents();
 

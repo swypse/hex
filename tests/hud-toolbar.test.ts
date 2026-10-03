@@ -12,6 +12,7 @@ import { IconButton } from '../src/ui/kit/icon-button';
 import { TileType } from '../src/game/tile-types';
 import { hexNeighbors } from '../src/game/hex';
 import { type UIHost } from '../src/ui/host';
+import { GameMode } from '@enums';
 
 function fakeCanvasContext() {
   return {
@@ -54,7 +55,7 @@ describe('HudToolbar build actions', () => {
     const players = buildPlayers(0, 1, new SeededRandom(1));
     players[0]!.skills.push('forestry', 'smithery', 'water');
     giveResources(map, players[0]!, { wood: 100, stone: 100, money: 500, ore: 100, food: 20 });
-    const sim = new Simulator(map, players, 'capture');
+    const sim = new Simulator(map, players, GameMode.CAPTURE);
     sim.startGame();
     sim.drainEvents();
     (gameController as unknown as { sim: unknown }).sim = sim;
@@ -223,7 +224,7 @@ describe('HudToolbar tutorial build highlights', () => {
     const players = buildPlayers(0, 1, new SeededRandom(1));
     players[0]!.skills.push('forestry', 'smithery');
     giveResources(map, players[0]!, { wood: 100, stone: 100, money: 500, ore: 100, food: 20 });
-    const sim = new Simulator(map, players, 'capture');
+    const sim = new Simulator(map, players, GameMode.CAPTURE);
     sim.startGame();
     sim.drainEvents();
     (gameController as unknown as { sim: unknown }).sim = sim;

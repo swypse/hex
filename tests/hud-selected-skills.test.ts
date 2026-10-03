@@ -12,6 +12,7 @@ import { Simulator } from '../src/game/simulator';
 import { TileType } from '../src/game/tile-types';
 import { type SkillId } from '../src/game/skills';
 import { type GameMap, type MapTile } from '../src/game/map-gen';
+import { GameMode } from '@enums';
 
 function fakeCanvasContext() {
   return {
@@ -58,7 +59,7 @@ describe('HudSelected skill unlock hints', () => {
 
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
     players[0]!.skills = skills;
-    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    const sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5 });
     (gameController as unknown as { sim: Simulator | null }).sim = sim;
     useGameStore.setState({
       screen: 'game',

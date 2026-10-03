@@ -1,3 +1,4 @@
+import { GameMode } from '@enums';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Simulator } from '../src/game/simulator';
 import { makeTestMap, tileAt, makeUnit } from './helpers/test-map';
@@ -16,7 +17,7 @@ describe('catapult move-or-attack dialog', () => {
   beforeEach(() => {
     map = makeTestMap(2);
     const players = buildPlayers(Tribe.Cats, 1, new SeededRandom(1));
-    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    const sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5 });
     (gameController as unknown as { sim: Simulator | null }).sim = sim;
     const store = useGameStore.getState();
     store.setLocalPlayerIndex(0);

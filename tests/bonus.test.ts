@@ -1,21 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { generateMap, type GameMap } from '../src/game/map-gen';
-import { makeTestMap, tileAt, makeUnit } from './helpers/test-map';
-import { readStock } from '../src/game/stock';
-import { Simulator } from '../src/game/simulator';
+import { bonusEligibleFor, explorerPath, findClosestVillage, randomBonusKind, } from '../src/game/bonus';
+import { isExploredFor } from '../src/game/explore';
+import { GameMode } from '../src/game/game-mode';
+import { hexDistance, hexNeighbors } from '../src/game/hex';
+import { type GameMap, generateMap } from '../src/game/map-gen';
 import { buildPlayers } from '../src/game/players';
+import { Simulator } from '../src/game/simulator';
+import { type SkillId, SKILLS } from '../src/game/skills';
+import { readStock } from '../src/game/stock';
+import { isWaterType, TileType } from '../src/game/tile-types';
 import { Tribe } from '../src/game/tribes';
 import { SeededRandom } from '../src/util/random';
-import { isWaterType, TileType } from '../src/game/tile-types';
-import { hexDistance, hexNeighbors } from '../src/game/hex';
-import {
-  bonusEligibleFor,
-  explorerPath,
-  findClosestVillage,
-  randomBonusKind,
-} from '../src/game/bonus';
-import { isExploredFor } from '../src/game/explore';
-import { SKILLS, type SkillId } from '../src/game/skills';
+import { makeTestMap, makeUnit, tileAt } from './helpers/test-map';
 
 describe('bonus placement', () => {
   it('places players+1 bonuses on land with spacing constraints', () => {
@@ -162,7 +158,7 @@ describe('bonus claiming (simulator)', () => {
   function makeSim(kind: 'money' | 'resources' | 'villageUpgrade' | 'explorer' | 'skill' = 'money', rng = 0.5) {
     const { map, target } = bonusMap(kind);
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
-    const sim = new Simulator(map, players, 'turns30', { rng: () => rng });
+    const sim = new Simulator(map, players, GameMode.TURNS30, { rng: () => rng });
     sim.startGame();
     sim.drainEvents();
     sim.applyCommand({ type: 'move', unitId: 'u1', q: 0, r: 1 });
@@ -244,7 +240,7 @@ describe('bonus claiming (simulator)', () => {
     target.bonus = { kind: 'skill', claimer: null, arrivalTurn: 0 };
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
     players[0]!.skills = Object.keys(SKILLS) as SkillId[];
-    const sim = new Simulator(map, players, 'turns30', { rng: () => 0.5 });
+    const sim = new Simulator(map, players, GameMode.TURNS30, { rng: () => 0.5 });
     sim.startGame();
     sim.drainEvents();
     sim.applyCommand({ type: 'move', unitId: 'u1', q: 0, r: 1 });
@@ -269,7 +265,7 @@ describe('bonus claiming (simulator)', () => {
       if (t) t.terrain = TileType.Water;
     }
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
-    const sim = new Simulator(map, players, 'turns30', { rng: () => 0.5 });
+    const sim = new Simulator(map, players, GameMode.TURNS30, { rng: () => 0.5 });
     sim.startGame();
     sim.drainEvents();
     // Human ends turn 1 -> AI turn 1 plays -> wrap -> human turn 2.

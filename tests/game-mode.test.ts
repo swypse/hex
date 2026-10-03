@@ -1,20 +1,14 @@
-import { describe, it, expect } from 'vitest';
-import { GameMap, MapTile, Settlement } from '../src/game/map-gen';
-import { TileType } from '../src/game/tile-types';
-import { Tribe } from '../src/game/tribes';
-import { Player } from '../src/game/players';
-import { Unit } from '../src/game/units';
 import {
-  captureWinnerIndex,
-  computeWinner,
-  countUnits,
-  GAME_MODE_NAMES,
-  quickCaptureScore,
-  quickCaptureTurnsCount,
-  rankPlayers,
-  shouldPromptWatch,
-  starRating,
-} from '../src/game/game-mode';
+  captureWinnerIndex, computeWinner, countUnits, GAME_MODE_NAMES, quickCaptureScore, quickCaptureTurnsCount,
+  rankPlayers, shouldPromptWatch, starRating,
+} from '@/game/game-mode';
+import { GameMap, MapTile, Settlement } from '@/game/map-gen';
+import { Player } from '@/game/players';
+import { TileType } from '@/game/tile-types';
+import { Tribe } from '@/game/tribes';
+import { Unit } from '@/game/units';
+import { GameMode } from '@enums';
+import { describe, expect, it } from 'vitest';
 
 function tile(
   q: number,
@@ -36,7 +30,20 @@ function player(index: number, overrides: Partial<Player> = {}): Player {
 }
 
 function unit(owner: number, id: string): Unit {
-  return { id, owner, type: 'warrior', q: 0, r: 0, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 5, attack: 2, attackDistance: 1, spawnVillage: null };
+  return {
+    id,
+    owner,
+    type: 'warrior',
+    q: 0,
+    r: 0,
+    hasMoved: false,
+    hasAttacked: false,
+    hasHealed: false,
+    hp: 5,
+    attack: 2,
+    attackDistance: 1,
+    spawnVillage: null
+  };
 }
 
 describe('gameMode', () => {
@@ -55,17 +62,17 @@ describe('gameMode', () => {
 
   it('rates capture games by score and the quick-capture turns budget', () => {
     // 3 players: 3★ needs >= 1100 and turn <= 25; 2★ needs >= 850.
-    expect(starRating(1200, 3, 'capture', 10)).toBe(3);
-    expect(starRating(1200, 3, 'capture', 26)).toBe(2);
-    expect(starRating(900, 3, 'capture', 10)).toBe(2);
-    expect(starRating(100, 3, 'capture', 10)).toBe(1);
+    expect(starRating(1200, 3, GameMode.CAPTURE, 10)).toBe(3);
+    expect(starRating(1200, 3, GameMode.CAPTURE, 26)).toBe(2);
+    expect(starRating(900, 3, GameMode.CAPTURE, 10)).toBe(2);
+    expect(starRating(100, 3, GameMode.CAPTURE, 10)).toBe(1);
   });
 
   it('rates 30-turn games by score only', () => {
     // 3 players: 3★ needs >= 3400; 2★ needs >= 2600.
-    expect(starRating(3500, 3, 'turns30', 30)).toBe(3);
-    expect(starRating(3000, 3, 'turns30', 30)).toBe(2);
-    expect(starRating(100, 3, 'turns30', 30)).toBe(1);
+    expect(starRating(3500, 3, GameMode.TURNS30, 30)).toBe(3);
+    expect(starRating(3000, 3, GameMode.TURNS30, 30)).toBe(2);
+    expect(starRating(100, 3, GameMode.TURNS30, 30)).toBe(1);
   });
 
   it('counts units on the map per player', () => {
@@ -149,7 +156,14 @@ describe('gameMode', () => {
 });
 
 describe('shouldPromptWatch', () => {
-  const base = { netMode: 'single', mode: 'capture' as const, gameOver: false, watching: false, localActive: false, overlayKind: null };
+  const base = {
+    netMode: 'single',
+    mode: GameMode.CAPTURE,
+    gameOver: false,
+    watching: false,
+    localActive: false,
+    overlayKind: null
+  };
   it('prompts when the local player is eliminated in single capture', () => {
     expect(shouldPromptWatch(base)).toBe(true);
   });
@@ -161,7 +175,7 @@ describe('shouldPromptWatch', () => {
   });
   it('does not prompt in multiplayer or non-capture mode', () => {
     expect(shouldPromptWatch({ ...base, netMode: 'host' })).toBe(false);
-    expect(shouldPromptWatch({ ...base, mode: 'turns30' })).toBe(false);
+    expect(shouldPromptWatch({ ...base, mode: GameMode.TURNS30 })).toBe(false);
   });
   it('does not prompt while already watching or already prompted', () => {
     expect(shouldPromptWatch({ ...base, watching: true })).toBe(false);

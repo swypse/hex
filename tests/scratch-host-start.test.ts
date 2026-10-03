@@ -1,3 +1,4 @@
+import { GameMode } from '@enums';
 import { describe, it, expect } from 'vitest';
 import { gameController } from '../src/controller/game-controller';
 import { useGameStore } from '../src/store/game-store';
@@ -14,7 +15,7 @@ describe('scratch host start 2h+4ai', () => {
       selection: null,
       overlay: null,
     });
-    gameController.hostGame({ mode: 'capture', totalPlayers: 6, aiCount: 4, name: 'Player', tribe: Tribe.Cats });
+    gameController.hostGame({ mode: GameMode.CAPTURE, totalPlayers: 6, aiCount: 4, name: 'Player', tribe: Tribe.Cats });
     const g = gameController as unknown as { getNetwork: () => import('../src/controller/network-controller').NetworkController };
     g.getNetwork().hostPlayers.push({ peerId: 'guest-x', name: 'Player2', tribeId: Tribe.Warriors, playerIndex: null, ready: true, online: true });
     try {

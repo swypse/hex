@@ -1,12 +1,13 @@
+import { gameController } from '@/controller/game-controller';
+import { Tribe, TRIBES } from '@/game/tribes';
+import { useGameStore } from '@/store/game-store';
+import { type UIHost } from '@/ui/host';
+import { Button } from '@/ui/kit/button';
+import { ButtonGroup } from '@/ui/kit/button-group';
+import { LobbyScreen } from '@/ui/screens/lobby-screen';
+import { GameMode } from '@enums';
+import { BitmapText, Container, Graphics, Sprite } from 'pixi.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { Container, Graphics, Sprite, BitmapText } from 'pixi.js';
-import { LobbyScreen } from '../src/ui/screens/lobby-screen';
-import { gameController } from '../src/controller/game-controller';
-import { TRIBES, Tribe } from '../src/game/tribes';
-import { useGameStore } from '../src/store/game-store';
-import { type UIHost } from '../src/ui/host';
-import { Button } from '../src/ui/kit/button';
-import { ButtonGroup } from '../src/ui/kit/button-group';
 
 function makeHost(): UIHost {
   return {
@@ -17,7 +18,8 @@ function makeHost(): UIHost {
 }
 
 function installCanvasDom(): void {
-  (globalThis as { CanvasRenderingContext2D?: unknown }).CanvasRenderingContext2D = class {};
+  (globalThis as { CanvasRenderingContext2D?: unknown }).CanvasRenderingContext2D = class {
+  };
   (globalThis as { document?: unknown }).document = {
     createElement: () => ({
       getContext: () => ({
@@ -34,7 +36,8 @@ function installCanvasDom(): void {
     }),
     activeElement: null,
   };
-  (globalThis as { HTMLInputElement?: unknown }).HTMLInputElement = class {};
+  (globalThis as { HTMLInputElement?: unknown }).HTMLInputElement = class {
+  };
 }
 
 // Every display object under the screen's root container, including the
@@ -84,9 +87,17 @@ describe('LobbyScreen host keyboard navigation', () => {
   beforeEach(() => {
     installCanvasDom();
     keyHandler = null;
-    const win = (globalThis as { window: { addEventListener: (t: string, cb: unknown) => void; removeEventListener: (t: string, cb: unknown) => void } }).window;
-    win.addEventListener = (t, cb) => { if (t === 'keydown') keyHandler = cb as (e: KeyboardEventLike) => void; };
-    win.removeEventListener = () => {};
+    const win = (globalThis as {
+      window: {
+        addEventListener: (t: string, cb: unknown) => void;
+        removeEventListener: (t: string, cb: unknown) => void
+      }
+    }).window;
+    win.addEventListener = (t, cb) => {
+      if (t === 'keydown') keyHandler = cb as (e: KeyboardEventLike) => void;
+    };
+    win.removeEventListener = () => {
+    };
 
     host = makeHost();
     screen = new LobbyScreen();
@@ -100,7 +111,10 @@ describe('LobbyScreen host keyboard navigation', () => {
     vi.restoreAllMocks();
   });
 
-  const key = (k: string): void => keyHandler!({ key: k, preventDefault: () => {} });
+  const key = (k: string): void => keyHandler!({
+    key: k, preventDefault: () => {
+    }
+  });
   const state = (): {
     focus: number;
     tribe: number;
@@ -109,7 +123,14 @@ describe('LobbyScreen host keyboard navigation', () => {
     mode: string;
     view: string;
   } => {
-    const s = screen as unknown as { focus: number; tribe: number; humans: number; aiCount: number; mode: string; view: string };
+    const s = screen as unknown as {
+      focus: number;
+      tribe: number;
+      humans: number;
+      aiCount: number;
+      mode: string;
+      view: string
+    };
     return { focus: s.focus, tribe: s.tribe, humans: s.humans, aiCount: s.aiCount, mode: s.mode, view: s.view };
   };
 
@@ -143,7 +164,7 @@ describe('LobbyScreen host keyboard navigation', () => {
 
     key('ArrowDown'); // focus mode
     key('ArrowRight');
-    expect(state().mode).toBe('turns30');
+    expect(state().mode).toBe(GameMode.TURNS30);
   });
 
   it('clamps AI count when humans change reduces available slots', () => {
@@ -278,9 +299,17 @@ describe('LobbyScreen menu keyboard navigation', () => {
   beforeEach(() => {
     installCanvasDom();
     keyHandler = null;
-    const win = (globalThis as { window: { addEventListener: (t: string, cb: unknown) => void; removeEventListener: (t: string, cb: unknown) => void } }).window;
-    win.addEventListener = (t, cb) => { if (t === 'keydown') keyHandler = cb as (e: KeyboardEventLike) => void; };
-    win.removeEventListener = () => {};
+    const win = (globalThis as {
+      window: {
+        addEventListener: (t: string, cb: unknown) => void;
+        removeEventListener: (t: string, cb: unknown) => void
+      }
+    }).window;
+    win.addEventListener = (t, cb) => {
+      if (t === 'keydown') keyHandler = cb as (e: KeyboardEventLike) => void;
+    };
+    win.removeEventListener = () => {
+    };
 
     host = makeHost();
     screen = new LobbyScreen();
@@ -292,7 +321,10 @@ describe('LobbyScreen menu keyboard navigation', () => {
     vi.restoreAllMocks();
   });
 
-  const key = (k: string): void => keyHandler!({ key: k, preventDefault: () => {} });
+  const key = (k: string): void => keyHandler!({
+    key: k, preventDefault: () => {
+    }
+  });
 
   it('moves the highlighted menu button with up/down and triggers it with Enter', () => {
     const s = screen as unknown as { menuIndex: number; view: string };
@@ -345,9 +377,17 @@ describe('LobbyScreen host tribe icons use tribe codes', () => {
     (globalThis as { Image?: unknown }).Image = FakeImage;
     installCanvasDom();
     keyHandler = null;
-    const win = (globalThis as { window: { addEventListener: (t: string, cb: unknown) => void; removeEventListener: (t: string, cb: unknown) => void } }).window;
-    win.addEventListener = (t, cb) => { if (t === 'keydown') keyHandler = cb as (e: KeyboardEventLike) => void; };
-    win.removeEventListener = () => {};
+    const win = (globalThis as {
+      window: {
+        addEventListener: (t: string, cb: unknown) => void;
+        removeEventListener: (t: string, cb: unknown) => void
+      }
+    }).window;
+    win.addEventListener = (t, cb) => {
+      if (t === 'keydown') keyHandler = cb as (e: KeyboardEventLike) => void;
+    };
+    win.removeEventListener = () => {
+    };
 
     host = makeHost();
     screen = new LobbyScreen();
@@ -390,7 +430,7 @@ describe('LobbyScreen client room tribe selection', () => {
       lobby: {
         role: 'client',
         code: 'ABCDEF',
-        mode: 'capture',
+        mode: GameMode.CAPTURE,
         totalPlayers: 2,
         aiCount: 0,
         players: [
@@ -408,10 +448,12 @@ describe('LobbyScreen client room tribe selection', () => {
 
   const hasSelectedStroke = (opt: Container): boolean =>
     (opt.children.filter((c) => c instanceof Graphics) as Graphics[]).some(
-      (g) => (g as unknown as { context?: { instructions?: { action: string }[] } }).context?.instructions?.some((i) => i.action === 'stroke') ?? false,
+      (g) => (g as unknown as {
+        context?: { instructions?: { action: string }[] }
+      }).context?.instructions?.some((i) => i.action === 'stroke') ?? false,
     );
 
-  it("highlights the client's own tribe and not the host's", () => {
+  it('highlights the client\'s own tribe and not the host\'s', () => {
     setClientRoom();
     const clientOpt = optionFor('Warriors');
     const hostOpt = optionFor('Cats');
@@ -441,7 +483,7 @@ describe('LobbyScreen client room tribe selection', () => {
       lobby: {
         role: 'client',
         code: 'ABCDEF',
-        mode: 'capture',
+        mode: GameMode.CAPTURE,
         totalPlayers: 2,
         aiCount: 0,
         players: [
@@ -480,7 +522,7 @@ describe('LobbyScreen client room tribe selection', () => {
       lobby: {
         role: 'client',
         code: 'ABCDEF',
-        mode: 'capture',
+        mode: GameMode.CAPTURE,
         totalPlayers: 2,
         aiCount: 0,
         players: [

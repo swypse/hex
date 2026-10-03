@@ -4,6 +4,8 @@ export default defineConfig(({ command }) => ({
   base: command === 'build' ? '/hex/' : '/',
   resolve: {
     alias: {
+      '@enums': new URL('./src/enums/index.ts', import.meta.url).pathname,
+      '@': new URL('./src', import.meta.url).pathname,
       'zustand/react': new URL('./src/ui/zustand-react-stub', import.meta.url).pathname,
     },
   },

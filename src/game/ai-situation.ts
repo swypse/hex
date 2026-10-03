@@ -1,13 +1,13 @@
-import { GameMap, MapTile } from './map-gen';
-import { Player } from './players';
-import { GameMode } from './game-mode';
+import { GameMode } from '@enums';
 import { AiDifficultyProfile } from './ai-difficulty';
+import { attackDamage } from './combat';
 import { isExploredFor } from './explore';
 import { hexDistance, hexNeighbors } from './hex';
+import { GameMap, MapTile } from './map-gen';
+import { Player } from './players';
 import { isShip, shipAttackDistance, shipMovePoints } from './ship';
-import { UNIT_ATTACK_DISTANCE, UNIT_MOVE_POINTS, Unit, UnitType } from './units';
 import { isWaterType } from './tile-types';
-import { attackDamage } from './combat';
+import { Unit, UNIT_ATTACK_DISTANCE, UNIT_MOVE_POINTS, UnitType } from './units';
 
 type AiStance = 'settle' | 'defend' | 'war';
 

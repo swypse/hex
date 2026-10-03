@@ -1,19 +1,19 @@
-import { BitmapText, Container } from 'pixi.js';
-import { gameController } from '../../controller/game-controller';
-import { useGameStore } from '../../store/game-store';
-import { t } from '../../i18n';
-import { TRIBES, type Tribe, tribeById } from '../../game/tribes';
-import { type GameMode } from '../../game/game-mode';
-import { buildJoinLink, consumePendingJoin } from '../../net/join-link';
-import { playerName, setPlayerName } from '../../storage/settings';
+import { gameController } from '@/controller/game-controller';
+import { type Tribe, tribeById, TRIBES } from '@/game/tribes';
+import { t } from '@/i18n';
+import { buildJoinLink, consumePendingJoin } from '@/net/join-link';
+import { playerName, setPlayerName } from '@/storage/settings';
+import { useGameStore } from '@/store/game-store';
+import { GameMode } from '@enums';
+import { Container } from 'pixi.js';
 import { type ScreenController, type UIHost } from '../host';
 import { Button } from '../kit/button';
 import { ButtonGroup } from '../kit/button-group';
 import { makeLabel } from '../kit/label';
-import { makeTribeOption } from '../kit/tribe-option';
-import { TRIBE_GAP, TRIBE_ROW_STEP, positionTribes } from '../kit/tribe-layout';
-import { TITLE_TO_CONTENT, BLOCK_GAP } from '../kit/screen-layout';
+import { BLOCK_GAP, TITLE_TO_CONTENT } from '../kit/screen-layout';
 import { TextInputOverlay } from '../kit/text-input-overlay';
+import { positionTribes, TRIBE_GAP, TRIBE_ROW_STEP } from '../kit/tribe-layout';
+import { makeTribeOption } from '../kit/tribe-option';
 import { isTouchDevice } from '../touch';
 import { ScreenScroll } from '../vertical-scroll';
 
@@ -30,7 +30,7 @@ export class LobbyScreen implements ScreenController {
   private host: UIHost | null = null;
   private scroller: ScreenScroll | null = null;
   private view: View = 'menu';
-  private mode: GameMode = 'capture';
+  private mode: GameMode = GameMode.CAPTURE;
   private humans = 2;
   private aiCount = 1;
   private tribe: Tribe = TRIBES[0]!.id;
@@ -107,9 +107,23 @@ export class LobbyScreen implements ScreenController {
   private renderMenu(): void {
     this.title(t('lobby.title'));
     const cx = this.host!.app.screen.width / 2;
-    const hostBtn = new Button({ label: t('lobby.hostGame'), width: 240, onClick: () => { this.view = 'host'; this.render(); } });
-    const joinBtn = new Button({ label: t('lobby.joinGame'), width: 240, onClick: () => { this.view = 'join'; this.render(); } });
-    const back = new Button({ label: t('common.back'), width: 240, onClick: () => useGameStore.getState().setScreen('start') });
+    const hostBtn = new Button({
+      label: t('lobby.hostGame'), width: 240, onClick: () => {
+        this.view = 'host';
+        this.render();
+      }
+    });
+    const joinBtn = new Button({
+      label: t('lobby.joinGame'), width: 240, onClick: () => {
+        this.view = 'join';
+        this.render();
+      }
+    });
+    const back = new Button({
+      label: t('common.back'),
+      width: 240,
+      onClick: () => useGameStore.getState().setScreen('start')
+    });
     hostBtn.position.set(cx - 120, 160);
     joinBtn.position.set(cx - 120, 230);
     back.position.set(cx - 120, 300);
@@ -139,7 +153,13 @@ export class LobbyScreen implements ScreenController {
 
   private createRoom(): void {
     if (this.name.trim().length > 0 && this.humans + this.aiCount >= 2) {
-      gameController.hostGame({ mode: this.mode, totalPlayers: this.humans + this.aiCount, aiCount: this.aiCount, name: this.name.trim(), tribe: this.tribe });
+      gameController.hostGame({
+        mode: this.mode,
+        totalPlayers: this.humans + this.aiCount,
+        aiCount: this.aiCount,
+        name: this.name.trim(),
+        tribe: this.tribe
+      });
     }
   }
 
@@ -212,7 +232,7 @@ export class LobbyScreen implements ScreenController {
       const i = opts.indexOf(this.aiCount);
       this.aiCount = opts[(i + dir + opts.length) % opts.length]!;
     } else if (this.focus === 3) {
-      const opts: GameMode[] = ['capture', 'turns30'];
+      const opts: GameMode[] = [GameMode.CAPTURE, GameMode.TURNS30];
       const i = opts.indexOf(this.mode);
       this.mode = opts[(i + dir + opts.length) % opts.length]!;
     }
@@ -225,13 +245,17 @@ export class LobbyScreen implements ScreenController {
     return label;
   }
 
-private renderHost(): void {
+  private renderHost(): void {
     const cx = this.host!.app.screen.width / 2;
     this.title(t('lobby.hostGame'));
 
     const nameInput = new TextInputOverlay({
       x: cx - 100, y: 110, width: 200, height: 34, value: this.name,
-      onChange: (v) => { this.name = v; setPlayerName(v); this.updateCreate(); },
+      onChange: (v) => {
+        this.name = v;
+        setPlayerName(v);
+        this.updateCreate();
+      },
     });
     this.inputs.push(nameInput);
     this.viewContent.addChild(nameInput.container);
@@ -243,7 +267,10 @@ private renderHost(): void {
     const tribeOpts: Container[] = [];
     let tribeLabelH = 14;
     TRIBES.forEach((tr) => {
-      const opt = makeTribeOption(tr.name, `${tr.code}-icon.png`, () => { this.tribe = tr.id; this.render(); }, tr.id === this.tribe, tr.color);
+      const opt = makeTribeOption(tr.name, `${tr.code}-icon.png`, () => {
+        this.tribe = tr.id;
+        this.render();
+      }, tr.id === this.tribe, tr.color);
       tribeOpts.push(opt.el);
       if (opt.labelHeight > tribeLabelH) tribeLabelH = opt.labelHeight;
       this.viewContent.addChild(opt.el);
@@ -263,12 +290,18 @@ private renderHost(): void {
     const humansGroup = new ButtonGroup({
       items: humanOpts.map((n) => ({
         label: String(n),
-        onClick: () => { this.humans = n; this.aiCount = Math.min(this.aiCount, 8 - n); this.render(); },
+        onClick: () => {
+          this.humans = n;
+          this.aiCount = Math.min(this.aiCount, 8 - n);
+          this.render();
+        },
       })),
     });
     const humansTop = humansHeading + TITLE_TO_CONTENT;
     humansGroup.position.set(cx - humansGroup.groupWidth / 2, humansTop);
-    humansGroup.buttons.forEach((b, i) => { b.selected = humanOpts[i] === this.humans; });
+    humansGroup.buttons.forEach((b, i) => {
+      b.selected = humanOpts[i] === this.humans;
+    });
     this.viewContent.addChild(humansGroup);
     const humansBottom = humansTop + humansGroup.buttonHeight;
 
@@ -282,12 +315,17 @@ private renderHost(): void {
     const aiGroup = new ButtonGroup({
       items: Array.from({ length: maxAi }, (_, i) => i).map((n) => ({
         label: String(n),
-        onClick: () => { this.aiCount = n; this.render(); },
+        onClick: () => {
+          this.aiCount = n;
+          this.render();
+        },
       })),
     });
     const aiTop = aiHeading + TITLE_TO_CONTENT;
     aiGroup.position.set(cx - aiGroup.groupWidth / 2, aiTop);
-    aiGroup.buttons.forEach((b, i) => { b.selected = aiOpts[i] === this.aiCount; });
+    aiGroup.buttons.forEach((b, i) => {
+      b.selected = aiOpts[i] === this.aiCount;
+    });
     this.viewContent.addChild(aiGroup);
     const aiBottom = aiTop + aiGroup.buttonHeight;
 
@@ -305,21 +343,40 @@ private renderHost(): void {
     const modeLabel = this.groupLabel(t('common.mode'), 3);
     modeLabel.position.set(cx, modeHeading);
     this.viewContent.addChild(modeLabel);
-    const modeOpts: GameMode[] = ['capture', 'turns30'];
+    const modeOpts: GameMode[] = [GameMode.CAPTURE, GameMode.TURNS30];
     const modeGroup = new ButtonGroup({
-      items: (['capture', 'turns30'] as GameMode[]).map((m) => ({
-        label: t(m === 'capture' ? 'mode.capture' : 'mode.turns30'),
-        onClick: () => { this.mode = m; this.render(); },
+      items: ([GameMode.CAPTURE, GameMode.TURNS30] as GameMode[]).map((m) => ({
+        label: t(m === GameMode.CAPTURE ? 'mode.capture' : 'mode.turns30'),
+        onClick: () => {
+          this.mode = m;
+          this.render();
+        },
       })),
     });
     const modeTop = modeHeading + TITLE_TO_CONTENT;
     modeGroup.position.set(cx - modeGroup.groupWidth / 2, modeTop);
-    modeGroup.buttons.forEach((b, i) => { b.selected = modeOpts[i] === this.mode; });
+    modeGroup.buttons.forEach((b, i) => {
+      b.selected = modeOpts[i] === this.mode;
+    });
     this.viewContent.addChild(modeGroup);
     const modeBottom = modeTop + modeGroup.buttonHeight;
 
-    this.createBtn = new Button({ label: t('lobby.createRoom'), width: 240, selected: this.focus === CREATE_ROOM_FOCUS, onClick: () => this.createRoom() });
-    const back = new Button({ label: t('common.back'), width: 96, fontSize: 14, selected: this.focus === HOST_NAV_ITEMS - 1, onClick: () => { this.view = 'menu'; this.render(); } });
+    this.createBtn = new Button({
+      label: t('lobby.createRoom'),
+      width: 240,
+      selected: this.focus === CREATE_ROOM_FOCUS,
+      onClick: () => this.createRoom()
+    });
+    const back = new Button({
+      label: t('common.back'),
+      width: 96,
+      fontSize: 14,
+      selected: this.focus === HOST_NAV_ITEMS - 1,
+      onClick: () => {
+        this.view = 'menu';
+        this.render();
+      }
+    });
     const startTop = modeBottom + 30;
     this.createBtn.position.set(cx - 120, startTop);
     back.position.set(cx - 48, startTop + this.createBtn.height + 16);
@@ -348,7 +405,10 @@ private renderHost(): void {
     const codeInput = new TextInputOverlay({
       x: cx - 100, y, width: 200, height: 34, value: this.code,
       transform: (v) => v.toUpperCase(),
-      onChange: (v) => { this.code = v; this.updateJoin(); },
+      onChange: (v) => {
+        this.code = v;
+        this.updateJoin();
+      },
     });
     this.inputs.push(codeInput);
     this.viewContent.addChild(codeInput.container);
@@ -356,13 +416,21 @@ private renderHost(): void {
 
     const nameInput = new TextInputOverlay({
       x: cx - 100, y, width: 200, height: 34, value: this.name,
-      onChange: (v) => { this.name = v; setPlayerName(v); this.updateJoin(); },
+      onChange: (v) => {
+        this.name = v;
+        setPlayerName(v);
+        this.updateJoin();
+      },
     });
     this.inputs.push(nameInput);
     this.viewContent.addChild(nameInput.container);
     y += 60;
 
-    this.joinBtn = new Button({ label: t('lobby.join'), width: 200, onClick: () => gameController.joinGame(this.code.trim(), this.name.trim()) });
+    this.joinBtn = new Button({
+      label: t('lobby.join'),
+      width: 200,
+      onClick: () => gameController.joinGame(this.code.trim(), this.name.trim())
+    });
     this.joinBtn.position.set(cx - 100, y);
     this.viewContent.addChild(this.joinBtn);
     this.updateJoin();
@@ -382,7 +450,12 @@ private renderHost(): void {
       y += 30;
     }
 
-    const back = new Button({ label: t('common.back'), width: 200, onClick: () => { this.view = 'menu'; this.render(); } });
+    const back = new Button({
+      label: t('common.back'), width: 200, onClick: () => {
+        this.view = 'menu';
+        this.render();
+      }
+    });
     back.position.set(cx - 100, y);
     this.viewContent.addChild(back);
   }
@@ -406,7 +479,8 @@ private renderHost(): void {
       label: t('lobby.copy'),
       width: 80,
       onClick: () => {
-        void navigator.clipboard.writeText(lobby.code).catch(() => {});
+        void navigator.clipboard.writeText(lobby.code).catch(() => {
+        });
         copyBtn?.setLabel(t('lobby.copied'));
         setTimeout(() => {
           if (copyBtn && !copyBtn.destroyed) copyBtn.setLabel('Copy');
@@ -424,7 +498,8 @@ private renderHost(): void {
         label: t('lobby.copyLink'),
         width: 240,
         onClick: () => {
-          void navigator.clipboard.writeText(buildJoinLink(lobby.code)).catch(() => {});
+          void navigator.clipboard.writeText(buildJoinLink(lobby.code)).catch(() => {
+          });
           joinLinkBtn?.setLabel(t('lobby.copied'));
           setTimeout(() => {
             if (joinLinkBtn && !joinLinkBtn.destroyed) joinLinkBtn.setLabel('Copy join link');
@@ -485,7 +560,13 @@ private renderHost(): void {
         errMsg.anchor.set(0.5, 0.5);
         errMsg.position.set(cx, y);
         this.viewContent.addChild(errMsg);
-        const back = new Button({ label: t('common.back'), width: 150, onClick: () => { gameController.cancelLobby(); this.view = 'menu'; this.render(); } });
+        const back = new Button({
+          label: t('common.back'), width: 150, onClick: () => {
+            gameController.cancelLobby();
+            this.view = 'menu';
+            this.render();
+          }
+        });
         back.position.set(cx - 75, y + 34);
         this.viewContent.addChild(back);
         return;
@@ -497,7 +578,11 @@ private renderHost(): void {
         this.viewContent.addChild(setup);
         return;
       }
-      const start = new Button({ label: t('lobby.startGame'), width: 240, disabled: !canStart, onClick: () => { void gameController.startHostGame(); } });
+      const start = new Button({
+        label: t('lobby.startGame'), width: 240, disabled: !canStart, onClick: () => {
+          void gameController.startHostGame();
+        }
+      });
       start.position.set(cx - 120, y);
       this.viewContent.addChild(start);
       y += 60;
@@ -515,16 +600,31 @@ private renderHost(): void {
         this.viewContent.addChild(errMsg);
         y += 30;
         const retryName = me?.name ?? this.name;
-        const retry = new Button({ label: t('lobby.tryAgain'), width: 150, onClick: () => gameController.joinGame(lobby.code, retryName) });
+        const retry = new Button({
+          label: t('lobby.tryAgain'),
+          width: 150,
+          onClick: () => gameController.joinGame(lobby.code, retryName)
+        });
         retry.position.set(cx - 165, y);
         this.viewContent.addChild(retry);
-        const back = new Button({ label: t('common.back'), width: 150, onClick: () => { gameController.cancelLobby(); this.view = 'join'; this.render(); } });
+        const back = new Button({
+          label: t('common.back'), width: 150, onClick: () => {
+            gameController.cancelLobby();
+            this.view = 'join';
+            this.render();
+          }
+        });
         back.position.set(cx + 15, y);
         this.viewContent.addChild(back);
         return;
       }
       const isReady = me?.ready ?? false;
-      const ready = new Button({ label: isReady ? t('lobby.readyBtnOn') : t('lobby.readyBtn'), width: 240, disabled: !me || me.tribeId === null || isReady, onClick: () => gameController.readyUp() });
+      const ready = new Button({
+        label: isReady ? t('lobby.readyBtnOn') : t('lobby.readyBtn'),
+        width: 240,
+        disabled: !me || me.tribeId === null || isReady,
+        onClick: () => gameController.readyUp()
+      });
       ready.position.set(cx - 120, y);
       this.viewContent.addChild(ready);
       y += 60;
@@ -547,7 +647,13 @@ private renderHost(): void {
         connecting.position.set(cx, y);
         this.viewContent.addChild(connecting);
         y += 30;
-        const cancel = new Button({ label: t('common.cancel'), width: 150, onClick: () => { gameController.cancelLobby(); this.view = 'join'; this.render(); } });
+        const cancel = new Button({
+          label: t('common.cancel'), width: 150, onClick: () => {
+            gameController.cancelLobby();
+            this.view = 'join';
+            this.render();
+          }
+        });
         cancel.position.set(cx - 75, y);
         this.viewContent.addChild(cancel);
       }

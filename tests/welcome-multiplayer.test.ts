@@ -1,13 +1,14 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { generateMap } from '../src/game/map-gen';
-import { buildMultiplayerPlayers } from '../src/game/players';
-import { Simulator } from '../src/game/simulator';
-import { SeededRandom } from '../src/util/random';
-import { initialExplorationFor } from '../src/game/explore';
-import { Tribe } from '../src/game/tribes';
-import { gameController } from '../src/controller/game-controller';
-import { useGameStore } from '../src/store/game-store';
-import type { HostMessage } from '../src/net/peer-session';
+import { gameController } from '@/controller/game-controller';
+import { initialExplorationFor } from '@/game/explore';
+import { generateMap } from '@/game/map-gen';
+import { buildMultiplayerPlayers } from '@/game/players';
+import { Simulator } from '@/game/simulator';
+import { Tribe } from '@/game/tribes';
+import type { HostMessage } from '@/net/peer-session';
+import { useGameStore } from '@/store/game-store';
+import { SeededRandom } from '@/util';
+import { GameMode } from '@enums';
+import { beforeEach, describe, expect, it } from 'vitest';
 
 function buildSim(): Simulator {
   const players = buildMultiplayerPlayers(
@@ -20,7 +21,7 @@ function buildSim(): Simulator {
   );
   const map = generateMap(players.length, 42);
   for (const p of players) initialExplorationFor(map, p.index);
-  return new Simulator(map, players, 'turns30', { rng: () => 0.5 });
+  return new Simulator(map, players, GameMode.TURNS30, { rng: () => 0.5 });
 }
 
 const controller = gameController as unknown as { onHostMessage(msg: HostMessage): void };

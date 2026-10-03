@@ -1,17 +1,18 @@
+import { GameMode } from '@enums';
 import { describe, expect, it } from 'vitest';
-import { Simulator } from '../src/game/simulator';
+import { TutorialDirector, type TutorialHost } from '@/controller/tutorial-director';
+import { hexDistance } from '@/game/hex';
+import { tileAt } from '@/game/selection';
+import { Simulator } from '@/game/simulator';
+import { isWaterType } from '@/game/tile-types';
 import {
-  buildTutorialMap, buildTutorialPlayers, TUTORIAL_PORT_TILE,
-  TUTORIAL_ENEMY_SHIP_ID, TUTORIAL_HUMAN, TUTORIAL_ENEMY_PLAYER,
-} from '../src/game/tutorial/tutorial-map';
-import { TutorialDirector, type TutorialHost } from '../src/controller/tutorial-director';
-import { tileAt } from '../src/game/selection';
-import { hexDistance } from '../src/game/hex';
-import { isWaterType } from '../src/game/tile-types';
-import { makeUnit } from '../src/game/units';
+  buildTutorialMap, buildTutorialPlayers, TUTORIAL_ENEMY_PLAYER, TUTORIAL_ENEMY_SHIP_ID, TUTORIAL_HUMAN,
+  TUTORIAL_PORT_TILE,
+} from '@/game/tutorial/tutorial-map';
+import { makeUnit } from '@/game/units';
 
 function makeSim(): Simulator {
-  const sim = new Simulator(buildTutorialMap(), buildTutorialPlayers(), 'turns30', { rng: () => 0.99 });
+  const sim = new Simulator(buildTutorialMap(), buildTutorialPlayers(), GameMode.TURNS30, { rng: () => 0.99 });
   sim.startGame();
   sim.drainEvents();
   return sim;

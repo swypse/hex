@@ -2,7 +2,7 @@ import { axialKey, hexNeighbors } from './hex';
 import { GameMap, MapTile } from './map-gen';
 import { Player } from './players';
 import { moneyCost, Resources } from './resources';
-import { canAffordAt, payAt, payerVillage, villageNetwork } from './stock';
+import { canAffordAt, payAt, payerVillage, villagesJoinedBy, villageNetwork } from './stock';
 import { hasSkill } from './skills';
 import { isForestType, isLandType, isMountainType, isSolidGround, isWaterType } from './tile-types';
 import { buildingsInVillage, villageBuildingLimit } from './village';
@@ -364,7 +364,10 @@ export function buildBuildingIgnoringSkill(map: GameMap, tile: MapTile, kind: Bu
 }
 
 function payAndPlaceBuilding(map: GameMap, tile: MapTile, kind: BuildingKind, player: Player): boolean {
-  if (!payAt(map, player, tile, BUILDING_COSTS[kind])) return false;
+  // A port is a road/water-cluster node: it may be paid by the networks it
+  // would join, just like a road or bridge.
+  const joined = kind === 'port' ? villagesJoinedBy(map, player.index, tile) : [];
+  if (!payAt(map, player, tile, BUILDING_COSTS[kind], joined)) return false;
   tile.building = kind === 'granary' ? { kind, level: 1, food: 0 } : { kind, level: 1 };
   return true;
 }

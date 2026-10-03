@@ -1,13 +1,12 @@
+import { Player } from '@/game/players';
+import { Selection } from '@/game/selection';
+import type { SkillId } from '@/game/skills';
+import { GameStateSnapshot } from '@/game/state';
+import type { TutorialStepId } from '@/game/tutorial/tutorial-steps';
+import type { LobbyPlayer } from '@/net/peer-session';
+import { activeMatchStore } from '@/storage/active-match';
+import { GameMode } from '@enums';
 import { create } from 'zustand';
-import type { LobbyPlayer } from '../net/peer-session';
-import { Player } from '../game/players';
-import { Selection } from '../game/selection';
-import { GameStateSnapshot } from '../game/state';
-import { GameMode } from '../game/game-mode';
-import { Tribe } from '../game/tribes';
-import type { SkillId } from '../game/skills';
-import type { TutorialStepId } from '../game/tutorial/tutorial-steps';
-import { activeMatchStore } from '../storage/active-match';
 
 export type Screen = 'start' | 'setup' | 'lobby' | 'game';
 
@@ -124,7 +123,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   aiActive: false,
   selection: null,
   overlay: null,
-  mode: 'capture',
+  mode: GameMode.CAPTURE,
   gameOver: false,
   winnerIndex: null,
   watching: false,

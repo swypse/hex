@@ -9,6 +9,7 @@ import { GameScreen } from '../src/ui/screens/game-screen';
 import { gameController } from '../src/controller/game-controller';
 import { useGameStore } from '../src/store/game-store';
 import { type UIHost } from '../src/ui/host';
+import { GameMode } from '@enums';
 
 vi.mock('../src/render/texture-factory', async () => {
   const { Texture, ImageSource } = await import('pixi.js');
@@ -125,7 +126,7 @@ describe('WebGL context loss recovery', () => {
   });
 
   it('rebuilds the map scene with fresh textures after the context is restored', async () => {
-    await gameController.startGame(TRIBES[0]!.id, 1, 'capture');
+    await gameController.startGame(TRIBES[0]!.id, 1, GameMode.CAPTURE);
     const app = makeApp();
     const host = makeHost(app);
     const screen = new GameScreen();
@@ -160,7 +161,7 @@ describe('WebGL context loss recovery', () => {
   });
 
   it('is a no-op when no map is currently rendered (e.g. on the start screen)', async () => {
-    await gameController.startGame(TRIBES[0]!.id, 1, 'capture');
+    await gameController.startGame(TRIBES[0]!.id, 1, GameMode.CAPTURE);
     expect(controller.mapView).toBeNull();
     useGameStore.setState({ texturesLoading: false });
 
@@ -171,7 +172,7 @@ describe('WebGL context loss recovery', () => {
   });
 
   it('rebuilds the map when the page returns to the foreground after a noted context loss', async () => {
-    await gameController.startGame(TRIBES[0]!.id, 1, 'capture');
+    await gameController.startGame(TRIBES[0]!.id, 1, GameMode.CAPTURE);
     const host = makeHost(makeApp());
     const screen = new GameScreen();
     screen.mount(host);
@@ -193,7 +194,7 @@ describe('WebGL context loss recovery', () => {
   });
 
   it('does not rebuild on foreground when the context was never lost', async () => {
-    await gameController.startGame(TRIBES[0]!.id, 1, 'capture');
+    await gameController.startGame(TRIBES[0]!.id, 1, GameMode.CAPTURE);
     const host = makeHost(makeApp());
     const screen = new GameScreen();
     screen.mount(host);

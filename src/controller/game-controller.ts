@@ -1,58 +1,55 @@
+import { aiLoggingEnabled, setAiLogging } from '@/game/ai';
+import { AiDifficulty, DEFAULT_AI_DIFFICULTY } from '@/game/ai-difficulty';
+import { builderBuildable, type BuilderBuildKind } from '@/game/buildings';
+import { RESOURCE_CHEAT_AMOUNT } from '@/game/cheats';
+import { attackableTargets } from '@/game/combat';
+import { BuildingKind, GameEvent } from '@/game/events';
+import { initialExplorationFor, isExploredFor } from '@/game/explore';
+import { shouldPromptWatch } from '@/game/game-mode';
+import { axialKey, hexDistance, hexToPixel } from '@/game/hex';
+import { countIceTiles } from '@/game/ice';
+import { type GameMap, generateMap, type MapSize, type MapTile } from '@/game/map-gen';
+import { buildPlayers } from '@/game/players';
+import { Season, seasonForTurn } from '@/game/season';
+import { cycleSelection, reachableTargets, tileAt } from '@/game/selection';
+import { type Command, Simulator } from '@/game/simulator';
+import { hasSkill, SkillId, SKILLS } from '@/game/skills';
+import { adjacentEnemyVillages, isMoveStealthed } from '@/game/stalker';
+import { GameStateSnapshot } from '@/game/state';
+import { addStock } from '@/game/stock';
+import { stormEligible } from '@/game/storm';
+import { TileType } from '@/game/tile-types';
+import { trapCells } from '@/game/traps';
+import { Tribe, tribeById } from '@/game/tribes';
+import {
+  buildTutorialMap, buildTutorialPlayers, TUTORIAL_CAPITAL, TUTORIAL_ENEMY_SHIP_ID, TUTORIAL_ENEMY_WARRIOR_ID,
+  TUTORIAL_START_WARRIOR_ID,
+} from '@/game/tutorial/tutorial-map';
+import { skillPulseStep, STEP_CONFIG } from '@/game/tutorial/tutorial-steps';
+import { canAttack, canDisband, canMove, makeUnit, movePoints, PIRATE_OWNER, type UnitType } from '@/game/units';
+import { exploreVillageSights } from '@/game/village';
+import { t } from '@/i18n';
+import { localizeVillageName } from '@/i18n/lists';
+import type { HostMessage } from '@/net/peer-session';
+import { MapView, type OverlayItem, ZOOM_DETAIL_HIDE } from '@/render/map-renderer';
+import { markDirty } from '@/render/render-gate';
+import { createTextures, destroyTextureSet } from '@/render/texture-factory';
+import { pickTileAt } from '@/render/tile-pick';
+import { type Viewport } from '@/render/tile-signature';
+import { sfx } from '@/sound/sfx';
+import { activeMatchStore } from '@/storage/active-match';
+import { saveRepository } from '@/storage/save-game';
+import { welcomeDismissed } from '@/storage/settings';
+import { confirmLeaveGame, useGameStore } from '@/store/game-store';
+import { SeededRandom } from '@/util';
+import { GameMode } from '@enums';
 import { Application, Container } from 'pixi.js';
-import { Simulator, type Command } from '../game/simulator';
-import { localizeVillageName } from '../i18n/lists';
-import { t } from '../i18n';
-import { GameStateSnapshot } from '../game/state';
-import { GameEvent, BuildingKind } from '../game/events';
-import type { HostMessage } from '../net/peer-session';
-import { axialKey, hexDistance, hexToPixel } from '../game/hex';
-import { TileType, isWaterType } from '../game/tile-types';
-import { generateMap, type GameMap, type MapSize, type MapTile } from '../game/map-gen';
-import { buildPlayers } from '../game/players';
-import { AiDifficulty, DEFAULT_AI_DIFFICULTY } from '../game/ai-difficulty';
-import { hasSkill, SKILLS, SkillId } from '../game/skills';
-import { attackableTargets } from '../game/combat';
-import { builderBuildable, type BuilderBuildKind } from '../game/buildings';
-import { trapCells } from '../game/traps';
-import { stormEligible } from '../game/storm';
-import { adjacentEnemyVillages, isMoveStealthed } from '../game/stalker';
-import { movePoints, canMove, canAttack, canDisband, makeUnit, PIRATE_OWNER, type Unit, type UnitType } from '../game/units';
-import { cycleSelection, reachableTargets, tileAt } from '../game/selection';
-import { addStock } from '../game/stock';
-import { shouldPromptWatch, type GameMode } from '../game/game-mode';
-import { isExploredFor, initialExplorationFor } from '../game/explore';
-import { exploreVillageSights } from '../game/village';
-import { RESOURCE_CHEAT_AMOUNT } from '../game/cheats';
-import { TRIBES, Tribe, tribeById } from '../game/tribes';
-import { MapView, ZOOM_DETAIL_HIDE, type OverlayItem } from '../render/map-renderer';
-import { pickTileAt } from '../render/tile-pick';
-import { markDirty } from '../render/render-gate';
-import { Season, seasonForTurn } from '../game/season';
-import { countIceTiles } from '../game/ice';
-import { createTextures, destroyTextureSet } from '../render/texture-factory';
-import { useGameStore, confirmLeaveGame } from '../store/game-store';
-import { saveRepository } from '../storage/save-game';
-import { activeMatchStore } from '../storage/active-match';
-import { welcomeDismissed } from '../storage/settings';
-import { sfx } from '../sound/sfx';
-import { SeededRandom } from '../util/random';
-import { setAiLogging, aiLoggingEnabled } from '../game/ai';
-import { CameraController, CAMERA_FOLLOW_MS } from './camera-controller';
+import { CAMERA_FOLLOW_MS, CameraController } from './camera-controller';
 import { damagePreviewVictim } from './damage-preview';
-import { HoldTimer } from './hold-timer';
-import { type Viewport } from '../render/tile-signature';
 import { EventPresenter } from './event-presenter';
+import { HoldTimer } from './hold-timer';
 import { NetworkController } from './network-controller';
 import { TutorialDirector, type TutorialHost } from './tutorial-director';
-import { STEP_CONFIG, skillPulseStep } from '../game/tutorial/tutorial-steps';
-import {
-  buildTutorialMap,
-  buildTutorialPlayers,
-  TUTORIAL_CAPITAL,
-  TUTORIAL_ENEMY_SHIP_ID,
-  TUTORIAL_ENEMY_WARRIOR_ID,
-  TUTORIAL_START_WARRIOR_ID,
-} from '../game/tutorial/tutorial-map';
 
 const HEX_SIZE = 40;
 const VILLAGE_START_OFFSET = 200;
@@ -636,13 +633,13 @@ class GameController {
     const store = useGameStore.getState();
     const players = buildTutorialPlayers();
     const map = buildTutorialMap();
-    this.sim = new Simulator(map, players, 'turns30', { disablePirates: true });
+    this.sim = new Simulator(map, players, GameMode.TURNS30, { disablePirates: true });
     this.sim.startGame();
     this.sim.drainEvents();
     this.tutorial = new TutorialDirector({ sim: () => this.sim } satisfies TutorialHost);
     this.tutorial.start();
     store.setPlayers(players);
-    store.setMode('turns30');
+    store.setMode(GameMode.TURNS30);
     store.setExpectedTurns(this.sim.expectedTurns);
     store.setGameOver(false);
     store.setWinnerIndex(null);
@@ -742,8 +739,12 @@ class GameController {
       this.network = new NetworkController({
         app: () => this.app,
         sim: () => this.sim,
-        setSim: (sim) => { this.sim = sim; },
-        setTextures: (textures) => { this.replaceTextures(textures); },
+        setSim: (sim) => {
+          this.sim = sim;
+        },
+        setTextures: (textures) => {
+          this.replaceTextures(textures);
+        },
         enqueue: (task) => this.enqueue(task),
         render: () => this.render(),
         syncStore: () => this.syncStore(),
@@ -1291,7 +1292,12 @@ class GameController {
     // Materials live in villages: every own village gets the amount.
     for (const t of this.sim.map.tiles) {
       if (t.settlement?.owner !== local.index) continue;
-      addStock(t, { wood: RESOURCE_CHEAT_AMOUNT, stone: RESOURCE_CHEAT_AMOUNT, ore: RESOURCE_CHEAT_AMOUNT, food: RESOURCE_CHEAT_AMOUNT });
+      addStock(t, {
+        wood: RESOURCE_CHEAT_AMOUNT,
+        stone: RESOURCE_CHEAT_AMOUNT,
+        ore: RESOURCE_CHEAT_AMOUNT,
+        food: RESOURCE_CHEAT_AMOUNT
+      });
     }
     this.syncStore();
     this.saveGame();
@@ -1564,7 +1570,14 @@ class GameController {
     }
   }
 
-  hostGame(opts: { mode: GameMode; totalPlayers: number; aiCount: number; name: string; tribe: Tribe; mapSize?: MapSize }): string {
+  hostGame(opts: {
+    mode: GameMode;
+    totalPlayers: number;
+    aiCount: number;
+    name: string;
+    tribe: Tribe;
+    mapSize?: MapSize
+  }): string {
     return this.getNetwork().hostGame(opts);
   }
 

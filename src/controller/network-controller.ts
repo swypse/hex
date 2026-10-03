@@ -490,7 +490,7 @@ export class NetworkController {
     store.setLobby({
       role: 'client',
       code,
-      mode: 'capture',
+      mode: GameMode.CAPTURE,
       totalPlayers: 0,
       aiCount: 0,
       players: [{ peerId: '', name, tribeId: null, isHost: false, ready: false }],
@@ -546,7 +546,7 @@ export class NetworkController {
         store.setLobby({
           role: 'client',
           code: store.lobby?.code ?? '',
-          mode: store.lobby?.mode ?? 'capture',
+          mode: store.lobby?.mode ?? GameMode.CAPTURE,
           totalPlayers: msg.totalPlayers,
           aiCount: msg.aiCount,
           players: msg.joined,

@@ -1,16 +1,17 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { makeTestMap, tileAt, makeUnit } from './helpers/test-map';
-import { Simulator } from '../src/game/simulator';
-import { buildPlayers } from '../src/game/players';
-import { Tribe } from '../src/game/tribes';
-import { SeededRandom } from '../src/util/random';
-import { Unit } from '../src/game/units';
+import { buildPlayers } from '@/game/players';
+import { Simulator } from '@/game/simulator';
+import { Tribe } from '@/game/tribes';
+import { Unit } from '@/game/units';
+import { SeededRandom } from '@/util';
+import { GameMode } from '@enums';
+import { beforeEach, describe, expect, it } from 'vitest';
+import { makeTestMap, makeUnit, tileAt } from './helpers/test-map';
 
 function freshSandSim(rng: () => number = () => 0.5) {
   const map = makeTestMap(3);
   const players = buildPlayers(Tribe.Sand, 1, new SeededRandom(1));
   players[0]!.tribe = Tribe.Sand;
-  const sim = new Simulator(map, players, 'turns30', { rng });
+  const sim = new Simulator(map, players, GameMode.TURNS30, { rng });
   sim.startGame();
   sim.drainEvents();
   return { map, players, sim };

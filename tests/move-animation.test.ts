@@ -1,3 +1,4 @@
+import { GameMode } from '@enums';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Application, Container, Graphics, ImageSource, Text, Texture } from 'pixi.js';
 import { RenderGate, installRenderGate, markDirty, type RenderGateApp } from '../src/render/render-gate';
@@ -201,7 +202,7 @@ let realRaf: typeof requestAnimationFrame | undefined;
 let rafStep = 30;
 
 function setupGame(map: GameMap, players: Player[]): Harness {
-  const sim = new Simulator(map, players, 'capture');
+  const sim = new Simulator(map, players, GameMode.CAPTURE);
   sim.startGame();
   sim.drainEvents();
 

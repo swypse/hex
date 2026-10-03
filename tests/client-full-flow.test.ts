@@ -1,21 +1,24 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { Application, Container, Sprite, Text, Texture, ImageSource } from 'pixi.js';
-import { Simulator } from '../src/game/simulator';
-import { generateMap, type GameMap } from '../src/game/map-gen';
-import { buildMultiplayerPlayers } from '../src/game/players';
-import { initialExplorationFor } from '../src/game/explore';
-import { SeededRandom } from '../src/util/random';
-import { Tribe } from '../src/game/tribes';
-import { gameController } from '../src/controller/game-controller';
-import { useGameStore } from '../src/store/game-store';
-import { GameScreen } from '../src/ui/screens/game-screen';
-import { axialKey } from '../src/game/hex';
-import type { TextureSet, TileTexture } from '../src/render/texture-factory';
-import type { HostMessage } from '../src/net/peer-session';
-import type { UIHost } from '../src/ui/host';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { Application, Container, Sprite, Text, Texture } from 'pixi.js';
+import { gameController } from '@/controller/game-controller';
+import { initialExplorationFor } from '@/game/explore';
+import { axialKey } from '@/game/hex';
+import { type GameMap, generateMap } from '@/game/map-gen';
+import { buildMultiplayerPlayers } from '@/game/players';
+import { Simulator } from '@/game/simulator';
+import { Tribe } from '@/game/tribes';
+import type { HostMessage } from '@/net/peer-session';
+import type { TextureSet, TileTexture } from '@/render/texture-factory';
+import { useGameStore } from '@/store/game-store';
+import type { UIHost } from '@/ui/host';
+import { GameScreen } from '@/ui/screens/game-screen';
+import { SeededRandom } from '@/util';
+import { GameMode } from '@enums';
 
 vi.mock('../src/render/texture-factory', async () => {
   const { Texture, ImageSource } = await import('pixi.js');
+  const { axialKey } = await import('@/game/hex');
+  const { Tribe } = await import('@/game/tribes');
   const tex = (w: number, h: number): Texture => new Texture({ source: new ImageSource({ width: w, height: h }) });
   const tileTex = (w: number, h: number, anchorY = 0.5): TileTexture => ({ texture: tex(w, h), anchorY });
   const unitTex = tileTex(100, 100, 0.7);
@@ -47,8 +50,18 @@ vi.mock('../src/render/texture-factory', async () => {
     },
     bridgeTextures: { nw: unitTex, ne: unitTex, we: unitTex },
     freePortTexture: tex(40, 40),
-    templeTextures: { 1: tileTex(40, 40, 0.7), 2: tileTex(40, 40, 0.7), 3: tileTex(40, 40, 0.7), 4: tileTex(40, 40, 0.7) },
-    forestTempleTextures: { 1: tileTex(40, 40, 0.7), 2: tileTex(40, 40, 0.7), 3: tileTex(40, 40, 0.7), 4: tileTex(40, 40, 0.7) },
+    templeTextures: {
+      1: tileTex(40, 40, 0.7),
+      2: tileTex(40, 40, 0.7),
+      3: tileTex(40, 40, 0.7),
+      4: tileTex(40, 40, 0.7)
+    },
+    forestTempleTextures: {
+      1: tileTex(40, 40, 0.7),
+      2: tileTex(40, 40, 0.7),
+      3: tileTex(40, 40, 0.7),
+      4: tileTex(40, 40, 0.7)
+    },
     shipTextures,
     bonusTexture: tileTex(50, 50),
     bottleTexture: tileTex(50, 50),
@@ -58,11 +71,15 @@ vi.mock('../src/render/texture-factory', async () => {
     wallTexture: null,
     arrowTexture: tex(67, 13),
     glowFor: new Map(),
-    cannonballTexture: tex(35, 15), 
+    cannonballTexture: tex(35, 15),
     attackIconTexture: null,
-    cannonbalTexture: null,  
+    cannonbalTexture: null,
   });
-  return { createTextures: async (_app: Application, map: GameMap): Promise<TextureSet> => build(map), destroyTextureSet: () => {} };
+  return {
+    createTextures: async (_app: Application, map: GameMap): Promise<TextureSet> => build(map),
+    destroyTextureSet: () => {
+    }
+  };
 });
 
 function buildSim(): Simulator {
@@ -76,14 +93,18 @@ function buildSim(): Simulator {
   );
   const map = generateMap(players.length, 42);
   for (const p of players) initialExplorationFor(map, p.index);
-  return new Simulator(map, players, 'turns30', { rng: () => 0.5 });
+  return new Simulator(map, players, GameMode.TURNS30, { rng: () => 0.5 });
 }
 
 function makeApp(): Application {
   return {
     screen: { width: 1280, height: 800 },
     stage: new Container(),
-    ticker: { add: (): void => {}, remove: (): void => {} },
+    ticker: {
+      add: (): void => {
+      }, remove: (): void => {
+      }
+    },
     canvas: {} as HTMLCanvasElement,
   } as unknown as Application;
 }
@@ -101,17 +122,33 @@ describe('full client entry flow', () => {
   beforeEach(() => {
     Object.defineProperty(Text.prototype, 'width', { configurable: true, get: () => 40 });
     Object.defineProperty(Text.prototype, 'height', { configurable: true, get: () => 14 });
-    (globalThis as { CanvasRenderingContext2D?: unknown }).CanvasRenderingContext2D = class {};
+    (globalThis as { CanvasRenderingContext2D?: unknown }).CanvasRenderingContext2D = class {
+    };
     (globalThis as { document?: unknown }).document = {
-      createElement: () => ({ getContext: () => ({
-        measureText: (s: string) => ({ width: s.length * 8, actualBoundingBoxLeft: 0, actualBoundingBoxRight: s.length * 8, actualBoundingBoxAscent: 12, actualBoundingBoxDescent: 3 }),
-        createLinearGradient: () => ({ addColorStop: () => {} }),
-        createRadialGradient: () => ({ addColorStop: () => {} }),
-        fillRect: () => {},
-        getImageData: () => ({ data: new Uint8ClampedArray(4) }),
-        width: 0,
-        height: 0,
-      }) }),
+      createElement: () => ({
+        getContext: () => ({
+          measureText: (s: string) => ({
+            width: s.length * 8,
+            actualBoundingBoxLeft: 0,
+            actualBoundingBoxRight: s.length * 8,
+            actualBoundingBoxAscent: 12,
+            actualBoundingBoxDescent: 3
+          }),
+          createLinearGradient: () => ({
+            addColorStop: () => {
+            }
+          }),
+          createRadialGradient: () => ({
+            addColorStop: () => {
+            }
+          }),
+          fillRect: () => {
+          },
+          getImageData: () => ({ data: new Uint8ClampedArray(4) }),
+          width: 0,
+          height: 0,
+        })
+      }),
     };
     controller.shutdown();
     useGameStore.setState({

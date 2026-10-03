@@ -1,3 +1,4 @@
+import { GameMode } from '@enums';
 import { describe, expect, it, beforeEach, afterEach } from 'vitest';
 import { Container, BitmapText } from 'pixi.js';
 import { Simulator } from '../src/game/simulator';
@@ -47,7 +48,7 @@ describe('DisbandDialog', () => {
     unitTile.unit = makeUnit('u1', 0, 'warrior', unitTile.q, unitTile.r);
     const players = buildPlayers(0, 1, new SeededRandom(1));
     players[0]!.resources.money = 50;
-    const sim = new Simulator(map, players, 'capture');
+    const sim = new Simulator(map, players, GameMode.CAPTURE);
     sim.startGame();
     sim.drainEvents();
     (gameController as unknown as { sim: unknown }).sim = sim;

@@ -1,11 +1,12 @@
-import { describe, it, expect } from 'vitest';
-import { makeTestMap, tileAt, makeUnit } from './helpers/test-map';
+import { GameMode } from '@enums';
+import { describe, expect, it } from 'vitest';
+import { hexNeighbors } from '../src/game/hex';
+import { buildMultiplayerPlayers, buildPlayers } from '../src/game/players';
 import { Simulator } from '../src/game/simulator';
-import { buildPlayers, buildMultiplayerPlayers } from '../src/game/players';
+import { TileType } from '../src/game/tile-types';
 import { Tribe } from '../src/game/tribes';
 import { SeededRandom } from '../src/util/random';
-import { TileType } from '../src/game/tile-types';
-import { hexNeighbors } from '../src/game/hex';
+import { makeTestMap, makeUnit, tileAt } from './helpers/test-map';
 
 function villageFor(map: ReturnType<typeof makeTestMap>, q: number, r: number, owner: number): void {
   tileAt(map, q, r)!.settlement = { owner, level: 1, captureReady: false };
@@ -19,7 +20,7 @@ describe('Simulator turn engine', () => {
     villageFor(map, 0, 2, 1);
     villageFor(map, 1, 0, 2);
     const players = buildPlayers(Tribe.Villagers, 2, new SeededRandom(1));
-    const sim = new Simulator(map, players, 'turns30', { rng: () => 0.5 });
+    const sim = new Simulator(map, players, GameMode.TURNS30, { rng: () => 0.5 });
     sim.startGame();
     sim.drainEvents();
     sim.applyCommand({ type: 'endTurn' });
@@ -40,7 +41,7 @@ describe('Simulator turn engine', () => {
       0,
       new SeededRandom(1),
     );
-    const sim = new Simulator(map, players, 'turns30', { rng: () => 0.5 });
+    const sim = new Simulator(map, players, GameMode.TURNS30, { rng: () => 0.5 });
     sim.startGame();
     sim.drainEvents();
     sim.applyCommand({ type: 'endTurn' });
@@ -57,7 +58,7 @@ describe('Simulator turn engine', () => {
     const map = makeTestMap();
     villageFor(map, 0, 0, 0);
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
-    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    const sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5 });
     sim.startGame();
     sim.drainEvents();
     sim.applyCommand({ type: 'endTurn' });
@@ -72,7 +73,7 @@ describe('Simulator turn engine', () => {
     villageFor(map, 0, 0, 0);
     villageFor(map, 0, 2, 1);
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
-    const sim = new Simulator(map, players, 'turns30', { rng: () => 0.5 });
+    const sim = new Simulator(map, players, GameMode.TURNS30, { rng: () => 0.5 });
     sim.turn = 29;
     sim.startGame();
     sim.drainEvents();
@@ -88,7 +89,7 @@ describe('Simulator turn engine', () => {
     const u = makeUnit('me', 0, 'warrior', 0, 0);
     u.hp = 40;
     tileAt(map, 0, 0)!.unit = u;
-    const sim = new Simulator(map, players, 'turns30', { rng: () => 0.5, aiRng: () => new SeededRandom(2) });
+    const sim = new Simulator(map, players, GameMode.TURNS30, { rng: () => 0.5, aiRng: () => new SeededRandom(2) });
     sim.startGame();
     sim.drainEvents();
     sim.applyCommand({ type: 'endTurn' });
@@ -105,7 +106,7 @@ describe('Simulator turn engine', () => {
     u.hp = 3;
     u.hasAttacked = true;
     tileAt(map, 0, 0)!.unit = u;
-    const sim = new Simulator(map, players, 'turns30', { rng: () => 0.5, aiRng: () => new SeededRandom(2) });
+    const sim = new Simulator(map, players, GameMode.TURNS30, { rng: () => 0.5, aiRng: () => new SeededRandom(2) });
     sim.startGame();
     sim.drainEvents();
     sim.applyCommand({ type: 'endTurn' });
@@ -122,7 +123,7 @@ describe('Simulator turn engine', () => {
     u.hasAttacked = true;
     u.hasHealed = true;
     tileAt(map, 0, 0)!.unit = u;
-    const sim = new Simulator(map, players, 'turns30', { rng: () => 0.5, aiRng: () => new SeededRandom(2) });
+    const sim = new Simulator(map, players, GameMode.TURNS30, { rng: () => 0.5, aiRng: () => new SeededRandom(2) });
     sim.startGame();
     sim.drainEvents();
     sim.applyCommand({ type: 'endTurn' });
@@ -143,7 +144,7 @@ describe('Simulator turn engine', () => {
     }
     const archer = makeUnit('arc', 0, 'archer', 2, 2);
     tileAt(map, 2, 2)!.unit = archer;
-    const sim = new Simulator(map, players, 'turns30', { rng: () => 0.5, aiRng: () => new SeededRandom(2) });
+    const sim = new Simulator(map, players, GameMode.TURNS30, { rng: () => 0.5, aiRng: () => new SeededRandom(2) });
     sim.startGame();
     sim.drainEvents();
     sim.applyCommand({ type: 'endTurn' });
@@ -161,7 +162,7 @@ describe('spectate turn advance', () => {
     villageFor(map, 1, 0, 2);
     const players = buildPlayers(Tribe.Villagers, 2, new SeededRandom(1));
     players[0]!.isActive = false; // human eliminated
-    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5, aiRng: () => new SeededRandom(2) });
+    const sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5, aiRng: () => new SeededRandom(2) });
     sim.startGame();
     sim.drainEvents();
     const startTurn = sim.turn;
@@ -176,7 +177,7 @@ describe('spectate turn advance', () => {
     villageFor(map, 0, 2, 1);
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
     players[1]!.score = 50;
-    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    const sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5 });
     sim.startGame();
     sim.drainEvents();
     sim.endNow();
@@ -205,7 +206,7 @@ describe('capture readiness', () => {
     const a2 = makeUnit('a2', 0, 'warrior', 2, 0);
     tileAt(map, 2, 0)!.unit = a2;
 
-    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5, aiRng: () => new SeededRandom(2) });
+    const sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5, aiRng: () => new SeededRandom(2) });
     sim.startGame();
     sim.drainEvents();
 

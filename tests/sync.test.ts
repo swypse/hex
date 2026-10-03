@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { GameMode } from '../src/game/game-mode';
 import { generateMap } from '../src/game/map-gen';
 import { buildMultiplayerPlayers } from '../src/game/players';
 import { Simulator } from '../src/game/simulator';
@@ -17,7 +18,7 @@ function buildSim(): Simulator {
   );
   const map = generateMap(players.length, 42);
   for (const p of players) initialExplorationFor(map, p.index);
-  return new Simulator(map, players, 'turns30', { rng: () => 0.5 });
+  return new Simulator(map, players, GameMode.TURNS30, { rng: () => 0.5 });
 }
 
 describe('host/client state sync', () => {

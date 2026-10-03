@@ -1,62 +1,29 @@
 import { Application } from 'pixi.js';
-import { initNavigation, useGameStore } from './store/game-store';
-import { readJoinCode, setPendingJoin } from './net/join-link';
-import { ScreenManager } from './ui/screen-manager';
 import { gameController } from './controller/game-controller';
-import { enableSizedFonts, loadBitmapFonts } from './ui/kit/bitmap-fonts';
-import { sfx } from './sound/sfx';
-import { preventCanvasContextMenu } from './prevent-canvas-context-menu';
 import { initErrorReporter } from './error-reporter';
+import { readJoinCode, setPendingJoin } from './net/join-link';
+import { preventCanvasContextMenu } from './prevent-canvas-context-menu';
 import { installRenderGate, markDirty } from './render/render-gate';
-
-function preventBrowserZoom(): void {
-  window.addEventListener(
-    'wheel',
-    (e) => {
-      if (e.ctrlKey) e.preventDefault();
-    },
-    { passive: false },
-  );
-  window.addEventListener('keydown', (e) => {
-    if ((e.ctrlKey || e.metaKey) && (e.key === '+' || e.key === '-' || e.key === '=' || e.key === '0')) {
-      e.preventDefault();
-    }
-  });
-  document.addEventListener('gesturestart', (e) => e.preventDefault());
-}
-
-/** The WebGPU device's preferred canvas texture format (e.g. 'rgba8unorm').
- *  Configuring the app's root canvas to this format avoids a per-frame
- *  format-conversion copy in the render target. Same API Pixi uses internally;
- *  falls back to undefined where WebGPU is unavailable. */
-function preferredCanvasFormat(): string | undefined {
-  try {
-    const gpu = (navigator as { gpu?: { getPreferredCanvasFormat?: () => string } }).gpu;
-    return gpu?.getPreferredCanvasFormat?.();
-  } catch {
-    return undefined;
-  }
-}
+import { sfx } from './sound/sfx';
+import { initNavigation, useGameStore } from './store/game-store';
+import { THEME } from './ui/kit/theme';
+import { ScreenManager } from './ui/screen-manager';
+import { preferredCanvasFormat, preventBrowserZoom } from './util';
+import { loadFonts } from './util/load-fonts';
 
 async function boot(): Promise<void> {
   preventBrowserZoom();
-  await Promise.all([
-    document.fonts.load('16px "Roboto"'),
-    document.fonts.load('800 16px "Roboto"'),
-  ]);
-  await loadBitmapFonts();
-  enableSizedFonts();
+  await loadFonts();
   sfx.preload();
   const app = new Application();
   const format = preferredCanvasFormat();
   await app.init({
     resizeTo: window,
-    background: '#1a1a2e',
+    background: THEME.bg,
     antialias: true,
     resolution: window.devicePixelRatio || 1,
     autoDensity: true,
-    preference: 'webgl',
-    // preference: 'webgpu',
+    preference: ['webgpu', 'webgl'],
     ...(format ? { format } : {}),
   });
   document.getElementById('root')!.appendChild(app.canvas);

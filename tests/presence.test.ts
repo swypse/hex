@@ -1,12 +1,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { Simulator } from '../src/game/simulator';
 import { gameController } from '../src/controller/game-controller';
-import { useGameStore } from '../src/store/game-store';
-import { makeTestMap } from './helpers/test-map';
-import { buildPlayers } from '../src/game/players';
-import { Tribe } from '../src/game/tribes';
-import { SeededRandom } from '../src/util/random';
 import { NetworkController } from '../src/controller/network-controller';
+import { GameMode } from '../src/game/game-mode';
+import { buildPlayers } from '../src/game/players';
+import { Simulator } from '../src/game/simulator';
+import { Tribe } from '../src/game/tribes';
+import { useGameStore } from '../src/store/game-store';
+import { SeededRandom } from '../src/util';
+import { makeTestMap } from './helpers/test-map';
 
 const controller = gameController as unknown as {
   getNetwork: () => NetworkController;
@@ -33,7 +34,7 @@ describe('multiplayer presence', () => {
   it('keeps a mid-game disconnect in the list, marks it offline, and broadcasts presence', () => {
     const map = makeTestMap();
     const players = buildPlayers(Tribe.Cats, 1, new SeededRandom(1));
-    controller.sim = new Simulator(map, players, 'turns30', { rng: () => 0.5 });
+    controller.sim = new Simulator(map, players, GameMode.TURNS30, { rng: () => 0.5 });
     useGameStore.setState({ players, playersOnline: players.map(() => true) });
     net().hostPlayers = [
       { peerId: 'guest-1', name: 'Guest', tribeId: Tribe.Warriors, playerIndex: 1, ready: true, online: true },
@@ -50,7 +51,7 @@ describe('multiplayer presence', () => {
   it('does not re-broadcast presence when a duplicate close is delivered for an offline client', () => {
     const map = makeTestMap();
     const players = buildPlayers(Tribe.Cats, 1, new SeededRandom(1));
-    controller.sim = new Simulator(map, players, 'turns30', { rng: () => 0.5 });
+    controller.sim = new Simulator(map, players, GameMode.TURNS30, { rng: () => 0.5 });
     useGameStore.setState({ players, playersOnline: players.map(() => true) });
     net().hostPlayers = [
       { peerId: 'guest-1', name: 'Guest', tribeId: Tribe.Warriors, playerIndex: 1, ready: true, online: false },
@@ -64,9 +65,9 @@ describe('multiplayer presence', () => {
 
   it('removes a disconnected player from the lobby list before the game starts', () => {
     useGameStore.setState({
-      lobby: { role: 'host', code: 'ABC123', mode: 'capture', totalPlayers: 2, aiCount: 0, players: [] },
+      lobby: { role: 'host', code: 'ABC123', mode: GameMode.CAPTURE, totalPlayers: 2, aiCount: 0, players: [] },
     });
-    net().hostConfig = { mode: 'capture', totalPlayers: 2, aiCount: 0, mapSize: 'normal' };
+    net().hostConfig = { mode: GameMode.CAPTURE, totalPlayers: 2, aiCount: 0, mapSize: 'normal' };
     net().hostName = 'Host';
     net().hostTribe = Tribe.Cats;
     net().hostPlayers = [

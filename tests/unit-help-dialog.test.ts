@@ -1,3 +1,4 @@
+import { GameMode } from '@enums';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Container, Sprite, BitmapText } from 'pixi.js';
 import { UnitHelpDialog } from '../src/ui/overlays/unit-help-dialog';
@@ -78,7 +79,7 @@ describe('UnitHelpDialog', () => {
     tileAt(map, 0, 0)!.unit = makeUnit('u1', 0, 'warrior', 0, 0);
     tileAt(map, 0, 0)!.exploredBy = [0];
     const players = buildPlayers(Tribe.Cats, 1, new SeededRandom(1));
-    (gameController as unknown as { sim: Simulator | null }).sim = new Simulator(map, players, 'capture');
+    (gameController as unknown as { sim: Simulator | null }).sim = new Simulator(map, players, GameMode.CAPTURE);
     useGameStore.setState({
       selection: { kind: 'unit', q: 0, r: 0 },
       players,

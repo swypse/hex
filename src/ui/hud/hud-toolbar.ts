@@ -1,18 +1,19 @@
-import { t } from '../../i18n';
+import { gameController } from '@/controller/game-controller';
+import { captureWinnerIndex } from '@/game/game-mode';
+import { hasAnyAvailableAction } from '@/game/player-actions';
+import { skillPulseStep, STEP_CONFIG } from '@/game/tutorial/tutorial-steps';
+import { t } from '@/i18n';
+import { useGameStore } from '@/store/game-store';
+import { GameMode } from '@enums';
 import { Container, Graphics, Rectangle } from 'pixi.js';
-import { gameController } from '../../controller/game-controller';
-import { captureWinnerIndex } from '../../game/game-mode';
-import { useGameStore } from '../../store/game-store';
 import { type UIHost, type Widget } from '../host';
-import { Button } from '../kit/button';
-import { IconButton } from '../kit/icon-button';
 import { ACTION_BUTTON_ICON_FILES, makeActionButtonIcon } from '../kit/action-button-icons';
 import { ActionTooltip } from '../kit/action-tooltip';
+import { Button } from '../kit/button';
+import { IconButton } from '../kit/icon-button';
 import { tooltipsEnabled } from '../kit/tooltip-gate';
 import { TOOLBAR_HEIGHT, TURN_BAR_HEIGHT } from '../layout';
 import { toolbarSpecs } from './toolbar-specs';
-import { hasAnyAvailableAction } from '../../game/player-actions';
-import { STEP_CONFIG, skillPulseStep } from '../../game/tutorial/tutorial-steps';
 
 const ICON_ACTIONS: Record<string, string> = {
   upgrade: 'upgrade',
@@ -170,7 +171,7 @@ export class HudToolbar implements Widget {
     const isLastTurn = (): boolean => {
       const s = useGameStore.getState();
       if (s.gameOver) return false;
-      if (s.mode === 'turns30') return s.turn >= 30;
+      if (s.mode === GameMode.TURNS30) return s.turn >= 30;
       const map = gameController.getMap();
       return !!map && captureWinnerIndex(map) !== null;
     };

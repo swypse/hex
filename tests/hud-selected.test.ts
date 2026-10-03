@@ -16,6 +16,7 @@ import { TRAP_TURNS } from '../src/game/traps';
 import { hexNeighbors } from '../src/game/hex';
 import { t } from '../src/i18n';
 import type { GameMap, MapTile } from '../src/game/map-gen';
+import { GameMode } from '@enums';
 
 function fakeCanvasContext() {
   return {
@@ -78,7 +79,7 @@ describe('HudSelected village building constraints', () => {
       t.building = { kind: 'mine', level: 1 };
     }
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
-    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    const sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5 });
     (gameController as unknown as { sim: Simulator | null }).sim = sim;
     useGameStore.setState({
       screen: 'game',
@@ -344,7 +345,7 @@ describe('HudSelected building produce and bridge info lines', () => {
     const map = makeTestMap(2);
     const tile = setup(map);
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
-    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    const sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5 });
     (gameController as unknown as { sim: Simulator | null }).sim = sim;
     useGameStore.setState({
       screen: 'game',
@@ -461,7 +462,7 @@ describe('HudSelected connected village income bonus', () => {
       other.settlement = { owner: 0, level: 1, captureReady: false, name: 'Beta' };
     }
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
-    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    const sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5 });
     (gameController as unknown as { sim: Simulator | null }).sim = sim;
     useGameStore.setState({
       screen: 'game',
@@ -534,7 +535,7 @@ describe('HudSelected pirate deal info', () => {
       ...(paidBy ? { paidBy } : {}),
     };
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
-    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    const sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5 });
     (gameController as unknown as { sim: Simulator | null }).sim = sim;
     useGameStore.setState({
       screen: 'game',
@@ -602,7 +603,7 @@ describe('HudSelected berserker rage attack info', () => {
     tile.unit = makeUnit('b1', 0, 'berserker', 0, 0);
     tile.unit.hp = hp;
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
-    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    const sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5 });
     (gameController as unknown as { sim: Simulator | null }).sim = sim;
     useGameStore.setState({
       screen: 'game',
@@ -669,7 +670,7 @@ describe('HudSelected stealth info', () => {
       ...(stealthed ? { isStealthed: true } : {}),
     };
     const players = buildPlayers(Tribe.Cats, 1, new SeededRandom(1));
-    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    const sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5 });
     (gameController as unknown as { sim: Simulator | null }).sim = sim;
     useGameStore.setState({
       screen: 'game',
@@ -728,7 +729,7 @@ describe('HudSelected trap info', () => {
     tile.ownedBy = 0;
     if (trapOwner !== null) tile.trap = { owner: trapOwner, placedTurn: 2 };
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
-    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    const sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5 });
     (gameController as unknown as { sim: Simulator | null }).sim = sim;
     useGameStore.setState({
       screen: 'game',
@@ -801,7 +802,7 @@ describe('HudSelected bonus info', () => {
     const tile = tileAt(map, 0, 0)!;
     tile.bonus = { kind, claimer: null, arrivalTurn: 0 };
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
-    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    const sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5 });
     (gameController as unknown as { sim: Simulator | null }).sim = sim;
     useGameStore.setState({
       screen: 'game',
@@ -840,7 +841,7 @@ describe('HudSelected bonus info', () => {
     const map = makeTestMap(2);
     tileAt(map, 0, 0)!.bonus = null;
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
-    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    const sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5 });
     (gameController as unknown as { sim: Simulator | null }).sim = sim;
     useGameStore.setState({
       screen: 'game',
@@ -869,7 +870,7 @@ describe('HudSelected turn visibility', () => {
     const tile = tileAt(map, 0, 0)!;
     tile.unit = makeUnit('u1', 0, 'warrior', 0, 0);
     const players = buildPlayers(Tribe.Villagers, 2, new SeededRandom(1));
-    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    const sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5 });
     (gameController as unknown as { sim: Simulator | null }).sim = sim;
     useGameStore.setState({
       screen: 'game',
@@ -969,7 +970,7 @@ describe('HudSelected close button and collapsed state', () => {
     const village = tileAt(map, 0, 0)!;
     village.unit = makeUnit('u1', 0, 'warrior', 0, 0);
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
-    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    const sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5 });
     (gameController as unknown as { sim: Simulator | null }).sim = sim;
     useGameStore.setState({
       screen: 'game',
@@ -1070,7 +1071,7 @@ describe('HudSelected building destroy and tile extras', () => {
     }
     if (opts.bottle) tile.bottle = { bornTurn: 1, arrivalTurn: 1 };
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
-    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    const sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5 });
     (gameController as unknown as { sim: Simulator | null }).sim = sim;
     useGameStore.setState({
       screen: 'game',

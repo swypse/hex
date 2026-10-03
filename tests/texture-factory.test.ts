@@ -1,8 +1,8 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { TileType } from '../src/game/tile-types';
 import { MapTile } from '../src/game/map-gen';
 import { tileElevation } from '../src/render/elevation';
-import { coastWaterBrightness } from '../src/render/texture-factory';
+import { coastWaterBrightness, destroyTextureSet, suppressPixiWarnings, type TextureSet } from '../src/render/texture-factory';
 
 function tile(terrain: TileType, height: number): MapTile {
   return {
@@ -71,5 +71,41 @@ describe('coastWaterBrightness', () => {
 
   it('keeps land tiles at factor 1', () => {
     expect(coastWaterBrightness(land, find)).toBe(1);
+  });
+});
+
+describe('destroyTextureSet warning mitigation', () => {
+  const BIND_GROUP_WARNING =
+    "[BindGroup] a 'textureSource' was destroyed while still bound to a shader. Remove it from the shader before destroying it.";
+
+  it('suppresses Pixi bind-group teardown warnings but keeps other warnings', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const textures = {
+        ownedTextures: [
+          { destroyed: false, destroy: (): void => { console.warn(BIND_GROUP_WARNING); } },
+          { destroyed: false, destroy: (): void => { console.warn('unrelated pixel warning'); } },
+          { destroyed: true, destroy: vi.fn() },
+        ],
+      } as unknown as TextureSet;
+      destroyTextureSet(textures);
+      expect(textures.ownedTextures).toEqual([]);
+      // Only the non-Pixi warning reached the console.
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn).toHaveBeenCalledWith('unrelated pixel warning');
+      expect(warn).not.toHaveBeenCalledWith(BIND_GROUP_WARNING);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('restores console.warn after running the suppressed block', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    suppressPixiWarnings(() => { console.warn(BIND_GROUP_WARNING); }, 'was destroyed while still bound to a shader');
+    expect(warn).not.toHaveBeenCalled();
+    console.warn('after restore');
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledWith('after restore');
+    warn.mockRestore();
   });
 });

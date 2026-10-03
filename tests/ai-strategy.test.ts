@@ -1,17 +1,18 @@
-import { describe, it, expect } from 'vitest';
-import { AI_DIFFICULTY_PROFILES, profileFor } from '../src/game/ai-difficulty';
-import { AI_PERSONALITIES, personalityFor } from '../src/game/ai-personality';
-import { SpawnPreference } from '../src/game/ai-types';
-import { Player } from '../src/game/players';
-import { updateStrategy, goalTargetKey, productionBuildings, deriveDirectives, ensurePlayerStrategy } from '../src/game/ai-strategy';
-import { analyzeSituation } from '../src/game/ai-situation';
-import { SeededRandom } from '../src/util/random';
-import { GameMap, MapTile, Settlement } from '../src/game/map-gen';
-import { TileType } from '../src/game/tile-types';
-import { Unit } from '../src/game/units';
-import { GameMode } from '../src/game/game-mode';
-import { AiStrategyState } from '../src/game/ai-types';
-import { planAiActions } from '../src/game/ai';
+import { planAiActions } from '@/game/ai';
+import { AI_DIFFICULTY_PROFILES, profileFor } from '@/game/ai-difficulty';
+import { personalityFor } from '@/game/ai-personality';
+import { analyzeSituation } from '@/game/ai-situation';
+import {
+  deriveDirectives, ensurePlayerStrategy, goalTargetKey, productionBuildings, updateStrategy
+} from '@/game/ai-strategy';
+import { AiStrategyState, SpawnPreference } from '@/game/ai-types';
+import { GameMap, MapTile, Settlement } from '@/game/map-gen';
+import { Player } from '@/game/players';
+import { TileType } from '@/game/tile-types';
+import { Unit } from '@/game/units';
+import { SeededRandom } from '@/util';
+import { GameMode } from '@enums';
+import { describe, expect, it } from 'vitest';
 
 function aiPlayer(name: string): Player {
   return {
@@ -22,11 +23,35 @@ function aiPlayer(name: string): Player {
 }
 
 function makeTile(q: number, r: number, ownedBy: number | null = null, settlement: Settlement | null = null, unit: Unit | null = null): MapTile {
-  return { q, r, terrain: TileType.GrasslandLand, settlement, unit, ownedBy, claimedByVillage: null, building: null, exploredBy: [0, 1] };
+  return {
+    q,
+    r,
+    terrain: TileType.GrasslandLand,
+    settlement,
+    unit,
+    ownedBy,
+    claimedByVillage: null,
+    building: null,
+    exploredBy: [0, 1]
+  };
 }
 
 function makeWarrior(id: string, owner: number, q: number, r: number): Unit {
-  return { id, owner, type: 'warrior', q, r, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 50, attack: 20, attackDistance: 1, defense: 0, spawnVillage: null };
+  return {
+    id,
+    owner,
+    type: 'warrior',
+    q,
+    r,
+    hasMoved: false,
+    hasAttacked: false,
+    hasHealed: false,
+    hp: 50,
+    attack: 20,
+    attackDistance: 1,
+    defense: 0,
+    spawnVillage: null
+  };
 }
 
 function twoVillageMap(): GameMap {
@@ -70,7 +95,7 @@ describe('AI strategy types & personalities', () => {
 });
 
 describe('AiStrategy lifecycle', () => {
-  const mode: GameMode = 'capture';
+  const mode: GameMode = GameMode.CAPTURE;
 
   function v1(name = 'Adaro'): Player {
     return aiPlayer(name);
@@ -127,7 +152,7 @@ describe('AiStrategy lifecycle', () => {
 });
 
 describe('AiStrategy deriveDirectives', () => {
-  const mode: GameMode = 'capture';
+  const mode: GameMode = GameMode.CAPTURE;
   const rng = new SeededRandom(1);
 
   function pickPrimary(s: AiStrategyState): string {
@@ -208,12 +233,12 @@ describe('AiStrategy deriveDirectives', () => {
   });
 
   it('score goal sets a rushed pace and zero reserve in 30-turn mode', () => {
-    const state = planState('Kade', 12, 'turns30');
+    const state = planState('Kade', 12, GameMode.TURNS30);
     expect(state.goals.some((g) => g.id === 'score')).toBe(true);
     const p = aiPlayer('Kade');
     const map = twoVillageMap();
     const profile = profileFor(p);
-    const situation = analyzeSituation(map, p, 'turns30', profile);
+    const situation = analyzeSituation(map, p, GameMode.TURNS30, profile);
     const d = deriveDirectives(map, p, situation, profile, state);
     expect(d.pace).toBe('rushed');
     expect(d.moneyReserve).toBe(0);
@@ -232,20 +257,22 @@ describe('planAiActions with strategy', () => {
       makeTile(2, 0),
     ];
     const map: GameMap = { radius: 4, tiles, spawns: [] };
-    const actions = planAiActions(map, aiPlayer('Ona'), new SeededRandom(1), 'capture');
+    const actions = planAiActions(map, aiPlayer('Ona'), new SeededRandom(1), GameMode.CAPTURE);
     expect(actions.length).toBeGreaterThan(0);
   });
 
   it('army-plan moves units toward the enemy village front', () => {
-    const map: GameMap = { radius: 6, tiles: [
-      makeTile(0, 0, null, null, makeWarrior('g1', 1, 0, 0)),
-      makeTile(1, 0),
-      makeTile(2, 0, 1, { owner: 1, level: 1, captureReady: false }),
-      makeTile(3, 0),
-      makeTile(4, 0),
-      makeTile(5, 0, 0, { owner: 0, level: 1, captureReady: false }),
-    ], spawns: [] };
-    const actions = planAiActions(map, aiPlayer('Ragnar'), new SeededRandom(1), 'capture');
+    const map: GameMap = {
+      radius: 6, tiles: [
+        makeTile(0, 0, null, null, makeWarrior('g1', 1, 0, 0)),
+        makeTile(1, 0),
+        makeTile(2, 0, 1, { owner: 1, level: 1, captureReady: false }),
+        makeTile(3, 0),
+        makeTile(4, 0),
+        makeTile(5, 0, 0, { owner: 0, level: 1, captureReady: false }),
+      ], spawns: []
+    };
+    const actions = planAiActions(map, aiPlayer('Ragnar'), new SeededRandom(1), GameMode.CAPTURE);
     const moves = actions.filter((a) => a.type === 'move');
     expect(moves.length).toBeGreaterThan(0);
     expect(moves.some((m) => m.type === 'move' && m.q > 0)).toBe(true);
@@ -255,7 +282,7 @@ describe('planAiActions with strategy', () => {
     const map = twoVillageMap();
     const p = aiPlayer('Drake');
     for (let turn = 1; turn <= 12; turn++) {
-      const actions = planAiActions(map, p, new SeededRandom(turn), 'capture');
+      const actions = planAiActions(map, p, new SeededRandom(turn), GameMode.CAPTURE);
       expect(actions.length).toBeGreaterThanOrEqual(0);
     }
   });

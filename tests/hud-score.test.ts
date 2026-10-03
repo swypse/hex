@@ -13,6 +13,7 @@ import { SeededRandom } from '../src/util/random';
 import { Simulator } from '../src/game/simulator';
 import { TileType } from '../src/game/tile-types';
 import { SCORE_PAD, SCORE_TOP_OFFSET, SCORE_CHIP_RADIUS } from '../src/ui/layout';
+import { GameMode } from '@enums';
 import { t } from '../src/i18n';
 
 function makeHost(): UIHost {
@@ -38,7 +39,7 @@ describe('HudScore buff icons', () => {
       tile.ownedBy = 0;
       if (q <= waterTemples) tile.building = { kind: 'temple', level: 1 };
     }
-    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    const sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5 });
     (gameController as unknown as { sim: unknown }).sim = sim;
 
     useGameStore.setState({ screen: 'game', players, localPlayerIndex: 0 });
@@ -138,7 +139,7 @@ describe('HudScore buff icons', () => {
       tile.ownedBy = 0;
       tile.building = { kind: 'forestTemple', level: 1 };
     }
-    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    const sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5 });
     (gameController as unknown as { sim: unknown }).sim = sim;
     useGameStore.setState({ screen: 'game', players, localPlayerIndex: 0 });
     root = new Container();

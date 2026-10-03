@@ -38,7 +38,7 @@ const sizedFamilies = new Map<string, string>();
 let sizedFontsEnabled = false;
 
 /** Turns on per-size font baking (see `sizedFontFamily`). Called once from the
- *  app boot, after the CSS Roboto faces have loaded; left off in tests, which
+ *  app boot -> loadFonts, after the CSS Roboto faces have loaded; left off in tests, which
  *  have no canvas to rasterise glyphs with. */
 export function enableSizedFonts(): void {
   sizedFontsEnabled = true;

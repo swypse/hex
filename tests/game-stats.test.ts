@@ -1,3 +1,4 @@
+import { GameMode } from '@enums';
 import { afterEach, describe, expect, it } from 'vitest';
 import { Container, BitmapText } from 'pixi.js';
 import { GameStats } from '../src/ui/overlays/game-stats';
@@ -43,7 +44,7 @@ describe('GameStats unknown tribes', () => {
   const mount = (map: ReturnType<typeof makeTestMap>): { enemyName: string } => {
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(42));
     const enemyName = TRIBES.find((t) => t.id === players[1]!.tribe)!.name;
-    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    const sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5 });
     (gameController as unknown as { sim: unknown }).sim = sim;
     (globalThis as { CanvasRenderingContext2D?: unknown }).CanvasRenderingContext2D = class {};
     (globalThis as { document?: unknown }).document = {
@@ -60,7 +61,7 @@ describe('GameStats unknown tribes', () => {
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(42));
     const enemyName = TRIBES.find((t) => t.id === players[1]!.tribe)!.name;
     players[0]!.knownTribes = [Tribe.Villagers, players[1]!.tribe];
-    const sim = new Simulator(makeTestMap(), players, 'capture', { rng: () => 0.5 });
+    const sim = new Simulator(makeTestMap(), players, GameMode.CAPTURE, { rng: () => 0.5 });
     (gameController as unknown as { sim: unknown }).sim = sim;
     (globalThis as { CanvasRenderingContext2D?: unknown }).CanvasRenderingContext2D = class {};
     (globalThis as { document?: unknown }).document = {

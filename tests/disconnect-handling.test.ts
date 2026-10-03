@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { GameMode } from '@enums';
 import { Simulator } from '../src/game/simulator';
 import { gameController } from '../src/controller/game-controller';
 import { useGameStore } from '../src/store/game-store';
@@ -55,7 +56,7 @@ describe('multiplayer disconnect handling', () => {
     players[0]!.name = 'H';
     players[1]!.name = 'G';
     players[1]!.isHuman = true;
-    controller.sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    controller.sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5 });
     controller.sim.currentPlayerIndex = 1; // guest's turn
     const { session, broadcast, sendTo } = hostSessionMock();
     net().hostSession = session;
@@ -82,7 +83,7 @@ describe('multiplayer disconnect handling', () => {
     const map = makeTestMap();
     const players = buildPlayers(Tribe.Cats, 1, new SeededRandom(1));
     players[1]!.isHuman = true;
-    controller.sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    controller.sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5 });
     controller.sim.currentPlayerIndex = 0; // host's turn
     const { session } = hostSessionMock();
     net().hostSession = session;
@@ -101,7 +102,7 @@ describe('multiplayer disconnect handling', () => {
     const players = buildPlayers(Tribe.Cats, 1, new SeededRandom(1));
     players[1]!.name = 'G';
     players[1]!.isHuman = true;
-    controller.sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    controller.sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5 });
     controller.sim.currentPlayerIndex = 1;
     const { session } = hostSessionMock();
     net().hostSession = session;
@@ -126,7 +127,7 @@ describe('multiplayer disconnect handling', () => {
     const players = buildPlayers(Tribe.Cats, 1, new SeededRandom(1));
     players[1]!.name = 'G';
     players[1]!.isHuman = true;
-    controller.sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    controller.sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5 });
     controller.sim.currentPlayerIndex = 1;
     const { session, broadcast, sendTo } = hostSessionMock();
     net().hostSession = session;
@@ -171,7 +172,7 @@ describe('multiplayer disconnect handling', () => {
     const players = buildPlayers(Tribe.Cats, 1, new SeededRandom(1));
     players[1]!.name = 'G';
     players[1]!.isHuman = true;
-    controller.sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    controller.sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5 });
     controller.sim.currentPlayerIndex = 1;
     const { session, broadcast, sendTo } = hostSessionMock();
     net().hostSession = session;
@@ -195,7 +196,7 @@ describe('multiplayer disconnect handling', () => {
     const players = buildPlayers(Tribe.Cats, 1, new SeededRandom(1));
     players[1]!.name = 'G';
     players[1]!.isHuman = true;
-    controller.sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    controller.sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5 });
     controller.sim.currentPlayerIndex = 1;
     const { session, broadcast, sendTo } = hostSessionMock();
     net().hostSession = session;
@@ -223,7 +224,7 @@ describe('multiplayer disconnect handling', () => {
     const players = buildPlayers(Tribe.Cats, 1, new SeededRandom(1));
     players[1]!.name = 'G';
     players[1]!.isHuman = true;
-    controller.sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    controller.sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5 });
     controller.sim.currentPlayerIndex = 1;
     const { session, broadcast, sendTo } = hostSessionMock();
     net().hostSession = session;

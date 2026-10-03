@@ -3,7 +3,7 @@ import { gameController } from '../../controller/game-controller';
 import { useGameStore } from '../../store/game-store';
 import { tileAt } from '../../game/selection';
 import { villageUpgradeCost } from '../../game/resources';
-import { canAffordAt } from '../../game/stock';
+import { canAffordAt, villagesJoinedBy } from '../../game/stock';
 import { canBuildSawmill, canBuildFarm, canBuildGranary, canBurnBuilding, canBurnRoad, canBuildForestTemple, canBuildMine, canBuildPort, canBuildTemple, BUILDING_COSTS, canRepairBuilding, REPAIR_COST, canAffordAnyBuilderBuild } from '../../game/buildings';
 import { canHeal, canDisband, disbandCost, hasPirateDeal, PIRATE_DEAL_COST, UNIT_TYPES, UNIT_TYPE_NAMES } from '../../game/units';
 import { SHIP_UPGRADE_COST, canUpgradeShip } from '../../game/ship';
@@ -106,13 +106,16 @@ export function toolbarSpecs(): ToolbarSpec[] {
                   ? canBuildGranary(map, tile, player)
                   : canBuildForestTemple(map, tile, player);
       if (!ok) continue;
-      out.push({ key: kind, label, disabled: !canAffordAt(map, player, tile, BUILDING_COSTS[kind]), onClick: () => gameController.buildSelectedBuilding(kind) });
+      // A port is a road/water-cluster node: it may be paid by the networks it
+      // would join, just like a road or bridge.
+      const joined = kind === 'port' ? villagesJoinedBy(map, player.index, tile) : [];
+      out.push({ key: kind, label, disabled: !canAffordAt(map, player, tile, BUILDING_COSTS[kind], joined), onClick: () => gameController.buildSelectedBuilding(kind) });
     }
     if (canBuildRoad(map, tile, player)) {
-      out.push({ key: 'road', label: t('ui.buildroad5w2s10m'), disabled: !canAffordAt(map, player, tile, ROAD_COST), onClick: () => gameController.buildSelectedRoad() });
+      out.push({ key: 'road', label: t('ui.buildroad5w2s10m'), disabled: !canAffordAt(map, player, tile, ROAD_COST, villagesJoinedBy(map, player.index, tile)), onClick: () => gameController.buildSelectedRoad() });
     }
     if (canBuildBridge(map, tile, player)) {
-      out.push({ key: 'bridge', label: t('ui.buildbridge10w5s15m'), disabled: !canAffordAt(map, player, tile, BRIDGE_COST), onClick: () => gameController.buildSelectedBridge() });
+      out.push({ key: 'bridge', label: t('ui.buildbridge10w5s15m'), disabled: !canAffordAt(map, player, tile, BRIDGE_COST, villagesJoinedBy(map, player.index, tile)), onClick: () => gameController.buildSelectedBridge() });
     }
   }
 

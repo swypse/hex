@@ -1,30 +1,22 @@
-import { describe, it, expect } from 'vitest';
-import { makeTestMap, tileAt, makeUnit } from './helpers/test-map';
-import type { GameMap, MapTile } from '../src/game/map-gen';
-import type { Player } from '../src/game/players';
-import { buildPlayers } from '../src/game/players';
-import { Tribe } from '../src/game/tribes';
-import { TileType } from '../src/game/tile-types';
-import { SeededRandom } from '../src/util/random';
-import { Simulator } from '../src/game/simulator';
-import { buildRoad, canBuildRoad } from '../src/game/roads';
-import { captureVillage } from '../src/game/capture';
-import { applyFood } from '../src/game/food';
-import { BUILDING_COSTS, buildBuilding, buildingIncomeByVillage, networkBuildingIncome } from '../src/game/buildings';
-import { START_STOCK } from '../src/game/resources';
+import { buildBuilding, BUILDING_COSTS, buildingIncomeByVillage, networkBuildingIncome } from '@/game/buildings';
+import { captureVillage } from '@/game/capture';
+import { applyFood } from '@/game/food';
+import type { GameMap, MapTile } from '@/game/map-gen';
+import type { Player } from '@/game/players';
+import { buildPlayers } from '@/game/players';
+import { START_STOCK } from '@/game/resources';
+import { buildRoad, canBuildRoad } from '@/game/roads';
+import { Simulator } from '@/game/simulator';
 import {
-  addStock,
-  canAffordAt,
-  capitalOf,
-  migrateLegacyResources,
-  networkStock,
-  payAt,
-  payerVillage,
-  readStock,
-  totalStock,
-  villageNetwork,
-  villageOfTile,
-} from '../src/game/stock';
+  addStock, canAffordAt, capitalOf, migrateLegacyResources, networkStock, payAt, payerVillage, readStock, totalStock,
+  villageNetwork, villageOfTile,
+} from '@/game/stock';
+import { TileType } from '@/game/tile-types';
+import { Tribe } from '@/game/tribes';
+import { SeededRandom } from '@/util';
+import { GameMode } from '@enums';
+import { describe, expect, it } from 'vitest';
+import { makeTestMap, makeUnit, tileAt } from './helpers/test-map';
 
 /** Player 0 owns villages at (0,0) and (4,0); `connected` joins them by a road
  *  along (1,0)..(3,0). A (0,3) village belongs to player 1. */
@@ -186,7 +178,7 @@ describe('building income goes to villages', () => {
   it('the round-end income lands in the village stock, not on the player', () => {
     const { map, a, b, p } = sawmillScene();
     const players = [p, buildPlayers(Tribe.Villagers, 1, new SeededRandom(2))[1]!];
-    const sim = new Simulator(map, players, 'turns30', { rng: () => 0.5, disablePirates: true });
+    const sim = new Simulator(map, players, GameMode.TURNS30, { rng: () => 0.5, disablePirates: true });
     sim.startGame();
     sim.drainEvents();
     sim.applyCommand({ type: 'endTurn' });

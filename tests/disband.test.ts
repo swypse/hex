@@ -1,3 +1,4 @@
+import { GameMode } from '@enums';
 import { describe, it, expect } from 'vitest';
 import { Simulator } from '../src/game/simulator';
 import { makeTestMap, tileAt, makeUnit } from './helpers/test-map';
@@ -12,7 +13,7 @@ describe('disband command', () => {
     tileAt(map, 0, 0)!.unit = makeUnit('u1', 0, 'warrior', 0, 0);
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
     players[0]!.resources.money = money;
-    const sim = new Simulator(map, players, 'capture');
+    const sim = new Simulator(map, players, GameMode.CAPTURE);
     sim.startGame();
     sim.drainEvents();
     return sim;

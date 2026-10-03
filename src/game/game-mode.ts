@@ -1,8 +1,8 @@
+import { GameMode } from '@enums';
+export { GameMode };
 import { GameMap } from './map-gen';
 import { Player } from './players';
 import { totalScore } from './score';
-
-export type GameMode = 'capture' | 'turns30';
 
 export const GAME_MODE_NAMES: Record<GameMode, string> = {
   capture: 'Capture the map',
@@ -26,7 +26,7 @@ export type StarRating = 1 | 2 | 3;
 /** Winner's star rating (1–3) for a finished game. Capture mode awards the top
  *  tier only when the game also ends within the quick-capture turns budget. */
 export function starRating(score: number, playerCount: number, mode: GameMode, turn: number): StarRating {
-  if (mode === 'capture') {
+  if (mode === GameMode.CAPTURE) {
     if (score >= 500 + 200 * playerCount && turn <= quickCaptureTurnsCount(playerCount)) return 3;
     if (score >= 400 + 150 * playerCount) return 2;
     return 1;

@@ -1,3 +1,4 @@
+import { GameMode } from '@enums';
 import { describe, it, expect } from 'vitest';
 import { makeTestMap, tileAt, makeUnit } from './helpers/test-map';
 import type { GameMap, MapTile } from '../src/game/map-gen';
@@ -358,7 +359,7 @@ describe('starving state refresh', () => {
     p.skills.push('agriculture');
     setFood(map, 0);
     addUnit(map, 'warrior', 0, 1);
-    const sim = new Simulator(map, [p], 'capture', { rng: () => 0.5 });
+    const sim = new Simulator(map, [p], GameMode.CAPTURE, { rng: () => 0.5 });
     sim.startGame();
     sim.drainEvents();
     v.settlement!.starving = true;
@@ -374,7 +375,7 @@ describe('starving state on spawn', () => {
   it('spawning a unit a village cannot feed shows starvation at once', () => {
     const { map, p, village: v } = setup();
     setFood(map, 0);
-    const sim = new Simulator(map, [p], 'capture', { rng: () => 0.5 });
+    const sim = new Simulator(map, [p], GameMode.CAPTURE, { rng: () => 0.5 });
     sim.startGame();
     sim.drainEvents();
     expect(v.settlement!.starving).toBeFalsy();
@@ -392,7 +393,7 @@ describe('starving state on unit death', () => {
     const enemy = buildPlayers(Tribe.Villagers, 2, new SeededRandom(1))[1]!;
     addUnit(map, 'swordsman', 1, 1, 1, null);
     tileAt(map, 0, 1)!.unit!.hp = 1;
-    const sim = new Simulator(map, [p, enemy], 'capture', { rng: () => 0.99 });
+    const sim = new Simulator(map, [p, enemy], GameMode.CAPTURE, { rng: () => 0.99 });
     sim.startGame();
     sim.currentPlayerIndex = 1;
     sim.drainEvents();
@@ -414,7 +415,7 @@ describe('starving state on capture', () => {
     const cap = makeUnit('cap', 0, 'warrior', 0, 3); // becomes the village's unit: 1 food a round
     target.unit = cap;
     setFood(map, 0);
-    const sim = new Simulator(map, [p], 'capture', { rng: () => 0.5 });
+    const sim = new Simulator(map, [p], GameMode.CAPTURE, { rng: () => 0.5 });
     sim.startGame();
     sim.drainEvents();
     expect(target.settlement.starving).toBeFalsy();
@@ -489,7 +490,7 @@ describe('food networks', () => {
     const { map, p, a } = setupNetwork(false);
     p.skills.push('roads');
     addUnit(map, 'warrior', 0, 1);
-    const sim = new Simulator(map, [p], 'capture', { rng: () => 0.5 });
+    const sim = new Simulator(map, [p], GameMode.CAPTURE, { rng: () => 0.5 });
     sim.startGame();
     sim.drainEvents();
     p.resources = { money: 100 };
@@ -614,7 +615,7 @@ describe('burning farms and granaries', () => {
   it('the simulator burn command destroys it, emits burned and ends the unit turn', () => {
     const { map, tile } = burnSetup();
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
-    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    const sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5 });
     sim.startGame();
     sim.currentPlayerIndex = 1;
     sim.drainEvents();
@@ -672,7 +673,7 @@ describe('destroying roads', () => {
   it('the simulator command destroys the road, emits an event and re-evaluates starvation', () => {
     const { map, tile } = roadSetup();
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
-    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    const sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5 });
     sim.startGame();
     sim.currentPlayerIndex = 1;
     sim.drainEvents();
@@ -709,7 +710,7 @@ describe('round end', () => {
     addUnit(map, 'warrior', 0, 1);
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
     players[0] = p;
-    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    const sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5 });
     sim.startGame();
     sim.drainEvents();
     for (let i = 0; i < players.length; i++) sim.applyCommand({ type: 'endTurn' });
@@ -725,7 +726,7 @@ describe('round end', () => {
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
     players[0]!.resources = { money: 7, wood: 4, stone: 3, ore: 2 };
     const sim = Simulator.fromSnapshot({
-      map, players, mode: 'capture', turn: 1, currentPlayerIndex: 0, gameOver: false, winnerIndex: null, expectedTurns: 10, bonusAwarded: false,
+      map, players, mode: GameMode.CAPTURE, turn: 1, currentPlayerIndex: 0, gameOver: false, winnerIndex: null, expectedTurns: 10, bonusAwarded: false,
     });
     expect(village.settlement!.stock).toEqual({ wood: 4, stone: 3, ore: 2, food: START_RESOURCES.food });
     expect(sim.players[0]!.resources).toEqual({ money: 7 });
@@ -738,7 +739,7 @@ describe('round end', () => {
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
     players[0]!.resources = { money: 7, wood: 9, stone: 8, ore: 6, food: 11 };
     Simulator.fromSnapshot({
-      map, players, mode: 'capture', turn: 1, currentPlayerIndex: 0, gameOver: false, winnerIndex: null, expectedTurns: 10, bonusAwarded: false,
+      map, players, mode: GameMode.CAPTURE, turn: 1, currentPlayerIndex: 0, gameOver: false, winnerIndex: null, expectedTurns: 10, bonusAwarded: false,
     });
     expect(village.settlement!.stock).toEqual({ wood: 9, stone: 8, ore: 6, food: 11 });
   });

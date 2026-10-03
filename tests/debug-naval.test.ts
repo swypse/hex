@@ -1,3 +1,4 @@
+import { GameMode } from '@enums';
 import { describe, it, expect } from 'vitest';
 import { makeTestMap, tileAt, makeUnit } from './helpers/test-map';
 import { PIRATE_OWNER, type Unit } from '../src/game/units';
@@ -25,7 +26,7 @@ describe('Debug naval hunt', () => {
       resources: { wood: 0, stone: 0, money: 100, ore: 0, food: 20 },
       score: 0, kills: 0, skills: ['water', 'navigation'], isActive: true,
     };
-    const actions = planAiActions(map, player, new SeededRandom(1), 'capture');
+    const actions = planAiActions(map, player, new SeededRandom(1), GameMode.CAPTURE);
     const moveIdx = actions.findIndex((a) => a.type === 'move' && a.unitId === 'ship1');
     const attackIdx = actions.findIndex((a) => a.type === 'attack' && a.unitId === 'ship1');
     // The ship sails toward the pirate and fires once in range.

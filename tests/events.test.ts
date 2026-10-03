@@ -1,3 +1,4 @@
+import { GameMode } from '@enums';
 import { describe, it, expect } from 'vitest';
 import { GameEvent } from '../src/game/events';
 import { GameStateSnapshot } from '../src/game/state';
@@ -16,7 +17,7 @@ describe('game events & state', () => {
     const players: Player[] = [
       { index: 0, tribe: 1, isHuman: true, name: 'p0', resources: { wood: 3, stone: 2, money: 5, ore: 0, food: 20 }, score: 0, kills: 0, skills: [], isActive: true },
     ];
-    const snap: GameStateSnapshot = { map, players, mode: 'capture', turn: 1, currentPlayerIndex: 0, gameOver: false, winnerIndex: null, expectedTurns: 15, bonusAwarded: false };
+    const snap: GameStateSnapshot = { map, players, mode: GameMode.CAPTURE, turn: 1, currentPlayerIndex: 0, gameOver: false, winnerIndex: null, expectedTurns: 15, bonusAwarded: false };
     const copy = JSON.parse(JSON.stringify(snap)) as GameStateSnapshot;
     expect(copy).toEqual(snap);
   });

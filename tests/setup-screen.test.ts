@@ -1,8 +1,9 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { Bounds, Container, Graphics, Rectangle, Text } from 'pixi.js';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { Bounds, Container, FillGradient, Graphics, Rectangle, RendererType, Text } from 'pixi.js';
 import { SetupScreen } from '../src/ui/screens/setup-screen';
 import { useGameStore } from '../src/store/game-store';
 import { type UIHost } from '../src/ui/host';
+import { TRIBE_BG_DEPTH } from '../src/ui/screens/tribe-bg-shader';
 
 function makeHost(): UIHost {
   return {
@@ -95,6 +96,37 @@ describe('SetupScreen', () => {
     // The custom gradient shader is attached to the background Graphics.
     expect(bg.context.customShader).not.toBeNull();
     expect(s.bgShader).not.toBeNull();
+  });
+
+  it('avoids the WebGL-only custom shader on a WebGPU renderer', () => {
+    const host = makeHost();
+    (host.app as { renderer?: { type: number } }).renderer = { type: RendererType.WEBGPU };
+    const s = new SetupScreen();
+    s.mount(host);
+    const view = s as unknown as { bg: Graphics | null; bgShader: unknown; bgColor: number | null };
+    expect(view.bgColor).not.toBeNull();
+    // Without a GPU program the custom shader would make WebGPU crash reading
+    // `shader.gpuProgram`; the WebGPU path must render without it.
+    expect(view.bgShader).toBeNull();
+    expect(view.bg!.context.customShader).toBeFalsy();
+    s.destroy();
+  });
+
+  it('keeps the WebGPU gradient visually identical to the WebGL shader', () => {
+    const host = makeHost();
+    (host.app as { renderer?: { type: number } }).renderer = { type: RendererType.WEBGPU };
+    const buildSpy = vi.spyOn(FillGradient.prototype, 'buildLinearGradient');
+    const s = new SetupScreen();
+    s.mount(host);
+    expect(buildSpy).toHaveBeenCalled();
+    const gradient = buildSpy.mock.instances[0] as unknown as FillGradient;
+    // FillGradient local-space coordinates are normalized to the shape (0-1).
+    // The GL shader blends tribe→bg down to `uDepth` (TRIBE_BG_DEPTH) then
+    // holds solid bg; the gradient end must be the same normalized fraction.
+    expect(gradient.start).toEqual({ x: 0, y: 0 });
+    expect(gradient.end!.y).toBeCloseTo(TRIBE_BG_DEPTH);
+    buildSpy.mockRestore();
+    s.destroy();
   });
 
   it('starts a background cross-fade when the tribe changes by arrow keys', () => {

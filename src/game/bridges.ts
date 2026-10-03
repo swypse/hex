@@ -1,7 +1,7 @@
 import { GameMap, MapTile, type BridgeDir } from './map-gen';
 import { Player } from './players';
 import { Resources } from './resources';
-import { payAt } from './stock';
+import { payAt, villagesJoinedBy } from './stock';
 import { tileAt } from './selection';
 import { hasSkill } from './skills';
 import { isSolidGround, isWaterType } from './tile-types';
@@ -67,7 +67,8 @@ export function buildBridgeIgnoringSkill(map: GameMap, tile: MapTile, player: Pl
 
 function payAndPlaceBridge(map: GameMap, tile: MapTile, player: Player): boolean {
   const dir = bridgeDirFor(map, tile)!;
-  if (!payAt(map, player, tile, BRIDGE_COST)) return false;
+  // A bridge is a road node: it may be paid by the networks it connects.
+  if (!payAt(map, player, tile, BRIDGE_COST, villagesJoinedBy(map, player.index, tile))) return false;
   tile.bridge = { owner: player.index, dir };
   tile.roadOwner = player.index;
   return true;

@@ -11,7 +11,10 @@ import { TileType } from '../src/game/tile-types';
 import { hexNeighbors } from '../src/game/hex';
 import { UNIT_TYPES } from '../src/game/units';
 import { Tribe } from '../src/game/tribes';
+import { tileAt } from '../src/game/selection';
+import { addStock } from '../src/game/stock';
 import { sfx } from '../src/sound/sfx';
+import { GameMode } from '@enums';
 
 describe('toolbarSpecs', () => {
   let map: ReturnType<typeof generateMap>;
@@ -19,7 +22,7 @@ describe('toolbarSpecs', () => {
   beforeEach(() => {
     map = generateMap(2, 42);
     const players = buildPlayers(0, 1, new SeededRandom(1));
-    const sim = new Simulator(map, players, 'capture');
+    const sim = new Simulator(map, players, GameMode.CAPTURE);
     sim.startGame();
     sim.drainEvents();
     (gameController as unknown as { sim: unknown }).sim = sim;
@@ -482,5 +485,51 @@ describe('toolbarSpecs', () => {
     expect(toolbarSpecs().some((a) => a.key === 'burn-farm')).toBe(true);
     tile.building = { kind: 'granary', level: 1, food: 0 };
     expect(toolbarSpecs().some((a) => a.key === 'burn-granary')).toBe(true);
+  });
+
+  it('offers building a road paid from the joined village network, not the nearest empty village', () => {
+    const players = useGameStore.getState().players;
+    // Layout: A --road-- target -- B. Village A is the capital and holds the
+    // materials; village B (whose territory the target tile belongs to) is empty.
+    const landOf = (t: MapTile | undefined): MapTile | undefined =>
+    t && t.terrain === TileType.GrasslandLand && !t.settlement && !t.unit ? t : undefined;
+    const neighbors = (t: MapTile): (MapTile | undefined)[] => hexNeighbors(t).map((n) => tileAt(map, n.q, n.r));
+    // Find any A --road-- target -- B chain of four empty land tiles.
+    let chain: { target: MapTile; road: MapTile; a: MapTile; b: MapTile } | null = null;
+    for (const target of map.tiles) {
+      if (!landOf(target)) continue;
+      const around = neighbors(target).map(landOf).filter((t): t is MapTile => !!t);
+      for (const b of around) {
+        for (const road of around) {
+          if (road === b) continue;
+          const a = neighbors(road).map(landOf).find((t) => t && t !== target && t !== b);
+          if (a) { chain = { target, road, a, b }; break; }
+        }
+        if (chain) break;
+      }
+      if (chain) break;
+    }
+    expect(chain).not.toBeNull();
+    const { target, road, a, b } = chain!;
+    // Drop the startGame villages so the payer/network logic only sees ours.
+    for (const t of map.tiles) t.settlement = null;
+    a.settlement = { owner: 0, level: 1, captureReady: false, capital: true };
+    a.ownedBy = 0;
+    b.settlement = { owner: 0, level: 1, captureReady: false };
+    b.ownedBy = 0;
+    road.roadOwner = 0;
+    road.ownedBy = 0;
+    target.ownedBy = 0;
+    target.claimedByVillage = { q: b.q, r: b.r };
+    // Money on the player; the only wood/stone sit in village A's stock.
+    players[0]!.resources.money = 100;
+    addStock(a, { wood: 10, stone: 10 });
+    players[0]!.skills.push('roads');
+    useGameStore.getState().setPlayers(players);
+    selectCell(target);
+    const spec = toolbarSpecs().find((a2) => a2.key === 'road');
+    expect(spec).toBeDefined();
+    // The road joins A's network, so A's stock must pay — the action may not be disabled.
+    expect(spec!.disabled).toBe(false);
   });
 });

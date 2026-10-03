@@ -1,3 +1,4 @@
+import { GameMode } from '@enums';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Container, Sprite, Text } from 'pixi.js';
 import { SpawnDialog, spawnableTypesFor } from '../src/ui/overlays/spawn-dialog';
@@ -55,7 +56,7 @@ describe('SpawnDialog', () => {
     const village = map.tiles.find((t) => axialKey(t) === '0,0')!;
     village.settlement = { owner: 0, level: 1, captureReady: false };
     const players = buildPlayers(Tribe.Cats, 1, new SeededRandom(1));
-    (gameController as unknown as { sim: Simulator | null }).sim = new Simulator(map, players, 'capture');
+    (gameController as unknown as { sim: Simulator | null }).sim = new Simulator(map, players, GameMode.CAPTURE);
     useGameStore.setState({
       selection: { kind: 'tile', q: 0, r: 0 },
       players,

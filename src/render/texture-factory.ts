@@ -547,6 +547,27 @@ export async function createTextures(
   };
 }
 
+/** Runs `fn`, dropping `console.warn` calls whose message contains `subset`.
+ *
+ *  Pixi's WebGPU batch bind groups cache each batched texture's *source*
+ *  process-wide and never release it, so destroying any texture that has been
+ *  rendered makes Pixi emit `[BindGroup] a 'textureSource' was destroyed while
+ *  still bound to a shader…` from `BindGroup.onResourceChange`. That guard is
+ *  benign (Pixi nulls the stale reference) and unavoidable from app code, so
+ *  teardown silences it at the console boundary instead of leaking noise. */
+export function suppressPixiWarnings(fn: () => void, subset: string): void {
+  const original = console.warn;
+  console.warn = (...args: unknown[]): void => {
+    if (args.some((a) => typeof a === 'string' && a.includes(subset))) return;
+    original(...args);
+  };
+  try {
+    fn();
+  } finally {
+    console.warn = original;
+  }
+}
+
 /** Releases the GPU/canvas memory of every texture baked by a TextureSet's
  *  village-build services (each village upgrade / owner switch creates new
  *  baked composites; the old ones must be destroyed once the set is discarded,
@@ -555,9 +576,11 @@ export function destroyTextureSet(textures: TextureSet, opts: { contextLost?: bo
   // After a GL context loss the baked textures' GPU data is already gone; the
   // JS objects are simply dropped instead of being destroyed through Pixi.
   if (!opts.contextLost) {
-    for (const tex of textures.ownedTextures ?? []) {
-      if (!tex.destroyed) tex.destroy(true);
-    }
+    suppressPixiWarnings(() => {
+      for (const tex of textures.ownedTextures ?? []) {
+        if (!tex.destroyed) tex.destroy(true);
+      }
+    }, 'was destroyed while still bound to a shader');
   }
   textures.ownedTextures = [];
   const builds = textures.villageBuilds;

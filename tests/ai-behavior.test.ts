@@ -1,10 +1,11 @@
-import { describe, it, expect } from 'vitest';
-import { Simulator } from '../src/game/simulator';
-import { buildPlayers } from '../src/game/players';
-import { planAiActions } from '../src/game/ai';
-import { Tribe } from '../src/game/tribes';
-import { SeededRandom } from '../src/util/random';
-import { makeTestMap, tileAt, makeUnit } from './helpers/test-map';
+import { planAiActions } from '@/game/ai';
+import { buildPlayers } from '@/game/players';
+import { Simulator } from '@/game/simulator';
+import { Tribe } from '@/game/tribes';
+import { SeededRandom } from '@/util';
+import { GameMode } from '@enums';
+import { describe, expect, it } from 'vitest';
+import { makeTestMap, makeUnit, tileAt } from './helpers/test-map';
 
 describe('AI behavior scenarios', () => {
   it('captures a reachable enemy village when it holds a strong advantage', () => {
@@ -21,7 +22,7 @@ describe('AI behavior scenarios', () => {
     tileAt(map, 2, 0)!.unit = makeUnit('w2', 1, 'warrior', 2, 0);
     tileAt(map, 3, 0)!.unit = makeUnit('w3', 1, 'warrior', 3, 0);
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1), 'normal');
-    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5, aiRng: () => new SeededRandom(2) });
+    const sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5, aiRng: () => new SeededRandom(2) });
     sim.startGame();
     for (let i = 0; i < 20 && !sim.gameOver; i++) {
       sim.applyCommand({ type: 'endTurn' });
@@ -42,7 +43,7 @@ describe('AI behavior scenarios', () => {
     const raiderTile = tileAt(map, 2, 0)!;
     raiderTile.unit = raider;
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1), 'normal');
-    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5, aiRng: () => new SeededRandom(2) });
+    const sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5, aiRng: () => new SeededRandom(2) });
     sim.startGame();
     for (let i = 0; i < 8; i++) {
       // Human: walk the raider one step toward the capital and end the turn.
@@ -63,7 +64,7 @@ describe('AI behavior scenarios', () => {
     capital.ownedBy = 1;
     capital.unit = makeUnit('cap', 1, 'warrior', 0, 0);
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1), 'hard');
-    const sim = new Simulator(map, players, 'turns30', { rng: () => 0.5, aiRng: () => new SeededRandom(3) });
+    const sim = new Simulator(map, players, GameMode.TURNS30, { rng: () => 0.5, aiRng: () => new SeededRandom(3) });
     sim.startGame();
     for (let i = 0; i < 35 && !sim.gameOver; i++) {
       sim.applyCommand({ type: 'endTurn' });
@@ -82,7 +83,7 @@ describe('AI behavior scenarios', () => {
     capital.ownedBy = 1;
     capital.unit = makeUnit('cap', 1, 'warrior', 0, 0);
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1), 'easy');
-    const sim = new Simulator(map, players, 'turns30', {
+    const sim = new Simulator(map, players, GameMode.TURNS30, {
       rng: () => 0.5,
       aiRng: () => ({ next: () => 0 } as SeededRandom),
     });
@@ -100,7 +101,7 @@ describe('AI behavior scenarios', () => {
     const broke = players[1]!;
     broke.resources = { wood: 0, stone: 0, money: 0, ore: 0, food: 20 };
     const alwaysRollMistake = { next: () => 0 } as SeededRandom;
-    expect(planAiActions(map, broke, alwaysRollMistake, 'capture')).toEqual([]);
+    expect(planAiActions(map, broke, alwaysRollMistake, GameMode.CAPTURE)).toEqual([]);
   });
 
   it('re-garrisons its village when the last defender attacks from it and dies', () => {
@@ -123,7 +124,7 @@ describe('AI behavior scenarios', () => {
     tileAt(map, 1, 0)!.unit = makeUnit('enemy', 0, 'knight', 1, 0);
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1), 'easy');
     players[1]!.resources = { wood: 50, stone: 50, money: 100, ore: 10, food: 20 };
-    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5, aiRng: () => new SeededRandom(2) });
+    const sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5, aiRng: () => new SeededRandom(2) });
     sim.startGame();
     sim.applyCommand({ type: 'endTurn' });
     expect(village.unit).not.toBeNull();
@@ -144,7 +145,7 @@ describe('AI behavior scenarios', () => {
     tileAt(map, 1, 0)!.unit = makeUnit('enemy', 0, 'knight', 1, 0);
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1), 'easy');
     players[1]!.resources = { wood: 0, stone: 0, money: 0, ore: 0, food: 20 };
-    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5, aiRng: () => new SeededRandom(2) });
+    const sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5, aiRng: () => new SeededRandom(2) });
     sim.startGame();
     sim.applyCommand({ type: 'endTurn' });
     // The garrison held its ground instead of dying: the village keeps its unit.

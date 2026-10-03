@@ -1,3 +1,4 @@
+import { GameMode } from '@enums';
 import { afterEach, describe, expect, it } from 'vitest';
 import { Container, Sprite, BitmapText } from 'pixi.js';
 import { GameOver, placeColor } from '../src/ui/overlays/game-over';
@@ -49,14 +50,14 @@ describe('GameOver screen', () => {
       p.knownTribes = players.map((x) => x.tribe);
       p.kills = 5;
     });
-    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    const sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5 });
     (gameController as unknown as { sim: unknown }).sim = sim;
     (globalThis as { CanvasRenderingContext2D?: unknown }).CanvasRenderingContext2D = class {};
     (globalThis as { document?: unknown }).document = {
       createElement: () => ({ getContext: () => fakeCanvasContext(), width: 0, height: 0 }),
     };
     useGameStore.setState({
-      screen: 'game', players, localPlayerIndex: 0, winnerIndex: 0, mode: 'capture', bonusAwarded: false, turn: opts?.turn ?? 27,
+      screen: 'game', players, localPlayerIndex: 0, winnerIndex: 0, mode: GameMode.CAPTURE, bonusAwarded: false, turn: opts?.turn ?? 27,
     });
     root = new Container();
     screen = new GameOver();

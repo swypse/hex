@@ -1,15 +1,22 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import type { Player } from '@/game/players';
+import { START_RESOURCES } from '@/game/resources';
+import { Tribe } from '@/game/tribes';
+import { useGameStore } from '@/store/game-store';
+import { type UIHost } from '@/ui/host';
+import { HudTurn } from '@/ui/hud/hud-turn';
+import { GameMode } from '@enums';
 import { Container, Text } from 'pixi.js';
-import { useGameStore } from '../src/store/game-store';
-import { HudTurn } from '../src/ui/hud/hud-turn';
-import { Tribe } from '../src/game/tribes';
-import { START_RESOURCES } from '../src/game/resources';
-import type { Player } from '../src/game/players';
-import { type UIHost } from '../src/ui/host';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 function fakeCanvasContext() {
   return {
-    measureText: (s: string) => ({ width: s.length * 8, actualBoundingBoxLeft: 0, actualBoundingBoxRight: s.length * 8, actualBoundingBoxAscent: 12, actualBoundingBoxDescent: 3 }),
+    measureText: (s: string) => ({
+      width: s.length * 8,
+      actualBoundingBoxLeft: 0,
+      actualBoundingBoxRight: s.length * 8,
+      actualBoundingBoxAscent: 12,
+      actualBoundingBoxDescent: 3
+    }),
   };
 }
 
@@ -43,7 +50,8 @@ describe('HudTurn waiting label', () => {
   beforeEach(() => {
     Object.defineProperty(Text.prototype, 'width', { configurable: true, get: () => 60 });
     Object.defineProperty(Text.prototype, 'height', { configurable: true, get: () => 14 });
-    (globalThis as { CanvasRenderingContext2D?: unknown }).CanvasRenderingContext2D = class {};
+    (globalThis as { CanvasRenderingContext2D?: unknown }).CanvasRenderingContext2D = class {
+    };
     (globalThis as { document?: unknown }).document = {
       createElement: () => ({ getContext: () => fakeCanvasContext(), width: 0, height: 0 }),
     };
@@ -72,7 +80,7 @@ describe('HudTurn waiting label', () => {
     ];
     useGameStore.setState({
       screen: 'game',
-      mode: 'capture',
+      mode: GameMode.CAPTURE,
       players,
       localPlayerIndex: 0,
       currentPlayerIndex: 1,
@@ -109,12 +117,21 @@ describe('HudTurn tutorial label', () => {
   beforeEach(() => {
     Object.defineProperty(Text.prototype, 'width', { configurable: true, get: () => 60 });
     Object.defineProperty(Text.prototype, 'height', { configurable: true, get: () => 14 });
-    (globalThis as { CanvasRenderingContext2D?: unknown }).CanvasRenderingContext2D = class {};
+    (globalThis as { CanvasRenderingContext2D?: unknown }).CanvasRenderingContext2D = class {
+    };
     (globalThis as { document?: unknown }).document = {
       createElement: () => ({ getContext: () => fakeCanvasContext(), width: 0, height: 0 }),
     };
     root = new Container();
-    useGameStore.setState({ screen: 'start', players: [], turn: 1, currentPlayerIndex: 0, localPlayerIndex: 0, gameOver: false, texturesLoading: false });
+    useGameStore.setState({
+      screen: 'start',
+      players: [],
+      turn: 1,
+      currentPlayerIndex: 0,
+      localPlayerIndex: 0,
+      gameOver: false,
+      texturesLoading: false
+    });
   });
 
   afterEach(() => {
@@ -125,7 +142,7 @@ describe('HudTurn tutorial label', () => {
   it('shows Tutorial instead of a mode name while store.tutorial is true', () => {
     const players = [makePlayer(0, Tribe.Villagers, [Tribe.Villagers]), makePlayer(1, Tribe.Warriors, [Tribe.Warriors])];
     useGameStore.setState({
-      screen: 'game', mode: 'turns30', tutorial: true, turn: 3, players,
+      screen: 'game', mode: GameMode.TURNS30, tutorial: true, turn: 3, players,
       localPlayerIndex: 0, currentPlayerIndex: 0, aiActive: false,
     });
     turn = new HudTurn();

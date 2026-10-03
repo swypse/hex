@@ -9,6 +9,7 @@ import { Unit } from '../src/game/units';
 import { SeededRandom } from '../src/util/random';
 import { SKILLS, type SkillId } from '../src/game/skills';
 import { migrateLegacyResources } from '../src/game/stock';
+import { GameMode } from '@enums';
 
 /** Moves the legacy-literal materials of a test player into its capital before planning. */
 function fund<T extends import('../src/game/players').Player>(map: import('../src/game/map-gen').GameMap, player: T): T {
@@ -82,7 +83,7 @@ describe('planAiActions', () => {
   });
 
   it('accepts an explicit game mode and still plans', () => {
-    const actions = planAiActions(makeAiMap(), aiPlayer(), new SeededRandom(1), 'capture');
+    const actions = planAiActions(makeAiMap(), aiPlayer(), new SeededRandom(1), GameMode.CAPTURE);
     expect(Array.isArray(actions)).toBe(true);
   });
 

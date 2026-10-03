@@ -1,26 +1,28 @@
-import { Container, BitmapText, Graphics } from 'pixi.js';
-import { gameController } from '../../controller/game-controller';
-import { useGameStore } from '../../store/game-store';
-import { TRIBES, type Tribe, tribeById } from '../../game/tribes';
-import { type GameMode } from '../../game/game-mode';
-import { type AiDifficulty } from '../../game/ai-difficulty';
-import { loadSettings } from '../../storage/settings';
-import { t } from '../../i18n';
-import { isTouchDevice } from '../touch';
+import { gameController } from '@/controller/game-controller';
+import { type AiDifficulty } from '@/game/ai-difficulty';
+import { type Tribe, tribeById, TRIBES } from '@/game/tribes';
+import { t } from '@/i18n';
+import { loadSettings } from '@/storage/settings';
+import { useGameStore } from '@/store/game-store';
+import { mixColor } from '@/util';
+import { GameMode } from '@enums';
+import { BitmapText, Container, FillGradient, Graphics, RendererType } from 'pixi.js';
 import { type ScreenController, type UIHost } from '../host';
-import { ScreenScroll } from '../vertical-scroll';
 import { Button } from '../kit/button';
 import { ButtonGroup } from '../kit/button-group';
 import { makeLabel } from '../kit/label';
-import { makeTribeOption, type TribeOption } from '../kit/tribe-option';
-import { TRIBE_GAP, TRIBE_ROW_STEP, tribeSlots } from '../kit/tribe-layout';
-import { TITLE_TO_CONTENT, BLOCK_GAP } from '../kit/screen-layout';
+import { BLOCK_GAP, TITLE_TO_CONTENT } from '../kit/screen-layout';
 import { THEME } from '../kit/theme';
-import { mixColor } from '../../util/color';
-import { BG_FADE_MS, makeTribeBackgroundShader, tribeBackgroundTexture, type TribeBackgroundShader } from './tribe-bg-shader';
+import { TRIBE_GAP, TRIBE_ROW_STEP, tribeSlots } from '../kit/tribe-layout';
+import { makeTribeOption, type TribeOption } from '../kit/tribe-option';
+import { isTouchDevice } from '../touch';
+import { ScreenScroll } from '../vertical-scroll';
+import {
+  BG_FADE_MS, makeTribeBackgroundShader, TRIBE_BG_DEPTH, type TribeBackgroundShader, tribeBackgroundTexture
+} from './tribe-bg-shader';
 
 const ENEMY_OPTIONS = [1, 2, 3, 4, 5, 6];
-const MODE_OPTIONS: GameMode[] = ['capture', 'turns30'];
+const MODE_OPTIONS: GameMode[] = [GameMode.CAPTURE, GameMode.TURNS30];
 const DIFFICULTY_OPTIONS: AiDifficulty[] = ['easy', 'normal', 'hard'];
 const SELECTOR_COUNT = 6;
 // Horizontal margin kept clear on each side when laying out the tribe grid.
@@ -28,6 +30,26 @@ const SIDE_MARGIN = 24;
 const RADIUS = 28;
 // Vertical gap between the tribe name labels and the description below them.
 const DESC_GAP = 24;
+
+/** A vertical tribe-color (top) → screen-bg (bottom) gradient that matches the
+ *  WebGL shader in tribe-bg-shader.ts. FillGradient's local-space coordinates
+ *  are normalized to the shape (0-1), so ending at `TRIBE_BG_DEPTH` puts the
+ *  full blend in the top `TRIBE_BG_DEPTH` of the screen and clamps to solid bg
+ *  below — the same curve as the shader's `t = clamp(vUV.y / depth, 0.0, 1.0)`.
+ *  Pixi's native gradient fill runs on any backend, so the WebGPU renderer
+ *  (which cannot run the WebGL-only custom shader) paints an identical
+ *  background through it. */
+function tribeGradientFill(topColor: number): FillGradient {
+  const gradient = new FillGradient({
+    type: 'linear',
+    start: { x: 0, y: 0 },
+    end: { x: 0, y: TRIBE_BG_DEPTH },
+    textureSpace: 'local',
+  });
+  gradient.addColorStop(0, topColor);
+  gradient.addColorStop(1, THEME.bg);
+  return gradient;
+}
 
 export class SetupScreen implements ScreenController {
   private root: Container | null = null;
@@ -207,46 +229,69 @@ export class SetupScreen implements ScreenController {
     const h = host.app.screen.height;
     const color = tribeById(this.tribe)?.color ?? THEME.bg;
     this.bgColor = color;
-    const shader = this.bgShader ?? makeTribeBackgroundShader();
-    shader.setTop(color);
-    this.bgShader = shader;
+    // The tribe-gradient shader is WebGL-only; on WebGPU, painting a Graphics
+    // with a GL-only customShader throws in the renderer (`shader.gpuProgram`
+    // is undefined), so WebGPU draws a native gradient fill instead.
+    const webGPU = host.app.renderer?.type === RendererType.WEBGPU;
+    if (!webGPU) {
+      const shader = this.bgShader ?? makeTribeBackgroundShader();
+      shader.setTop(color);
+      this.bgShader = shader;
+    }
     const bg = this.bg ?? new Graphics();
     bg.eventMode = 'none';
-    bg.context.customShader = shader.shader;
-    // A 1×1 white texture fill (textureSpace 'local') makes the batcher emit
-    // real UVs across the rect, so the custom fragment's `vUV.y` runs 0→1 down
-    // the screen and paints the tribe→bg gradient.
+    if (!webGPU) bg.context.customShader = this.bgShader!.shader;
     if (!this.bg) {
-      bg.clear().rect(0, 0, w, h).fill({ texture: tribeBackgroundTexture(), textureSpace: 'local' });
+      if (webGPU) {
+        bg.clear().rect(0, 0, w, h).fill(tribeGradientFill(color));
+      } else {
+        // A 1×1 white texture fill (textureSpace 'local') makes the batcher emit
+        // real UVs across the rect, so the custom fragment's `vUV.y` runs 0→1
+        // down the screen and paints the tribe→bg gradient.
+        bg.clear().rect(0, 0, w, h).fill({ texture: tribeBackgroundTexture(), textureSpace: 'local' });
+      }
       this.bg = bg;
       // Insert behind the scroll pad/content (mount adds it after ScreenScroll).
       this.root!.addChildAt(bg, 0);
+    } else if (webGPU) {
+      this.bg.clear().rect(0, 0, w, h).fill(tribeGradientFill(color));
     } else {
       this.bg.clear().rect(0, 0, w, h).fill({ texture: tribeBackgroundTexture(), textureSpace: 'local' });
     }
   }
 
   /** Cross-fades the full-screen background from the current tribe tint to the
-   *  new one over `BG_FADE_MS`, animating the shader's `uTopColor` uniform
-   *  instead of rebuilding a gradient texture. Driven on the app ticker so the
-   *  render gate keeps drawing frames while the tint animates. */
+   *  new one over `BG_FADE_MS`. WebGL animates the shader's `uTopColor` uniform
+   *  in place; WebGPU rebuilds a small native gradient fill each tick (the fade
+   *  is short, and the gradient texture is a tiny canvas). Driven on the app
+   *  ticker so the render gate keeps drawing frames while the tint animates. */
   private changeBackground(color: number): void {
     const host = this.host;
-    const shader = this.bgShader;
-    if (!shader || !host) return;
+    if (!host) return;
     if (this.bgTweenRemove) this.bgTweenRemove();
+
+    const webGPU = host.app.renderer?.type === RendererType.WEBGPU;
+    const shader = webGPU ? null : this.bgShader;
+    if (webGPU && !this.bg) return;
+    if (!webGPU && !shader) return;
 
     const from = this.bgColor ?? color;
     const to = color;
     const start = performance.now();
     const ticker = host.app.ticker;
 
-    shader.setTop(from);
+    shader?.setTop(from);
     const fn = (): void => {
       const t = Math.min(1, (performance.now() - start) / BG_FADE_MS);
       const mixed = mixColor(from, to, t);
-      shader.setTop(mixed);
       this.bgColor = mixed;
+      if (webGPU) {
+        const h = host.app.screen.height;
+        const w = host.app.screen.width;
+        this.bg?.clear().rect(0, 0, w, h).fill(tribeGradientFill(mixed));
+      } else {
+        shader!.setTop(mixed);
+      }
       if (t >= 1) {
         this.bgTweenRemove = null;
         ticker.remove(fn);

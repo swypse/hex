@@ -1,13 +1,14 @@
-import { describe, it, expect } from 'vitest';
-import { Simulator } from '../src/game/simulator';
-import { buildPlayers } from '../src/game/players';
-import { planAiActions } from '../src/game/ai';
-import { Tribe } from '../src/game/tribes';
-import { SeededRandom } from '../src/util/random';
-import { makeTestMap, tileAt, makeUnit } from './helpers/test-map';
-import { TileType } from '../src/game/tile-types';
-import { PIRATE_OWNER, type Unit } from '../src/game/units';
-import { migrateLegacyResources } from '../src/game/stock';
+import { planAiActions } from '@/game/ai';
+import { buildPlayers } from '@/game/players';
+import { Simulator } from '@/game/simulator';
+import { migrateLegacyResources } from '@/game/stock';
+import { TileType } from '@/game/tile-types';
+import { Tribe } from '@/game/tribes';
+import { PIRATE_OWNER, type Unit } from '@/game/units';
+import { SeededRandom } from '@/util';
+import { GameMode } from '@enums';
+import { describe, expect, it } from 'vitest';
+import { makeTestMap, makeUnit, tileAt } from './helpers/test-map';
 
 /** Moves the legacy-literal materials of a test player into its capital before planning. */
 function fund<T extends import('../src/game/players').Player>(map: import('../src/game/map-gen').GameMap, player: T): T {
@@ -62,7 +63,7 @@ describe('AI grind and capture behaviour', () => {
     humanCap.unit = human;
 
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1), 'normal');
-    const actions = planAiActions(map, fund(map, players[1]!), new SeededRandom(2), 'capture');
+    const actions = planAiActions(map, fund(map, players[1]!), new SeededRandom(2), GameMode.CAPTURE);
     expect(actions).toContainEqual({ type: 'attack', unitId: 'ai1', q: 2, r: 0 });
     expect(actions.some((a) => a.type === 'move' && a.unitId === 'ai1' && a.q === 0 && a.r === 0)).toBe(false);
   });
@@ -81,7 +82,7 @@ describe('AI grind and capture behaviour', () => {
     tileAt(map, 3, 0)!.unit = enemy;
 
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1), 'normal');
-    const actions = planAiActions(map, fund(map, players[1]!), new SeededRandom(2), 'capture');
+    const actions = planAiActions(map, fund(map, players[1]!), new SeededRandom(2), GameMode.CAPTURE);
     const moveOntoVillage = actions.some((a) => a.type === 'move' && a.unitId === 'ai1' && a.q === 2 && a.r === 0);
     const attackFromThere = actions.some((a) => a.type === 'attack' && a.unitId === 'ai1' && a.q === 3 && a.r === 0);
     expect(moveOntoVillage && attackFromThere).toBe(false);
@@ -99,7 +100,7 @@ describe('AI grind and capture behaviour', () => {
     const p = players[1]!;
     p.skills = ['roads'];
     p.resources = { wood: 50, stone: 50, money: 100, ore: 0, food: 20 };
-    const actions = planAiActions(map, fund(map, p), new SeededRandom(2), 'capture');
+    const actions = planAiActions(map, fund(map, p), new SeededRandom(2), GameMode.CAPTURE);
     expect(actions.some((a) => a.type === 'buildRoad' && a.q === 1 && a.r === 0)).toBe(true);
   });
 });
@@ -117,7 +118,7 @@ describe('AI vs AI shuttle regression', () => {
     humanCap.ownedBy = 0;
     humanCap.unit = makeUnit('hum1', 0, 'warrior', 2, 0);
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1), 'normal');
-    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5, aiRng: () => new SeededRandom(2) });
+    const sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5, aiRng: () => new SeededRandom(2) });
     sim.startGame();
     sim.drainEvents();
     const pos = () => `${ai.q},${ai.r}`;
@@ -156,7 +157,7 @@ describe('Pirate pathing', () => {
     tileAt(map, 4, 0)!.unit = ship;
 
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
-    const sim = new Simulator(map, players, 'turns30', { rng: () => 0.5 });
+    const sim = new Simulator(map, players, GameMode.TURNS30, { rng: () => 0.5 });
     sim.startGame();
     sim.drainEvents();
     sim.applyCommand({ type: 'endTurn' });
@@ -180,7 +181,7 @@ describe('Pirate pathing', () => {
     tileAt(map, 4, 0)!.unit = ship;
 
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
-    const sim = new Simulator(map, players, 'turns30', { rng: () => 0.5 });
+    const sim = new Simulator(map, players, GameMode.TURNS30, { rng: () => 0.5 });
     sim.startGame();
     sim.drainEvents();
     sim.applyCommand({ type: 'endTurn' });

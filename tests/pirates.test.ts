@@ -1,12 +1,13 @@
-import { describe, it, expect } from 'vitest';
-import { makeTestMap, tileAt, makeUnit } from './helpers/test-map';
-import { Simulator } from '../src/game/simulator';
-import { buildPlayers } from '../src/game/players';
-import { Tribe } from '../src/game/tribes';
-import { SeededRandom } from '../src/util/random';
-import { hexDistance, hexNeighbors } from '../src/game/hex';
-import { TileType, isWaterType } from '../src/game/tile-types';
-import { PIRATE_HP, PIRATE_OWNER, type Unit } from '../src/game/units';
+import { GameMode } from '@enums';
+import { describe, expect, it } from 'vitest';
+import { hexDistance, hexNeighbors } from '@/game/hex';
+import { buildPlayers } from '@/game/players';
+import { Simulator } from '@/game/simulator';
+import { isWaterType, TileType } from '@/game/tile-types';
+import { Tribe } from '@/game/tribes';
+import { PIRATE_HP, PIRATE_OWNER, type Unit } from '@/game/units';
+import { SeededRandom } from '@/util';
+import { makeTestMap, makeUnit, tileAt } from './helpers/test-map';
 
 function makeWaterMap(radius = 2): ReturnType<typeof makeTestMap> {
   const map = makeTestMap(radius);
@@ -44,7 +45,7 @@ describe('Pirates', () => {
   it('spawn on edge water cells only after turn 5, every second turn', () => {
     const map = makeWaterMap();
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
-    const sim = new Simulator(map, players, 'turns30', { rng: () => 0 });
+    const sim = new Simulator(map, players, GameMode.TURNS30, { rng: () => 0 });
     sim.startGame();
     sim.drainEvents();
 
@@ -76,7 +77,7 @@ describe('Pirates', () => {
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
     players[0]!.resources.money = 100;
     const before = players[0]!.resources.money;
-    const sim = new Simulator(map, players, 'turns30', { rng: () => 0.5 });
+    const sim = new Simulator(map, players, GameMode.TURNS30, { rng: () => 0.5 });
     sim.startGame();
     sim.drainEvents();
 
@@ -99,7 +100,7 @@ describe('Pirates', () => {
     tileAt(map, 0, 1)!.unit = ship;
 
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
-    const sim = new Simulator(map, players, 'turns30', { rng: () => 0.5 });
+    const sim = new Simulator(map, players, GameMode.TURNS30, { rng: () => 0.5 });
     sim.startGame();
     sim.drainEvents();
 
@@ -122,7 +123,7 @@ describe('Pirates', () => {
     tileAt(map, 0, 1)!.unit = ship;
 
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
-    const sim = new Simulator(map, players, 'turns30', { rng: () => 0.5 });
+    const sim = new Simulator(map, players, GameMode.TURNS30, { rng: () => 0.5 });
     sim.startGame();
     sim.drainEvents();
 
@@ -143,7 +144,7 @@ describe('Pirates', () => {
     tileAt(map, 0, 1)!.unit = ship;
 
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
-    const sim = new Simulator(map, players, 'turns30', { rng: () => 0.1 });
+    const sim = new Simulator(map, players, GameMode.TURNS30, { rng: () => 0.1 });
     sim.startGame();
     sim.drainEvents();
 
@@ -165,7 +166,7 @@ describe('Pirates', () => {
     tileAt(map, 0, 1)!.unit = ship;
 
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
-    const sim = new Simulator(map, players, 'turns30', { rng: () => 0.5 });
+    const sim = new Simulator(map, players, GameMode.TURNS30, { rng: () => 0.5 });
     sim.startGame();
     sim.drainEvents();
 
@@ -185,7 +186,7 @@ describe('Pirates', () => {
     tileAt(map, 0, 1)!.unit = defender;
 
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
-    const sim = new Simulator(map, players, 'turns30', { rng: () => 0.5 });
+    const sim = new Simulator(map, players, GameMode.TURNS30, { rng: () => 0.5 });
     sim.startGame();
     sim.drainEvents();
 
@@ -207,7 +208,7 @@ describe('Pirates', () => {
     tileAt(map, 0, 1)!.unit = defender;
 
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
-    const sim = new Simulator(map, players, 'turns30', { rng: () => 0.5 });
+    const sim = new Simulator(map, players, GameMode.TURNS30, { rng: () => 0.5 });
     sim.startGame();
     sim.drainEvents();
 
@@ -225,7 +226,7 @@ describe('Pirates', () => {
     tileAt(map, 0, 1)!.unit = attacker;
 
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
-    const sim = new Simulator(map, players, 'turns30', { rng: () => 0.5 });
+    const sim = new Simulator(map, players, GameMode.TURNS30, { rng: () => 0.5 });
     sim.startGame();
     sim.drainEvents();
 
@@ -251,7 +252,7 @@ describe('Pirates', () => {
     tileAt(map, 0, 4)!.unit = ship;
 
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
-    const sim = new Simulator(map, players, 'turns30', { rng: () => 0.5 });
+    const sim = new Simulator(map, players, GameMode.TURNS30, { rng: () => 0.5 });
     sim.startGame();
     sim.drainEvents();
 
@@ -274,7 +275,7 @@ describe('Pirates', () => {
     tileAt(map, 0, 0)!.unit = pirate;
 
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
-    const sim = new Simulator(map, players, 'turns30', { rng: () => 0.5 });
+    const sim = new Simulator(map, players, GameMode.TURNS30, { rng: () => 0.5 });
     sim.startGame();
     sim.drainEvents();
 
@@ -295,7 +296,7 @@ describe('Pirates', () => {
     tileAt(map, 1, 0)!.unit = ship;
 
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
-    const sim = new Simulator(map, players, 'turns30', { rng: () => 0.5 });
+    const sim = new Simulator(map, players, GameMode.TURNS30, { rng: () => 0.5 });
     sim.startGame();
     sim.drainEvents();
 
@@ -317,7 +318,7 @@ describe('Pirates', () => {
 
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
     players[0]!.resources.money = 100;
-    const sim = new Simulator(map, players, 'turns30', { rng: () => 0.5 });
+    const sim = new Simulator(map, players, GameMode.TURNS30, { rng: () => 0.5 });
     sim.startGame();
     sim.drainEvents();
 
@@ -343,7 +344,7 @@ describe('Pirates', () => {
 
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
     players[0]!.resources.money = 100;
-    const sim = new Simulator(map, players, 'turns30', { rng: () => 0.5 });
+    const sim = new Simulator(map, players, GameMode.TURNS30, { rng: () => 0.5 });
     sim.startGame();
     sim.drainEvents();
 
@@ -361,7 +362,7 @@ describe('Pirates', () => {
 
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
     const moneyBefore = players[0]!.resources.money;
-    const sim = new Simulator(map, players, 'turns30', { rng: () => 0.5 });
+    const sim = new Simulator(map, players, GameMode.TURNS30, { rng: () => 0.5 });
     sim.startGame();
     sim.drainEvents();
 
@@ -377,7 +378,7 @@ describe('Pirates', () => {
 
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
     players[0]!.resources.money = 100;
-    const sim = new Simulator(map, players, 'turns30', { rng: () => 0.5 });
+    const sim = new Simulator(map, players, GameMode.TURNS30, { rng: () => 0.5 });
     sim.startGame();
     sim.drainEvents();
 
@@ -395,7 +396,7 @@ describe('Pirates', () => {
 
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
     players[0]!.resources.money = 100;
-    const sim = new Simulator(map, players, 'turns30', { rng: () => 0.5 });
+    const sim = new Simulator(map, players, GameMode.TURNS30, { rng: () => 0.5 });
     sim.startGame();
     sim.drainEvents();
 
@@ -429,7 +430,7 @@ describe('Pirate target tribes', () => {
     });
     const pirate = makePirate('pirate-1', 5, 0);
     tileAt(map, 5, 0)!.unit = pirate;
-    const sim = new Simulator(map, players, 'turns30', { rng: () => 0.5 });
+    const sim = new Simulator(map, players, GameMode.TURNS30, { rng: () => 0.5 });
     sim.startGame();
     return { sim, pirate, internals: sim as unknown as PirateInternals };
   }

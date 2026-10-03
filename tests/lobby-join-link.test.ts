@@ -1,3 +1,4 @@
+import { GameMode } from '@enums';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Container, Sprite, BitmapText } from 'pixi.js';
 import { LobbyScreen } from '../src/ui/screens/lobby-screen';
@@ -217,7 +218,7 @@ describe('LobbyScreen host copy join link button', () => {
       lobby: {
         role: 'host',
         code: 'ABC234',
-        mode: 'capture',
+        mode: GameMode.CAPTURE,
         totalPlayers: 2,
         aiCount: 0,
         players: [{ peerId: 'host', name: 'Host', tribeId: Tribe.Cats, isHost: true, ready: true }],
@@ -279,7 +280,7 @@ describe('LobbyScreen host copy join link button', () => {
       lobby: {
         role: 'client',
         code: 'ABC234',
-        mode: 'capture',
+        mode: GameMode.CAPTURE,
         totalPlayers: 2,
         aiCount: 0,
         players: [

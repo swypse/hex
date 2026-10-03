@@ -1,15 +1,16 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { NetworkController, type NetworkHost } from '@/controller/network-controller';
+import { initialExplorationFor } from '@/game/explore';
+import { generateMap } from '@/game/map-gen';
+import { buildMultiplayerPlayers } from '@/game/players';
+import { reachableTargets } from '@/game/selection';
+import { PREDICTABLE_COMMAND_TYPES, Simulator } from '@/game/simulator';
+import { Tribe } from '@/game/tribes';
+import type { HostMessage } from '@/net/peer-session';
+import { useGameStore } from '@/store/game-store';
+import { SeededRandom } from '@/util';
+import { GameMode } from '@enums';
 import type { Application } from 'pixi.js';
-import { Simulator, PREDICTABLE_COMMAND_TYPES } from '../src/game/simulator';
-import { generateMap } from '../src/game/map-gen';
-import { buildMultiplayerPlayers } from '../src/game/players';
-import { initialExplorationFor } from '../src/game/explore';
-import { SeededRandom } from '../src/util/random';
-import { Tribe } from '../src/game/tribes';
-import { reachableTargets } from '../src/game/selection';
-import { NetworkController, type NetworkHost } from '../src/controller/network-controller';
-import { useGameStore } from '../src/store/game-store';
-import type { HostMessage } from '../src/net/peer-session';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 function buildSim(): Simulator {
   const players = buildMultiplayerPlayers(
@@ -22,7 +23,7 @@ function buildSim(): Simulator {
   );
   const map = generateMap(players.length, 42);
   for (const p of players) initialExplorationFor(map, p.index);
-  return new Simulator(map, players, 'turns30', { rng: () => 0.5 });
+  return new Simulator(map, players, GameMode.TURNS30, { rng: () => 0.5 });
 }
 
 describe('predictable command types', () => {
@@ -83,14 +84,18 @@ function makeFakeHost() {
   const host: NetworkHost = {
     app: () => ({}) as unknown as Application,
     sim: () => null,
-    setSim: () => {},
-    setTextures: () => {},
+    setSim: () => {
+    },
+    setTextures: () => {
+    },
     enqueue: async (task) => {
       await task();
     },
     render,
-    syncStore: () => {},
-    syncKnownTribes: () => {},
+    syncStore: () => {
+    },
+    syncKnownTribes: () => {
+    },
     exploredKeysFor: () => new Set<string>(),
     presentEvents: async () => {
       present();
@@ -98,10 +103,13 @@ function makeFakeHost() {
     adoptSnapshot: () => {
       adopt();
     },
-    applyFitToScreen: () => {},
-    centerOnStartVillage: () => {},
+    applyFitToScreen: () => {
+    },
+    centerOnStartVillage: () => {
+    },
     cameraQualityFactor: () => 1,
-    runCommand: async () => {},
+    runCommand: async () => {
+    },
   };
   return { host, adopt, present, render };
 }

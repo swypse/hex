@@ -9,6 +9,7 @@ import { useGameStore } from '../src/store/game-store';
 import { buildPlayers } from '../src/game/players';
 import { Simulator } from '../src/game/simulator';
 import { SeededRandom } from '../src/util/random';
+import { GameMode } from '@enums';
 
 function player(index: number, tribe: Tribe): Player {
   return { index, tribe, isHuman: index === 0, name: `p${index}`, resources: { ...START_RESOURCES }, score: 0, kills: 0, skills: [], isActive: true };
@@ -92,7 +93,7 @@ describe('simulator discovery persistence', () => {
     const map = makeTestMap();
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(42));
     tileAt(map, 1, 0)!.unit = makeUnit('u1', 1, 'warrior', 1, 0);
-    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    const sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5 });
     sim.startGame();
     const sync = (sim as unknown as { syncDiscoveries(): void }).syncDiscoveries.bind(sim);
     expect(players[0]!.knownTribes).toEqual([Tribe.Villagers]);
@@ -105,7 +106,7 @@ describe('simulator discovery persistence', () => {
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(42));
     const enemyTile = tileAt(map, 1, 0)!;
     enemyTile.unit = makeUnit('u1', 1, 'warrior', 1, 0);
-    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    const sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5 });
     sim.startGame();
     const sync = (sim as unknown as { syncDiscoveries(): void }).syncDiscoveries.bind(sim);
     sync();
@@ -118,7 +119,7 @@ describe('simulator discovery persistence', () => {
     const map = makeTestMap();
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(42));
     tileAt(map, 1, 0)!.unit = makeUnit('u1', 1, 'warrior', 1, 0);
-    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    const sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5 });
     sim.startGame();
     sim.applyCommand({ type: 'heal', unitId: 'does-not-exist' });
     expect(players[0]!.knownTribes).toContain(players[1]!.tribe);
@@ -128,7 +129,7 @@ describe('simulator discovery persistence', () => {
     const map = makeTestMap();
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(42));
     tileAt(map, 1, 0)!.settlement = { owner: 1, level: 1, captureReady: false };
-    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    const sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5 });
     sim.startGame();
     const sync = (sim as unknown as { syncDiscoveries(): void }).syncDiscoveries.bind(sim);
     expect(players[0]!.knownTribes).toEqual([Tribe.Villagers]);
@@ -147,7 +148,7 @@ describe('discovery notification', () => {
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(42));
     const enemyTribeName = TRIBES.find((t) => t.id === players[1]!.tribe)!.name;
     players[0]!.knownTribes = [Tribe.Villagers, players[1]!.tribe];
-    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    const sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5 });
     (gameController as unknown as { sim: Simulator | null }).sim = sim;
     useGameStore.setState({ localPlayerIndex: 0, centerMessage: null });
     const gc = gameController as unknown as { knownTribeIds: Set<number>; syncKnownTribes(notify: boolean): void };
@@ -161,7 +162,7 @@ describe('discovery notification', () => {
   it('does not announce an already-known tribe', () => {
     const map = makeTestMap();
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(42));
-    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    const sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5 });
     (gameController as unknown as { sim: Simulator | null }).sim = sim;
     useGameStore.setState({ localPlayerIndex: 0, centerMessage: null });
     const gc = gameController as unknown as { knownTribeIds: Set<number>; syncKnownTribes(notify: boolean): void };

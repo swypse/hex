@@ -61,7 +61,7 @@ function ctx(map: GameMap, player: Player, rng: SeededRandom): AiPatternContext 
   return { map, player, rng, state: state() };
 }
 
-function situCtx(map: GameMap, player: Player, mode: GameMode = 'capture') {
+function situCtx(map: GameMap, player: Player, mode: GameMode = GameMode.CAPTURE) {
   const base = ctx(map, player, new SeededRandom(1));
   return {
     ...base,

@@ -1,3 +1,4 @@
+import { GameMode } from '@enums';
 import { describe, it, expect } from 'vitest';
 import { GameMap, MapTile, Settlement } from '../src/game/map-gen';
 import { TileType } from '../src/game/tile-types';
@@ -226,7 +227,7 @@ describe('roads', () => {
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
     players[0]!.skills = ['forestry', 'roads'];
     players[0]!.resources = { wood: 10, stone: 10, money: 20, ore: 0, food: 20 };
-    const sim = new Simulator(map, players, 'capture', { rng: () => 0.5 });
+    const sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5 });
     sim.startGame();
     sim.drainEvents();
     expect(sim.applyCommand({ type: 'buildRoad', q: 1, r: 0 })).toBe(true);

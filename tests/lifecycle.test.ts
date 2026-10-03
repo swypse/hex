@@ -1,9 +1,10 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { gameController } from '../src/controller/game-controller';
-import { useGameStore } from '../src/store/game-store';
+import { NetworkController } from '../src/controller/network-controller';
+import { GameMode } from '../src/game/game-mode';
 import { totalStock } from '../src/game/stock';
 import { TRIBES } from '../src/game/tribes';
-import { NetworkController } from '../src/controller/network-controller';
+import { useGameStore } from '../src/store/game-store';
 
 describe('GameController lifecycle', () => {
   beforeEach(() => {
@@ -19,12 +20,12 @@ describe('GameController lifecycle', () => {
   });
 
   it('startGame creates a simulator', () => {
-    gameController.startGame(TRIBES[0]!.id, 1, 'capture');
+    gameController.startGame(TRIBES[0]!.id, 1, GameMode.CAPTURE);
     expect(gameController.getSim()).not.toBeNull();
   });
 
   it('shutdown preserves the simulator so init can re-render after a remount', () => {
-    gameController.startGame(TRIBES[0]!.id, 1, 'capture');
+    gameController.startGame(TRIBES[0]!.id, 1, GameMode.CAPTURE);
     const sim = gameController.getSim();
     expect(sim).not.toBeNull();
 
@@ -33,15 +34,22 @@ describe('GameController lifecycle', () => {
   });
 
   it('hostGame with tribe 0 (Villagers) still starts the game', () => {
-    gameController.hostGame({ mode: 'turns30', totalPlayers: 3, aiCount: 1, name: 'Host', tribe: 0 });
+    gameController.hostGame({ mode: GameMode.TURNS30, totalPlayers: 3, aiCount: 1, name: 'Host', tribe: 0 });
     const g = gameController as unknown as { getNetwork: () => NetworkController };
-    g.getNetwork().hostPlayers.push({ peerId: 'fake', name: 'Guest', tribeId: 2, playerIndex: 1, ready: true, online: true });
+    g.getNetwork().hostPlayers.push({
+      peerId: 'fake',
+      name: 'Guest',
+      tribeId: 2,
+      playerIndex: 1,
+      ready: true,
+      online: true
+    });
     gameController.startHostGame();
     expect(gameController.getSim()).not.toBeNull();
   });
 
   it('cheatResources grants +1000 of every resource in single-player', async () => {
-    await gameController.startGame(TRIBES[0]!.id, 1, 'capture');
+    await gameController.startGame(TRIBES[0]!.id, 1, GameMode.CAPTURE);
     const sim = gameController.getSim()!;
     const before = { money: sim.players[0]!.resources.money, ...totalStock(sim.map, 0) };
     const villages = sim.map.tiles.filter((t) => t.settlement?.owner === 0).length;
@@ -55,7 +63,7 @@ describe('GameController lifecycle', () => {
   });
 
   it('cheatResources is refused outside single-player', async () => {
-    await gameController.startGame(TRIBES[0]!.id, 1, 'capture');
+    await gameController.startGame(TRIBES[0]!.id, 1, GameMode.CAPTURE);
     const sim = gameController.getSim()!;
     const before = { ...sim.players[0]!.resources };
     useGameStore.setState({ netMode: 'host' });
@@ -64,7 +72,7 @@ describe('GameController lifecycle', () => {
   });
 
   it('cheatWin eliminates enemies and the next end turn resolves the win', async () => {
-    await gameController.startGame(TRIBES[0]!.id, 1, 'capture');
+    await gameController.startGame(TRIBES[0]!.id, 1, GameMode.CAPTURE);
     const sim = gameController.getSim()!;
     expect(sim.gameOver).toBe(false);
     expect(gameController.cheatWin()).toBe(true);
@@ -77,7 +85,7 @@ describe('GameController lifecycle', () => {
   });
 
   it('does not clear the selected cell when ending the turn', async () => {
-    await gameController.startGame(TRIBES[0]!.id, 1, 'capture');
+    await gameController.startGame(TRIBES[0]!.id, 1, GameMode.CAPTURE);
     const store = useGameStore.getState();
     const selection: import('../src/game/selection').Selection = { kind: 'tile', q: 2, r: 1 };
     store.setSelection(selection);

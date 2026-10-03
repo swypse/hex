@@ -724,7 +724,7 @@ export function planAiActions(
   map: GameMap,
   player: Player,
   rng: SeededRandom,
-  mode: GameMode = 'capture',
+  mode: GameMode = GameMode.CAPTURE,
   markers?: AiActionMarker[],
   turn: number = 0,
   execute?: AiActionExecutor,

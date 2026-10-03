@@ -5,12 +5,30 @@
     "moduleResolution": "Bundler",
     "strict": true,
     "noUncheckedIndexedAccess": true,
-    "lib": ["ES2020", "DOM", "DOM.Iterable"],
-    "types": ["vite/client"],
+    "lib": [
+      "ES2020",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "types": [
+      "vite/client"
+    ],
     "skipLibCheck": true,
     "isolatedModules": true,
     "noEmit": true,
-    "esModuleInterop": true
+    "esModuleInterop": true,
+    "paths": {
+      "@enums": [
+        "./src/enums/index.ts"
+      ],
+      "@/*": [
+        "./src/*"
+      ]
+    }
   },
-  "include": ["src", "tests", "vite.config.ts"]
+  "include": [
+    "src",
+    "tests",
+    "vite.config.ts"
+  ]
 }
