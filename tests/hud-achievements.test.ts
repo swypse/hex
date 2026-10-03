@@ -6,9 +6,7 @@ import {
   SCORE_PAD,
   SCORE_TOP_OFFSET,
   SCORE_CHIP_RADIUS,
-  SCORE_TEXT_CHIP_GAP,
-  SCORE_TEXT_HEIGHT,
-  SCORE_ACHIEVEMENTS_TEXT_GAP,
+  SCORE_ACHIEVEMENTS_CHIP_GAP,
   SKILLS_BUTTON_SIZE,
   scoreButtonsPosition,
 } from '../src/ui/layout';
@@ -42,8 +40,8 @@ describe('score-stack button placement', () => {
     expect(el.position.y).toBe(pos.y);
     expect(el.position.x).toBe(chipX - SKILLS_BUTTON_SIZE / 2);
     const chipY = SCORE_PAD + SCORE_TOP_OFFSET + SCORE_CHIP_RADIUS;
-    const textBottom = chipY + SCORE_CHIP_RADIUS + SCORE_TEXT_CHIP_GAP + SCORE_TEXT_HEIGHT;
-    expect(el.position.y).toBe(textBottom + SCORE_ACHIEVEMENTS_TEXT_GAP);
+    const chipBottom = chipY + SCORE_CHIP_RADIUS;
+    expect(el.position.y).toBe(chipBottom + SCORE_ACHIEVEMENTS_CHIP_GAP);
     ach.destroy();
   });
 

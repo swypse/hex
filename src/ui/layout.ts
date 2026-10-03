@@ -11,12 +11,8 @@ export const SCORE_TOP_OFFSET = 20;
 export const SCORE_CHIP_RADIUS = 20;
 /** Vertical centre of the score text (and the season label), below the resource panel row. */
 export const SCORE_TEXT_Y = 48;
-/** Gap between the chip bottom and the score text below it. */
-export const SCORE_TEXT_CHIP_GAP = 6;
-/** Height of the score text (font size) below the chip. */
-export const SCORE_TEXT_HEIGHT = 16;
-/** Gap between the score text bottom and the achievements button. */
-export const SCORE_ACHIEVEMENTS_TEXT_GAP = 8;
+/** Gap between the chip bottom and the achievements button below it. */
+export const SCORE_ACHIEVEMENTS_CHIP_GAP = 6;
 /** Gap between the achievements button bottom and the first buff icon. */
 export const SCORE_BUFF_BUTTON_GAP = 6;
 /** Size of each temple-buff icon under the score chip. */
@@ -33,7 +29,7 @@ export function isWideScreen(width: number): boolean {
   return width > ACTION_TOOLBAR_MAX_WIDTH;
 }
 
-/** Top-left of the Achievements button, directly below the player's score text
+/** Top-left of the Achievements button, directly below the player's chip
  *  (centred on the chip's x). Buff icons stack under the button in HudScore. */
 export function scoreButtonsPosition(
   screenWidth: number,
@@ -43,10 +39,10 @@ export function scoreButtonsPosition(
 } {
   const chipX = screenWidth - SCORE_PAD - SCORE_CHIP_RADIUS;
   const chipY = SCORE_PAD + SCORE_TOP_OFFSET + SCORE_CHIP_RADIUS;
-  const textBottom = chipY + SCORE_CHIP_RADIUS + SCORE_TEXT_CHIP_GAP + SCORE_TEXT_HEIGHT;
+  const chipBottom = chipY + SCORE_CHIP_RADIUS;
   const x = chipX - SKILLS_BUTTON_SIZE / 2;
   return {
-    achievements: { x, y: textBottom + SCORE_ACHIEVEMENTS_TEXT_GAP },
+    achievements: { x, y: chipBottom + SCORE_ACHIEVEMENTS_CHIP_GAP },
   };
 }
 
@@ -54,9 +50,9 @@ export function scoreButtonsPosition(
 export function buffRowPosition(screenWidth: number, screenHeight: number): { x: number; y: number } {
   const chipX = screenWidth - SCORE_PAD - SCORE_CHIP_RADIUS;
   const chipY = SCORE_PAD + SCORE_TOP_OFFSET + SCORE_CHIP_RADIUS;
-  const textBottom = chipY + SCORE_CHIP_RADIUS + SCORE_TEXT_CHIP_GAP + SCORE_TEXT_HEIGHT;
+  const chipBottom = chipY + SCORE_CHIP_RADIUS;
   return {
     x: chipX - SCORE_BUFF_ICON / 2,
-    y: textBottom + SCORE_ACHIEVEMENTS_TEXT_GAP + SKILLS_BUTTON_SIZE + SCORE_BUFF_BUTTON_GAP,
+    y: chipBottom + SCORE_ACHIEVEMENTS_CHIP_GAP + SKILLS_BUTTON_SIZE + SCORE_BUFF_BUTTON_GAP,
   };
 }
