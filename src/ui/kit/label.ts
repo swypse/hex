@@ -14,6 +14,10 @@ export function makeLabel(
     /** Bakes the glyphs this many times larger and scales the label back down,
      *  so text inside a container that gets magnified stays sharp. */
     bake?: number;
+    /** Snaps the glyph quads to whole device pixels. On by default: UI cards
+     *  and scrolled content sit at fractional offsets, which resamples the
+     *  glyphs and blurs them. Turn off for text that glides across the map. */
+    roundPixels?: boolean;
   } = {},
 ): BitmapText {
   const bake = Math.max(1, opts.bake ?? 1);
@@ -27,7 +31,7 @@ export function makeLabel(
     style.wordWrap = true;
     style.wordWrapWidth = (opts.wordWrapWidth ?? 200) * bake;
   }
-  const label = new BitmapText({ text, style });
+  const label = new BitmapText({ text, style, roundPixels: opts.roundPixels ?? true });
   if (bake > 1) label.scale.set(1 / bake);
   if (opts.anchor) label.anchor.set(opts.anchor[0], opts.anchor[1]);
   return label;
