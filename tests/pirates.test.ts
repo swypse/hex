@@ -193,9 +193,9 @@ describe('Pirates', () => {
     sim.applyCommand({ type: CommandType.END_TURN });
     sim.drainEvents();
     // pirate force 30, warrior defenseForce 10, total 40:
-    // round((30/40)*30*1.5) = 34; counter round((10/40)*10*1.5) = 4
+    // round((30/40)*30*1.5) = 34; counter round((10/40)*10*1.5*2) = 8
     expect(defender.hp).toBe(16);
-    expect(tileAt(map, 0, 0)!.unit!.hp).toBe(76);
+    expect(tileAt(map, 0, 0)!.unit!.hp).toBe(72);
   });
 
   it('does not step onto the land tile of a unit it kills', () => {
@@ -234,8 +234,8 @@ describe('Pirates', () => {
     expect(ok).toBe(true);
     sim.drainEvents();
     // warrior force 20, pirate defenseForce 5, total 25:
-    // damage round((20/25)*20*1.5) = 24, counter round((5/25)*5*1.5) = 2
-    expect(attacker.hp).toBe(48);
+    // damage round((20/25)*20*1.5) = 24, counter round((5/25)*5*1.5*2) = 3
+    expect(attacker.hp).toBe(47);
     expect(tileAt(map, 0, 0)!.unit!.hp).toBe(56);
   });
 

@@ -1,5 +1,5 @@
 import { RAGE_BONUS, RAGE_THRESHOLD_PCT } from './abilities';
-import { canCounterAttack, COMBAT_SCALE, MISS_CHANCE } from './combat';
+import { canCounterAttack, COMBAT_SCALE, COUNTER_SCALE, MISS_CHANCE, SHIELD_COUNTER_SCALE } from './combat';
 import { SKILLS, skillCost } from './skills';
 import { UNIT_TYPES } from './units';
 import { SkillId, UnitType } from '@enums';
@@ -123,7 +123,7 @@ export function isRaging(type: UnitType, hp: number, maxHp: number): boolean {
 }
 
 /** One directed hit, mirroring `resolveCombat` + `performAttack` (miss roll
- *  excluded): attack force vs defense force, shield counter x2, raging
+ *  excluded): attack force vs defense force, counters scaled by COUNTER_SCALE (shield: SHIELD_COUNTER_SCALE), raging
  *  berserkers do not counter, land catapults never counter. */
 export function strike(
   attType: UnitType,
@@ -144,8 +144,8 @@ export function strike(
   const dmg = Math.round((attackForce / total) * attack * COMBAT_SCALE);
   const canCounter =
     ctx.distance <= def.attackDistance && canCounterAttackType(defType) && !isRaging(defType, defHp, def.maxHp);
-  // A shield's counter-attack is doubled in the real combat formula too.
-  const counterMult = defType === UnitType.SHIELD ? 2 : 1;
+  // Same counter multipliers as the real combat formula.
+  const counterMult = defType === UnitType.SHIELD ? SHIELD_COUNTER_SCALE : COUNTER_SCALE;
   const counter = canCounter ? Math.round((defenseForce / total) * defense * COMBAT_SCALE * counterMult) : 0;
   return { dmg, counter };
 }

@@ -154,9 +154,11 @@ its own artwork and its own spawn-popup icon (`action-spawn-<type>`).
   `round(attackForce / (attackForce + defenseForce) × attack × 1.5)`. Each attack has a 10% chance to miss (5% if the
   attacker's owner has opened Science), dealing no damage (the attack still counts as used). If the target survives and
    is in range, it counter-attacks with
-   `round(defenseForce / (attackForce + defenseForce) × defense × 1.5)`, except a land catapult never counter-attacks
-   (aboard a ship the crew still fights back with the ship's cannon). A **shield** doubles its counter-attack
-   (×2): attacking a shield unit head-on hurts, so it is dangerous to strike one without killing it. A shield cannot
+   `round(defenseForce / (attackForce + defenseForce) × defense × 1.5 × 2)`, except a land catapult never
+   counter-attacks (aboard a ship the crew still fights back with the ship's cannon). Every counter-attack is doubled
+   (`COUNTER_SCALE` = 2, so a counter is no longer dwarfed by the blow that provoked it); a **shield** keeps the same
+   ×2 (`SHIELD_COUNTER_SCALE`), so its counter-attack is as strong as before and attacking a shield head-on still
+   hurts: it is dangerous to strike one without killing it. A shield cannot
    attack in a turn in which it has
   already moved (as a ship this limit does not apply). On a kill, the attacker moves onto the target's tile (unless the
   attacker is an archer or a pirate, is a ship, or the target was a pirate or a ship).

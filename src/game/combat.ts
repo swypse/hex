@@ -26,6 +26,13 @@ const SCIENCE_MISS_CHANCE = 0.05;
  *  at a raw ratio of 20/30 × 20 ≈ 13.3; calibrating that back to the long-
  *  standing warrior trade damage of 20 gives 20 / 13.3 = 1.5. */
 export const COMBAT_SCALE = 1.5;
+/** Extra multiplier on a counter-attack. The counter is scaled by the defender's
+ *  defense, which is small next to attack, so it was too weak next to the blow
+ *  that provokes it; this doubles it for every unit but the shield. */
+export const COUNTER_SCALE = 2;
+/** A shield's counter-attack multiplier. Kept at its old strength: shields
+ *  already retaliate hard, so they do not get COUNTER_SCALE on top. */
+export const SHIELD_COUNTER_SCALE = 2;
 
 export function missChanceFor(player: Player): number {
   return hasSkill(player, SkillId.SCIENCE) ? SCIENCE_MISS_CHANCE : MISS_CHANCE;
@@ -55,10 +62,10 @@ export interface CombatResolution {
  *      defenseForce = defender.defense × defender.hp / maxHp × defenseBonus
  *      total        = attackForce + defenseForce
  *      attackerDamage = round(attackForce / total × attacker.attack  × COMBAT_SCALE)
- *      counterDamage  = round(defenseForce / total × defender.defense × COMBAT_SCALE)
- *  A shield's counter-attack is doubled: wall of steel, it is dangerous to hit
- *  a shield unit head-on (its retaliation still uses the same defense force,
- *  just boosted so attackers think twice). */
+ *      counterDamage  = round(defenseForce / total × defender.defense × COMBAT_SCALE × COUNTER_SCALE)
+ *  A shield counters with SHIELD_COUNTER_SCALE instead of COUNTER_SCALE: wall of
+ *  steel, it is dangerous to hit a shield unit head-on (its retaliation uses a
+ *  high defense force, so attackers think twice). */
 export function resolveCombat(map: GameMap | null, attacker: Unit, target: MapTile): CombatResolution {
   const defender = target.unit!;
   // A stealthed stalker's strike ignores the defender's armor entirely.
@@ -76,7 +83,7 @@ export function resolveCombat(map: GameMap | null, attacker: Unit, target: MapTi
   // so a ship's counter math is unchanged, while bonuses apply on top.
   const scaleAttack = attacker.attack + bonus;
   const attackerDamage = Math.round((attackForce / total) * scaleAttack * COMBAT_SCALE);
-  const counterMult = defender.type === UnitType.SHIELD && !isShip(defender) ? 2 : 1;
+  const counterMult = defender.type === UnitType.SHIELD && !isShip(defender) ? SHIELD_COUNTER_SCALE : COUNTER_SCALE;
   const counterDamage = Math.round((defenseForce / total) * def * COMBAT_SCALE * counterMult);
   return { attackerDamage, counterDamage };
 }
