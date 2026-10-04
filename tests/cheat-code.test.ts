@@ -83,3 +83,15 @@ describe('cheat code buffer', () => {
     }
   });
 });
+
+describe('weather cheat words', () => {
+  it('are recognised by name', () => {
+    for (const word of ['storm', 'drought', 'earthquake']) {
+      expect(triggeredCheat(advanceCheatBufferWord(word))).toBe(word);
+    }
+  });
+});
+
+function advanceCheatBufferWord(word: string): string {
+  return [...word].reduce((buffer, key) => advanceCheatBuffer(buffer, key), '');
+}

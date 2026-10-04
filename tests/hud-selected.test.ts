@@ -1,3 +1,5 @@
+import { WeatherType } from '@enums';
+import type { WeatherEvent } from '../src/game/weather';
 import { afterEach, describe, expect, it } from 'vitest';
 import { Circle, Rectangle, Container, Graphics, Sprite, BitmapText } from 'pixi.js';
 import { HudSelected } from '../src/ui/hud/hud-selected';
@@ -1107,3 +1109,85 @@ describe('HudSelected building destroy and tile extras', () => {
     expect(texts().some((s) => s.startsWith('Upgrade to level 2:'))).toBe(true);
   });
 });
+
+describe('HudSelected weather effects', () => {
+  let hud: HudSelected;
+  const originalSim = (gameController as unknown as { sim: unknown }).sim;
+
+  const texts = (): string[] => {
+    const el = (hud as unknown as { el: Container }).el!;
+    const out: string[] = [];
+    const walk = (c: Container): void => {
+      for (const ch of c.children) {
+        if (ch instanceof BitmapText) out.push((ch as BitmapText).text);
+        if (ch instanceof Container) walk(ch as Container);
+      }
+    };
+    walk(el);
+    return out;
+  };
+
+  /** Selects (0,0) on a map whose (1,0) is water and (0,0) land, with `weather` active. */
+  const boot = (weather: WeatherEvent[], select = { q: 0, r: 0 }): void => {
+    (globalThis as { CanvasRenderingContext2D?: unknown }).CanvasRenderingContext2D = class {};
+    (globalThis as { document?: unknown }).document = {
+      createElement: () => ({ getContext: () => fakeCanvasContext(), width: 0, height: 0 }),
+    };
+    const map = makeTestMap(2);
+    tileAt(map, 1, 0)!.terrain = TileType.Water;
+    tileAt(map, 0, 0)!.unit = makeUnit('u1', 0, UnitType.WARRIOR, 0, 0);
+    map.weather = weather;
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    const sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5 });
+    (gameController as unknown as { sim: Simulator | null }).sim = sim;
+    useGameStore.setState({
+      screen: Screen.GAME,
+      players,
+      localPlayerIndex: 0,
+      selection: { kind: SelectionKind.TILE, ...select },
+      tutorial: false,
+      tutorialStep: null,
+    });
+    hud = new HudSelected();
+    hud.mount(makeHost(), new Container());
+  };
+
+  const event = (type: WeatherType, q: number, r: number, lifetime: number): WeatherEvent =>
+    ({ id: `${type}@9`, type, q, r, radius: 2, startTurn: 9, age: 1, lifetime });
+
+  afterEach(() => {
+    hud?.destroy();
+    (gameController as unknown as { sim: unknown }).sim = originalSim;
+  });
+
+  it('describes a drought on a land tile inside it', () => {
+    boot([event(WeatherType.DROUGHT, 0, 0, 5)]);
+    expect(texts().join('\n')).toContain(t('weather.effect.drought'));
+  });
+
+  it('describes a storm on a water tile inside it, with the real numbers', () => {
+    boot([event(WeatherType.STORM, 1, 0, 6)], { q: 1, r: 0 });
+    const text = texts().join('\n');
+    expect(text).toContain('Storm: ships take 10 damage each turn');
+    expect(text).toContain('2x moves');
+  });
+
+  it('says nothing about a storm on a land tile (a storm only acts on water)', () => {
+    boot([event(WeatherType.STORM, 1, 0, 6)]);
+    expect(texts().join('\n')).not.toContain('Storm:');
+  });
+
+  it('describes an earthquake on any tile in its scope', () => {
+    boot([event(WeatherType.EARTHQUAKE, 0, 0, 1)]);
+    expect(texts().join('\n')).toContain(t('weather.effect.earthquake'));
+  });
+
+  it('shows no weather line for a tile outside the scope or in calm weather', () => {
+    boot([{ ...event(WeatherType.DROUGHT, 5, 5, 5), radius: 1 }]);
+    expect(texts().join('\n')).not.toContain('Drought:');
+    hud.destroy();
+    boot([]);
+    expect(texts().join('\n')).not.toMatch(/Drought:|Storm:|Earthquake:/);
+  });
+});
+

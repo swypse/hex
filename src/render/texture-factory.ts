@@ -17,7 +17,7 @@ import { ensureActionButtonAtlas, actionButtonFrameTexture } from '../ui/kit/act
 import { ensureIcons32Atlas, icons32FrameTexture } from '../ui/kit/icons32';
 import { VillageBuildTextureService } from './village-build-texture';
 import { SLICE_BUDGET_MS, yieldToMain } from '../util/time-slice';
-import { BridgeDir, PortDirection, Season, TileAnchor, TileLayer, UnitType } from '@enums';
+import { BridgeDir, PortDirection, Season, TileAnchor, TileLayer, UnitType, WeatherType } from '@enums';
 
 const TEXTURE_BASE = `${import.meta.env.BASE_URL}textures/`;
 
@@ -78,9 +78,10 @@ const FOREST_TEMPLE_TILE_FILES: Record<1 | 2 | 3 | 4, string> = {
 export const GRANARY_MAX_FARMS = 6;
 const granaryTileFile = (farms: number): string => (farms <= 1 ? 'granary' : `granary-${farms}`);
 
-const IMAGE_HEX_W = 254;
-const IMAGE_H = 448;
-const IMAGE_HEX_CENTER_Y = 316;
+/** Terrain art frames are 256x448 with the hex face 254 wide and centred 316 px from the top. */
+export const IMAGE_HEX_W = 254;
+export const IMAGE_H = 448;
+export const IMAGE_HEX_CENTER_Y = 316;
 
 export interface TileTexture {
   texture: Texture;
@@ -110,6 +111,8 @@ export interface TextureSet {
   farmTexture: TileTexture;
   /** Black-and-white farm, shown while the farm yields nothing (winter). Baked so no per-frame filter pass is needed. */
   farmIdleTexture: TileTexture;
+  /** Weather overlay art (storm / drought), raw terrain-atlas frames drawn over a tile. Shared, not owned by the set. */
+  weatherOverlays?: Partial<Record<WeatherType.STORM | WeatherType.DROUGHT, Texture>>;
   /** Indexed by adjacent farm count, 1..GRANARY_MAX_FARMS (index 0 unused). */
   granaryTextures: TileTexture[];
   bridgeTextures: Record<BridgeDir, TileTexture>;
@@ -393,6 +396,16 @@ class LazyGlowMap extends Map<Texture, TileTexture> {
   }
 }
 
+/** The storm and drought overlay frames, when the terrain atlas is available. */
+function weatherOverlayTextures(): NonNullable<TextureSet['weatherOverlays']> {
+  const out: NonNullable<TextureSet['weatherOverlays']> = {};
+  const storm = terrainFrameTexture('storm');
+  const drought = terrainFrameTexture('drought');
+  if (storm) out.storm = storm;
+  if (drought) out.drought = drought;
+  return out;
+}
+
 export async function createTextures(
   app: Application,
   map: GameMap,
@@ -609,6 +622,7 @@ export async function createTextures(
     mineTexture,
     farmTexture,
     farmIdleTexture,
+    weatherOverlays: weatherOverlayTextures(),
     granaryTextures,
     bridgeTextures,
     portTextures,

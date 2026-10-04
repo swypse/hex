@@ -10,7 +10,8 @@ import { isWaterType } from '../game/tile-types';
 import { tileAt } from '../game/selection';
 import { claimingVillage, villageWaterTiles } from '../game/storm';
 import { isExploredFor } from '../game/explore';
-import { axialKey, hexDistance, hexToPixel, type Axial } from '../game/hex';
+import { axialKey, hexDistance, hexToPixel, tilesInRange, type Axial } from '../game/hex';
+import { compassDirection, weatherCopies, type WeatherBuildingHit, type WeatherEvent, type WeatherUnitHit } from '../game/weather';
 import { tileElevation } from '../render/elevation';
 import { MapView } from '../render/map-renderer';
 import { spawnMuzzleSmoke } from '../render/smoke';
@@ -30,7 +31,7 @@ import { t } from '../i18n';
 import { sfx } from '../sound/sfx';
 import { attackSound } from '../sound/attack-sounds';
 import { markDirty } from '../render/render-gate';
-import { AttackImpact, BonusKind, FontSize, GameEventType, NetMode, SelectionKind, UnitFacing, UnitType } from '@enums';
+import { AttackImpact, BonusKind, FontSize, GameEventType, NetMode, SelectionKind, UnitFacing, UnitType, WeatherType } from '@enums';
 
 const HEX_SIZE = 40;
 
@@ -139,6 +140,8 @@ export interface EventHost {
   syncKnownTribes(notify: boolean): void;
   enqueue(task: () => Promise<void>): Promise<void>;
   bringCellIntoView(q: number, r: number): Promise<void>;
+  /** Centers the camera on a cell regardless of what is visible. */
+  centerOnCell(q: number, r: number): Promise<void>;
   exploredKeysFor(playerIndex: number): Set<string>;
   saveGame(): void;
 }
@@ -454,6 +457,19 @@ export class EventPresenter {
             else if (e.landed.some((l) => l.owner === local)) store.setCenterMessage(t('msg.iceLanded'));
             break;
           }
+          case GameEventType.WEATHER_STARTED:
+            await this.presentWeatherStarted(e.weather);
+            break;
+          case GameEventType.WEATHER_ENDED:
+            await this.presentWeatherEnded(e.weather);
+            break;
+          case GameEventType.WEATHER_MOVED:
+            this.syncWeatherStore();
+            this.host.render();
+            break;
+          case GameEventType.WEATHER_DAMAGE:
+            await this.presentWeatherDamage(e.units, e.buildings);
+            break;
           case GameEventType.TURN_STARTED:
             this.presentTurnStarted(e.playerIndex, e.turn);
             break;
@@ -1338,6 +1354,69 @@ export class EventPresenter {
       camera.pan.x + world.x * scale,
       camera.pan.y + (world.y - tileElevation(tile, HEX_SIZE)) * scale,
     );
+  }
+
+  /** The HUD list of active weather follows what has been presented so far. */
+  private syncWeatherStore(): void {
+    const sim = this.host.sim();
+    if (sim) useGameStore.getState().setWeather(weatherCopies(sim.map));
+  }
+
+  private async presentWeatherStarted(weather: WeatherEvent): Promise<void> {
+    const sim = this.host.sim();
+    if (!sim) return;
+    this.syncWeatherStore();
+    this.host.render();
+    const local = useGameStore.getState().localPlayerIndex;
+    let shakeMs = 0;
+    if (weather.type === WeatherType.EARTHQUAKE) {
+      // Bring the quake into view first, so the shake plays where the player looks.
+      const centerTile = tileAt(sim.map, weather.q, weather.r);
+      if (centerTile && isExploredFor(centerTile, local)) await this.host.centerOnCell(weather.q, weather.r);
+      const visible = tilesInRange(weather, weather.radius).filter((c) => {
+        const tile = tileAt(sim.map, c.q, c.r);
+        return tile !== undefined && isExploredFor(tile, local);
+      });
+      shakeMs = this.host.mapView()?.shakeTiles(visible) ?? 0;
+    }
+    useGameStore.getState().setCenterMessage(
+      t('weather.started', {
+        name: t(`weather.${weather.type}` as never),
+        where: t(`weather.where.${compassDirection(weather)}` as never),
+      }),
+    );
+    // Messages queue in the store; only the shake has to play out first.
+    if (shakeMs > 0) await sleep(shakeMs);
+  }
+
+  private async presentWeatherEnded(weather: WeatherEvent): Promise<void> {
+    this.syncWeatherStore();
+    this.host.render();
+    // A one-turn event (the earthquake) is over before anyone could read it.
+    if (weather.lifetime <= 1) return;
+    useGameStore.getState().setCenterMessage(t(`weather.ended.${weather.type}` as never));
+  }
+
+  private async presentWeatherDamage(units: WeatherUnitHit[], buildings: WeatherBuildingHit[]): Promise<void> {
+    const sim = this.host.sim();
+    if (!sim) return;
+    this.host.render();
+    const local = useGameStore.getState().localPlayerIndex;
+    let burst = false;
+    for (const hit of units) {
+      const tile = tileAt(sim.map, hit.q, hit.r);
+      if (!tile || !isExploredFor(tile, local)) continue;
+      this.spawnHpText(tile, `-${hit.damage}`, 0xff4d4d);
+      if (hit.died) {
+        this.spawnDeath(tile);
+        burst = true;
+      }
+    }
+    for (const hit of buildings) {
+      const tile = tileAt(sim.map, hit.q, hit.r);
+      if (tile) this.spawnHpText(tile, '-1', 0xffa040);
+    }
+    if (burst) await sleep(COMBAT_DEATH_GAP_MS);
   }
 
   private spawnDeath(tile: MapTile): void {

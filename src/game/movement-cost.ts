@@ -2,6 +2,7 @@ import { axialKey, hexNeighbors } from './hex';
 import { GameMap, MapTile } from './map-gen';
 import { isForestType, isMountainType, isWaterType } from './tile-types';
 import { waterRouteEdges } from './water-roads';
+import { stormOverTile, WEATHER_RULES } from './weather';
 
 /** Move-points cost to LEAVE a tile of each terrain kind. Land also covers
  *  village/settlement tiles; settlements never reduce the base cost. */
@@ -37,9 +38,11 @@ export function tileMoveCost(
       : isForestType(tile.terrain)
         ? TILE_MOVE_COST.forest
         : TILE_MOVE_COST.land;
+  // Leaving a water tile inside a storm costs more move points.
+  const cost = stormOverTile(map, tile) ? base * WEATHER_RULES.storm.moveCostFactor : base;
   const discount =
     tile.roadOwner === owner ||
     (isWaterType(tile.terrain) && tile.ownedBy === owner && waterKeys?.has(axialKey(tile))) ||
     (tile.settlement !== null && tile.settlement.owner === owner && ownRoadNeighbor(map, tile, owner));
-  return discount ? Math.floor(base / 2) : base;
+  return discount ? Math.floor(cost / 2) : cost;
 }

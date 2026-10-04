@@ -6,6 +6,7 @@ import { foodNetworks, networkStock, readStock, stockOf, totalStock } from './st
 import { hasSkill } from './skills';
 import { unitFoodUpkeep, type Unit } from './units';
 import { BuildingKind, FoodPressure, Season, SkillId, UnitType } from '@enums';
+import { droughtOverTile, halvedYield } from './weather';
 
 export { foodNetworks } from './stock';
 
@@ -25,10 +26,13 @@ const UNIT_FEED_PRIORITY: UnitType[] = [
   UnitType.SHIELD, UnitType.RIDER, UnitType.ARCHER, UnitType.WARRIOR, UnitType.PIRATE,
 ];
 
-/** Farm yield per round: nothing in winter, otherwise 2 (3 with Science). */
-export function farmYield(owner: Player | null | undefined, map?: Pick<GameMap, 'season'>): number {
+/** Farm yield per round: nothing in winter, otherwise 2 (3 with Science), halved
+ *  (rounded up) for a farm inside a drought. */
+export function farmYield(owner: Player | null | undefined, map?: Pick<GameMap, 'season' | 'weather'>, farm?: MapTile): number {
   if (map?.season === Season.WINTER) return 0;
-  return owner && hasSkill(owner, SkillId.SCIENCE) ? FARM_FOOD_SCIENCE : FARM_FOOD;
+  const normal = owner && hasSkill(owner, SkillId.SCIENCE) ? FARM_FOOD_SCIENCE : FARM_FOOD;
+  // A drought halves the farms inside it.
+  return farm && map && droughtOverTile(map, farm) ? halvedYield(normal) : normal;
 }
 
 /** Units are fed from the hungriest to the least hungry. */
@@ -130,7 +134,7 @@ export interface VillageFood {
 
 function networkFood(map: GameMap, ownerIndex: number, villages: MapTile[], owner: Player | null | undefined): Omit<VillageFood, 'starving'> {
   const keys = keysOf(villages);
-  const production = farmsOf(map, ownerIndex, keys).length * farmYield(owner, map);
+  const production = farmsOf(map, ownerIndex, keys).reduce((sum, farm) => sum + farmYield(owner, map, farm), 0);
   const upkeep = eatersOf(map, ownerIndex, villages).reduce((sum, e) => sum + unitFoodUpkeep(e.unit.type), 0);
   const granaryFood = granariesOf(map, ownerIndex, keys).reduce((sum, t) => sum + (t.building?.food ?? 0), 0);
   return { production, upkeep, balance: production - upkeep, granaryFood, networkSize: villages.length };
@@ -195,7 +199,6 @@ export function applyFood(map: GameMap, player: Player, dryRun = false): Starvat
   const reserves = new Map<MapTile, number>();
   for (const t of map.tiles) if (t.settlement?.owner === owner) reserves.set(t, readStock(t).food);
   const stored = (g: MapTile): number => amounts.get(g) ?? 0;
-  const yieldPerFarm = farmYield(player, map);
 
   const adjacentGranaries = (farm: MapTile): MapTile[] => {
     const out: MapTile[] = [];
@@ -230,7 +233,7 @@ export function applyFood(map: GameMap, player: Player, dryRun = false): Starvat
   const feedFromFarms = (farms: MapTile[], eaters: Eater[]): void => {
     const plain = farms.filter((f) => adjacentGranaries(f).length === 0);
     const near = farms.filter((f) => adjacentGranaries(f).length > 0);
-    const pool = [...plain, ...near].map((farm) => ({ farm, left: yieldPerFarm }));
+    const pool = [...plain, ...near].map((farm) => ({ farm, left: farmYield(player, map, farm) }));
     for (const e of eaters) {
       for (const slot of pool) {
         if (e.got >= e.need) break;

@@ -1,4 +1,5 @@
 import type { Axial } from './hex';
+import type { WeatherBuildingHit, WeatherEvent, WeatherUnitHit } from './weather';
 import { AchievementId, BonusKind, BottleEffect, BuildingKind, GameEventType, Season, SiegeTargetKind, SkillId, UnitType } from '@enums';
 
 
@@ -52,6 +53,10 @@ export type GameEvent =
   | { type: GameEventType.STUN_SHOT; attackerId: string; targetId: string; attackerTile: Axial; targetTile: Axial; missed: boolean; stunned: boolean }
   | { type: GameEventType.ACHIEVEMENT_UNLOCKED; playerIndex: number; achievement: AchievementId }
   | { type: GameEventType.SEASON_CHANGED; season: Season; frozen: Axial[]; thawed: Axial[]; landed: { unitId: string; owner: number }[]; removed: Axial[]; killed: { unitId: string; q: number; r: number; owner: number }[] }
+  | { type: GameEventType.WEATHER_STARTED; weather: WeatherEvent }
+  | { type: GameEventType.WEATHER_ENDED; weather: WeatherEvent }
+  | { type: GameEventType.WEATHER_MOVED; weather: WeatherEvent }
+  | { type: GameEventType.WEATHER_DAMAGE; weather: WeatherEvent; units: WeatherUnitHit[]; buildings: WeatherBuildingHit[] }
   | { type: GameEventType.TURN_STARTED; playerIndex: number; turn: number }
   | { type: GameEventType.AI_TURN; playerIndex: number }
   | { type: GameEventType.AI_TAKEOVER; playerIndex: number }

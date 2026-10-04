@@ -13,6 +13,7 @@ import { Unit, UNIT_TYPES } from '../src/game/units';
 import { axialKey, hexToPixel } from '../src/game/hex';
 import { tileElevation } from '../src/render/elevation';
 import { type TextureSet, type TileTexture } from '../src/render/texture-factory';
+import { WeatherType } from '@enums';
 import { ENEMY_GLOW_COLOR, OWN_GLOW_COLOR } from '../src/render/unit-glow-color';
 import { HP_BAR_BOX_TOP, HP_BAR_HEIGHT, HP_BAR_ICON_GAP, HP_BAR_INNER_W, HP_BAR_OUTER_H, HP_BAR_OUTER_W, HP_LABEL_PAD_X, HP_LABEL_RADIUS, HP_LABEL_UP } from '../src/render/hp-bar-layout';
 import { BonusKind, BridgeDir, BuildingKind, CaptureMarkerSide, SelectionKind, UnitFacing, UnitType } from '@enums';
@@ -1149,6 +1150,94 @@ describe('MapView hp bar anchoring', () => {
     map.tiles.find((t) => t.q === 0 && t.r === 0)!.exploredBy = [0, 1];
     view.update(map, players, selection, new Set(), new Set(), 1, new Set(), vp);
     expect(tvOf().glowSprite!.tint).toBe(ENEMY_GLOW_COLOR);
+  });
+
+  it('draws the storm art over water and the drought art over land inside them, above the terrain, and removes it afterwards', () => {
+    const vp = { x: 400, y: 300, scale: 1, width: 800, height: 600 };
+    const stormTex = tex(256, 448);
+    const droughtTex = tex(256, 448);
+    textures.weatherOverlays = { storm: stormTex, drought: droughtTex };
+    type Views = Map<string, { terrainSprite: Sprite; weatherOverlay: Sprite | null }>;
+    const views = (): Views => (view as unknown as { tileViews: Views }).tileViews;
+    const water = map.tiles.find((t) => t.q === 1 && t.r === 0)!;
+    water.terrain = TileType.Water;
+    const event = { startTurn: 9, age: 1 } as const;
+    map.weather = [
+      { ...event, id: 'storm@9', type: WeatherType.STORM, q: 1, r: 0, radius: 1, lifetime: 6 },
+      { ...event, id: 'drought@9', type: WeatherType.DROUGHT, q: -1, r: 0, radius: 1, lifetime: 5 },
+    ];
+    view.update(map, players, null, new Set(), new Set(), 0, new Set(), vp);
+    const onWater = views().get('1,0')!.weatherOverlay!;
+    expect(onWater.texture).toBe(stormTex);
+    const onLand = views().get('-1,0')!.weatherOverlay!;
+    expect(onLand.texture).toBe(droughtTex);
+    expect(views().get('0,0')!.weatherOverlay!.texture).toBe(droughtTex); // land inside both radii: drought only
+    expect(views().get('1,-1')!.weatherOverlay).toBeNull(); // land in the storm's radius, outside the drought's
+    // drawn like the terrain art: same scale, anchored on the top face, between terrain and sprites
+    const scale = (Math.sqrt(3) * HEX) / 254;
+    expect(onLand.scale.x).toBeCloseTo(scale, 10);
+    expect(onLand.anchor.y).toBeCloseTo(316 / 448, 10);
+    expect(onLand.zIndex).toBeGreaterThan(2);
+    expect(onLand.zIndex).toBeLessThan(3);
+    expect(views().get('-1,0')!.terrainSprite.tint).toBe(0xffffff); // no tint any more
+
+    map.weather = [];
+    view.update(map, players, null, new Set(), new Set(), 0, new Set(), vp);
+    expect(views().get('1,0')!.weatherOverlay).toBeNull();
+    expect(views().get('-1,0')!.weatherOverlay).toBeNull();
+  });
+
+  it('draws no weather overlay when the textures are missing', () => {
+    const vp = { x: 400, y: 300, scale: 1, width: 800, height: 600 };
+    textures.weatherOverlays = undefined;
+    map.weather = [{ id: 'drought@9', type: WeatherType.DROUGHT, q: 0, r: 0, radius: 1, startTurn: 9, age: 1, lifetime: 5 }];
+    view.update(map, players, null, new Set(), new Set(), 0, new Set(), vp);
+    const tv = (view as unknown as { tileViews: Map<string, { weatherOverlay: Sprite | null }> }).tileViews.get('0,0')!;
+    expect(tv.weatherOverlay).toBeNull();
+  });
+
+  it('shakes tiles up, down and back three times, each tile with its own delay, then restores them', () => {
+    const callbacks: Array<() => void> = [];
+    const app = {
+      screen: { width: 800, height: 600 },
+      ticker: { add: (fn: () => void) => callbacks.push(fn), remove: (): void => {} },
+    } as unknown as Application;
+    const v = new MapView(app, textures, HEX, SPRITE_SCALE, 2);
+    v.update(map, players, null, new Set(), new Set(), 0, new Set(), { x: 400, y: 300, scale: 1, width: 800, height: 600 });
+    const sprite = (v as unknown as { tileViews: Map<string, { terrainSprite: Sprite }> }).tileViews.get('0,0')!.terrainSprite;
+    const baseY = sprite.position.y;
+    const origNow = performance.now;
+    let now = 1000;
+    (performance as { now: () => number }).now = () => now;
+    try {
+      // No delay: 3 cycles of 120 ms.
+      const ms = v.shakeTiles([{ q: 0, r: 0 }], 3, 120, 0);
+      expect(ms).toBe(360);
+      const tick = callbacks[callbacks.length - 1]!;
+      now = 1030; // a quarter into the first cycle: up
+      tick();
+      expect(sprite.position.y).toBeLessThan(baseY);
+      now = 1090; // three quarters in: below the start
+      tick();
+      expect(sprite.position.y).toBeGreaterThan(baseY);
+      now = 1150; // inside the second cycle: moving again
+      tick();
+      expect(sprite.position.y).not.toBe(baseY);
+      now = 1361; // past 3 cycles: back at the start
+      tick();
+      expect(sprite.position.y).toBe(baseY);
+    } finally {
+      (performance as { now: () => number }).now = origNow;
+      v.destroy();
+    }
+  });
+
+  it('shakes for five cycles of 110 ms by default, plus up to 100 ms of stagger', () => {
+    expect(view.shakeTiles([{ q: 0, r: 0 }])).toBe(5 * 110 + 100);
+  });
+
+  it('reports no shake for tiles the view does not have', () => {
+    expect(view.shakeTiles([{ q: 40, r: 40 }])).toBe(0);
   });
 
   it('keeps the selected tile el above same-row neighbors so the top border stays visible', () => {

@@ -1,5 +1,5 @@
 import { SeededRandom } from '@/util';
-import { AchievementId, AiActionType, AiEngine, BonusKind, BottleEffect, BuilderExtraKind, BuildingKind, CommandType, GameEventType, GameMode, Season, SkillId, UnitType } from '@enums';
+import { AchievementId, AiActionType, AiEngine, BonusKind, BottleEffect, BuilderExtraKind, BuildingKind, CommandType, GameEventType, GameMode, Season, SkillId, UnitType, WeatherType } from '@enums';
 import { awardAchievementScores, currentlyMetIds, evaluateAchievements } from './achievements';
 import { type AiActionMarker, aiLoggingEnabled, formatAiAction, logAiTurnStart, planAiActions, planAiActionsSteps } from './ai';
 import type { AiAction } from './ai-types';
@@ -43,6 +43,8 @@ import { isWaterType, TileType } from './tile-types';
 import { canPlaceTrapOn, TRAP_COST, trapAlive, trapDamage } from './traps';
 import { canAttack, canDisband, canHeal, canMove, disbandCost, hasPirateDeal, healUnit, makeUnit, movePoints, PIRATE_DEAL_COST, PIRATE_OWNER, Unit, UNIT_MOVE_POINTS, UNIT_TYPES } from './units';
 import { buildWall as applyWall, canBuildWall, upgradeVillage } from './village';
+import { activeWeather, advanceWeather, createWeather, spawnWeather, WEATHER_RULES, type WeatherEvent } from './weather';
+import { applyEarthquake, applyStormTurn } from './weather-effects';
 
 export type Command =
   | { type: CommandType.MOVE; unitId: string; q: number; r: number }
@@ -1278,9 +1280,11 @@ export class Simulator {
       const next = (this.currentPlayerIndex + 1) % this.players.length;
       if (next === 0) {
         this.runPirateTurn();
+        this.applyWeatherEffects();
         this.applyIncome();
         this.turn += 1;
         this.applySeasonChange();
+        this.advanceWeatherEvents();
         this.runBottleTurn();
         this.growTemples();
         this.sweepTraps();
@@ -1305,6 +1309,52 @@ export class Simulator {
       this.emit({ type: GameEventType.TURN_STARTED, playerIndex: next, turn: this.turn });
       return;
     }
+  }
+
+  /** Round-end damage of the storms active during the turn that is ending. */
+  private applyWeatherEffects(): void {
+    for (const storm of activeWeather(this.map)) {
+      if (storm.type !== WeatherType.STORM) continue;
+      const report = applyStormTurn(this.map, storm);
+      if (report.units.length > 0 || report.buildings.length > 0) {
+        this.emit({ type: GameEventType.WEATHER_DAMAGE, weather: { ...storm }, ...report });
+      }
+    }
+  }
+
+  /** Cheat: starts a `type` event right now, ignoring the schedule and the
+   *  chance; with the maximum already active the oldest one is ended first.
+   *  Returns false when the map has no valid place for it. */
+  forceWeather(type: WeatherType): boolean {
+    const active = activeWeather(this.map);
+    if (active.length >= WEATHER_RULES.maxActive) {
+      const [oldest] = active.splice(0, 1);
+      this.emit({ type: GameEventType.WEATHER_ENDED, weather: { ...oldest! } });
+    }
+    const born = createWeather(this.map, type, this.turn, this.rng);
+    if (!born) return false;
+    this.announceWeather(born);
+    return true;
+  }
+
+  private announceWeather(born: WeatherEvent): void {
+    this.emit({ type: GameEventType.WEATHER_STARTED, weather: { ...born } });
+    if (born.type !== WeatherType.EARTHQUAKE) return;
+    const report = applyEarthquake(this.map, born, this.rng);
+    if (report.units.length > 0 || report.buildings.length > 0) {
+      this.emit({ type: GameEventType.WEATHER_DAMAGE, weather: { ...born }, ...report });
+    }
+  }
+
+  /** Once the turn counter has advanced: events age and expire, storms drift,
+   *  and the periodic spawn attempt may bring a new event (an earthquake strikes
+   *  at once). */
+  private advanceWeatherEvents(): void {
+    const { ended, moved } = advanceWeather(this.map, this.rng);
+    for (const weather of ended) this.emit({ type: GameEventType.WEATHER_ENDED, weather: { ...weather } });
+    for (const weather of moved) this.emit({ type: GameEventType.WEATHER_MOVED, weather: { ...weather } });
+    const born = spawnWeather(this.map, this.turn, this.rng);
+    if (born) this.announceWeather(born);
   }
 
   /** On entering winter coast water freezes; on leaving it the ice melts. */

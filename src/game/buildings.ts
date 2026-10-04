@@ -11,6 +11,7 @@ import type { Unit } from './units';
 import { t } from '../i18n';
 import { canBuildBridgeHere, BRIDGE_COST } from './bridges';
 import { BuilderExtraKind, BuildingKind, PortDirection, SkillId } from '@enums';
+import { droughtOverTile, halvedYield } from './weather';
 
 export type BuilderBuildKind = BuildingKind | BuilderExtraKind;
 /** The structures a builder unit can place from its build menu. */
@@ -388,7 +389,9 @@ function buildingYields(map: GameMap, player: Player): { tile: MapTile; wood: nu
     }
     if (tile.building.kind === BuildingKind.MINE) {
       const bonus = hasSkill(player, SkillId.GEOLOGY) ? 1 : 0;
-      out.push({ tile, wood: 0, stone: tile.building.level + bonus, ore: tile.building.level + bonus });
+      // A drought halves a mine's output (never below 1).
+      const produced = droughtOverTile(map, tile) ? halvedYield(tile.building.level + bonus) : tile.building.level + bonus;
+      out.push({ tile, wood: 0, stone: produced, ore: produced });
       continue;
     }
     if (tile.building.kind === BuildingKind.SAWMILL) {

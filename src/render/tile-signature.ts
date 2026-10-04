@@ -4,6 +4,7 @@ import { portDirection } from '../game/buildings';
 import { isExploredFor } from '../game/explore';
 import { adjacentFarmCount } from '../game/food';
 import { BuildingKind } from '@enums';
+import { weatherOverlayAt } from '../game/weather';
 
 export interface Viewport {
   x: number;
@@ -57,6 +58,7 @@ export function tileSignature(
     u ? (u.shipLevel ?? '') : '',
     u ? (u.paidBy ?? []).join(',') : '',
     u ? (u.isStealthed ? 's' : '') : '',
+    weatherOverlayAt(map, tile) ?? '',
     hidden ? 'h' : '',
     tile.building ? tile.building.kind : '',
     tile.building?.kind === BuildingKind.PORT ? (portDirection(map, tile) ?? '-') : '',

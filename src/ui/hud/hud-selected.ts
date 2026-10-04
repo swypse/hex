@@ -35,6 +35,7 @@ import { ACTION_BUTTON_ICON_FILES } from '../kit/action-button-icons';
 import { selectedInfoClosed, setSelectedInfoClosed } from '../../storage/settings';
 import { TOOLBAR_HEIGHT, TURN_BAR_HEIGHT } from '../layout';
 import { BuffId, BuildingKind, FontSize, OverlayKind, SkillId, TutorialStepId, UnitType } from '@enums';
+import { weatherEffectsAt, WEATHER_RULES } from '../../game/weather';
 
 /** Overlay kinds that open a help dialog from a row of the selection panel. */
 type HelpKind =
@@ -261,7 +262,7 @@ export class HudSelected implements Widget {
           ...(y.wood > 0 ? [{ icon: 'wood-32', value: String(y.wood) }] : []),
           ...(y.stone > 0 ? [{ icon: 'stone-32', value: String(y.stone) }] : []),
           ...(y.ore > 0 ? [{ icon: 'ore-32', value: String(y.ore) }] : []),
-          ...(b.kind === BuildingKind.FARM ? [{ icon: 'food-32', value: String(farmYield(owner, gameController.getMap() ?? undefined)) }] : []),
+          ...(b.kind === BuildingKind.FARM ? [{ icon: 'food-32', value: String(farmYield(owner, gameController.getMap() ?? undefined, tile)) }] : []),
           ...(b.kind === BuildingKind.GRANARY ? [{ icon: 'food-32', value: String(b.food ?? 0) }] : []),
         ],
       };
@@ -280,6 +281,18 @@ export class HudSelected implements Widget {
 
     if (tile.bottle) {
       lines.push(t('hud.selected.bottle'));
+      bolds.push(false);
+    }
+
+    // What the active weather does to this tile, if anything.
+    const weatherMap = gameController.getMap();
+    for (const event of weatherMap ? weatherEffectsAt(weatherMap, tile) : []) {
+      lines.push(t(`weather.effect.${event.type}` as never, {
+        damage: WEATHER_RULES.storm.shipDamage,
+        factor: WEATHER_RULES.storm.moveCostFactor,
+        portDamage: WEATHER_RULES.storm.portDamage,
+        portEvery: WEATHER_RULES.storm.portEvery,
+      }));
       bolds.push(false);
     }
 

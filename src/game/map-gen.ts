@@ -7,6 +7,7 @@ import { SeededRandom } from '../util/random';
 import { makeUnit, type Unit } from './units';
 import { claimTileForVillage } from './claim';
 import { placeBonuses, type Bonus } from './bonus';
+import type { WeatherEvent } from './weather';
 import { BridgeDir, BuildingKind, Season, TerrainFeature, UnitType, VillageBlockVariant } from '@enums';
 
 const WATER_BORDER = 2;
@@ -121,6 +122,8 @@ export interface Spawn {
 export interface GameMap {
   /** Current season (kept in sync by the simulator); spring when absent. */
   season?: Season;
+  /** Weather events currently active (see game/weather.ts); absent in saves from before weather. */
+  weather?: WeatherEvent[];
   radius: number;
   tiles: MapTile[];
   spawns: Spawn[];

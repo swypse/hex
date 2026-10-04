@@ -2,12 +2,13 @@ import { Container, Graphics } from 'pixi.js';
 import { gameController } from '../../controller/game-controller';
 import { useGameStore } from '../../store/game-store';
 import { t } from '../../i18n';
-import { advanceCheatBuffer, triggeredCheat, SKILLS_CHEAT_WORD, RESOURCE_CHEAT_WORD, FOG_CHEAT_WORD, PIRATES_CHEAT_WORD, AI_LOGS_CHEAT_WORD, WIN_CHEAT_WORD, SEASON_CHEAT_WORDS } from '../../game/cheats';
+import { advanceCheatBuffer, triggeredCheat, SKILLS_CHEAT_WORD, RESOURCE_CHEAT_WORD, FOG_CHEAT_WORD, PIRATES_CHEAT_WORD, AI_LOGS_CHEAT_WORD, WIN_CHEAT_WORD, SEASON_CHEAT_WORDS, WEATHER_CHEAT_WORDS } from '../../game/cheats';
 import { type ScreenController, type UIHost, type Widget } from '../host';
 import { HudScore } from '../hud/hud-score';
 import { HudPlayers } from '../hud/hud-players';
 import { HudLoading } from '../hud/hud-loading';
 import { HudSeason } from '../hud/hud-season';
+import { HudWeather } from '../hud/hud-weather';
 import { HudTurn } from '../hud/hud-turn';
 import { HudResourcePanel } from '../hud/hud-resource-panel';
 import { HudSelected } from '../hud/hud-selected';
@@ -16,7 +17,7 @@ import { HudToolbar } from '../hud/hud-toolbar';
 import { HudWatchExit } from '../hud/hud-watch-exit';
 import { HudPerf } from '../hud/hud-perf';
 import { HudScrim } from '../hud/hud-scrim';
-import { OverlayKind, ScrimSide, Season } from '@enums';
+import { OverlayKind, ScrimSide, Season, WeatherType } from '@enums';
 
 /** The score HUD: tapping the player's chip opens the stats popup. */
 function scoreHud(): HudScore {
@@ -60,6 +61,8 @@ export class GameScreen implements ScreenController {
       useGameStore.getState().setCenterMessage(t('msg.cheatWin'));
     } else if ((SEASON_CHEAT_WORDS as readonly string[]).includes(cheat)) {
       void gameController.cheatSetSeason(cheat as Season);
+    } else if (WEATHER_CHEAT_WORDS.includes(cheat)) {
+      void gameController.cheatStartWeather(cheat as WeatherType);
     }
   };
 
@@ -89,6 +92,7 @@ export class GameScreen implements ScreenController {
       new HudPlayers(),
       new HudTurn(),
       new HudSeason(),
+      new HudWeather(),
       new HudWatchExit(),
       new HudResourcePanel(),
       new HudSelected(),

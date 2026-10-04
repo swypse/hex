@@ -8,8 +8,10 @@ export const TERRAIN_ATLAS_COLS = 6;
 export const TERRAIN_ATLAS_FRAMES: Record<string, { x: number; y: number; w: number; h: number }> = {
   'bonus': { x: 0, y: 0, w: 256, h: 448 },
   'bottle-on-water': { x: 256, y: 0, w: 256, h: 448 },
-  'fog': { x: 512, y: 0, w: 256, h: 448 },
-  'ice': { x: 768, y: 0, w: 256, h: 448 },
-  'pirates-ship': { x: 1024, y: 0, w: 256, h: 448 },
-  'water': { x: 1280, y: 0, w: 256, h: 448 },
+  'drought': { x: 512, y: 0, w: 256, h: 448 },
+  'fog': { x: 768, y: 0, w: 256, h: 448 },
+  'ice': { x: 1024, y: 0, w: 256, h: 448 },
+  'pirates-ship': { x: 1280, y: 0, w: 256, h: 448 },
+  'storm': { x: 0, y: 448, w: 256, h: 448 },
+  'water': { x: 256, y: 448, w: 256, h: 448 },
 };

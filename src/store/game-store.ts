@@ -5,6 +5,7 @@ import type { LobbyPlayer } from '@/net/peer-session';
 import { activeMatchStore } from '@/storage/active-match';
 import { ConnectionState, GameMode, LobbyRole, NetMode, OverlayKind, PauseReason, Screen, SkillId, TutorialStepId } from '@enums';
 import { create } from 'zustand';
+import type { WeatherEvent } from '@/game/weather';
 
 
 
@@ -51,6 +52,8 @@ interface GameStore {
   screen: Screen;
   players: Player[];
   turn: number;
+  /** Weather events active now, for the HUD. */
+  weather: WeatherEvent[];
   currentPlayerIndex: number;
   aiActive: boolean;
   selection: Selection | null;
@@ -86,6 +89,7 @@ interface GameStore {
   setScreen: (screen: Screen) => void;
   setPlayers: (players: Player[]) => void;
   setTurn: (turn: number) => void;
+  setWeather: (weather: WeatherEvent[]) => void;
   setCurrentPlayerIndex: (index: number) => void;
   setAiActive: (active: boolean) => void;
   setSelection: (selection: Selection | null) => void;
@@ -117,6 +121,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   screen: Screen.START,
   players: [],
   turn: 1,
+  weather: [],
   currentPlayerIndex: 0,
   aiActive: false,
   selection: null,
@@ -170,6 +175,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
   setPlayers: (players) => set({ players }),
   setTurn: (turn) => set({ turn }),
+  setWeather: (weather) => set({ weather }),
   setCurrentPlayerIndex: (index) => set({ currentPlayerIndex: index }),
   setAiActive: (active) => set({ aiActive: active }),
   setSelection: (selection) => set({ selection }),

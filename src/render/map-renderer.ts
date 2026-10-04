@@ -24,7 +24,7 @@ import { tileElevation } from './elevation';
 import { DamageBadgeLayer } from './damage-badge';
 import { FireEffects } from './fire';
 import { captureMarkerPoints, CAPTURE_EDGE_MARKER_ALPHA, CAPTURE_EDGE_MARKER_SIZE, CAPTURE_EDGE_MARKER_SLIDE, CAPTURE_EDGE_PULSE_MS } from './capture-marker';
-import { type TextureSet, type TileTexture } from './texture-factory';
+import { IMAGE_H, IMAGE_HEX_CENTER_Y, IMAGE_HEX_W, type TextureSet, type TileTexture } from './texture-factory';
 import { villageTextureFor, villageOwnerTribe } from './village-texture';
 import { acquireVillageBuildTexture, releaseVillageBuildTexture } from './village-build-texture';
 import { tileSignature, tileInView, granaryFarmCount, type Viewport } from './tile-signature';
@@ -33,6 +33,7 @@ import { Tooltip } from '../ui/kit/tooltip';
 import { THEME } from '../ui/kit/theme';
 import { villageLabelTextColor } from './village-label-color';
 import { unitGlowColor } from './unit-glow-color';
+import { weatherOverlayAt } from '../game/weather';
 import { HP_BAR_BOX_TOP, HP_BAR_HEIGHT, HP_BAR_ICON_GAP, HP_BAR_INNER_W, HP_BAR_OUTER_H, HP_BAR_OUTER_W, HP_BAR_PADDING, HP_LABEL_GAP, HP_LABEL_PAD_X, HP_LABEL_PLATE_GAP, HP_LABEL_RADIUS } from './hp-bar-layout';
 import { icons32FrameTexture } from '../ui/kit/icons32';
 import { BuildingKind, CaptureMarkerSide, FontSize, PortDirection, Season, SelectionKind, UnitFacing, UnitType } from '@enums';
@@ -40,6 +41,9 @@ import { BuildingKind, CaptureMarkerSide, FontSize, PortDirection, Season, Selec
 /** Diameter of a pirate-deal dot (screen px; the row does not scale with zoom). */
 /** Length of one row's bounce in the season ice wave. */
 const ICE_BOUNCE_MS = 150;
+/** Earthquake shake: how many up-down-back cycles each tile plays, and how long one takes. */
+const QUAKE_SHAKE_CYCLES = 5;
+const QUAKE_SHAKE_CYCLE_MS = 110;
 const PIRATE_DEAL_DOT = 8;
 /** Horizontal gap between pirate-deal dots (screen px). */
 const PIRATE_DEAL_GAP = 4;
@@ -96,6 +100,8 @@ interface TileView {
   /** White silhouette glow shown behind the unit sprite while it is selected. */
   glowSprite: Sprite | null;
   territory: Graphics;
+  /** Storm / drought art drawn over the terrain while the tile is inside one. */
+  weatherOverlay: Sprite | null;
   roadGraphics: Graphics | null;
   /** Interactive row of 8px tribe-colored dots, one per active pirate deal. */
   dealCircles: Container | null;
@@ -665,6 +671,7 @@ export class MapView {
         trapSprite: null,
         glowSprite: null,
         territory,
+        weatherOverlay: null,
         roadGraphics: null,
         dealCircles: null,
         signature: '',
@@ -727,6 +734,7 @@ export class MapView {
 
     this.drawTileTerritory(tv.territory, tile, players, explored);
     tv.territory.visible = explored;
+    this.syncWeatherOverlay(tv, tile, explored, p.x, y);
 
     this.drawRoad(tv, tile, explored);
 
@@ -1016,6 +1024,35 @@ export class MapView {
       current.destroy();
       tv[kind] = null;
     }
+  }
+
+  /** The storm or drought texture over an explored tile inside one: the same
+   *  tile frame as the terrain art, anchored on the middle of the top face. It is
+   *  removed again when the weather ends or leaves the tile. */
+  private syncWeatherOverlay(tv: TileView, tile: MapTile, explored: boolean, x: number, y: number): void {
+    const type = explored && this.map ? weatherOverlayAt(this.map, tile) : null;
+    const texture = type ? (this.textures.weatherOverlays?.[type] ?? null) : null;
+    if (!texture) {
+      if (tv.weatherOverlay) {
+        tv.el.removeChild(tv.weatherOverlay);
+        tv.weatherOverlay.destroy();
+        tv.weatherOverlay = null;
+      }
+      return;
+    }
+    if (!tv.weatherOverlay || tv.weatherOverlay.destroyed) {
+      const sprite = new Sprite(texture);
+      sprite.anchor.set(0.5, IMAGE_HEX_CENTER_Y / IMAGE_H);
+      sprite.scale.set((Math.sqrt(3) * this.hexSize) / IMAGE_HEX_W);
+      // Above the terrain and the territory border, under villages, buildings and units.
+      sprite.zIndex = 2.5;
+      sprite.eventMode = 'none';
+      tv.el.addChild(sprite);
+      tv.weatherOverlay = sprite;
+    } else if (tv.weatherOverlay.texture !== texture) {
+      tv.weatherOverlay.texture = texture;
+    }
+    tv.weatherOverlay.position.set(x, y);
   }
 
   private drawTileTerritory(g: Graphics, tile: MapTile, players: Player[], explored: boolean): void {
@@ -1524,6 +1561,8 @@ export class MapView {
     const tv = this.tileViews.get(axialKey({ q, r }));
     if (!tv) return;
     const sprites = this.hexSurfaceSprites(tv);
+    // An unexplored tile shows its fog sprite instead of its terrain.
+    if (tv.fogSprite.visible && !tv.fogSprite.destroyed) sprites.push(tv.fogSprite);
     if (sprites.length === 0) return;
     this.runHexBounce(sprites.map((sprite) => ({ obj: sprite, baseY: sprite.position.y, delay: 0 })));
   }
@@ -1613,17 +1652,22 @@ export class MapView {
     return null;
   }
 
+  /** Moves the entries up and back down once (or `repeats` times). With `shake`
+   *  each cycle goes up, then below the start, then back to the start. */
   private runHexBounce(
     entries: { obj: Sprite | Graphics; baseY: number; delay: number }[],
     duration = 150,
     amp = this.hexSize * 0.2,
+    repeats = 1,
+    shake = false,
   ): void {
     this.stopHexBounce();
     this.hexBounceSprites = entries;
     if (entries.length === 0) return;
     const start = performance.now();
     const maxDelay = entries.reduce((m, e) => Math.max(m, e.delay), 0);
-    const endAt = start + duration + maxDelay;
+    const total = duration * repeats;
+    const endAt = start + total + maxDelay;
     const fn = (): void => {
       const active = this.hexBounceSprites.filter((e) => !e.obj.destroyed);
       if (active.length === 0) {
@@ -1634,8 +1678,12 @@ export class MapView {
       for (const e of active) {
         const local = elapsed - e.delay;
         if (local < 0) continue;
-        const t = Math.min(1, local / duration);
-        const p = t < 0.5 ? t * 2 : 2 - t * 2;
+        if (local >= total) {
+          e.obj.position.y = e.baseY;
+          continue;
+        }
+        const t = (local % duration) / duration;
+        const p = shake ? Math.sin(t * Math.PI * 2) : t < 0.5 ? t * 2 : 2 - t * 2;
         e.obj.position.y = e.baseY - p * amp;
       }
       if (performance.now() >= endAt) this.stopHexBounce();
@@ -1699,6 +1747,23 @@ export class MapView {
         }, (r - topRow) * rowDelayMs + ICE_BOUNCE_MS);
       }
     });
+  }
+
+  /** Earthquake: every tile in `tiles` (its terrain, village, building, bridge
+   *  and unit) shakes up, down and back `cycles` times, each tile starting after
+   *  its own random delay. Returns the animation's length in ms. */
+  shakeTiles(tiles: { q: number; r: number }[], cycles = QUAKE_SHAKE_CYCLES, cycleMs = QUAKE_SHAKE_CYCLE_MS, maxDelayMs = 100): number {
+    const entries: { obj: Sprite | Graphics; baseY: number; delay: number }[] = [];
+    for (const tile of tiles) {
+      const tv = this.tileViews.get(axialKey(tile));
+      if (!tv) continue;
+      const sprites = this.hexSurfaceSprites(tv);
+      if (tv.unitSprite && !tv.unitSprite.destroyed) sprites.push(tv.unitSprite);
+      const delay = Math.random() * maxDelayMs;
+      for (const s of sprites) entries.push({ obj: s, baseY: s.position.y, delay });
+    }
+    this.runHexBounce(entries, cycleMs, this.hexSize * 0.12, cycles, true);
+    return entries.length > 0 ? cycleMs * cycles + maxDelayMs : 0;
   }
 
   /** Points the terrain sprites of `tiles` at the textures of another bake

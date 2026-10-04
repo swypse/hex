@@ -365,6 +365,32 @@ spring, 7-12 summer, 13-18 autumn, 19-24 winter, then spring again). The HUD sho
   still be used.
 - **Spring — thaw.** When spring begins all ice melts back into water, and every unit still standing on ice is lost.
 
+## Weather
+
+From turn 9 on, every 3rd turn (9, 12, 15, …) a random weather event tries to appear with a **30%** chance, unless 2
+events are already active. A random type is picked (storm, drought or earthquake) and it appears on a random valid tile;
+a type with no valid tile (e.g. no mountain) just fails that attempt. Every event has a **center** and a **radius** (its
+scope of action, in hexes), and a lifetime in turns. The HUD lists active events under the season text as
+`Name N/M` (N = turns it has existed, M = its lifetime; just the name for the one-turn earthquake); tapping a line centers the map on the event's center tile and
+plays the selected-hex bounce on it. Everyone is told when an event starts ("Storm in the
+southeast": the direction is one of eight compass points from the middle of the map, or "in the center") and when it
+ends ("Storm is over"); the one-turn earthquake has no end message. Selecting a tile shows what the active weather does to it (a storm on water, a drought on land, an earthquake on
+anything in its scope). Weather is part of the saved game and of the
+multiplayer state. Tuning values live in `WEATHER_RULES` (`src/game/weather.ts`).
+
+- **Storm** — 6 turns, appears on a random water tile, radius 2-4. At the end of each turn every ship and pirate ship in
+  scope takes **10 damage**, and every port in scope takes **1 damage** on every second turn of the storm. Leaving a
+  water tile in scope costs **2x** move points. At the end of each turn the center drifts one tile onto another water
+  tile with 50% chance, never onto a tile that was already a center of the same storm. Water in scope is covered with
+  the storm texture (`terrain/storm.png`).
+- **Drought** — 5 turns, appears on a random land tile, radius 2-4. Farms in scope produce half the food and mines half
+  the stone and ore (rounded up, never below 1, so only a mine boosted by Geology actually loses output). Land tiles in
+  scope are covered with the drought texture (`terrain/drought.png`); water is not marked.
+- **Earthquake** — 1 turn, appears on a random mountain tile, radius 1-3. When it appears each building in scope takes
+  1 damage with 60% probability and each unit in scope takes **20 damage** with 60% probability. Villages and walls are
+  not affected. Before it strikes the map centers on its center tile (when the player has explored it); then the tiles in scope shake (up,
+  down and back, 5 times, each tile starting after a random 0-100 ms delay).
+
 ## Map
 
 - Hex grid. Radius depends on player count: 2 players → 8, 3 → 9, 4 → 10, 5 → 11, 6 → 12, 7 → 13.

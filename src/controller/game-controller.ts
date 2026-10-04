@@ -42,7 +42,7 @@ import { saveRepository } from '@/storage/save-game';
 import { welcomeDismissed } from '@/storage/settings';
 import { confirmLeaveGame, useGameStore } from '@/store/game-store';
 import { SeededRandom } from '@/util';
-import { AiDifficulty, BuildingKind, CommandType, GameMode, NetMode, OverlayKind, Screen, Season, SelectionKind, SkillId, TutorialStepId, UnitType } from '@enums';
+import { AiDifficulty, BuildingKind, CommandType, GameMode, NetMode, OverlayKind, Screen, Season, SelectionKind, SkillId, TutorialStepId, UnitType, WeatherType } from '@enums';
 import { Application, Container } from 'pixi.js';
 import { CAMERA_FOLLOW_MS, CameraController } from './camera-controller';
 import { damagePreviewVictim } from './damage-preview';
@@ -51,6 +51,7 @@ import { HoldTimer } from './hold-timer';
 import { NetworkController } from './network-controller';
 import { TutorialDirector, type TutorialHost } from './tutorial-director';
 import { runSliced } from '@/util/time-slice';
+import { weatherCopies } from '@/game/weather';
 
 const HEX_SIZE = 40;
 const VILLAGE_START_OFFSET = 200;
@@ -314,6 +315,7 @@ class GameController {
       })),
     );
     store.setTurn(this.sim.turn);
+    store.setWeather(weatherCopies(this.sim.map));
     store.setCurrentPlayerIndex(this.sim.currentPlayerIndex);
     store.setGameOver(this.sim.gameOver);
     store.setWinnerIndex(this.sim.winnerIndex);
@@ -455,6 +457,7 @@ class GameController {
     store.setPlayers(snap.players);
     store.setMode(snap.mode);
     store.setTurn(snap.turn);
+    store.setWeather(weatherCopies(snap.map));
     store.setCurrentPlayerIndex(snap.currentPlayerIndex);
     store.setGameOver(snap.gameOver);
     store.setWinnerIndex(snap.winnerIndex);
@@ -751,6 +754,7 @@ class GameController {
         syncKnownTribes: (notify) => this.syncKnownTribes(notify),
         enqueue: (task) => this.enqueue(task),
         bringCellIntoView: (q, r) => this.bringCellIntoView(q, r),
+        centerOnCell: (q, r) => this.centerOnTile(q, r),
         exploredKeysFor: (playerIndex) => this.exploredKeysFor(playerIndex),
         saveGame: () => this.saveGame(),
       });
@@ -860,6 +864,31 @@ class GameController {
       y: this.mapHeight() / 2 - world.y * camera.scale,
     };
     await camera.animateTo(target, true, CAMERA_FOLLOW_MS);
+  }
+
+  /** Centers the camera on a tile (whatever is visible now) and, once it has
+   *  arrived, plays the selected-hex bounce on it. */
+  async focusTile(q: number, r: number): Promise<void> {
+    if (!this.mapView) return;
+    await this.centerOnTile(q, r);
+    this.mapView?.bounceHex(q, r);
+    markDirty();
+  }
+
+  /** Slides the camera so the tile is in the middle of the screen (as far as the
+   *  map edge allows), whatever is visible now. */
+  private async centerOnTile(q: number, r: number): Promise<void> {
+    if (!this.app || !this.sim) return;
+    const camera = this.getCamera();
+    const world = hexToPixel({ q, r }, HEX_SIZE);
+    await camera.animateTo(
+      {
+        x: this.app.screen.width / 2 - world.x * camera.scale,
+        y: this.mapHeight() / 2 - world.y * camera.scale,
+      },
+      true,
+      CAMERA_FOLLOW_MS,
+    );
   }
 
   private centerOnStartVillage(): void {
@@ -1479,6 +1508,23 @@ class GameController {
       if (!this.sim || this.sim.gameOver) return;
       const preExplored = this.exploredKeysFor(store.localPlayerIndex);
       applied = this.sim.forceSeason(season);
+      if (!applied) return;
+      this.saveGame();
+      await this.presentEvents(this.sim.drainEvents(), preExplored);
+      this.syncStore();
+    }).then(() => applied);
+  }
+
+  /** Cheat (single-player only): starts a weather event of `type` right now and
+   *  plays it. Returns true when applied. */
+  cheatStartWeather(type: WeatherType): Promise<boolean> {
+    const store = useGameStore.getState();
+    if (!this.sim || store.screen !== Screen.GAME || store.netMode !== NetMode.SINGLE) return Promise.resolve(false);
+    let applied = false;
+    return this.enqueue(async () => {
+      if (!this.sim || this.sim.gameOver) return;
+      const preExplored = this.exploredKeysFor(store.localPlayerIndex);
+      applied = this.sim.forceWeather(type);
       if (!applied) return;
       this.saveGame();
       await this.presentEvents(this.sim.drainEvents(), preExplored);

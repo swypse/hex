@@ -19,6 +19,7 @@ import { seasonForTurn } from '../game/season';
 import { createTextures, TextureSet } from '../render/texture-factory';
 import { activeMatchStore } from '../storage/active-match';
 import { ClientMessageType, CommandType, ConnectionState, GameMode, HostMessageType, LobbyRole, NetMode, OverlayKind, PauseReason, Screen, SelectionKind } from '@enums';
+import { weatherCopies } from '../game/weather';
 
 /** How long a dropped player stays unmarked-by-modal before the host pause
  *  modal fires: transient network flaps (or a fast refresh) that resolve within
@@ -572,6 +573,7 @@ export class NetworkController {
         store.setPlayers(msg.state.players);
         store.setMode(msg.state.mode);
         store.setTurn(msg.state.turn);
+        store.setWeather(weatherCopies(msg.state.map));
         store.setCurrentPlayerIndex(msg.state.currentPlayerIndex);
         store.setGameOver(msg.state.gameOver);
         store.setWinnerIndex(msg.state.winnerIndex);
