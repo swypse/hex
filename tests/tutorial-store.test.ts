@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { useGameStore } from '../src/store/game-store';
 import { gameController } from '../src/controller/game-controller';
+import { SkillId, TutorialStepId } from '@enums';
 
 describe('tutorial store fields', () => {
   it('defaults to inactive', () => {
@@ -14,13 +15,13 @@ describe('tutorial store fields', () => {
   it('persists tutorial state and highlight setters', () => {
     const s = useGameStore.getState();
     s.setTutorial(true);
-    s.setTutorialStep('moveUnit');
-    s.setTutorialHighlightSkills(['forestry']);
+    s.setTutorialStep(TutorialStepId.MOVE_UNIT);
+    s.setTutorialHighlightSkills([SkillId.FORESTRY]);
     s.setTutorialHighlightEndTurn(true);
     const t = useGameStore.getState();
     expect(t.tutorial).toBe(true);
-    expect(t.tutorialStep).toBe('moveUnit');
-    expect(t.tutorialHighlightSkills).toEqual(['forestry']);
+    expect(t.tutorialStep).toBe(TutorialStepId.MOVE_UNIT);
+    expect(t.tutorialHighlightSkills).toEqual([SkillId.FORESTRY]);
     expect(t.tutorialHighlightEndTurn).toBe(true);
     s.setTutorial(false);
     s.setTutorialStep(null);

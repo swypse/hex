@@ -1,11 +1,12 @@
 import { t } from '../../i18n';
+import { ResourceKind } from '@enums';
 
 interface ResourceTooltipInfo {
   name: string;
   requiredFor: string;
 }
 
-export const RESOURCE_TOOLTIPS: Record<'money' | 'wood' | 'stone' | 'ore' | 'food', ResourceTooltipInfo> = {
+export const RESOURCE_TOOLTIPS: Record<ResourceKind, ResourceTooltipInfo> = {
   money: { name: t('res.money'), requiredFor: t('res.req.money') },
   wood: { name: t('res.wood'), requiredFor: t('res.req.wood') },
   stone: { name: t('res.stone'), requiredFor: t('res.req.stone') },

@@ -3,6 +3,7 @@ import { BitmapText, Container, Sprite, Text } from 'pixi.js';
 import { HudResourcePanel } from '../src/ui/hud/hud-resource-panel';
 import { useGameStore } from '../src/store/game-store';
 import { type UIHost } from '../src/ui/host';
+import { Screen } from '@enums';
 
 function fakeCanvasContext() {
   return {
@@ -39,7 +40,7 @@ describe('HudResourcePanel placement', () => {
     };
     host = makeHost();
     root = new Container();
-    useGameStore.setState({ screen: 'game', players: [], localPlayerIndex: 0 });
+    useGameStore.setState({ screen: Screen.GAME, players: [], localPlayerIndex: 0 });
   });
 
   it('is docked to the top edge', () => {

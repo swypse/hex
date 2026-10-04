@@ -10,6 +10,7 @@ import {
   releaseVillageBuildTexture,
 } from '../src/render/village-build-texture';
 import type { SettlementBuild } from '../src/game/map-gen';
+import { VillageBlockVariant } from '@enums';
 
 describe('villageBuildFrames', () => {
   it('level 1: eight top t1 blocks in draw order at column origins', () => {
@@ -30,8 +31,8 @@ describe('villageBuildFrames', () => {
 
   it('level 2: tall columns rise by one 28px step, bottoms stay put', () => {
     const build: SettlementBuild = {
-      l: [[], ['m1'], ['m1']],
-      r: [['m1'], ['m1']],
+      l: [[], [VillageBlockVariant.M1], [VillageBlockVariant.M1]],
+      r: [[VillageBlockVariant.M1], [VillageBlockVariant.M1]],
       lBack: [[], []],
       rBack: [[]],
     };
@@ -59,10 +60,10 @@ describe('villageBuildFrames', () => {
 
   it('level 3: uses recorded variants; back columns read lBack/rBack', () => {
     const build: SettlementBuild = {
-      l: [['m2'], ['m1'], ['m1']],
-      r: [['m1'], ['m1']],
-      lBack: [['m1'], ['m1']],
-      rBack: [['m1']],
+      l: [[VillageBlockVariant.M2], [VillageBlockVariant.M1], [VillageBlockVariant.M1]],
+      r: [[VillageBlockVariant.M1], [VillageBlockVariant.M1]],
+      lBack: [[VillageBlockVariant.M1], [VillageBlockVariant.M1]],
+      rBack: [[VillageBlockVariant.M1]],
     };
     const { frames } = villageBuildFrames(3, build);
     expect(frames).toHaveLength(16);
@@ -101,9 +102,9 @@ describe('villageBuildFrames', () => {
 
 describe('villageBuildSignature', () => {
   it('distinguishes level and every column variant', () => {
-    const a: SettlementBuild = { l: [['m1'], [], []], r: [[], []] };
-    const b: SettlementBuild = { l: [['m2'], [], []], r: [[], []] };
-    const c: SettlementBuild = { l: [['m1'], [], []], r: [[], []], lBack: [['m2'], []] };
+    const a: SettlementBuild = { l: [[VillageBlockVariant.M1], [], []], r: [[], []] };
+    const b: SettlementBuild = { l: [[VillageBlockVariant.M2], [], []], r: [[], []] };
+    const c: SettlementBuild = { l: [[VillageBlockVariant.M1], [], []], r: [[], []], lBack: [[VillageBlockVariant.M2], []] };
     expect(villageBuildSignature(2, a)).toBe('2|m1;;|;||');
     expect(villageBuildSignature(2, a)).not.toBe(villageBuildSignature(2, b));
     expect(villageBuildSignature(2, c)).not.toBe(villageBuildSignature(2, a));

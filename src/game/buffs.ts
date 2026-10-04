@@ -3,8 +3,9 @@ import { isShip } from './ship';
 import { isForestType } from './tile-types';
 import { Unit } from './units';
 import { t } from '../i18n';
+import { BuffId, BuildingKind } from '@enums';
 
-export type BuffId = 'waterProtection' | 'forestProtection';
+
 
 const TEMPLE_BUFF_THRESHOLD = 3;
 
@@ -28,7 +29,7 @@ export const BUFF_INFO: Record<BuffId, { name: string; icon: string; tooltip: st
 
 /** Number of owned temples of the kind that feeds `buff`. */
 export function templeCount(map: GameMap, playerIndex: number, buff: BuffId): number {
-  const kind = buff === 'waterProtection' ? 'temple' : 'forestTemple';
+  const kind = buff === BuffId.WATER_PROTECTION ? BuildingKind.TEMPLE : BuildingKind.FOREST_TEMPLE;
   let n = 0;
   for (const t of map.tiles) {
     if (t.ownedBy === playerIndex && t.building?.kind === kind) n++;
@@ -41,12 +42,12 @@ export function activeBuffs(map: GameMap, playerIndex: number): BuffId[] {
   let forest = 0;
   for (const t of map.tiles) {
     if (t.ownedBy !== playerIndex || !t.building) continue;
-    if (t.building.kind === 'temple') water++;
-    else if (t.building.kind === 'forestTemple') forest++;
+    if (t.building.kind === BuildingKind.TEMPLE) water++;
+    else if (t.building.kind === BuildingKind.FOREST_TEMPLE) forest++;
   }
   const buffs: BuffId[] = [];
-  if (water >= TEMPLE_BUFF_THRESHOLD) buffs.push('waterProtection');
-  if (forest >= TEMPLE_BUFF_THRESHOLD) buffs.push('forestProtection');
+  if (water >= TEMPLE_BUFF_THRESHOLD) buffs.push(BuffId.WATER_PROTECTION);
+  if (forest >= TEMPLE_BUFF_THRESHOLD) buffs.push(BuffId.FOREST_PROTECTION);
   return buffs;
 }
 
@@ -54,8 +55,8 @@ export function damageReduction(map: GameMap, unit: Unit, tile: MapTile): number
   if (unit.owner < 0) return 0;
   const buffs = activeBuffs(map, unit.owner);
   let reduction = 0;
-  if (buffs.includes('waterProtection') && isShip(unit)) reduction += 10;
-  if (buffs.includes('forestProtection') && isForestType(tile.terrain)) reduction += 10;
+  if (buffs.includes(BuffId.WATER_PROTECTION) && isShip(unit)) reduction += 10;
+  if (buffs.includes(BuffId.FOREST_PROTECTION) && isForestType(tile.terrain)) reduction += 10;
   if (tile.settlement?.wall && tile.settlement.owner === unit.owner) reduction += 3;
   if (tile.settlement && tile.settlement.owner === unit.owner) reduction += VILLAGE_DEFENSE;
   return reduction;

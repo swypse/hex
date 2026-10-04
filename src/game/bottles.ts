@@ -3,6 +3,7 @@ import { isWaterType } from './tile-types';
 import { hasBridge } from './bridges';
 import { isShip } from './ship';
 import { canMove, canAttack } from './units';
+import { BottleEffect } from '@enums';
 
 export const BOTTLE_SPAWN_TURNS = 2;
 export const BOTTLE_SPAWN_PROBABILITY = 0.2;
@@ -10,15 +11,14 @@ const BOTTLE_LIFETIME_TURNS = 5;
 export const BOTTLE_MONEY = 50;
 export const BOTTLE_HEAL = 20;
 
-/** What a collected bottle turns out to hold. */
-export type BottleEffect = 'money' | 'skill' | 'heal';
+
 
 /** Picks a random bottle effect with equal chances. */
 export function randomBottleEffectKind(rng: () => number): BottleEffect {
   const d = rng();
-  if (d < 1 / 3) return 'money';
-  if (d < 2 / 3) return 'skill';
-  return 'heal';
+  if (d < 1 / 3) return BottleEffect.MONEY;
+  if (d < 2 / 3) return BottleEffect.SKILL;
+  return BottleEffect.HEAL;
 }
 
 /** Free non-owned water hexes where a bottle may float: water terrain, not

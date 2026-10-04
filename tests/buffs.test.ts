@@ -3,6 +3,7 @@ import { activeBuffs, damageReduction, BUFF_INFO, VILLAGE_DEFENSE } from '../src
 import { GameMap, MapTile } from '../src/game/map-gen';
 import { TileType } from '../src/game/tile-types';
 import { Unit } from '../src/game/units';
+import { BuffId, BuildingKind, UnitType } from '@enums';
 
 function tile(q: number, r: number, terrain: TileType, ownedBy: number | null, building: MapTile['building'] = null): MapTile {
   return { q, r, terrain, settlement: null, building, unit: null, ownedBy, claimedByVillage: null };
@@ -12,10 +13,10 @@ function makeWaterMap(): GameMap {
   return {
     radius: 4,
     tiles: [
-      tile(0, 0, TileType.Water, 0, { kind: 'temple', level: 1 }),
-      tile(1, 0, TileType.Water, 0, { kind: 'temple', level: 1 }),
-      tile(2, 0, TileType.Water, 0, { kind: 'temple', level: 1 }),
-      tile(3, 0, TileType.Water, 1, { kind: 'temple', level: 1 }),
+      tile(0, 0, TileType.Water, 0, { kind: BuildingKind.TEMPLE, level: 1 }),
+      tile(1, 0, TileType.Water, 0, { kind: BuildingKind.TEMPLE, level: 1 }),
+      tile(2, 0, TileType.Water, 0, { kind: BuildingKind.TEMPLE, level: 1 }),
+      tile(3, 0, TileType.Water, 1, { kind: BuildingKind.TEMPLE, level: 1 }),
     ],
     spawns: [],
   };
@@ -25,9 +26,9 @@ function makeForestMap(): GameMap {
   return {
     radius: 4,
     tiles: [
-      tile(0, 0, TileType.GrasslandForest, 0, { kind: 'forestTemple', level: 1 }),
-      tile(1, 0, TileType.GrasslandForest, 0, { kind: 'forestTemple', level: 1 }),
-      tile(2, 0, TileType.GrasslandForest, 0, { kind: 'forestTemple', level: 1 }),
+      tile(0, 0, TileType.GrasslandForest, 0, { kind: BuildingKind.FOREST_TEMPLE, level: 1 }),
+      tile(1, 0, TileType.GrasslandForest, 0, { kind: BuildingKind.FOREST_TEMPLE, level: 1 }),
+      tile(2, 0, TileType.GrasslandForest, 0, { kind: BuildingKind.FOREST_TEMPLE, level: 1 }),
     ],
     spawns: [],
   };
@@ -35,7 +36,7 @@ function makeForestMap(): GameMap {
 
 function makeUnit(id: string, owner: number, q: number, r: number, ship: boolean): Unit {
   return {
-    id, owner, type: 'warrior', q, r, hasMoved: false, hasAttacked: false, hasHealed: false,
+    id, owner, type: UnitType.WARRIOR, q, r, hasMoved: false, hasAttacked: false, hasHealed: false,
     hp: 5, attack: 2, attackDistance: 1, spawnVillage: null,
     ...(ship ? { shipLevel: 1 as const } : {}),
   };
@@ -47,11 +48,11 @@ describe('activeBuffs', () => {
   });
 
   it('gives water protection at 3 owned water temples', () => {
-    expect(activeBuffs(makeWaterMap(), 0)).toContain('waterProtection');
+    expect(activeBuffs(makeWaterMap(), 0)).toContain(BuffId.WATER_PROTECTION);
   });
 
   it('gives forest protection at 3 owned forest temples', () => {
-    expect(activeBuffs(makeForestMap(), 0)).toContain('forestProtection');
+    expect(activeBuffs(makeForestMap(), 0)).toContain(BuffId.FOREST_PROTECTION);
   });
 });
 

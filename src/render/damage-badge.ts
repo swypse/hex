@@ -8,15 +8,15 @@ import type { GameMap, MapTile } from '../game/map-gen';
 import type { Player } from '../game/players';
 import type { Unit } from '../game/units';
 import type { Viewport } from './tile-signature';
+import { BadgeAnimPhase, FontSize } from '@enums';
+import { HP_LABEL_UP } from './hp-bar-layout';
 
 /** Font size of the damage-preview `-N` label. */
-const DAMAGE_BADGE_FONT_SIZE = 14;
+const DAMAGE_BADGE_FONT_SIZE = FontSize.SMALL;
 /** Corner radius of the damage-preview badge rect. */
 const DAMAGE_BADGE_RADIUS = 2;
 /** Vertical gap between the badge caret tip and the hp text (px). */
 const DAMAGE_BADGE_ABOVE_TEXT = 4;
-/** Pixels above the hp-bar anchor at which the hp label sits (its bottom). */
-const HP_LABEL_UP = 13;
 /** Fill color of the badge rect and caret. */
 const DAMAGE_BADGE_BG = 0x111111;
 /** Whitespace around the badge content (world px). */
@@ -73,7 +73,7 @@ export class DamageBadgeLayer {
    *  badge for a tile instead of tearing it down and fading it again from 0. */
   private badgeByKey = new Map<string, Container>();
   /** Badge elements in an active fade phase. */
-  private badgeAnim = new Map<Container, { phase: 'in' | 'out'; start: number }>();
+  private badgeAnim = new Map<Container, { phase: BadgeAnimPhase; start: number }>();
   private badgeAnimRemove: (() => void) | null = null;
 
   constructor(private readonly opts: DamageBadgeLayerOptions) {
@@ -191,7 +191,7 @@ export class DamageBadgeLayer {
       if (outer.destroyed) continue;
       const el = outer.children[0] as Container;
       changed = true;
-      this.badgeAnim.set(el, { phase: 'out', start: now });
+      this.badgeAnim.set(el, { phase: BadgeAnimPhase.OUT, start: now });
     }
     if (!changed) return;
     this.ensureTick();
@@ -211,7 +211,7 @@ export class DamageBadgeLayer {
     if (existing && !existing.destroyed) {
       const existingEl = existing.children[0] as Container;
       const anim = this.badgeAnim.get(existingEl);
-      if (!anim || anim.phase === 'in') return;
+      if (!anim || anim.phase === BadgeAnimPhase.IN) return;
     }
     const p = hexToPixel(tile, this.hexSize);
     const y = p.y - tileElevation(tile, this.hexSize);
@@ -278,7 +278,7 @@ export class DamageBadgeLayer {
     // Fade the badge in (alpha only; the outer tracks the world position via
     // syncPositions).
     el.alpha = 0;
-    this.badgeAnim.set(el, { phase: 'in', start: performance.now() });
+    this.badgeAnim.set(el, { phase: BadgeAnimPhase.IN, start: performance.now() });
     this.ensureTick();
   }
 
@@ -298,7 +298,7 @@ export class DamageBadgeLayer {
           continue;
         }
         const t = Math.min(1, (now - anim.start) / DAMAGE_BADGE_ANIM_MS);
-        if (anim.phase === 'in') {
+        if (anim.phase === BadgeAnimPhase.IN) {
           el.alpha = t;
           if (t >= 1) {
             el.alpha = 1;

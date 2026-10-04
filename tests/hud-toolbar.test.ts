@@ -12,7 +12,7 @@ import { IconButton } from '../src/ui/kit/icon-button';
 import { TileType } from '../src/game/tile-types';
 import { hexNeighbors } from '../src/game/hex';
 import { type UIHost } from '../src/ui/host';
-import { GameMode } from '@enums';
+import { BonusKind, GameMode, SelectionKind, SkillId, TutorialStepId, UnitType } from '@enums';
 
 function fakeCanvasContext() {
   return {
@@ -53,7 +53,7 @@ describe('HudToolbar build actions', () => {
     };
     map = generateMap(2, 42);
     const players = buildPlayers(0, 1, new SeededRandom(1));
-    players[0]!.skills.push('forestry', 'smithery', 'water');
+    players[0]!.skills.push(SkillId.FORESTRY, SkillId.SMITHERY, SkillId.WATER);
     giveResources(map, players[0]!, { wood: 100, stone: 100, money: 500, ore: 100, food: 20 });
     const sim = new Simulator(map, players, GameMode.CAPTURE);
     sim.startGame();
@@ -77,11 +77,11 @@ describe('HudToolbar build actions', () => {
   });
 
   function select(tile: MapTile): void {
-    useGameStore.getState().setSelection({ kind: 'unit', q: tile.q, r: tile.r });
+    useGameStore.getState().setSelection({ kind: SelectionKind.UNIT, q: tile.q, r: tile.r });
   }
 
   function selectCell(tile: MapTile): void {
-    useGameStore.getState().setSelection({ kind: 'tile', q: tile.q, r: tile.r });
+    useGameStore.getState().setSelection({ kind: SelectionKind.TILE, q: tile.q, r: tile.r });
   }
 
   function ownedTile(terrain: TileType): MapTile {
@@ -133,9 +133,9 @@ describe('HudToolbar build actions', () => {
 
   it('shows a Get the bonus icon button when a claimable bonus cell is selected', () => {
     const t = map.tiles.find((x) => x.settlement === null && x.unit === null)!;
-    t.bonus = { kind: 'money', claimer: 0, arrivalTurn: 1 };
+    t.bonus = { kind: BonusKind.MONEY, claimer: 0, arrivalTurn: 1 };
     t.unit = {
-      id: 'b1', owner: 0, type: 'warrior', q: t.q, r: t.r,
+      id: 'b1', owner: 0, type: UnitType.WARRIOR, q: t.q, r: t.r,
       hasMoved: false, hasAttacked: false, hasHealed: false,
       hp: 50, attack: 2, attackDistance: 1, spawnVillage: null,
     };
@@ -222,7 +222,7 @@ describe('HudToolbar tutorial build highlights', () => {
     };
     map = generateMap(2, 42);
     const players = buildPlayers(0, 1, new SeededRandom(1));
-    players[0]!.skills.push('forestry', 'smithery');
+    players[0]!.skills.push(SkillId.FORESTRY, SkillId.SMITHERY);
     giveResources(map, players[0]!, { wood: 100, stone: 100, money: 500, ore: 100, food: 20 });
     const sim = new Simulator(map, players, GameMode.CAPTURE);
     sim.startGame();
@@ -245,11 +245,11 @@ describe('HudToolbar tutorial build highlights', () => {
   });
 
   function select(tile: MapTile): void {
-    useGameStore.getState().setSelection({ kind: 'unit', q: tile.q, r: tile.r });
+    useGameStore.getState().setSelection({ kind: SelectionKind.UNIT, q: tile.q, r: tile.r });
   }
 
   function selectCell(tile: MapTile): void {
-    useGameStore.getState().setSelection({ kind: 'tile', q: tile.q, r: tile.r });
+    useGameStore.getState().setSelection({ kind: SelectionKind.TILE, q: tile.q, r: tile.r });
   }
 
   function ownedTile(terrain: TileType): MapTile {
@@ -267,7 +267,7 @@ describe('HudToolbar tutorial build highlights', () => {
     neighbor.terrain = TileType.GrasslandForest;
     const store = useGameStore.getState();
     store.setTutorial(true);
-    store.setTutorialStep('buildSawmill');
+    store.setTutorialStep(TutorialStepId.BUILD_SAWMILL);
     selectCell(tile);
     expect(row.children.length).toBe(4);
     expect(row.children[2]).toBeInstanceOf(Graphics);
@@ -277,7 +277,7 @@ describe('HudToolbar tutorial build highlights', () => {
     const tile = ownedTile(TileType.GrasslandMountain);
     const store = useGameStore.getState();
     store.setTutorial(true);
-    store.setTutorialStep('buildMine');
+    store.setTutorialStep(TutorialStepId.BUILD_MINE);
     selectCell(tile);
     expect(row.children.length).toBe(4);
     expect(row.children[2]).toBeInstanceOf(Graphics);
@@ -287,8 +287,8 @@ describe('HudToolbar tutorial build highlights', () => {
     const capital = map.tiles.find((t) => t.settlement?.owner === 0)!;
     const store = useGameStore.getState();
     store.setTutorial(true);
-    store.setTutorialStep('upgradeVillage');
-    useGameStore.getState().setSelection({ kind: 'tile', q: capital.q, r: capital.r });
+    store.setTutorialStep(TutorialStepId.UPGRADE_VILLAGE);
+    useGameStore.getState().setSelection({ kind: SelectionKind.TILE, q: capital.q, r: capital.r });
     // The garrison's disband action now also shows alongside the upgrade.
     expect(row.children.length).toBe(5);
     expect(row.children[2]).toBeInstanceOf(Graphics);
@@ -301,7 +301,7 @@ describe('HudToolbar tutorial build highlights', () => {
     neighbor.terrain = TileType.GrasslandForest;
     const store = useGameStore.getState();
     store.setTutorial(true);
-    store.setTutorialStep('spawnArcher');
+    store.setTutorialStep(TutorialStepId.SPAWN_ARCHER);
     selectCell(tile);
     expect(row.children.length).toBe(3);
   });
@@ -313,7 +313,7 @@ describe('HudToolbar tutorial build highlights', () => {
     neighbor.terrain = TileType.GrasslandForest;
     const store = useGameStore.getState();
     store.setTutorial(true);
-    store.setTutorialStep('buildSawmill');
+    store.setTutorialStep(TutorialStepId.BUILD_SAWMILL);
     select(tile);
     expect((toolbar as unknown as { tooltips: unknown[] }).tooltips.length).toBe(0);
     store.setTutorial(false);

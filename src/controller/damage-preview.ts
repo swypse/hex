@@ -1,6 +1,7 @@
 import { GameMap, MapTile } from '../game/map-gen';
 import { Selection } from '../game/selection';
 import { isExploredFor } from '../game/explore';
+import { SelectionKind } from '@enums';
 
 /** Whether a long-press on `tile` should start a damage preview, and returns
  *  the enemy tile to preview when it should (null otherwise). A preview needs
@@ -12,7 +13,7 @@ export function damagePreviewVictim(
   localPlayerIndex: number,
   tile: MapTile | null,
 ): MapTile | null {
-  if (!selection || selection.kind !== 'unit') return null;
+  if (!selection || selection.kind !== SelectionKind.UNIT) return null;
   if (!tile || !tile.unit) return null;
   if (tile.unit.owner === localPlayerIndex) return null;
   if (!isExploredFor(tile, localPlayerIndex)) return null;

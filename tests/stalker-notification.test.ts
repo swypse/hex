@@ -1,4 +1,4 @@
-import { GameMode } from '@enums';
+import { GameEventType, GameMode, NetMode } from '@enums';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { Application, Container, ImageSource, Text, Texture } from 'pixi.js';
 import { gameController } from '../src/controller/game-controller';
@@ -89,7 +89,7 @@ describe('stalker spotted notification', () => {
 
     Object.defineProperty(Text.prototype, 'width', { configurable: true, get: () => 40 });
     Object.defineProperty(Text.prototype, 'height', { configurable: true, get: () => 14 });
-    useGameStore.setState({ localPlayerIndex: 1, netMode: 'client', players, centerMessage: null, centerMessageQueue: [] });
+    useGameStore.setState({ localPlayerIndex: 1, netMode: NetMode.CLIENT, players, centerMessage: null, centerMessageQueue: [] });
 
     gc = gameController as unknown as Record<string, unknown>;
     (gc as { app: unknown }).app = app;
@@ -113,13 +113,13 @@ describe('stalker spotted notification', () => {
   it('shows "Stalker in the {village}!" to every player when a stalker is spotted', async () => {
     const villageTile = (gc as { sim: { map: GameMap } }).sim.map.tiles.find((t) => t.q === 1 && t.r === 0)!;
     villageTile.settlement = { owner: 0, level: 1, captureReady: false, name: 'Willow Creek' };
-    const ev: GameEvent = { type: 'stalkerSpotted', unitId: 's1', villageQ: 1, villageR: 0 };
+    const ev: GameEvent = { type: GameEventType.STALKER_SPOTTED, unitId: 's1', villageQ: 1, villageR: 0 };
     await (gc as { presentEvents: (e: GameEvent[], pre: Set<string>) => Promise<void> }).presentEvents([ev], new Set());
     expect(useGameStore.getState().centerMessage).toBe('Stalker in the Willow Creek!');
   });
 
   it('falls back to a generic village name when the village has none', async () => {
-    const ev: GameEvent = { type: 'stalkerSpotted', unitId: 's1', villageQ: 1, villageR: 0 };
+    const ev: GameEvent = { type: GameEventType.STALKER_SPOTTED, unitId: 's1', villageQ: 1, villageR: 0 };
     await (gc as { presentEvents: (e: GameEvent[], pre: Set<string>) => Promise<void> }).presentEvents([ev], new Set());
     expect(useGameStore.getState().centerMessage).toBe('Stalker in the Settlement!');
   });

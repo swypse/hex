@@ -1,4 +1,4 @@
-import { GameMode } from '@enums';
+import { ConnectionState, GameMode, LobbyRole, NetMode, Screen } from '@enums';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Container, Sprite, BitmapText } from 'pixi.js';
 import { LobbyScreen } from '../src/ui/screens/lobby-screen';
@@ -167,7 +167,7 @@ describe('LobbyScreen join link prefill', () => {
   beforeEach(() => {
     installDom();
     setPendingJoin(null);
-    useGameStore.setState({ screen: 'lobby', lobby: null, connection: 'idle' });
+    useGameStore.setState({ screen: Screen.LOBBY, lobby: null, connection: ConnectionState.IDLE });
     host = makeHost();
     screen = new LobbyScreen();
   });
@@ -212,11 +212,11 @@ describe('LobbyScreen host copy join link button', () => {
       value: { writeText: vi.fn().mockResolvedValue(undefined) },
     });
     useGameStore.setState({
-      screen: 'lobby',
+      screen: Screen.LOBBY,
       myPeerId: 'host',
-      netMode: 'host',
+      netMode: NetMode.HOST,
       lobby: {
-        role: 'host',
+        role: LobbyRole.HOST,
         code: 'ABC234',
         mode: GameMode.CAPTURE,
         totalPlayers: 2,
@@ -276,9 +276,9 @@ describe('LobbyScreen host copy join link button', () => {
     screen.destroy();
     useGameStore.setState({
       myPeerId: 'guest-1',
-      netMode: 'client',
+      netMode: NetMode.CLIENT,
       lobby: {
-        role: 'client',
+        role: LobbyRole.CLIENT,
         code: 'ABC234',
         mode: GameMode.CAPTURE,
         totalPlayers: 2,

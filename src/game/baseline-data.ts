@@ -1,4 +1,4 @@
-import type { UnitType } from './units';
+import { UnitType } from '@enums';
 
 /** Pre-rebalance snapshot captured 2026-09-24 from tests/_baseline-snapshot.json
  *  (before the archer/rider/swordsman/knight rebalance). Used by the report's

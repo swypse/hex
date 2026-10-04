@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { SKILLS, type SkillId } from '../src/game/skills';
+import { SKILLS } from '../src/game/skills';
 import { skillLayout } from '../src/ui/overlays/skill-tree';
+import { SkillId } from '@enums';
 
 describe('skill tree layout', () => {
   const layout = skillLayout();

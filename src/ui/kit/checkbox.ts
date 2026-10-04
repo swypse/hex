@@ -1,6 +1,7 @@
 import { Container, Graphics, type BitmapText } from 'pixi.js';
 import { makeLabel } from './label';
 import { sfx } from '../../sound/sfx';
+import { FontSize } from '@enums';
 
 export interface Checkbox {
   el: Container;
@@ -25,7 +26,7 @@ export function makeCheckbox(
   const labelGap = options.labelGap ?? 8;
   let on = checked;
   const bg = new Graphics();
-  const mark = makeLabel('\u2713', { fontSize: 15, fill: 0xffffff, fontWeight: '700' });
+  const mark = makeLabel('\u2713', { fontSize: FontSize.SMALL, fill: 0xffffff, fontWeight: '700' });
   mark.anchor.set(0.5, 0.5);
   mark.position.set(size / 2, size / 2);
 
@@ -57,7 +58,7 @@ export function makeCheckbox(
   el.on('pointertap', tap);
 
   if (options.label) {
-    const label: BitmapText = makeLabel(options.label, { fontSize: 14, fill: 0xcccccc });
+    const label: BitmapText = makeLabel(options.label, { fontSize: FontSize.SMALL, fill: 0xcccccc });
     label.position.set(size + labelGap, Math.max(0, (size - label.height) / 2));
     label.eventMode = 'static';
     label.cursor = 'pointer';

@@ -3,16 +3,16 @@ import { Player } from './players';
 import { villageUpgradeCost } from './resources';
 import { canAffordAt } from './stock';
 import { isWaterType, isMountainType } from './tile-types';
-import { canOpenSkill, hasSkill, SkillId } from './skills';
+import { canOpenSkill, hasSkill } from './skills';
 import { reachableTargets, tileAt } from './selection';
-import { UNIT_MOVE_POINTS, unitSpawnCost, UNIT_TYPES, UNIT_ATTACK_DISTANCE, canHeal, HEAL_AMOUNT, Unit, UnitType } from './units';
+import { UNIT_MOVE_POINTS, unitSpawnCost, UNIT_TYPES, UNIT_ATTACK_DISTANCE, canHeal, HEAL_AMOUNT, Unit } from './units';
 import { SeededRandom } from '../util/random';
 import { hexDistance, hexNeighbors } from './hex';
 import { attackableTargets, attackDamage, canCounterAttack, counterDamageTo as counterDamageToFromCombat, resolveCombat, tradeIsFavorable } from './combat';
 import { canBuildPort, canBuildSawmill, canBuildMine, builderBuildable, BUILDING_COSTS, type BuilderBuildableKind } from './buildings';
 import { unitsInVillage, villageCapacity, buildingsInVillage, villageBuildingLimit } from './village';
 import { isExploredFor } from './explore';
-import { AiAction, AiDirectives, AiOperation, AiPlannerState, SpawnPreference } from './ai-types';
+import { AiAction, AiDirectives, AiOperation, AiPlannerState } from './ai-types';
 import { AiDifficultyProfile } from './ai-difficulty';
 import { AiSituation, coastExposedTile, isMelee, isNavalEnemy } from './ai-situation';
 import { isShip, shipAttackDistance, shipMovePoints, canUpgradeShip } from './ship';
@@ -24,6 +24,7 @@ import { flagsFor } from './ai-flags';
 import { berserkerRage } from './abilities';
 import { counterScore, effectiveCost } from './balance';
 import { eatsFarmMaterials } from './food';
+import { AiActionType, AiStance, BuilderExtraKind, BuildingKind, GarrisonGuardKind, SkillId, SpawnPreference, UnitType } from '@enums';
 
 export interface AiPatternContext {
   map: GameMap;
@@ -141,7 +142,7 @@ export const LETHAL_PENALTY = 100000;
  *  Warriors banner. They never attack and the AI keeps them out of fights —
  *  they build, plant traps and buff their neighbours instead. */
 export function isSupportUnit(unit: Unit): boolean {
-  return unit.type === 'builder' || unit.type === 'trapper' || unit.type === 'banner';
+  return unit.type === UnitType.BUILDER || unit.type === UnitType.TRAPPER || unit.type === UnitType.BANNER;
 }
 
 /** A raging berserker (<=35% hp) takes no counter-damage when it attacks, so
@@ -181,7 +182,7 @@ function builderHasMineToBuild(map: GameMap, player: Player): boolean {
 /** The builder is summoned when a mine is wanted but no mining skill is open:
  *  only then does the builder, who builds without any skill, unlock it. */
 function builderWanted(map: GameMap, player: Player): boolean {
-  if (hasSkill(player, 'smithery')) return false;
+  if (hasSkill(player, SkillId.SMITHERY)) return false;
   if (!builderHasMineToBuild(map, player)) {
     // No mine site yet, but a bare owned mountain claim list is enough to aim for.
     if (!map.tiles.some((t) => t.ownedBy === player.index && !t.building && !t.settlement && isMountainType(t.terrain))) return false;
@@ -209,29 +210,29 @@ function specialUnitWanted(
 ): boolean {
   const special = TRIBE_SPECIAL_UNIT[player.tribe];
   switch (special) {
-    case 'stormcaller':
+    case UnitType.STORMCALLER:
       return !!situation?.navalThreat;
-    case 'banner':
+    case UnitType.BANNER:
       return map.tiles.filter((t) => t.unit && t.unit.owner === player.index).length >= 3;
-    case 'stalker':
+    case UnitType.STALKER:
       return map.tiles.some((t) => !isExploredFor(t, player.index)) || map.tiles.some((t) => t.settlement && t.settlement.owner !== player.index);
-    case 'trapper':
+    case UnitType.TRAPPER:
       return map.tiles.some((t) => t.ownedBy === player.index && frontierTile(map, t, player.index));
-    case 'builder':
+    case UnitType.BUILDER:
       return builderWanted(map, player);
-    case 'stunner':
-    case 'berserker':
-      return (situation?.enemies.length ?? 0) > 0 || situation?.stance === 'war';
+    case UnitType.STUNNER:
+    case UnitType.BERSERKER:
+      return (situation?.enemies.length ?? 0) > 0 || situation?.stance === AiStance.WAR;
     default:
       return false;
   }
 }
 
 const SPAWN_ORDER: Record<SpawnPreference, UnitType[]> = {
-  offense: ['knight', 'swordsman', 'catapult', 'warrior', 'rider', 'archer', 'shield', 'stalker', 'builder', 'banner', 'berserker', 'trapper', 'stormcaller', 'stunner'],
-  defense: ['shield', 'knight', 'catapult', 'archer', 'swordsman', 'warrior', 'rider', 'stalker', 'builder', 'banner', 'berserker', 'trapper', 'stormcaller', 'stunner'],
-  scout: ['rider', 'knight', 'swordsman', 'warrior', 'archer', 'shield', 'catapult', 'stalker', 'builder', 'banner', 'berserker', 'trapper', 'stormcaller', 'stunner'],
-  naval: ['catapult', 'archer', 'shield', 'warrior', 'rider', 'swordsman', 'knight', 'stalker', 'builder', 'banner', 'berserker', 'trapper', 'stormcaller', 'stunner'],
+  offense: [UnitType.KNIGHT, UnitType.SWORDSMAN, UnitType.CATAPULT, UnitType.WARRIOR, UnitType.RIDER, UnitType.ARCHER, UnitType.SHIELD, UnitType.STALKER, UnitType.BUILDER, UnitType.BANNER, UnitType.BERSERKER, UnitType.TRAPPER, UnitType.STORMCALLER, UnitType.STUNNER],
+  defense: [UnitType.SHIELD, UnitType.KNIGHT, UnitType.CATAPULT, UnitType.ARCHER, UnitType.SWORDSMAN, UnitType.WARRIOR, UnitType.RIDER, UnitType.STALKER, UnitType.BUILDER, UnitType.BANNER, UnitType.BERSERKER, UnitType.TRAPPER, UnitType.STORMCALLER, UnitType.STUNNER],
+  scout: [UnitType.RIDER, UnitType.KNIGHT, UnitType.SWORDSMAN, UnitType.WARRIOR, UnitType.ARCHER, UnitType.SHIELD, UnitType.CATAPULT, UnitType.STALKER, UnitType.BUILDER, UnitType.BANNER, UnitType.BERSERKER, UnitType.TRAPPER, UnitType.STORMCALLER, UnitType.STUNNER],
+  naval: [UnitType.CATAPULT, UnitType.ARCHER, UnitType.SHIELD, UnitType.WARRIOR, UnitType.RIDER, UnitType.SWORDSMAN, UnitType.KNIGHT, UnitType.STALKER, UnitType.BUILDER, UnitType.BANNER, UnitType.BERSERKER, UnitType.TRAPPER, UnitType.STORMCALLER, UnitType.STUNNER],
 };
 
 /** Count of each enemy unit type currently visible to `player`, for weighing
@@ -254,18 +255,18 @@ function visibleEnemyComposition(map: GameMap, playerIndex: number): Map<UnitTyp
  *  spotted yet, no map given, or a scout/naval preference). */
 export function bestSpawnableUnitType(
   player: Player,
-  prefer: SpawnPreference = 'offense',
+  prefer: SpawnPreference = SpawnPreference.OFFENSE,
   map?: GameMap,
   village?: MapTile,
 ): UnitType | null {
   const candidates: UnitType[] = [];
   for (const type of SPAWN_ORDER[prefer]) {
     if (TRIBE_SPECIAL_UNIT[player.tribe] !== type && Object.values(TRIBE_SPECIAL_UNIT).includes(type)) continue;
-    if (type === 'rider' && !hasSkill(player, 'riding')) continue;
-    if (type === 'knight' && !hasSkill(player, 'knights')) continue;
-    if (type === 'swordsman' && !hasSkill(player, 'swordsman')) continue;
-    if (type === 'catapult' && !hasSkill(player, 'catapult')) continue;
-    if (type === 'shield' && !hasSkill(player, 'shields')) continue;
+    if (type === UnitType.RIDER && !hasSkill(player, SkillId.RIDING)) continue;
+    if (type === UnitType.KNIGHT && !hasSkill(player, SkillId.KNIGHTS)) continue;
+    if (type === UnitType.SWORDSMAN && !hasSkill(player, SkillId.SWORDSMAN)) continue;
+    if (type === UnitType.CATAPULT && !hasSkill(player, SkillId.CATAPULT)) continue;
+    if (type === UnitType.SHIELD && !hasSkill(player, SkillId.SHIELDS)) continue;
     const cost = unitSpawnCost(type);
     // The money is the player's; wood and ore come from the spawning village's
     // network (without a village only the money can be checked).
@@ -273,7 +274,7 @@ export function bestSpawnableUnitType(
     if (affordable) candidates.push(type);
   }
   if (candidates.length === 0) return null;
-  if (!map || (prefer !== 'offense' && prefer !== 'defense') || !flagsFor(player).composition) return candidates[0]!;
+  if (!map || (prefer !== SpawnPreference.OFFENSE && prefer !== SpawnPreference.DEFENSE) || !flagsFor(player).composition) return candidates[0]!;
   const enemies = visibleEnemyComposition(map, player.index);
   if (enemies.size === 0) return candidates[0]!;
 
@@ -306,7 +307,7 @@ export function counterDamageTo(
   return counterDamageToFromCombat(map, attacker, targetTile);
 }
 
-export type GarrisonGuardResult = { kind: 'attack'; guardType?: UnitType } | { kind: 'hold' };
+export type GarrisonGuardResult = { kind: GarrisonGuardKind.ATTACK; guardType?: UnitType } | { kind: GarrisonGuardKind.HOLD };
 
 /** A unit standing on its own village must never trade its life for a kill if
  *  that would leave the village with no garrison and no way to replace one.
@@ -324,21 +325,21 @@ export function guardGarrisonAttack(
   state?: AiPlannerState,
 ): GarrisonGuardResult {
   const tile = map.tiles.find((t) => t.unit === unit);
-  if (!tile?.settlement || tile.settlement.owner !== player.index) return { kind: 'attack' };
+  if (!tile?.settlement || tile.settlement.owner !== player.index) return { kind: GarrisonGuardKind.ATTACK };
   // A catapult siege of a structure tile draws no counter at all.
-  if (!targetTile.unit) return { kind: 'attack' };
-  if (counterDamageTo(map, unit, tile, targetTile) < unit.hp) return { kind: 'attack' };
+  if (!targetTile.unit) return { kind: GarrisonGuardKind.ATTACK };
+  if (counterDamageTo(map, unit, tile, targetTile) < unit.hp) return { kind: GarrisonGuardKind.ATTACK };
 
   const vk = key(tile.q, tile.r);
-  if (state?.occupied.has(vk)) return { kind: 'hold' };
+  if (state?.occupied.has(vk)) return { kind: GarrisonGuardKind.HOLD };
   // The dying garrison frees a spawn slot: a guard fits as long as the
   // village is not already at capacity with its other spawns.
   const garrisonHome = unit.spawnVillage !== null && key(unit.spawnVillage.q, unit.spawnVillage.r) === vk;
   const stayed = unitsInVillage(map, tile) - (garrisonHome ? 1 : 0);
-  if (stayed >= villageCapacity(tile.settlement.level)) return { kind: 'hold' };
-  const guardType = bestSpawnableUnitType(player, 'defense', map, tile);
-  if (!guardType) return { kind: 'hold' };
-  return { kind: 'attack', guardType };
+  if (stayed >= villageCapacity(tile.settlement.level)) return { kind: GarrisonGuardKind.HOLD };
+  const guardType = bestSpawnableUnitType(player, SpawnPreference.DEFENSE, map, tile);
+  if (!guardType) return { kind: GarrisonGuardKind.HOLD };
+  return { kind: GarrisonGuardKind.ATTACK, guardType };
 }
 
 export function nearestEnemyDistanceFrom(map: GameMap, owner: number, tile: MapTile): number {
@@ -397,15 +398,15 @@ function attackersForTile(
   state: AiPlannerState,
 ): { unit: Unit; moveTo: MapTile | null }[] {
   const out: { unit: Unit; moveTo: MapTile | null }[] = [];
-  const canClimb = hasSkill(player, 'climbing');
-  const canDock = hasSkill(player, 'navigation');
+  const canClimb = hasSkill(player, SkillId.CLIMBING);
+  const canDock = hasSkill(player, SkillId.NAVIGATION);
   for (const t of map.tiles) {
     const unit = t.unit;
     if (!unit || unit.owner !== player.index) continue;
     if (state.acted.has(unit.id) || state.moved.has(unit.id)) continue;
     // Support units and stalkers never join a gang-up: the builder/trapper/
     // banner have jobs to do and the stalker only strikes to free a village.
-    if (isSupportUnit(unit) || unit.type === 'stalker') continue;
+    if (isSupportUnit(unit) || unit.type === UnitType.STALKER) continue;
     const endangeredGarrison =
       !!t.settlement && t.settlement.owner === player.index && enemyCanReach(map, t, player.index);
     if (attackableTargets(map, unit, player.index).some((a) => a.q === targetTile.q && a.r === targetTile.r)) {
@@ -439,7 +440,7 @@ export const AI_PATTERNS: AiPattern[] = [
         if (state.acted.has(unit.id)) continue;
         if (t.settlement && t.settlement.owner !== unit.owner && t.settlement.captureReady) {
           state.acted.add(unit.id);
-          return [{ type: 'capture', q: t.q, r: t.r, unitId: unit.id }];
+          return [{ type: AiActionType.CAPTURE, q: t.q, r: t.r, unitId: unit.id }];
         }
       }
       return null;
@@ -455,7 +456,7 @@ export const AI_PATTERNS: AiPattern[] = [
       for (const t of map.tiles) {
         const unit = t.unit;
         if (!unit || unit.owner !== player.index) continue;
-        if (unit.type !== 'stunner') continue;
+        if (unit.type !== UnitType.STUNNER) continue;
         if (unit.shipLevel !== undefined) continue;
         if (state.acted.has(unit.id) || state.moved.has(unit.id)) continue;
         if (unit.hasMoved || unit.hasAttacked || unit.hasHealed) continue;
@@ -471,7 +472,7 @@ export const AI_PATTERNS: AiPattern[] = [
             best = e;
           }
         }
-        if (best) return [{ type: 'stun', unitId: unit.id, q: best.q, r: best.r }];
+        if (best) return [{ type: AiActionType.STUN, unitId: unit.id, q: best.q, r: best.r }];
       }
       return null;
     },
@@ -484,11 +485,11 @@ export const AI_PATTERNS: AiPattern[] = [
       // enemy and stun it, but only with a follow-up attacker close behind:
       // a stunned target cannot counter, so the rest of the army hits it free.
       if (!flagsFor(player).stunnerHunt) return null;
-      const canClimb = hasSkill(player, 'climbing');
-      const canDock = hasSkill(player, 'navigation');
+      const canClimb = hasSkill(player, SkillId.CLIMBING);
+      const canDock = hasSkill(player, SkillId.NAVIGATION);
       for (const t of map.tiles) {
         const unit = t.unit;
-        if (!unit || unit.owner !== player.index || unit.type !== 'stunner') continue;
+        if (!unit || unit.owner !== player.index || unit.type !== UnitType.STUNNER) continue;
         if (unit.shipLevel !== undefined) continue;
         if (state.acted.has(unit.id) || state.moved.has(unit.id)) continue;
         if (unit.hasMoved || unit.hasAttacked || unit.hasHealed) continue;
@@ -503,7 +504,7 @@ export const AI_PATTERNS: AiPattern[] = [
           let followers = 0;
           for (const f of map.tiles) {
             if (!f.unit || f.unit.owner !== player.index || f.unit === unit) continue;
-            if (isSupportUnit(f.unit) || f.unit.type === 'stalker') continue;
+            if (isSupportUnit(f.unit) || f.unit.type === UnitType.STALKER) continue;
             if (hexDistance(f, e) <= 4) followers += 1;
           }
           if (followers === 0) continue;
@@ -517,8 +518,8 @@ export const AI_PATTERNS: AiPattern[] = [
         }
         if (best) {
           return [
-            { type: 'move', unitId: unit.id, q: best.step.q, r: best.step.r },
-            { type: 'stun', unitId: unit.id, q: best.target.q, r: best.target.r },
+            { type: AiActionType.MOVE, unitId: unit.id, q: best.step.q, r: best.step.r },
+            { type: AiActionType.STUN, unitId: unit.id, q: best.target.q, r: best.target.r },
           ];
         }
       }
@@ -545,17 +546,17 @@ export const AI_PATTERNS: AiPattern[] = [
         // Support units never join a fight; a stalker strikes only when it can
         // kill the defender outright.
         if (isSupportUnit(unit)) continue;
-        if (unit.type === 'stalker' && enemyInVillage.unit && attackDamage(unit) < enemyInVillage.unit.hp) continue;
+        if (unit.type === UnitType.STALKER && enemyInVillage.unit && attackDamage(unit) < enemyInVillage.unit.hp) continue;
         if (
           attackableTargets(map, unit, unit.owner).some(
             (a) => a.q === enemyInVillage.q && a.r === enemyInVillage.r,
           )
         ) {
           const garrisonGuard = guardGarrisonAttack(map, player, unit, enemyInVillage, state);
-          if (garrisonGuard.kind === 'hold') continue;
-          actions.push({ type: 'attack', unitId: unit.id, q: enemyInVillage.q, r: enemyInVillage.r });
+          if (garrisonGuard.kind === GarrisonGuardKind.HOLD) continue;
+          actions.push({ type: AiActionType.ATTACK, unitId: unit.id, q: enemyInVillage.q, r: enemyInVillage.r });
           if (garrisonGuard.guardType) {
-            actions.push({ type: 'spawn', q: t.q, r: t.r, unitType: garrisonGuard.guardType });
+            actions.push({ type: AiActionType.SPAWN, q: t.q, r: t.r, unitType: garrisonGuard.guardType });
           }
           continue;
         }
@@ -570,8 +571,8 @@ export const AI_PATTERNS: AiPattern[] = [
         );
         if (moveTarget) {
           actions.push(
-            { type: 'move', unitId: unit.id, q: moveTarget.q, r: moveTarget.r },
-            { type: 'attack', unitId: unit.id, q: enemyInVillage.q, r: enemyInVillage.r },
+            { type: AiActionType.MOVE, unitId: unit.id, q: moveTarget.q, r: moveTarget.r },
+            { type: AiActionType.ATTACK, unitId: unit.id, q: enemyInVillage.q, r: enemyInVillage.r },
           );
         }
       }
@@ -610,12 +611,12 @@ export const AI_PATTERNS: AiPattern[] = [
         // take a lethal counter: it must not unless a spawn covers the village,
         // or hold entirely when it cannot be replaced.
         const garrisonGuard = a.moveTo ? null : guardGarrisonAttack(map, player, a.unit, best.t, state);
-        if (garrisonGuard?.kind === 'hold') continue;
-        if (a.moveTo) actions.push({ type: 'move', unitId: a.unit.id, q: a.moveTo.q, r: a.moveTo.r });
-        actions.push({ type: 'attack', unitId: a.unit.id, q: best.t.q, r: best.t.r });
+        if (garrisonGuard?.kind === GarrisonGuardKind.HOLD) continue;
+        if (a.moveTo) actions.push({ type: AiActionType.MOVE, unitId: a.unit.id, q: a.moveTo.q, r: a.moveTo.r });
+        actions.push({ type: AiActionType.ATTACK, unitId: a.unit.id, q: best.t.q, r: best.t.r });
         if (garrisonGuard?.guardType) {
           const home = map.tiles.find((x) => x.unit === a.unit);
-          if (home) actions.push({ type: 'spawn', q: home.q, r: home.r, unitType: garrisonGuard.guardType });
+          if (home) actions.push({ type: AiActionType.SPAWN, q: home.q, r: home.r, unitType: garrisonGuard.guardType });
         }
       }
       return actions;
@@ -631,14 +632,14 @@ export const AI_PATTERNS: AiPattern[] = [
       for (const t of map.tiles) {
         const unit = t.unit;
         if (!unit || unit.owner !== player.index) continue;
-        if (unit.type !== 'stalker' || unit.shipLevel !== undefined) continue;
+        if (unit.type !== UnitType.STALKER || unit.shipLevel !== undefined) continue;
         if (unit.isStealthed) continue;
         if (state.acted.has(unit.id) || state.moved.has(unit.id)) continue;
         if (unit.hasMoved || unit.hasAttacked || unit.hasHealed) continue;
         // The holster cannot hide while standing beside an enemy village.
         if (adjacentEnemyVillages(map, unit, player.index).length > 0) continue;
         if (nearestEnemyDistanceFrom(map, player.index, t) > STALKER_STEALTH_RADIUS) continue;
-        return [{ type: 'enableStealth', unitId: unit.id }];
+        return [{ type: AiActionType.ENABLE_STEALTH, unitId: unit.id }];
       }
       return null;
     },
@@ -650,12 +651,12 @@ export const AI_PATTERNS: AiPattern[] = [
       // The stalker is the Cats' scout: it explores to find villages, claims
       // empty ones and free villages, and only ever fights to kill a defender
       // standing inside a village so the tile can be claimed afterwards.
-      const canClimb = hasSkill(player, 'climbing');
-      const canDock = hasSkill(player, 'navigation');
+      const canClimb = hasSkill(player, SkillId.CLIMBING);
+      const canDock = hasSkill(player, SkillId.NAVIGATION);
       for (const t of map.tiles) {
         const unit = t.unit;
         if (!unit || unit.owner !== player.index) continue;
-        if (unit.type !== 'stalker') continue;
+        if (unit.type !== UnitType.STALKER) continue;
         if (unit.shipLevel !== undefined) continue;
         if (state.acted.has(unit.id) || state.moved.has(unit.id)) continue;
         if (t.settlement && t.settlement.owner === player.index && enemyCanReach(map, t, player.index)) continue;
@@ -693,10 +694,10 @@ export const AI_PATTERNS: AiPattern[] = [
         if (killTile) {
           return killStep
             ? [
-                { type: 'move', unitId: unit.id, q: killStep.q, r: killStep.r },
-                { type: 'attack', unitId: unit.id, q: killTile.q, r: killTile.r },
+                { type: AiActionType.MOVE, unitId: unit.id, q: killStep.q, r: killStep.r },
+                { type: AiActionType.ATTACK, unitId: unit.id, q: killTile.q, r: killTile.r },
               ]
-            : [{ type: 'attack', unitId: unit.id, q: killTile.q, r: killTile.r }];
+            : [{ type: AiActionType.ATTACK, unitId: unit.id, q: killTile.q, r: killTile.r }];
         }
 
         // 2. Move onto an empty (free) village to claim it.
@@ -705,7 +706,7 @@ export const AI_PATTERNS: AiPattern[] = [
           if (v.unit) continue;
           if (state.occupied.has(key(v.q, v.r))) continue;
           if (!reachableTargets(map, unit, undefined, canClimb, canDock, player.index).some((c) => c.q === v.q && c.r === v.r)) continue;
-          return [{ type: 'move', unitId: unit.id, q: v.q, r: v.r }];
+          return [{ type: AiActionType.MOVE, unitId: unit.id, q: v.q, r: v.r }];
         }
 
         // 3. Scout one step toward unexplored ground or an empty enemy village.
@@ -742,7 +743,7 @@ export const AI_PATTERNS: AiPattern[] = [
               bestStep = c;
             }
           }
-          if (bestStep) return [{ type: 'move', unitId: unit.id, q: bestStep.q, r: bestStep.r }];
+          if (bestStep) return [{ type: AiActionType.MOVE, unitId: unit.id, q: bestStep.q, r: bestStep.r }];
         }
       }
       return null;
@@ -752,8 +753,8 @@ export const AI_PATTERNS: AiPattern[] = [
     id: 'capture-free-village',
     priority: 130,
     evaluate({ map, player, state }): AiAction[] | null {
-      const canClimb = hasSkill(player, 'climbing');
-      const canDock = hasSkill(player, 'navigation');
+      const canClimb = hasSkill(player, SkillId.CLIMBING);
+      const canDock = hasSkill(player, SkillId.NAVIGATION);
       let best: { unit: Unit; target: MapTile } | null = null;
       let bestDist = Infinity;
       for (const v of map.tiles) {
@@ -781,7 +782,7 @@ export const AI_PATTERNS: AiPattern[] = [
           }
         }
       }
-      if (best) return [{ type: 'move', unitId: best.unit.id, q: best.target.q, r: best.target.r }];
+      if (best) return [{ type: AiActionType.MOVE, unitId: best.unit.id, q: best.target.q, r: best.target.r }];
       return null;
     },
   },
@@ -789,8 +790,8 @@ export const AI_PATTERNS: AiPattern[] = [
     id: 'collect-bonus',
     priority: 125,
     evaluate({ map, player, state }): AiAction[] | null {
-      const canClimb = hasSkill(player, 'climbing');
-      const canDock = hasSkill(player, 'navigation');
+      const canClimb = hasSkill(player, SkillId.CLIMBING);
+      const canDock = hasSkill(player, SkillId.NAVIGATION);
       const goals: MapTile[] = [];
       for (const t of map.tiles) {
         if (!t.bonus) continue;
@@ -832,16 +833,16 @@ export const AI_PATTERNS: AiPattern[] = [
         }
       }
       if (!best) return null;
-      return [{ type: 'move', unitId: best.unit.id, q: best.step.q, r: best.step.r }];
+      return [{ type: AiActionType.MOVE, unitId: best.unit.id, q: best.step.q, r: best.step.r }];
     },
   },
   {
     id: 'reinforce-endangered-village',
     priority: 120,
     evaluate({ map, player, state, situation }): AiAction[] | null {
-      if (!situation || situation.stance !== 'defend') return null;
-      const canClimb = hasSkill(player, 'climbing');
-      const canDock = hasSkill(player, 'navigation');
+      if (!situation || situation.stance !== AiStance.DEFEND) return null;
+      const canClimb = hasSkill(player, SkillId.CLIMBING);
+      const canDock = hasSkill(player, SkillId.NAVIGATION);
       let best: { unit: Unit; step: MapTile; villageKey: string; score: number } | null = null;
       for (const d of situation.dangers) {
         const v = d.village;
@@ -880,15 +881,15 @@ export const AI_PATTERNS: AiPattern[] = [
       }
       if (!best) return null;
       state.occupied.add(best.villageKey);
-      return [{ type: 'move', unitId: best.unit.id, q: best.step.q, r: best.step.r }];
+      return [{ type: AiActionType.MOVE, unitId: best.unit.id, q: best.step.q, r: best.step.r }];
     },
   },
   {
     id: 'capture-push',
     priority: 110,
     evaluate({ map, player, state }): AiAction[] | null {
-      const canClimb = hasSkill(player, 'climbing');
-      const canDock = hasSkill(player, 'navigation');
+      const canClimb = hasSkill(player, SkillId.CLIMBING);
+      const canDock = hasSkill(player, SkillId.NAVIGATION);
       for (const t of map.tiles) {
         if (!t.settlement || t.settlement.owner === player.index) continue;
         if (!isExploredFor(t, player.index)) continue;
@@ -906,7 +907,7 @@ export const AI_PATTERNS: AiPattern[] = [
             (c) => c.q === t.q && c.r === t.r,
           );
           if (!canReach) continue;
-          return [{ type: 'move', unitId: unit.id, q: t.q, r: t.r }];
+          return [{ type: AiActionType.MOVE, unitId: unit.id, q: t.q, r: t.r }];
         }
       }
       return null;
@@ -916,8 +917,8 @@ export const AI_PATTERNS: AiPattern[] = [
     id: 'secure-free-village',
     priority: 105,
     evaluate({ map, player, state }): AiAction[] | null {
-      const canClimb = hasSkill(player, 'climbing');
-      const canDock = hasSkill(player, 'navigation');
+      const canClimb = hasSkill(player, SkillId.CLIMBING);
+      const canDock = hasSkill(player, SkillId.NAVIGATION);
       let best: { unit: Unit; target: MapTile; villageKey: string } | null = null;
       let bestScore = Infinity;
       for (const v of map.tiles) {
@@ -954,7 +955,7 @@ export const AI_PATTERNS: AiPattern[] = [
       }
       if (best) {
         state.occupied.add(best.villageKey);
-        return [{ type: 'move', unitId: best.unit.id, q: best.target.q, r: best.target.r }];
+        return [{ type: AiActionType.MOVE, unitId: best.unit.id, q: best.target.q, r: best.target.r }];
       }
       return null;
     },
@@ -969,9 +970,9 @@ export const AI_PATTERNS: AiPattern[] = [
         if (state.spawned.has(k)) continue;
         if (v.unit) continue;
         if (!landEnemyCanReach(map, v, player.index)) continue;
-        const type = bestSpawnableUnitType(player, 'defense', map, v);
+        const type = bestSpawnableUnitType(player, SpawnPreference.DEFENSE, map, v);
         if (!type) continue;
-        return [{ type: 'spawn', q: v.q, r: v.r, unitType: type }];
+        return [{ type: AiActionType.SPAWN, q: v.q, r: v.r, unitType: type }];
       }
       return null;
     },
@@ -980,14 +981,14 @@ export const AI_PATTERNS: AiPattern[] = [
     id: 'counter-threat',
     priority: 95,
     evaluate({ map, player, state }): AiAction[] | null {
-      const canClimb = hasSkill(player, 'climbing');
-      const canDock = hasSkill(player, 'navigation');
+      const canClimb = hasSkill(player, SkillId.CLIMBING);
+      const canDock = hasSkill(player, SkillId.NAVIGATION);
       for (const t of map.tiles) {
         const unit = t.unit;
         if (!unit || unit.owner !== player.index) continue;
         if (state.acted.has(unit.id) || state.moved.has(unit.id)) continue;
         // Support units don't retaliate and the stalker avoids combat entirely.
-        if (isSupportUnit(unit) || unit.type === 'stalker') continue;
+        if (isSupportUnit(unit) || unit.type === UnitType.STALKER) continue;
         // Ships have their own naval-hunt pattern; don't retreat them here.
         if (unit.shipLevel !== undefined) continue;
         if (berserkerShouldPress(map, player, unit)) continue;
@@ -1001,7 +1002,7 @@ export const AI_PATTERNS: AiPattern[] = [
           if (hexDistance(t, e) > enemy.attackDistance) continue;
           if (attackDamage(enemy) < unit.hp) continue;
           const canKill = attackableTargets(map, unit, player.index).some((a) => a.q === e.q && a.r === e.r) && attackDamage(unit) >= enemy.hp;
-          if (canKill) return [{ type: 'attack', unitId: unit.id, q: e.q, r: e.r }];
+          if (canKill) return [{ type: AiActionType.ATTACK, unitId: unit.id, q: e.q, r: e.r }];
           let best: MapTile | null = null;
           let bestDist = -Infinity;
           for (const c of reachableTargets(map, unit, undefined, canClimb, canDock, player.index)) {
@@ -1016,7 +1017,7 @@ export const AI_PATTERNS: AiPattern[] = [
               best = c;
             }
           }
-          if (best) return [{ type: 'move', unitId: unit.id, q: best.q, r: best.r }];
+          if (best) return [{ type: AiActionType.MOVE, unitId: unit.id, q: best.q, r: best.r }];
         }
       }
       return null;
@@ -1026,8 +1027,8 @@ export const AI_PATTERNS: AiPattern[] = [
     id: 'garrison-empty-village',
     priority: 92,
     evaluate({ map, player, state }): AiAction[] | null {
-      const canClimb = hasSkill(player, 'climbing');
-      const canDock = hasSkill(player, 'navigation');
+      const canClimb = hasSkill(player, SkillId.CLIMBING);
+      const canDock = hasSkill(player, SkillId.NAVIGATION);
       for (const v of map.tiles) {
         if (!v.settlement || v.settlement.owner !== player.index) continue;
         if (v.unit) continue;
@@ -1050,7 +1051,7 @@ export const AI_PATTERNS: AiPattern[] = [
           if (!best || dist < best.dist) best = { unit, dist };
         }
         if (!best) continue;
-        return [{ type: 'move', unitId: best.unit.id, q: v.q, r: v.r }];
+        return [{ type: AiActionType.MOVE, unitId: best.unit.id, q: v.q, r: v.r }];
       }
       return null;
     },
@@ -1071,13 +1072,13 @@ export const AI_PATTERNS: AiPattern[] = [
         if (!threatened) continue;
         // Keep the unit and heal when that restores it to full hp.
         if (canHeal(unit) && unit.hp + HEAL_AMOUNT >= maxHp) {
-          return [{ type: 'heal', unitId: unit.id, q: t.q, r: t.r }];
+          return [{ type: AiActionType.HEAL, unitId: unit.id, q: t.q, r: t.r }];
         }
         // Too hurt to fully heal: pull it back and put a strong fresh defender
         // in the village instead (only when the village can actually spawn it).
-        const canClimb = hasSkill(player, 'climbing');
-        const canDock = hasSkill(player, 'navigation');
-        const spawnType = bestSpawnableUnitType(player, 'defense', map, t);
+        const canClimb = hasSkill(player, SkillId.CLIMBING);
+        const canDock = hasSkill(player, SkillId.NAVIGATION);
+        const spawnType = bestSpawnableUnitType(player, SpawnPreference.DEFENSE, map, t);
         const slotFree = unitsInVillage(map, t) < villageCapacity(t.settlement.level);
         if (spawnType && slotFree) {
           let best: MapTile | null = null;
@@ -1093,15 +1094,15 @@ export const AI_PATTERNS: AiPattern[] = [
           }
           if (best) {
             return [
-              { type: 'move', unitId: unit.id, q: best.q, r: best.r },
-              { type: 'spawn', q: t.q, r: t.r, unitType: spawnType },
+              { type: AiActionType.MOVE, unitId: unit.id, q: best.q, r: best.r },
+              { type: AiActionType.SPAWN, q: t.q, r: t.r, unitType: spawnType },
             ];
           }
         }
         // No money (or no room/route): keep the low-hp unit in the village and
         // heal it rather than leaving the village empty.
         if (canHeal(unit)) {
-          return [{ type: 'heal', unitId: unit.id, q: t.q, r: t.r }];
+          return [{ type: AiActionType.HEAL, unitId: unit.id, q: t.q, r: t.r }];
         }
         return null;
       }
@@ -1114,12 +1115,12 @@ export const AI_PATTERNS: AiPattern[] = [
     evaluate({ map, player, state, situation }): AiAction[] | null {
       // The banner is an aura (friends within 2 hexes get +5 attack): keep it
       // next to the army cluster and never send it into a fight.
-      const canClimb = hasSkill(player, 'climbing');
-      const canDock = hasSkill(player, 'navigation');
+      const canClimb = hasSkill(player, SkillId.CLIMBING);
+      const canDock = hasSkill(player, SkillId.NAVIGATION);
       for (const t of map.tiles) {
         const unit = t.unit;
         if (!unit || unit.owner !== player.index) continue;
-        if (unit.type !== 'banner') continue;
+        if (unit.type !== UnitType.BANNER) continue;
         if (unit.shipLevel !== undefined) continue;
         if (state.acted.has(unit.id) || state.moved.has(unit.id)) continue;
         // Already covering at least two friends: hold position.
@@ -1138,7 +1139,7 @@ export const AI_PATTERNS: AiPattern[] = [
             bestStep = c;
           }
         }
-        if (bestStep && bestScore > 0) return [{ type: 'move', unitId: unit.id, q: bestStep.q, r: bestStep.r }];
+        if (bestStep && bestScore > 0) return [{ type: AiActionType.MOVE, unitId: unit.id, q: bestStep.q, r: bestStep.r }];
       }
       return null;
     },
@@ -1150,27 +1151,27 @@ export const AI_PATTERNS: AiPattern[] = [
       // The Villagers builder raises buildings without any skill: send it to a
       // mine when mining is locked (smithery), a sawmill when forestry is
       // locked, and otherwise to the best mine/sawmill site. It never fights.
-      const canClimb = hasSkill(player, 'climbing');
-      const canDock = hasSkill(player, 'navigation');
+      const canClimb = hasSkill(player, SkillId.CLIMBING);
+      const canDock = hasSkill(player, SkillId.NAVIGATION);
       for (const t of map.tiles) {
         const unit = t.unit;
         if (!unit || unit.owner !== player.index) continue;
-        if (unit.type !== 'builder') continue;
+        if (unit.type !== UnitType.BUILDER) continue;
         if (unit.shipLevel !== undefined) continue;
         if (state.acted.has(unit.id) || state.moved.has(unit.id)) continue;
         if (t.settlement && t.settlement.owner === player.index && enemyCanReach(map, t, player.index)) continue;
-        const kinds: Exclude<BuilderBuildableKind, 'bridge'>[] = [];
-        if (!hasSkill(player, 'smithery')) kinds.push('mine');
-        if (!hasSkill(player, 'forestry')) kinds.push('sawmill');
-        if (!kinds.includes('mine')) kinds.unshift('mine');
-        if (!kinds.includes('sawmill')) kinds.push('sawmill');
-        kinds.push('port');
+        const kinds: Exclude<BuilderBuildableKind, BuilderExtraKind.BRIDGE>[] = [];
+        if (!hasSkill(player, SkillId.SMITHERY)) kinds.push(BuildingKind.MINE);
+        if (!hasSkill(player, SkillId.FORESTRY)) kinds.push(BuildingKind.SAWMILL);
+        if (!kinds.includes(BuildingKind.MINE)) kinds.unshift(BuildingKind.MINE);
+        if (!kinds.includes(BuildingKind.SAWMILL)) kinds.push(BuildingKind.SAWMILL);
+        kinds.push(BuildingKind.PORT);
         for (const kind of kinds) {
           if (!canAffordAt(map, player, t, BUILDING_COSTS[kind])) continue;
           // Already standing where it can build something.
           const local = builderBuildable(map, t, kind, player);
           if (local.length > 0) {
-            return [{ type: 'builderBuild', unitId: unit.id, q: local[0]!.q, r: local[0]!.r, kind }];
+            return [{ type: AiActionType.BUILDER_BUILD, unitId: unit.id, q: local[0]!.q, r: local[0]!.r, kind }];
           }
           let bestStep: MapTile | null = null;
           let bestDist = Infinity;
@@ -1185,7 +1186,7 @@ export const AI_PATTERNS: AiPattern[] = [
               bestStep = c;
             }
           }
-          if (bestStep) return [{ type: 'move', unitId: unit.id, q: bestStep.q, r: bestStep.r }];
+          if (bestStep) return [{ type: AiActionType.MOVE, unitId: unit.id, q: bestStep.q, r: bestStep.r }];
         }
       }
       return null;
@@ -1197,12 +1198,12 @@ export const AI_PATTERNS: AiPattern[] = [
     evaluate({ map, player, state, situation }): AiAction[] | null {
       // The Forest trapper lays thorn traps on the front lines and never
       // fights: it stays back from combat and plants traps on likely enemy paths.
-      const canClimb = hasSkill(player, 'climbing');
-      const canDock = hasSkill(player, 'navigation');
+      const canClimb = hasSkill(player, SkillId.CLIMBING);
+      const canDock = hasSkill(player, SkillId.NAVIGATION);
       for (const t of map.tiles) {
         const unit = t.unit;
         if (!unit || unit.owner !== player.index) continue;
-        if (unit.type !== 'trapper') continue;
+        if (unit.type !== UnitType.TRAPPER) continue;
         if (unit.shipLevel !== undefined) continue;
         if (state.acted.has(unit.id) || state.moved.has(unit.id)) continue;
         if (t.settlement && t.settlement.owner === player.index && enemyCanReach(map, t, player.index)) continue;
@@ -1221,7 +1222,7 @@ export const AI_PATTERNS: AiPattern[] = [
               best = s;
             }
           }
-          if (best) return [{ type: 'trap', unitId: unit.id, q: best.q, r: best.r }];
+          if (best) return [{ type: AiActionType.TRAP, unitId: unit.id, q: best.q, r: best.r }];
         }
 
         // Otherwise move toward a camp where a trap can cover a frontier tile.
@@ -1242,7 +1243,7 @@ export const AI_PATTERNS: AiPattern[] = [
             bestStep = c;
           }
         }
-        if (bestStep && bestScore > 0) return [{ type: 'move', unitId: unit.id, q: bestStep.q, r: bestStep.r }];
+        if (bestStep && bestScore > 0) return [{ type: AiActionType.MOVE, unitId: unit.id, q: bestStep.q, r: bestStep.r }];
       }
       return null;
     },
@@ -1251,8 +1252,8 @@ export const AI_PATTERNS: AiPattern[] = [
     id: 'retreat-heal',
     priority: 85,
     evaluate({ map, player, state }): AiAction[] | null {
-      const canClimb = hasSkill(player, 'climbing');
-      const canDock = hasSkill(player, 'navigation');
+      const canClimb = hasSkill(player, SkillId.CLIMBING);
+      const canDock = hasSkill(player, SkillId.NAVIGATION);
       for (const t of map.tiles) {
         const unit = t.unit;
         if (!unit || unit.owner !== player.index) continue;
@@ -1275,7 +1276,7 @@ export const AI_PATTERNS: AiPattern[] = [
             best = c;
           }
         }
-        if (best) return [{ type: 'move', unitId: unit.id, q: best.q, r: best.r }];
+        if (best) return [{ type: AiActionType.MOVE, unitId: unit.id, q: best.q, r: best.r }];
       }
       return null;
     },
@@ -1287,21 +1288,21 @@ export const AI_PATTERNS: AiPattern[] = [
       for (const t of map.tiles) {
         const unit = t.unit;
         if (!unit || unit.owner !== player.index) continue;
-        if (unit.type !== 'archer') continue;
+        if (unit.type !== UnitType.ARCHER) continue;
         if (state.acted.has(unit.id) || state.moved.has(unit.id)) continue;
         if (t.settlement) continue;
         const enemy = map.tiles.find(
           (e) => e.unit && e.unit.owner !== player.index && hexDistance(t, e) === 1,
         );
         if (!enemy) continue;
-        const targets = reachableTargets(map, unit, undefined, undefined, hasSkill(player, 'navigation'), unit.owner).filter(
+        const targets = reachableTargets(map, unit, undefined, undefined, hasSkill(player, SkillId.NAVIGATION), unit.owner).filter(
           (c) => hexDistance(enemy, c) === 2 && !state.occupied.has(key(c.q, c.r)),
         );
         if (targets.length === 0) continue;
         const target = targets[Math.floor(rng.next() * targets.length)]!;
         return [
-          { type: 'move', unitId: unit.id, q: target.q, r: target.r },
-          { type: 'attack', unitId: unit.id, q: enemy.q, r: enemy.r },
+          { type: AiActionType.MOVE, unitId: unit.id, q: target.q, r: target.r },
+          { type: AiActionType.ATTACK, unitId: unit.id, q: enemy.q, r: enemy.r },
         ];
       }
       return null;
@@ -1315,8 +1316,8 @@ export const AI_PATTERNS: AiPattern[] = [
       // When endangered, reinforcement (higher priority) recalls the closest
       // free unit to the village; units already engaging a threat keep pressing
       // it instead of being frozen out of combat entirely.
-      const canClimb = hasSkill(player, 'climbing');
-      const canDock = hasSkill(player, 'navigation');
+      const canClimb = hasSkill(player, SkillId.CLIMBING);
+      const canDock = hasSkill(player, SkillId.NAVIGATION);
       let best: { action: AiAction[]; score: number } | null = null;
       for (const t of map.tiles) {
         const unit = t.unit;
@@ -1324,7 +1325,7 @@ export const AI_PATTERNS: AiPattern[] = [
         if (state.acted.has(unit.id) || state.moved.has(unit.id)) continue;
         // Support units don't hunt; the stalker only strikes to free a village
         // (handled by its own scout pattern), so keep it out of general hunts.
-        if (isSupportUnit(unit) || unit.type === 'stalker') continue;
+        if (isSupportUnit(unit) || unit.type === UnitType.STALKER) continue;
         if (t.settlement && t.settlement.owner === player.index) continue;
         const melee = isMelee(unit);
         for (const e of situation.enemies) {
@@ -1348,7 +1349,7 @@ export const AI_PATTERNS: AiPattern[] = [
             if (!kills && difficulty?.checkTrades && !tradeIsFavorable(unit, enemyTile)) continue;
             const score = (kills ? 500 : 300) - hexDistance(t, enemyTile);
             if (!best || score > best.score) {
-              best = { action: [{ type: 'attack', unitId: unit.id, q: enemyTile.q, r: enemyTile.r }], score };
+              best = { action: [{ type: AiActionType.ATTACK, unitId: unit.id, q: enemyTile.q, r: enemyTile.r }], score };
             }
             continue;
           }
@@ -1371,8 +1372,8 @@ export const AI_PATTERNS: AiPattern[] = [
               if (!best || score > best.score) {
                 best = {
                   action: [
-                    { type: 'move', unitId: unit.id, q: c.q, r: c.r },
-                    { type: 'attack', unitId: unit.id, q: enemyTile.q, r: enemyTile.r },
+                    { type: AiActionType.MOVE, unitId: unit.id, q: c.q, r: c.r },
+                    { type: AiActionType.ATTACK, unitId: unit.id, q: enemyTile.q, r: enemyTile.r },
                   ],
                   score,
                 };
@@ -1380,7 +1381,7 @@ export const AI_PATTERNS: AiPattern[] = [
             } else {
               const score = 200 - nd * 10 - moveDist;
               if (!best || score > best.score) {
-                best = { action: [{ type: 'move', unitId: unit.id, q: c.q, r: c.r }], score };
+                best = { action: [{ type: AiActionType.MOVE, unitId: unit.id, q: c.q, r: c.r }], score };
               }
             }
           }
@@ -1395,16 +1396,16 @@ export const AI_PATTERNS: AiPattern[] = [
     priority: 78,
     evaluate({ player, state, situation }): AiAction[] | null {
       if (!situation || !situation.navalThreat) return null;
-      const chain: SkillId[] = ['water', 'navigation', 'catapult'];
+      const chain: SkillId[] = [SkillId.WATER, SkillId.NAVIGATION, SkillId.CATAPULT];
       for (const skill of chain) {
         if (state.opened.has(skill)) continue;
-        if (skill === 'catapult' && !hasSkill(player, 'science')) {
-          if (!state.opened.has('science') && canOpenSkill(player, 'science')) {
-            return [{ type: 'openSkill', skill: 'science' }];
+        if (skill === SkillId.CATAPULT && !hasSkill(player, SkillId.SCIENCE)) {
+          if (!state.opened.has(SkillId.SCIENCE) && canOpenSkill(player, SkillId.SCIENCE)) {
+            return [{ type: AiActionType.OPEN_SKILL, skill: SkillId.SCIENCE }];
           }
           continue;
         }
-        if (canOpenSkill(player, skill)) return [{ type: 'openSkill', skill }];
+        if (canOpenSkill(player, skill)) return [{ type: AiActionType.OPEN_SKILL, skill }];
       }
       return null;
     },
@@ -1414,7 +1415,7 @@ export const AI_PATTERNS: AiPattern[] = [
     priority: 77,
     evaluate({ map, player, state, situation }): AiAction[] | null {
       if (!situation || !situation.navalThreat || !situation.nearestNaval) return null;
-      if (!hasSkill(player, 'water')) return null;
+      if (!hasSkill(player, SkillId.WATER)) return null;
       const naval = situation.nearestNaval;
       let best: MapTile | null = null;
       let bestDist = Infinity;
@@ -1429,7 +1430,7 @@ export const AI_PATTERNS: AiPattern[] = [
         }
       }
       if (!best) return null;
-      return [{ type: 'build', q: best.q, r: best.r, kind: 'port' }];
+      return [{ type: AiActionType.BUILD, q: best.q, r: best.r, kind: BuildingKind.PORT }];
     },
   },
   {
@@ -1437,13 +1438,13 @@ export const AI_PATTERNS: AiPattern[] = [
     priority: 76,
     evaluate({ map, player, state, situation }): AiAction[] | null {
       if (!situation || !situation.navalThreat) return null;
-      if (!hasSkill(player, 'navigation')) return null;
-      const port = map.tiles.find((t) => t.building !== null && t.building.kind === 'port' && t.ownedBy === player.index);
+      if (!hasSkill(player, SkillId.NAVIGATION)) return null;
+      const port = map.tiles.find((t) => t.building !== null && t.building.kind === BuildingKind.PORT && t.ownedBy === player.index);
       if (!port) return null;
       if (state.occupied.has(key(port.q, port.r))) return null;
       const hasShip = map.tiles.some((t) => t.unit && t.unit.owner === player.index && t.unit.shipLevel !== undefined);
       if (hasShip) return null;
-      const canClimb = hasSkill(player, 'climbing');
+      const canClimb = hasSkill(player, SkillId.CLIMBING);
       let best: { unit: Unit; step: MapTile; dist: number } | null = null;
       for (const t of map.tiles) {
         const unit = t.unit;
@@ -1464,7 +1465,7 @@ export const AI_PATTERNS: AiPattern[] = [
         }
       }
       if (!best) return null;
-      return [{ type: 'move', unitId: best.unit.id, q: best.step.q, r: best.step.r }];
+      return [{ type: AiActionType.MOVE, unitId: best.unit.id, q: best.step.q, r: best.step.r }];
     },
   },
   {
@@ -1473,9 +1474,9 @@ export const AI_PATTERNS: AiPattern[] = [
     evaluate({ map, player, state, situation }): AiAction[] | null {
       if (!situation || !situation.navalThreat) return null;
       if (situation.navalEnemies.length === 0) return null;
-      const pirates = situation.navalEnemies.filter((e) => e.unit.type === 'pirate');
+      const pirates = situation.navalEnemies.filter((e) => e.unit.type === UnitType.PIRATE);
       const safeTile = (c: MapTile): boolean => !pirates.some((p) => hexDistance(c, p.tile) < 2);
-      const canClimb = hasSkill(player, 'climbing');
+      const canClimb = hasSkill(player, SkillId.CLIMBING);
       let best: { action: AiAction[]; score: number } | null = null;
       for (const t of map.tiles) {
         const ship = t.unit;
@@ -1489,7 +1490,7 @@ export const AI_PATTERNS: AiPattern[] = [
           if (dist >= 2 && dist <= range) {
             const score = 600 - dist * 10;
             if (!best || score > best.score) {
-              best = { action: [{ type: 'attack', unitId: ship.id, q: enemyTile.q, r: enemyTile.r }], score };
+              best = { action: [{ type: AiActionType.ATTACK, unitId: ship.id, q: enemyTile.q, r: enemyTile.r }], score };
             }
             continue;
           }
@@ -1506,8 +1507,8 @@ export const AI_PATTERNS: AiPattern[] = [
               if (!best || score > best.score) {
                 best = {
                   action: [
-                    { type: 'move', unitId: ship.id, q: c.q, r: c.r },
-                    { type: 'attack', unitId: ship.id, q: enemyTile.q, r: enemyTile.r },
+                    { type: AiActionType.MOVE, unitId: ship.id, q: c.q, r: c.r },
+                    { type: AiActionType.ATTACK, unitId: ship.id, q: enemyTile.q, r: enemyTile.r },
                   ],
                   score,
                 };
@@ -1515,7 +1516,7 @@ export const AI_PATTERNS: AiPattern[] = [
             } else if (nd < dist && nd >= 2) {
               const score = 250 - nd * 10 - moveDist;
               if (!best || score > best.score) {
-                best = { action: [{ type: 'move', unitId: ship.id, q: c.q, r: c.r }], score };
+                best = { action: [{ type: AiActionType.MOVE, unitId: ship.id, q: c.q, r: c.r }], score };
               }
             }
           }
@@ -1536,7 +1537,7 @@ export const AI_PATTERNS: AiPattern[] = [
         if (unit.shipLevel === undefined || unit.shipLevel >= 3) continue;
         if (state.acted.has(unit.id) || state.moved.has(unit.id)) continue;
         if (!canUpgradeShip(map, unit, t, player)) continue;
-        return [{ type: 'upgradeShip', unitId: unit.id }];
+        return [{ type: AiActionType.UPGRADE_SHIP, unitId: unit.id }];
       }
       return null;
     },
@@ -1546,14 +1547,14 @@ export const AI_PATTERNS: AiPattern[] = [
     priority: 73,
     evaluate({ map, player, state, situation }): AiAction[] | null {
       if (!situation || !situation.navalThreat || !situation.nearestNaval) return null;
-      if (!hasSkill(player, 'catapult')) return null;
+      if (!hasSkill(player, SkillId.CATAPULT)) return null;
       const naval = situation.nearestNaval;
-      const canClimb = hasSkill(player, 'climbing');
+      const canClimb = hasSkill(player, SkillId.CLIMBING);
       let best: { unit: Unit; step: MapTile; score: number } | null = null;
       for (const t of map.tiles) {
         const unit = t.unit;
         if (!unit || unit.owner !== player.index) continue;
-        if (unit.type !== 'catapult') continue;
+        if (unit.type !== UnitType.CATAPULT) continue;
         if (state.acted.has(unit.id) || state.moved.has(unit.id)) continue;
         // A catapult garrisoning an endangered own village holds its ground.
         if (t.settlement && t.settlement.owner === player.index && enemyCanReach(map, t, player.index)) continue;
@@ -1573,15 +1574,15 @@ export const AI_PATTERNS: AiPattern[] = [
         }
       }
       if (!best) return null;
-      return [{ type: 'move', unitId: best.unit.id, q: best.step.q, r: best.step.r }];
+      return [{ type: AiActionType.MOVE, unitId: best.unit.id, q: best.step.q, r: best.step.r }];
     },
   },
   {
     id: 'explore-frontier',
     priority: 70,
     evaluate({ map, player, state, situation }): AiAction[] | null {
-      const canClimb = hasSkill(player, 'climbing');
-      const canDock = hasSkill(player, 'navigation');
+      const canClimb = hasSkill(player, SkillId.CLIMBING);
+      const canDock = hasSkill(player, SkillId.NAVIGATION);
       let best: { unit: Unit; target: MapTile } | null = null;
       let bestScore = -Infinity;
       for (const t of map.tiles) {
@@ -1595,7 +1596,7 @@ export const AI_PATTERNS: AiPattern[] = [
           if (state.occupied.has(key(c.q, c.r))) continue;
           // Don't explore into a beach a naval enemy can hit with land units
           // that cannot fight back (catapults and ships are the naval answer).
-          if (situation?.navalThreat && !isShip(unit) && unit.type !== 'catapult' && coastExposedTile(map, c, situation.navalEnemies)) continue;
+          if (situation?.navalThreat && !isShip(unit) && unit.type !== UnitType.CATAPULT && coastExposedTile(map, c, situation.navalEnemies)) continue;
           // Don't walk a scout into a spot where the enemy's combined reach is
           // likely lethal: a stalled scout beats a dead one.
           if (isLikelyLethal(map, c, player.index, unit)) continue;
@@ -1611,7 +1612,7 @@ export const AI_PATTERNS: AiPattern[] = [
           }
         }
       }
-      if (best) return [{ type: 'move', unitId: best.unit.id, q: best.target.q, r: best.target.r }];
+      if (best) return [{ type: AiActionType.MOVE, unitId: best.unit.id, q: best.target.q, r: best.target.r }];
       return null;
     },
   },
@@ -1625,7 +1626,7 @@ export const AI_PATTERNS: AiPattern[] = [
       const special = TRIBE_SPECIAL_UNIT[player.tribe];
       if (!special) return null;
       const fielded = map.tiles.filter((t) => t.unit && t.unit.owner === player.index && t.unit.type === special).length;
-      const cap = flagsFor(player).multiSpecial && (special === 'berserker' || special === 'stunner')
+      const cap = flagsFor(player).multiSpecial && (special === UnitType.BERSERKER || special === UnitType.STUNNER)
         ? Math.max(1, Math.floor(map.tiles.filter((t) => t.unit && t.unit.owner === player.index && !isSupportUnit(t.unit)).length / 3))
         : 1;
       if (fielded >= cap) return null;
@@ -1653,9 +1654,9 @@ export const AI_PATTERNS: AiPattern[] = [
           if (state.spawned.has(k) || state.occupied.has(k)) continue;
           const enemyDist = nearestEnemyDistanceFrom(map, player.index, v);
           const score =
-            special === 'banner'
+            special === UnitType.BANNER
               ? friendlyUnitsWithin(map, player.index, v, 3) * 100
-              : special === 'builder'
+              : special === UnitType.BUILDER
                 ? -mineDist(v)
                 : Number.isFinite(enemyDist)
                   ? -enemyDist
@@ -1666,7 +1667,7 @@ export const AI_PATTERNS: AiPattern[] = [
           }
         }
       if (!best) return null;
-      return [{ type: 'spawn', q: best.q, r: best.r, unitType: special }];
+      return [{ type: AiActionType.SPAWN, q: best.q, r: best.r, unitType: special }];
     },
   },
   {
@@ -1684,16 +1685,16 @@ export const AI_PATTERNS: AiPattern[] = [
         if (!canAffordAt(map, player, t, villageUpgradeCost(t.settlement.level))) continue;
         if (eatsFarmMaterials(map, player, villageUpgradeCost(t.settlement.level), t)) continue;
         const front = nearestEnemyDistanceFrom(map, player.index, t) <= 4;
-        if (front || ownUnits <= 2) return [{ type: 'upgrade', q: t.q, r: t.r }];
+        if (front || ownUnits <= 2) return [{ type: AiActionType.UPGRADE, q: t.q, r: t.r }];
       }
       for (const tile of map.tiles) {
         if (tile.ownedBy !== player.index) continue;
         if (state.built.has(key(tile.q, tile.r))) continue;
         if (canBuildMine(map, tile, player) && canAffordAt(map, player, tile, BUILDING_COSTS.mine)) {
-          return [{ type: 'build', q: tile.q, r: tile.r, kind: 'mine' }];
+          return [{ type: AiActionType.BUILD, q: tile.q, r: tile.r, kind: BuildingKind.MINE }];
         }
         if (canBuildSawmill(map, tile, player) && canAffordAt(map, player, tile, BUILDING_COSTS.sawmill)) {
-          return [{ type: 'build', q: tile.q, r: tile.r, kind: 'sawmill' }];
+          return [{ type: AiActionType.BUILD, q: tile.q, r: tile.r, kind: BuildingKind.SAWMILL }];
         }
       }
       return null;
@@ -1710,8 +1711,8 @@ export const AI_PATTERNS: AiPattern[] = [
         const u = t.unit;
         if (!u || u.owner !== player.index) continue;
         const idle = !u.hasMoved && !u.hasAttacked && !u.hasHealed;
-        if (u.type === 'stormcaller' && idle && stormTargetShips(map, u).length > 0) {
-          return [{ type: 'storm', unitId: u.id }];
+        if (u.type === UnitType.STORMCALLER && idle && stormTargetShips(map, u).length > 0) {
+          return [{ type: AiActionType.STORM, unitId: u.id }];
         }
       }
       return null;

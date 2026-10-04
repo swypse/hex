@@ -13,6 +13,7 @@ import { isMountainType, isWaterType } from './tile-types';
 
 type WalkField = Map<string, number>;
 import { UNIT_TYPES, Unit } from './units';
+import { AiActionType, AiGoalId, AiOperationPhase, AiStance, SkillId, UnitType } from '@enums';
 
 /** Fewest idle units for which the AI bothers running a squad operation. */
 const MIN_SQUAD = 3;
@@ -44,7 +45,7 @@ function key(q: number, r: number): string {
  *  stall it, and greedy hex-distance dead ends behind water or mountains are
  *  avoided. */
 function walkField(map: GameMap, player: Player, dest: { q: number; r: number }): WalkField {
-  const canClimb = hasSkill(player, 'climbing');
+  const canClimb = hasSkill(player, SkillId.CLIMBING);
   const field: WalkField = new Map([[key(dest.q, dest.r), 0]]);
   let frontier: { q: number; r: number }[] = [dest];
   for (let d = 1; frontier.length > 0; d++) {
@@ -75,7 +76,7 @@ function walk(field: WalkField, t: { q: number; r: number }): number {
 function squadEligible(map: GameMap, player: Player, tile: MapTile): Unit | null {
   const unit = tile.unit;
   if (!unit || unit.owner !== player.index) return null;
-  if (isSupportUnit(unit) || unit.type === 'stalker' || unit.type === 'pirate') return null;
+  if (isSupportUnit(unit) || unit.type === UnitType.STALKER || unit.type === UnitType.PIRATE) return null;
   if (unit.shipLevel !== undefined) return null;
   if (unit.hp * 2 < UNIT_TYPES[unit.type].maxHp) return null;
   if (tile.settlement && tile.settlement.owner === player.index && enemyCanReach(map, tile, player.index)) return null;
@@ -103,7 +104,7 @@ function nearEnemyPower(map: GameMap, player: Player, target: { q: number; r: nu
 }
 
 function chooseRally(map: GameMap, player: Player, target: MapTile, squad: MapTile[], targetField: WalkField): { q: number; r: number } {
-  const canClimb = hasSkill(player, 'climbing');
+  const canClimb = hasSkill(player, SkillId.CLIMBING);
   let cq = 0;
   let cr = 0;
   for (const t of squad) {
@@ -143,8 +144,8 @@ export function updateOperation(
     return null;
   };
   if (!flagsFor(player).operations) return clear();
-  if (situation.stance === 'defend' || situation.endangered) return clear();
-  const armyGoal = player.strategy?.goals.find((g) => g.id === 'army')?.target ?? null;
+  if (situation.stance === AiStance.DEFEND || situation.endangered) return clear();
+  const armyGoal = player.strategy?.goals.find((g) => g.id === AiGoalId.ARMY)?.target ?? null;
   const goal = armyGoal ?? (situation.frontTarget ? { q: situation.frontTarget.q, r: situation.frontTarget.r } : null);
   if (!goal) return clear();
   const targetTile = enemyVillageAt(map, player, goal);
@@ -166,20 +167,20 @@ export function updateOperation(
     : {
         target: { q: goal.q, r: goal.r },
         rally: chooseRally(map, player, targetTile, squad, targetField),
-        phase: contested ? 'gather' : 'assault',
+        phase: contested ? AiOperationPhase.GATHER : AiOperationPhase.ASSAULT,
         startTurn: turn,
         leash: contested,
       };
   op.leash = contested && turn - op.startTurn <= LEASH_TURNS;
 
-  if (op.phase === 'gather') {
+  if (op.phase === AiOperationPhase.GATHER) {
     const rallyField = walkField(map, player, op.rally);
     const atRally = squad.filter((t) => walk(rallyField, t) <= 3).length;
     const allClose = squad.every((t) => walk(targetField, t) <= 6);
     const ready = !contested || atRally >= Math.ceil(squad.length * RALLY_QUORUM) || allClose || turn - op.startTurn > LEASH_TURNS;
-    if (ready && squadPower >= nearPower * ABORT_POWER_RATIO) op.phase = 'assault';
+    if (ready && squadPower >= nearPower * ABORT_POWER_RATIO) op.phase = AiOperationPhase.ASSAULT;
   } else if (squadPower < nearPower * ABORT_POWER_RATIO) {
-    op = { ...op, phase: 'gather', rally: chooseRally(map, player, targetTile, squad, targetField), startTurn: turn, leash: true };
+    op = { ...op, phase: AiOperationPhase.GATHER, rally: chooseRally(map, player, targetTile, squad, targetField), startTurn: turn, leash: true };
   }
   player.operation = op;
   return op;
@@ -192,12 +193,12 @@ export const OPERATION_PATTERN = {
     const { map, player, state, operation: op, difficulty } = ctx;
     if (!op) return null;
     if (!enemyVillageAt(map, player, op.target)) return null;
-    const dest = op.phase === 'gather' ? op.rally : op.target;
-    const canClimb = hasSkill(player, 'climbing');
-    const canDock = hasSkill(player, 'navigation');
+    const dest = op.phase === AiOperationPhase.GATHER ? op.rally : op.target;
+    const canClimb = hasSkill(player, SkillId.CLIMBING);
+    const canDock = hasSkill(player, SkillId.NAVIGATION);
 
     const targetField = walkField(map, player, op.target);
-    const field = op.phase === 'gather' ? walkField(map, player, op.rally) : targetField;
+    const field = op.phase === AiOperationPhase.GATHER ? walkField(map, player, op.rally) : targetField;
     const squad = squadTiles(map, player, targetField).filter((t) => walk(field, t) < Infinity);
     if (squad.length < 2) return null;
     let rearmost = 0;
@@ -215,7 +216,7 @@ export const OPERATION_PATTERN = {
       // A unit that can strike right now is left to the combat patterns.
       if (attackableTargets(map, unit, player.index).length > 0) continue;
       const d0 = walk(field, t);
-      if (op.phase === 'gather' && d0 <= 1) {
+      if (op.phase === AiOperationPhase.GATHER && d0 <= 1) {
         state.moved.add(unit.id);
         continue;
       }
@@ -230,7 +231,7 @@ export const OPERATION_PATTERN = {
         if (dc >= d0) continue;
         const ghost: Unit = { ...unit, q: c.q, r: c.r };
         let attack: MapTile | null = null;
-        if (op.phase === 'assault' && !isTarget) {
+        if (op.phase === AiOperationPhase.ASSAULT && !isTarget) {
           const a = chooseBestAttack(map, ghost, player.index);
           if (a && (!difficulty?.checkTrades || tradeIsFavorable(ghost, a))) attack = a;
         }
@@ -245,8 +246,8 @@ export const OPERATION_PATTERN = {
         state.moved.add(unit.id);
         continue;
       }
-      const actions: AiAction[] = [{ type: 'move', unitId: unit.id, q: best.c.q, r: best.c.r }];
-      if (best.attack) actions.push({ type: 'attack', unitId: unit.id, q: best.attack.q, r: best.attack.r });
+      const actions: AiAction[] = [{ type: AiActionType.MOVE, unitId: unit.id, q: best.c.q, r: best.c.r }];
+      if (best.attack) actions.push({ type: AiActionType.ATTACK, unitId: unit.id, q: best.attack.q, r: best.attack.r });
       return actions;
     }
     return null;

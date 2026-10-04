@@ -1,26 +1,8 @@
 import { t } from '../i18n';
 import type { Player } from './players';
+import { SkillId } from '@enums';
 
-export type SkillId =
-  | 'climbing'
-  | 'smithery'
-  | 'swordsman'
-  | 'geology'
-  | 'water'
-  | 'navigation'
-  | 'waterTemples'
-  | 'forestry'
-  | 'forestTemple'
-  | 'science'
-  | 'roads'
-  | 'shields'
-  | 'defense'
-  | 'catapult'
-  | 'riding'
-  | 'knights'
-  | 'agriculture'
-  | 'granary'
-  | 'bridges';
+
 
 interface SkillInfo {
   id: SkillId;
@@ -32,136 +14,136 @@ interface SkillInfo {
 
 export const SKILLS: Record<SkillId, SkillInfo> = {
   climbing: {
-    id: 'climbing',
+    id: SkillId.CLIMBING,
     name: t('skill.climbing.name'),
     level: 1,
     parent: null,
     description: t('skill.climbing.desc'),
   },
   smithery: {
-    id: 'smithery',
+    id: SkillId.SMITHERY,
     name: t('skill.smithery.name'),
     level: 2,
-    parent: 'climbing',
+    parent: SkillId.CLIMBING,
     description: t('skill.smithery.desc'),
   },
   swordsman: {
-    id: 'swordsman',
+    id: SkillId.SWORDSMAN,
     name: t('skill.swordsman.name'),
     level: 2,
-    parent: 'climbing',
+    parent: SkillId.CLIMBING,
     description: t('skill.swordsman.desc'),
   },
   geology: {
-    id: 'geology',
+    id: SkillId.GEOLOGY,
     name: t('skill.geology.name'),
     level: 2,
-    parent: 'science',
+    parent: SkillId.SCIENCE,
     description: t('skill.geology.desc'),
   },
   water: {
-    id: 'water',
+    id: SkillId.WATER,
     name: t('skill.water.name'),
     level: 1,
     parent: null,
     description: t('skill.water.desc'),
   },
   navigation: {
-    id: 'navigation',
+    id: SkillId.NAVIGATION,
     name: t('skill.navigation.name'),
     level: 2,
-    parent: 'water',
+    parent: SkillId.WATER,
     description: t('skill.navigation.desc'),
   },
   waterTemples: {
-    id: 'waterTemples',
+    id: SkillId.WATER_TEMPLES,
     name: t('skill.waterTemples.name'),
     level: 2,
-    parent: 'water',
+    parent: SkillId.WATER,
     description: t('skill.waterTemples.desc'),
   },
   forestry: {
-    id: 'forestry',
+    id: SkillId.FORESTRY,
     name: t('skill.forestry.name'),
     level: 1,
     parent: null,
     description: t('skill.forestry.desc'),
   },
   forestTemple: {
-    id: 'forestTemple',
+    id: SkillId.FOREST_TEMPLE,
     name: t('skill.forestTemple.name'),
     level: 2,
-    parent: 'forestry',
+    parent: SkillId.FORESTRY,
     description: t('skill.forestTemple.desc'),
   },
   science: {
-    id: 'science',
+    id: SkillId.SCIENCE,
     name: t('skill.science.name'),
     level: 1,
     parent: null,
     description: t('skill.science.desc'),
   },
   roads: {
-    id: 'roads',
+    id: SkillId.ROADS,
     name: t('skill.roads.name'),
     level: 2,
-    parent: 'forestry',
+    parent: SkillId.FORESTRY,
     description: t('skill.roads.desc'),
   },
   shields: {
-    id: 'shields',
+    id: SkillId.SHIELDS,
     name: t('skill.shields.name'),
     level: 1,
     parent: null,
     description: t('skill.shields.desc'),
   },
   defense: {
-    id: 'defense',
+    id: SkillId.DEFENSE,
     name: t('skill.defense.name'),
     level: 2,
-    parent: 'shields',
+    parent: SkillId.SHIELDS,
     description: t('skill.defense.desc'),
   },
   catapult: {
-    id: 'catapult',
+    id: SkillId.CATAPULT,
     name: t('skill.catapult.name'),
     level: 2,
-    parent: 'science',
+    parent: SkillId.SCIENCE,
     description: t('skill.catapult.desc'),
   },
   riding: {
-    id: 'riding',
+    id: SkillId.RIDING,
     name: t('skill.riding.name'),
     level: 1,
     parent: null,
     description: t('skill.riding.desc'),
   },
   bridges: {
-    id: 'bridges',
+    id: SkillId.BRIDGES,
     name: t('skill.bridges.name'),
     level: 2,
-    parent: 'riding',
+    parent: SkillId.RIDING,
     description: t('skill.bridges.desc'),
   },
   knights: {
-    id: 'knights',
+    id: SkillId.KNIGHTS,
     name: t('skill.knights.name'),
     level: 2,
-    parent: 'riding',
+    parent: SkillId.RIDING,
     description: t('skill.knights.desc'),
   },
   agriculture: {
-    id: 'agriculture',
+    id: SkillId.AGRICULTURE,
     name: t('skill.agriculture.name'),
     level: 1,
     parent: null,
     description: t('skill.agriculture.desc'),
   },
   granary: {
-    id: 'granary',
+    id: SkillId.GRANARY,
     name: t('skill.granary.name'),
     level: 2,
-    parent: 'agriculture',
+    parent: SkillId.AGRICULTURE,
     description: t('skill.granary.desc'),
   },
 };

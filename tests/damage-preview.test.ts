@@ -4,6 +4,7 @@ import { TileType } from '../src/game/tile-types';
 import { Selection } from '../src/game/selection';
 import { Unit, UNIT_TYPES } from '../src/game/units';
 import { damagePreviewVictim } from '../src/controller/damage-preview';
+import { SelectionKind, UnitType } from '@enums';
 
 function tile(q: number, r: number, u: Unit | null, exploredBy: number[] = [0]): MapTile {
   return {
@@ -15,7 +16,7 @@ function tile(q: number, r: number, u: Unit | null, exploredBy: number[] = [0]):
 function warrior(id: string, owner: number, q: number, r: number): Unit {
   const t = UNIT_TYPES.warrior;
   return {
-    id, owner, type: 'warrior', q, r, hasMoved: false, hasAttacked: false, hasHealed: false,
+    id, owner, type: UnitType.WARRIOR, q, r, hasMoved: false, hasAttacked: false, hasHealed: false,
     hp: 50, attack: t.attack, attackDistance: t.attackDistance, defense: t.defense, spawnVillage: null,
   };
 }
@@ -31,7 +32,7 @@ describe('damagePreviewVictim', () => {
   it('returns the enemy tile when a friendly unit is selected and the tile is explored', () => {
     const victim = tile(2, 0, enemy);
     const map = mapWith([tile(0, 0, friendly), victim]);
-    const selection = { kind: 'unit', q: 0, r: 0 } as Selection;
+    const selection = { kind: SelectionKind.UNIT, q: 0, r: 0 } as Selection;
     expect(damagePreviewVictim(map, selection, 0, victim)).toBe(victim);
   });
 
@@ -43,21 +44,21 @@ describe('damagePreviewVictim', () => {
   it('returns null when the press is on a friendly unit', () => {
     const other: MapTile = tile(1, 0, warrior('crew', 0, 1, 0));
     const map = mapWith([tile(0, 0, friendly), other]);
-    const selection = { kind: 'unit', q: 0, r: 0 } as Selection;
+    const selection = { kind: SelectionKind.UNIT, q: 0, r: 0 } as Selection;
     expect(damagePreviewVictim(map, selection, 0, other)).toBeNull();
   });
 
   it('returns null when the press is on an unexplored tile', () => {
     const victim = tile(2, 0, enemy, []);
     const map = mapWith([tile(0, 0, friendly), victim]);
-    const selection = { kind: 'unit', q: 0, r: 0 } as Selection;
+    const selection = { kind: SelectionKind.UNIT, q: 0, r: 0 } as Selection;
     expect(damagePreviewVictim(map, selection, 0, victim)).toBeNull();
   });
 
   it('returns null when the pressed unit has no actual unit', () => {
     const empty = tile(2, 0, null);
     const map = mapWith([tile(0, 0, friendly), empty]);
-    const selection = { kind: 'unit', q: 0, r: 0 } as Selection;
+    const selection = { kind: SelectionKind.UNIT, q: 0, r: 0 } as Selection;
     expect(damagePreviewVictim(map, selection, 0, empty)).toBeNull();
   });
 });

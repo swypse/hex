@@ -1,4 +1,4 @@
-import { GameMode } from '@enums';
+import { AiStance, BuildingKind, GameMode, UnitType } from '@enums';
 import { AiDifficultyProfile } from './ai-difficulty';
 import { attackDamage } from './combat';
 import { isExploredFor } from './explore';
@@ -7,9 +7,9 @@ import { GameMap, MapTile } from './map-gen';
 import { Player } from './players';
 import { isShip, shipAttackDistance, shipMovePoints } from './ship';
 import { isWaterType } from './tile-types';
-import { Unit, UNIT_ATTACK_DISTANCE, UNIT_MOVE_POINTS, UnitType } from './units';
+import { Unit, UNIT_ATTACK_DISTANCE, UNIT_MOVE_POINTS } from './units';
 
-type AiStance = 'settle' | 'defend' | 'war';
+
 
 interface EnemyUnit {
   tile: MapTile;
@@ -35,7 +35,7 @@ interface NavalEnemy {
 
 /** A unit that fights from water: a pirate or any unit currently on a ship. */
 export function isNavalEnemy(unit: Unit): boolean {
-  return unit.type === 'pirate' || unit.shipLevel !== undefined;
+  return unit.type === UnitType.PIRATE || unit.shipLevel !== undefined;
 }
 
 /** Farthest range from which a naval enemy can hit a tile this turn. */
@@ -67,7 +67,7 @@ function nearestOwnNavalTarget(map: GameMap, playerIndex: number, from: MapTile)
   for (const t of map.tiles) {
     const ownUnit = t.unit !== null && t.unit.owner === playerIndex;
     const ownSettlement = t.settlement !== null && t.settlement.owner === playerIndex;
-    const ownPort = t.building !== null && t.building.kind === 'port' && t.ownedBy === playerIndex;
+    const ownPort = t.building !== null && t.building.kind === BuildingKind.PORT && t.ownedBy === playerIndex;
     if (ownUnit || ownSettlement || ownPort) {
       const d = hexDistance(from, t);
       if (d < best) best = d;
@@ -101,7 +101,7 @@ export interface AiSituation {
   nearestNaval: NavalEnemy | null;
 }
 
-const MELEE_TYPES = new Set<UnitType>(['warrior', 'rider', 'swordsman', 'shield', 'knight']);
+const MELEE_TYPES = new Set<UnitType>([UnitType.WARRIOR, UnitType.RIDER, UnitType.SWORDSMAN, UnitType.SHIELD, UnitType.KNIGHT]);
 
 export function isMelee(unit: Unit): boolean {
   return MELEE_TYPES.has(unit.type);
@@ -224,11 +224,11 @@ export function analyzeSituation(
   const enemyVillage = nearestEnemyVillage(map, player.index);
   const units = ownUnitCount(map, player.index);
 
-  let stance: AiStance = 'settle';
+  let stance: AiStance = AiStance.SETTLE;
   if (enemyOnOwnVillage || endangered) {
-    stance = 'defend';
-  } else if (mode === 'capture' && enemyVillage && units >= 3 && pow >= epow * profile.warRatio) {
-    stance = 'war';
+    stance = AiStance.DEFEND;
+  } else if (mode === GameMode.CAPTURE && enemyVillage && units >= 3 && pow >= epow * profile.warRatio) {
+    stance = AiStance.WAR;
   }
 
   let huntTarget: MapTile | null = null;
@@ -253,7 +253,7 @@ export function analyzeSituation(
     enemies,
     dangers,
     endangered,
-    frontTarget: stance === 'war' ? enemyVillage : null,
+    frontTarget: stance === AiStance.WAR ? enemyVillage : null,
     freeVillages: freeVillages(map, player.index),
     ownPower: pow,
     enemyPower: epow,

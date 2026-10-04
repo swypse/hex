@@ -1,6 +1,7 @@
 import { Container, Graphics } from 'pixi.js';
 import { makeLabel } from './label';
 import { THEME } from './theme';
+import { FontSize } from '@enums';
 
 const GAP = 10;
 const TRI_H = 6;
@@ -21,7 +22,7 @@ export class ActionTooltip {
     el.visible = false;
     el.zIndex = 100;
 
-    const label = makeLabel(text, { fontSize: 13, fill: THEME.white });
+    const label = makeLabel(text, { fontSize: FontSize.VERY_SMALL, fill: THEME.white });
     const padX = 10;
     const padY = 6;
     const w = label.width + padX * 2;

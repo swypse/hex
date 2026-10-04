@@ -1,9 +1,10 @@
 import { storageService } from './storage-service';
-import { AiDifficulty, DEFAULT_AI_DIFFICULTY } from '../game/ai-difficulty';
+import { DEFAULT_AI_DIFFICULTY } from '../game/ai-difficulty';
+import { AiDifficulty, Language } from '@enums';
 
 const SETTINGS_KEY = 'hex-settings-v1';
 
-export type Language = 'en' | 'ru';
+
 
 export const DEFAULT_PLAYER_NAME = 'Player';
 
@@ -21,7 +22,7 @@ interface GameSettings {
 
 const DEFAULTS: GameSettings = {
   aiDifficulty: DEFAULT_AI_DIFFICULTY,
-  lang: 'en',
+  lang: Language.EN,
   soundOn: true,
   selectedInfoClosed: false,
   playerName: DEFAULT_PLAYER_NAME,

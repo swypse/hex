@@ -422,7 +422,7 @@ export default {
   'hud.selected.trap': 'Thorn trap: {turns} turns left',
   'hud.selected.pirateDeal': 'Pirate: no deal',
   'hud.selected.pirateDealActive': 'Pirate: deal active — {tribes}',
-  'hud.selected.bonus.info': 'A glowing bonus marker — move a unit onto it, end the turn, then press "Get the bonus" next turn',
+  'hud.selected.bonus.info': 'Bonus: step on it, end turn, then "Get the bonus"',
 'hud.selected.bonus.money': 'A stash of 15 money',
   'hud.selected.bonus.resources': '+10 wood, +5 stone, +5 ore',
   'hud.selected.bonus.villageUpgrade': 'Upgrades a village for free',

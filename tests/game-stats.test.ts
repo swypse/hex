@@ -1,4 +1,4 @@
-import { GameMode } from '@enums';
+import { GameMode, Screen, UnitType } from '@enums';
 import { afterEach, describe, expect, it } from 'vitest';
 import { Container, BitmapText } from 'pixi.js';
 import { GameStats } from '../src/ui/overlays/game-stats';
@@ -50,7 +50,7 @@ describe('GameStats unknown tribes', () => {
     (globalThis as { document?: unknown }).document = {
       createElement: () => ({ getContext: () => fakeCanvasContext(), width: 0, height: 0 }),
     };
-    useGameStore.setState({ screen: 'game', players, localPlayerIndex: 0 });
+    useGameStore.setState({ screen: Screen.GAME, players, localPlayerIndex: 0 });
     root = new Container();
     stats = new GameStats();
     stats.mount(makeHost(), root);
@@ -67,7 +67,7 @@ describe('GameStats unknown tribes', () => {
     (globalThis as { document?: unknown }).document = {
       createElement: () => ({ getContext: () => fakeCanvasContext(), width: 0, height: 0 }),
     };
-    useGameStore.setState({ screen: 'game', players, localPlayerIndex: 0 });
+    useGameStore.setState({ screen: Screen.GAME, players, localPlayerIndex: 0 });
     root = new Container();
     stats = new GameStats();
     stats.mount(makeHost(), root);
@@ -90,7 +90,7 @@ describe('GameStats unknown tribes', () => {
     const map = makeTestMap();
     const tile = tileAt(map, 1, 0)!;
     tile.exploredBy = [1];
-    tile.unit = makeUnit('u1', 1, 'warrior', 1, 0);
+    tile.unit = makeUnit('u1', 1, UnitType.WARRIOR, 1, 0);
     mount(map);
     expect(renderedTexts().some((s) => s.includes('Unknown tribe'))).toBe(true);
   });

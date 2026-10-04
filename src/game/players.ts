@@ -1,12 +1,11 @@
 import { SeededRandom } from '../util/random';
 import { generatePlayerNames } from './names';
 import { PlayerResources, START_RESOURCES } from './resources';
-import type { SkillId } from './skills';
 import { EMPTY_STATS, type PlayerStats } from './score';
-import type { AchievementId } from './achievements';
 import { Tribe, TRIBES, tribeById } from './tribes';
-import { AiDifficulty, DEFAULT_AI_DIFFICULTY } from './ai-difficulty';
+import { DEFAULT_AI_DIFFICULTY } from './ai-difficulty';
 import type { AiOperation, AiStrategyState } from './ai-types';
+import { AchievementId, AiDifficulty, AiEngine, SkillId } from '@enums';
 
 export interface Player {
   index: number;
@@ -22,7 +21,7 @@ export interface Player {
   stats?: PlayerStats;
   difficulty?: AiDifficulty;
   /** AI planning engine: 'live' (default) applies each step before planning the next; 'batch' plans the whole turn on a frozen board (legacy, kept for benchmarking). */
-  aiEngine?: 'batch' | 'live';
+  aiEngine?: AiEngine;
   /** Per-behaviour AI switches (default: all on). */
   aiFlags?: Partial<import('./ai-flags').AiFlags>;
   achievements?: AchievementId[];

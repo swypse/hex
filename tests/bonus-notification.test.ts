@@ -1,4 +1,4 @@
-import { GameMode } from '@enums';
+import { BonusKind, GameEventType, GameMode, NetMode, SkillId } from '@enums';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { Application, Container, Graphics, ImageSource, Text, Texture } from 'pixi.js';
 import { gameController } from '../src/controller/game-controller';
@@ -93,7 +93,7 @@ describe('bonus claim notifications', () => {
 
     Object.defineProperty(Text.prototype, 'width', { configurable: true, get: () => 40 });
     Object.defineProperty(Text.prototype, 'height', { configurable: true, get: () => 14 });
-    useGameStore.setState({ localPlayerIndex: 1, netMode: 'client', players, centerMessage: null, centerMessageQueue: [] });
+    useGameStore.setState({ localPlayerIndex: 1, netMode: NetMode.CLIENT, players, centerMessage: null, centerMessageQueue: [] });
 
     gc = gameController as unknown as Record<string, unknown>;
     (gc as { app: unknown }).app = app;
@@ -115,13 +115,13 @@ describe('bonus claim notifications', () => {
   });
 
   it('does not notify the local player about another player claiming a bonus', async () => {
-    const ev: GameEvent = { type: 'bonusClaimed', q: 1, r: 0, kind: 'money', playerIndex: 0 };
+    const ev: GameEvent = { type: GameEventType.BONUS_CLAIMED, q: 1, r: 0, kind: BonusKind.MONEY, playerIndex: 0 };
     await (gc as { presentEvents: (e: GameEvent[], pre: Set<string>) => Promise<void> }).presentEvents([ev], new Set());
     expect(useGameStore.getState().centerMessage).toBeNull();
   });
 
   it('notifies the local player with Skill {name} opened! for a skill bonus', async () => {
-    const ev: GameEvent = { type: 'bonusClaimed', q: 1, r: 0, kind: 'skill', playerIndex: 1, skill: 'navigation' };
+    const ev: GameEvent = { type: GameEventType.BONUS_CLAIMED, q: 1, r: 0, kind: BonusKind.SKILL, playerIndex: 1, skill: SkillId.NAVIGATION };
     await (gc as { presentEvents: (e: GameEvent[], pre: Set<string>) => Promise<void> }).presentEvents([ev], new Set());
     expect(useGameStore.getState().centerMessage).toBe('Skill Navigation opened!');
   });

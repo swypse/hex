@@ -4,7 +4,7 @@ import { Tribe } from '@/game/tribes';
 import { useGameStore } from '@/store/game-store';
 import { type UIHost } from '@/ui/host';
 import { HudTurn } from '@/ui/hud/hud-turn';
-import { GameMode } from '@enums';
+import { GameMode, Screen } from '@enums';
 import { Container, Text } from 'pixi.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
@@ -57,7 +57,7 @@ describe('HudTurn waiting label', () => {
     };
     root = new Container();
     useGameStore.setState({
-      screen: 'start',
+      screen: Screen.START,
       players: [],
       turn: 1,
       currentPlayerIndex: 0,
@@ -79,7 +79,7 @@ describe('HudTurn waiting label', () => {
       makePlayer(1, other, [other]),
     ];
     useGameStore.setState({
-      screen: 'game',
+      screen: Screen.GAME,
       mode: GameMode.CAPTURE,
       players,
       localPlayerIndex: 0,
@@ -124,7 +124,7 @@ describe('HudTurn tutorial label', () => {
     };
     root = new Container();
     useGameStore.setState({
-      screen: 'start',
+      screen: Screen.START,
       players: [],
       turn: 1,
       currentPlayerIndex: 0,
@@ -142,7 +142,7 @@ describe('HudTurn tutorial label', () => {
   it('shows Tutorial instead of a mode name while store.tutorial is true', () => {
     const players = [makePlayer(0, Tribe.Villagers, [Tribe.Villagers]), makePlayer(1, Tribe.Warriors, [Tribe.Warriors])];
     useGameStore.setState({
-      screen: 'game', mode: GameMode.TURNS30, tutorial: true, turn: 3, players,
+      screen: Screen.GAME, mode: GameMode.TURNS30, tutorial: true, turn: 3, players,
       localPlayerIndex: 0, currentPlayerIndex: 0, aiActive: false,
     });
     turn = new HudTurn();

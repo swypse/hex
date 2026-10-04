@@ -1,6 +1,7 @@
 import en from './locales/en';
 import ru from './locales/ru';
-import { type Language, currentLanguage } from '../storage/settings';
+import { currentLanguage } from '../storage/settings';
+import { Language } from '@enums';
 
 const dicts: Record<Language, Record<string, string>> = {
   en: en as Record<string, string>,
@@ -20,7 +21,7 @@ export function t(key: string, params?: Record<string, string | number>): string
 
 function availableLanguages(): { code: Language; label: string }[] {
   return [
-    { code: 'en', label: dicts.en['lang.en'] ?? 'English' },
-    { code: 'ru', label: dicts.ru['lang.ru'] ?? 'Русский' },
+    { code: Language.EN, label: dicts.en['lang.en'] ?? 'English' },
+    { code: Language.RU, label: dicts.ru['lang.ru'] ?? 'Русский' },
   ];
 }

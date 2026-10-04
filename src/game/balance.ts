@@ -1,16 +1,17 @@
 import { RAGE_BONUS, RAGE_THRESHOLD_PCT } from './abilities';
 import { canCounterAttack, COMBAT_SCALE, MISS_CHANCE } from './combat';
-import { SKILLS, skillCost, type SkillId } from './skills';
-import { UNIT_TYPES, type UnitType } from './units';
+import { SKILLS, skillCost } from './skills';
+import { UNIT_TYPES } from './units';
+import { SkillId, UnitType } from '@enums';
 
-export const PLAYABLE_UNITS: UnitType[] = ['warrior', 'rider', 'archer', 'swordsman', 'shield', 'catapult', 'knight', 'stalker', 'builder', 'banner', 'berserker', 'trapper', 'stormcaller', 'stunner'];
+export const PLAYABLE_UNITS: UnitType[] = [UnitType.WARRIOR, UnitType.RIDER, UnitType.ARCHER, UnitType.SWORDSMAN, UnitType.SHIELD, UnitType.CATAPULT, UnitType.KNIGHT, UnitType.STALKER, UnitType.BUILDER, UnitType.BANNER, UnitType.BERSERKER, UnitType.TRAPPER, UnitType.STORMCALLER, UnitType.STUNNER];
 
 /** Combat-role units: the roster whose duel results decide the balance verdict.
  *  Utility specials (stalker, builder, banner) are judged on their abilities. */
-export const CORE_COMBAT: UnitType[] = ['warrior', 'rider', 'archer', 'swordsman', 'shield', 'catapult', 'knight', 'berserker', 'trapper', 'stormcaller', 'stunner'];
+export const CORE_COMBAT: UnitType[] = [UnitType.WARRIOR, UnitType.RIDER, UnitType.ARCHER, UnitType.SWORDSMAN, UnitType.SHIELD, UnitType.CATAPULT, UnitType.KNIGHT, UnitType.BERSERKER, UnitType.TRAPPER, UnitType.STORMCALLER, UnitType.STUNNER];
 
 /** Utility units that are expected to lose duels; their value is the ability. */
-export const UTILITY_UNITS: UnitType[] = ['stalker', 'builder', 'banner'];
+export const UTILITY_UNITS: UnitType[] = [UnitType.STALKER, UnitType.BUILDER, UnitType.BANNER];
 
 /** Win-rate thresholds shared by the flags and the report. */
 export const WIN_THRESHOLD = 0.6;
@@ -52,11 +53,11 @@ export function statsFor(type: UnitType, overrides?: Partial<Record<UnitType, Pa
 
 /** Unit type -> skill that unlocks spawning it (mirrors spawn.ts gates). */
 export const UNIT_SKILL: Partial<Record<UnitType, SkillId>> = {
-  rider: 'riding',
-  swordsman: 'swordsman',
-  shield: 'shields',
-  catapult: 'catapult',
-  knight: 'knights',
+  rider: SkillId.RIDING,
+  swordsman: SkillId.SWORDSMAN,
+  shield: SkillId.SHIELDS,
+  catapult: SkillId.CATAPULT,
+  knight: SkillId.KNIGHTS,
 };
 
 /** The skill plus its prerequisite chain, root first. */
@@ -118,7 +119,7 @@ export interface StrikeContext {
 
 /** True while a berserker is at/below the rage hp threshold. */
 export function isRaging(type: UnitType, hp: number, maxHp: number): boolean {
-  return type === 'berserker' && hp <= maxHp * RAGE_THRESHOLD_PCT;
+  return type === UnitType.BERSERKER && hp <= maxHp * RAGE_THRESHOLD_PCT;
 }
 
 /** One directed hit, mirroring `resolveCombat` + `performAttack` (miss roll
@@ -144,7 +145,7 @@ export function strike(
   const canCounter =
     ctx.distance <= def.attackDistance && canCounterAttackType(defType) && !isRaging(defType, defHp, def.maxHp);
   // A shield's counter-attack is doubled in the real combat formula too.
-  const counterMult = defType === 'shield' ? 2 : 1;
+  const counterMult = defType === UnitType.SHIELD ? 2 : 1;
   const counter = canCounter ? Math.round((defenseForce / total) * defense * COMBAT_SCALE * counterMult) : 0;
   return { dmg, counter };
 }
@@ -196,7 +197,7 @@ export function duel(
     if (rng() < MISS_CHANCE) return { dmg: 0, counter: 0 };
     return strike(attType, defType, att, def, attHp, defHp, {
       distance,
-      ignoreDefense: attType === 'stalker' && first,
+      ignoreDefense: attType === UnitType.STALKER && first,
     });
   };
 
@@ -208,7 +209,7 @@ export function duel(
       dist = Math.max(ra, dist - step(A.movePoints));
       movedA = true;
     }
-    if (dist <= ra && !(movedA && a === 'catapult')) {
+    if (dist <= ra && !(movedA && a === UnitType.CATAPULT)) {
       const hitA = resolve(a, b, A, B, hpA, hpB, dist, firstA);
       firstA = false;
       hpB -= hitA.dmg;
@@ -224,7 +225,7 @@ export function duel(
       dist = Math.max(rb, dist - step(B.movePoints));
       movedB = true;
     }
-    if (dist <= rb && !(movedB && b === 'catapult')) {
+    if (dist <= rb && !(movedB && b === UnitType.CATAPULT)) {
       const hitB = resolve(b, a, B, A, hpB, hpA, dist, firstB);
       firstB = false;
       hpA -= hitB.dmg;
@@ -239,7 +240,7 @@ export function duel(
 
 /** A land catapult never counter-attacks; all other units do when in range. */
 function canCounterAttackType(t: UnitType): boolean {
-  return t !== 'catapult';
+  return t !== UnitType.CATAPULT;
 }
 
 function key(a: UnitType, b: UnitType): string {

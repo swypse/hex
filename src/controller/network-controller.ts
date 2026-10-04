@@ -7,17 +7,18 @@ import { generateRoomCode, ClientMessage, HostMessage, LobbyPlayer } from '../ne
 import { RelayHostSession, RelayClientSession } from '../net/relay-session';
 import { resolveRelayUrl } from '../net/relay-session';
 import { buildMultiplayerPlayers } from '../game/players';
-import { generateMap, type MapSize } from '../game/map-gen';
+import { generateMap } from '../game/map-gen';
 import { initialExplorationFor } from '../game/explore';
 import { exploreVillageSights } from '../game/village';
+import { runSliced } from '../util/time-slice';
 import { Tribe } from '../game/tribes';
 import { useGameStore } from '../store/game-store';
 import { loadSettings, welcomeDismissed } from '../storage/settings';
 import { SeededRandom } from '../util/random';
-import { GameMode } from '../game/game-mode';
 import { seasonForTurn } from '../game/season';
 import { createTextures, TextureSet } from '../render/texture-factory';
 import { activeMatchStore } from '../storage/active-match';
+import { ClientMessageType, CommandType, ConnectionState, GameMode, HostMessageType, LobbyRole, MapSize, NetMode, OverlayKind, PauseReason, Screen, SelectionKind } from '@enums';
 
 /** How long a dropped player stays unmarked-by-modal before the host pause
  *  modal fires: transient network flaps (or a fast refresh) that resolve within
@@ -85,7 +86,7 @@ export class NetworkController {
     // Hosting is not a client match — drop any saved rejoin for it.
     activeMatchStore.clear();
     const code = generateRoomCode();
-    this.hostConfig = { mode: opts.mode, totalPlayers: opts.totalPlayers, aiCount: opts.aiCount, mapSize: opts.mapSize ?? 'normal' };
+    this.hostConfig = { mode: opts.mode, totalPlayers: opts.totalPlayers, aiCount: opts.aiCount, mapSize: opts.mapSize ?? MapSize.NORMAL };
     this.hostName = opts.name;
     this.hostTribe = opts.tribe;
     this.hostPlayers = [];
@@ -94,8 +95,8 @@ export class NetworkController {
         if (this.canceled) return;
         this.hostPlayers = [];
         const s = useGameStore.getState();
-        s.setConnection('connected');
-        if (!this.hostStarted && s.lobby && s.lobby.role === 'host') this.broadcastLobby();
+        s.setConnection(ConnectionState.CONNECTED);
+        if (!this.hostStarted && s.lobby && s.lobby.role === LobbyRole.HOST) this.broadcastLobby();
       },
       onClientJoined: (clientId) => {
         if (this.hostStarted) return;
@@ -109,25 +110,25 @@ export class NetworkController {
       onError: (err) => {
         if (this.canceled) return;
         const s = useGameStore.getState();
-        s.setConnection('error');
+        s.setConnection(ConnectionState.ERROR);
         s.setConnectionMessage(err?.message ?? t('lobby.connectionError'));
       },
     });
     this.hostSession.open(code);
     const store = useGameStore.getState();
-    store.setNetMode('host');
+    store.setNetMode(NetMode.HOST);
     store.setLocalPlayerIndex(0);
-    store.setConnection('connecting');
+    store.setConnection(ConnectionState.CONNECTING);
     store.setConnectionMessage('');
     store.setLobby({
-      role: 'host',
+      role: LobbyRole.HOST,
       code,
       mode: opts.mode,
       totalPlayers: opts.totalPlayers,
       aiCount: opts.aiCount,
       players: this.lobbyPlayers(),
     });
-    store.setScreen('lobby');
+    store.setScreen(Screen.LOBBY);
     return code;
   }
 
@@ -148,19 +149,19 @@ export class NetworkController {
     const joined = this.lobbyPlayers();
     const store = useGameStore.getState();
     store.setLobby({
-      role: 'host',
+      role: LobbyRole.HOST,
       code: store.lobby?.code ?? '',
       mode: this.hostConfig.mode,
       totalPlayers: this.hostConfig.totalPlayers,
       aiCount: this.hostConfig.aiCount,
       players: joined,
     });
-    this.hostSession?.broadcast({ type: 'lobbyUpdate', joined, totalPlayers: this.hostConfig.totalPlayers, aiCount: this.hostConfig.aiCount });
+    this.hostSession?.broadcast({ type: HostMessageType.LOBBY_UPDATE, joined, totalPlayers: this.hostConfig.totalPlayers, aiCount: this.hostConfig.aiCount });
   }
 
   private onHostData(peerId: string, msg: ClientMessage): void {
     switch (msg.type) {
-      case 'join': {
+      case ClientMessageType.JOIN: {
         if (this.hostStarted) {
           this.bindInGameClient(peerId, msg.name);
           break;
@@ -170,19 +171,19 @@ export class NetworkController {
         this.broadcastLobby();
         break;
       }
-      case 'pickTribe': {
+      case ClientMessageType.PICK_TRIBE: {
         const entry = this.hostPlayers.find((p) => p.peerId === peerId);
         if (entry) entry.tribeId = msg.tribeId;
         this.broadcastLobby();
         break;
       }
-      case 'ready': {
+      case ClientMessageType.READY: {
         const entry = this.hostPlayers.find((p) => p.peerId === peerId);
         if (entry) entry.ready = true;
         this.broadcastLobby();
         break;
       }
-      case 'command':
+      case ClientMessageType.COMMAND:
         this.handleClientCommand(peerId, msg.cmd);
         break;
     }
@@ -198,7 +199,8 @@ export class NetworkController {
       if (sim.currentPlayerIndex !== playerIndex) return;
       if (!sim.players[playerIndex]!.isHuman) return;
       const preExplored = this.host.exploredKeysFor(useGameStore.getState().localPlayerIndex);
-      sim.applyCommand(cmd);
+      if (cmd.type === CommandType.END_TURN) await runSliced(sim.applyCommandSteps(cmd));
+      else sim.applyCommand(cmd);
       this.host.syncStore();
       const events = sim.drainEvents();
       this.broadcastBatch(events);
@@ -214,11 +216,11 @@ export class NetworkController {
     stripUndefinedValues(snap);
     for (const entry of this.hostPlayers) {
       if (entry.playerIndex === null) continue;
-      this.hostSession.sendTo(entry.peerId, { type: 'state', state: snap, playerIndex: entry.playerIndex });
+      this.hostSession.sendTo(entry.peerId, { type: HostMessageType.STATE, state: snap, playerIndex: entry.playerIndex });
     }
     if (events.length > 0) {
       stripUndefinedValues(events);
-      this.hostSession.broadcast({ type: 'events', events });
+      this.hostSession.broadcast({ type: HostMessageType.EVENTS, events });
     }
     // The turn may have rotated to a player whose connection is still down:
     // schedule the freeze so the host can resolve it (after the grace window).
@@ -251,7 +253,7 @@ export class NetworkController {
     }
     const snap = sim.snapshot();
     stripUndefinedValues(snap);
-    this.hostSession?.sendTo(peerId, { type: 'state', state: snap, playerIndex: human.index });
+    this.hostSession?.sendTo(peerId, { type: HostMessageType.STATE, state: snap, playerIndex: human.index });
     this.broadcastPlayersOnline();
     this.cancelDisconnectTimer(human.index);
     useGameStore.getState().setPaused(null);
@@ -280,27 +282,27 @@ export class NetworkController {
     if (this.canceled) return;
     const sim = this.host.sim();
     const store = useGameStore.getState();
-    if (!this.hostStarted || !sim || store.screen !== 'game') return;
+    if (!this.hostStarted || !sim || store.screen !== Screen.GAME) return;
     if (sim.currentPlayerIndex !== playerIndex) return;
     if (sim.gameOver) return;
     const player = sim.players[playerIndex];
     if (!player || !player.isHuman) return;
     const entry = this.hostPlayers.find((h) => h.playerIndex === playerIndex);
     if (!entry || entry.online) return;
-    if (store.paused === 'disconnect') return;
+    if (store.paused === PauseReason.DISCONNECT) return;
     if (this.disconnectPauseTimers.has(playerIndex)) return;
     this.disconnectPauseTimers.set(playerIndex, setTimeout(() => {
       this.disconnectPauseTimers.delete(playerIndex);
       const storeNow = useGameStore.getState();
       const simNow = this.host.sim();
-      if (this.canceled || !this.hostStarted || !simNow || simNow.gameOver || storeNow.screen !== 'game') return;
+      if (this.canceled || !this.hostStarted || !simNow || simNow.gameOver || storeNow.screen !== Screen.GAME) return;
       if (simNow.currentPlayerIndex !== playerIndex) return;
       const playerNow = simNow.players[playerIndex];
       if (!playerNow || !playerNow.isHuman) return;
       const entryNow = this.hostPlayers.find((h) => h.playerIndex === playerIndex);
       if (!entryNow || entryNow.online) return;
-      if (storeNow.paused === 'disconnect') return;
-      storeNow.setPaused('disconnect', playerNow.name);
+      if (storeNow.paused === PauseReason.DISCONNECT) return;
+      storeNow.setPaused(PauseReason.DISCONNECT, playerNow.name);
     }, DISCONNECT_GRACE_MS));
   }
 
@@ -316,7 +318,7 @@ export class NetworkController {
    *  player rejoins or the host resolves it. */
   waitForDisconnected(): void {
     const store = useGameStore.getState();
-    if (store.paused === 'disconnect') store.setOverlay(null);
+    if (store.paused === PauseReason.DISCONNECT) store.setOverlay(null);
   }
 
   /** Index of the human player whose seat is currently in a disconnected-pause
@@ -324,7 +326,7 @@ export class NetworkController {
   offlinePlayerIndex(): number | null {
     const sim = this.host.sim();
     const store = useGameStore.getState();
-    if (store.paused !== 'disconnect' || !sim) return null;
+    if (store.paused !== PauseReason.DISCONNECT || !sim) return null;
     for (const p of sim.players) {
       if (!p.isHuman) continue;
       const entry = this.hostPlayers.find((h) => h.playerIndex === p.index);
@@ -339,10 +341,10 @@ export class NetworkController {
     if (!sim) return Promise.resolve();
     return this.host.enqueue(async () => {
       const pre = this.host.exploredKeysFor(useGameStore.getState().localPlayerIndex);
-      sim.applyCommand({ type: 'giveToAI', playerIndex });
+      sim.applyCommand({ type: CommandType.GIVE_TO_AI, playerIndex });
       this.aiTakeoverSeats.add(playerIndex);
       const wasCurrent = sim.currentPlayerIndex === playerIndex;
-      if (wasCurrent && !sim.gameOver) sim.applyCommand({ type: 'endTurn' });
+      if (wasCurrent && !sim.gameOver) await runSliced(sim.applyCommandSteps({ type: CommandType.END_TURN }));
       const events = sim.drainEvents();
       this.host.syncStore();
       this.broadcastBatch(events);
@@ -359,8 +361,8 @@ export class NetworkController {
     if (!sim) return Promise.resolve();
     return this.host.enqueue(async () => {
       const pre = this.host.exploredKeysFor(useGameStore.getState().localPlayerIndex);
-      sim.applyCommand({ type: 'forfeit', playerIndex });
-      if (sim.currentPlayerIndex === playerIndex && !sim.gameOver) sim.applyCommand({ type: 'endTurn' });
+      sim.applyCommand({ type: CommandType.FORFEIT, playerIndex });
+      if (sim.currentPlayerIndex === playerIndex && !sim.gameOver) await runSliced(sim.applyCommandSteps({ type: CommandType.END_TURN }));
       const events = sim.drainEvents();
       this.host.syncStore();
       this.broadcastBatch(events);
@@ -378,7 +380,7 @@ export class NetworkController {
       if (p.playerIndex !== null) online[p.playerIndex] = p.online;
     }
     useGameStore.getState().setPlayersOnline(online);
-    this.hostSession?.broadcast({ type: 'playersOnline', online });
+    this.hostSession?.broadcast({ type: HostMessageType.PLAYERS_ONLINE, online });
   }
 
   async startHostGame(): Promise<void> {
@@ -413,16 +415,16 @@ export class NetworkController {
     store.setWinnerIndex(null);
     store.setBonusAwarded(false);
     store.setLocalPlayerIndex(0);
-    store.setNetMode('host');
+    store.setNetMode(NetMode.HOST);
     store.setTurn(1);
     store.setCurrentPlayerIndex(0);
     store.setAiActive(false);
     store.setSelection(null);
-    store.setScreen('game');
-    if (!welcomeDismissed()) store.setOverlay({ kind: 'welcome' });
+    store.setScreen(Screen.GAME);
+    if (!welcomeDismissed()) store.setOverlay({ kind: OverlayKind.WELCOME });
     this.host.syncKnownTribes(false);
     const start = map.spawns[store.localPlayerIndex]!.start;
-    store.setSelection({ kind: 'unit', q: start.q, r: start.r });
+    store.setSelection({ kind: SelectionKind.UNIT, q: start.q, r: start.r });
     const app = this.host.app();
     if (app) {
       this.host.applyFitToScreen();
@@ -434,7 +436,7 @@ export class NetworkController {
   }
 
   sendClientCommand(cmd: Command): void {
-    this.clientSession?.send({ type: 'command', cmd });
+    this.clientSession?.send({ type: ClientMessageType.COMMAND, cmd });
   }
 
   /** Marks one locally-predicted command as in flight. Replies (state batches)
@@ -451,8 +453,8 @@ export class NetworkController {
     // Remember the room so a reloaded page can offer a one-click rejoin.
     activeMatchStore.save(code, name, relayUrl ?? resolveRelayUrl());
     const store = useGameStore.getState();
-    store.setNetMode('client');
-    store.setConnection('connecting');
+    store.setNetMode(NetMode.CLIENT);
+    store.setConnection(ConnectionState.CONNECTING);
     store.setConnectionMessage('');
     store.setLocalPlayerIndex(-1);
     this.clientSession = new RelayClientSession(
@@ -461,24 +463,24 @@ export class NetworkController {
           if (this.canceled) return;
           store.setMyPeerId(selfId);
           const lobby = useGameStore.getState().lobby;
-          if (lobby && lobby.role === 'client') {
+          if (lobby && lobby.role === LobbyRole.CLIENT) {
             store.setLobby({ ...lobby, players: lobby.players.map((p) => (p.peerId === '' ? { ...p, peerId: selfId } : p)) });
           }
         },
         onJoined: () => {
-          store.setConnection('connected');
+          store.setConnection(ConnectionState.CONNECTED);
           store.setConnectionMessage('');
         },
         onData: (msg) => this.onHostMessage(msg),
         onClose: () => {
           if (this.canceled) return;
-          store.setConnection('error');
+          store.setConnection(ConnectionState.ERROR);
           store.setConnectionMessage(t('lobby.disconnected'));
           this.noteHostDisconnected();
         },
         onError: (err) => {
           if (this.canceled) return;
-          store.setConnection('error');
+          store.setConnection(ConnectionState.ERROR);
           store.setConnectionMessage(err?.message ?? t('lobby.errMsg'));
           this.noteHostDisconnected();
         },
@@ -488,23 +490,23 @@ export class NetworkController {
     this.clientSession.join(code, name);
     store.setMyPeerId('');
     store.setLobby({
-      role: 'client',
+      role: LobbyRole.CLIENT,
       code,
       mode: GameMode.CAPTURE,
       totalPlayers: 0,
       aiCount: 0,
       players: [{ peerId: '', name, tribeId: null, isHost: false, ready: false }],
     });
-    store.setScreen('lobby');
+    store.setScreen(Screen.LOBBY);
   }
 
   /** Fired on a relay socket close/error: pause the game while it is running
    *  so the client waits for the host to return. */
   noteHostDisconnected(): void {
     const store = useGameStore.getState();
-    if (store.screen !== 'game' || store.netMode !== 'client') return;
-    if (store.paused === 'disconnect') return;
-    store.setPaused('disconnect', '');
+    if (store.screen !== Screen.GAME || store.netMode !== NetMode.CLIENT) return;
+    if (store.paused === PauseReason.DISCONNECT) return;
+    store.setPaused(PauseReason.DISCONNECT, '');
   }
 
   private markClientInGame(): void {
@@ -525,26 +527,26 @@ export class NetworkController {
     this.clientSession = null;
     const store = useGameStore.getState();
     store.setLobby(null);
-    store.setConnection('idle');
+    store.setConnection(ConnectionState.IDLE);
     store.setConnectionMessage('');
-    store.setNetMode('single');
+    store.setNetMode(NetMode.SINGLE);
     store.setMyPeerId('');
   }
 
   pickClientTribe(tribe: Tribe): void {
-    this.clientSession?.send({ type: 'pickTribe', tribeId: tribe });
+    this.clientSession?.send({ type: ClientMessageType.PICK_TRIBE, tribeId: tribe });
   }
 
   readyUp(): void {
-    this.clientSession?.send({ type: 'ready' });
+    this.clientSession?.send({ type: ClientMessageType.READY });
   }
 
   onHostMessage(msg: HostMessage): void {
     const store = useGameStore.getState();
     switch (msg.type) {
-      case 'lobbyUpdate':
+      case HostMessageType.LOBBY_UPDATE:
         store.setLobby({
-          role: 'client',
+          role: LobbyRole.CLIENT,
           code: store.lobby?.code ?? '',
           mode: store.lobby?.mode ?? GameMode.CAPTURE,
           totalPlayers: msg.totalPlayers,
@@ -552,7 +554,7 @@ export class NetworkController {
           players: msg.joined,
         });
         break;
-      case 'state': {
+      case HostMessageType.STATE: {
         if (msg.state.gameOver) activeMatchStore.clear();
         if (this.predictedPending > 0) {
           this.predictedPending--;
@@ -577,16 +579,16 @@ export class NetworkController {
         store.setBonusAwarded(msg.state.bonusAwarded);
         store.setAiActive(msg.state.currentPlayerIndex !== msg.playerIndex);
         store.setSelection(null);
-        const enteringGame = store.screen !== 'game';
-        store.setScreen('game');
-        if (enteringGame && !welcomeDismissed()) store.setOverlay({ kind: 'welcome' });
+        const enteringGame = store.screen !== Screen.GAME;
+        store.setScreen(Screen.GAME);
+        if (enteringGame && !welcomeDismissed()) store.setOverlay({ kind: OverlayKind.WELCOME });
         if (enteringGame) store.setPlayersOnline(msg.state.players.map(() => true));
         this.host.enqueue(async () => {
           this.host.adoptSnapshot(msg.state);
         });
         break;
       }
-      case 'events': {
+      case HostMessageType.EVENTS: {
         if (this.eventsToSkip > 0) {
           this.eventsToSkip--;
           this.pendingPreExplored = null;
@@ -605,10 +607,10 @@ export class NetworkController {
         }
         break;
       }
-      case 'error':
-        store.setConnection('error');
+      case HostMessageType.ERROR:
+        store.setConnection(ConnectionState.ERROR);
         break;
-      case 'playersOnline':
+      case HostMessageType.PLAYERS_ONLINE:
         store.setPlayersOnline(msg.online);
         break;
     }

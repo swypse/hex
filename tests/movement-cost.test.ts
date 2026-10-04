@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { GameMap, MapTile } from '../src/game/map-gen';
 import { TileType } from '../src/game/tile-types';
 import { TILE_MOVE_COST, tileMoveCost, waterRouteKeys } from '../src/game/movement-cost';
+import { BridgeDir, BuildingKind } from '@enums';
 
 function mk(q: number, r: number, terrain: TileType, opts: Partial<MapTile> = {}): MapTile {
   return {
@@ -46,15 +47,15 @@ describe('tileMoveCost', () => {
   });
 
   it('treats a bridge as an own road on water', () => {
-    const b = mk(0, 0, TileType.Water, { bridge: { owner: 0, dir: 'we' }, roadOwner: 0 });
+    const b = mk(0, 0, TileType.Water, { bridge: { owner: 0, dir: BridgeDir.WE }, roadOwner: 0 });
     expect(tileMoveCost(map([b]), b, 0)).toBe(5);
     expect(tileMoveCost(map([b]), b, 1)).toBe(10);
   });
 
   it('halves water-route tiles between own ports', () => {
-    const portA = mk(0, 0, TileType.Water, { building: { kind: 'port', level: 1 }, ownedBy: 0 });
+    const portA = mk(0, 0, TileType.Water, { building: { kind: BuildingKind.PORT, level: 1 }, ownedBy: 0 });
     const mid = mk(1, 0, TileType.Water, { ownedBy: 0 });
-    const portB = mk(2, 0, TileType.Water, { building: { kind: 'port', level: 1 }, ownedBy: 0 });
+    const portB = mk(2, 0, TileType.Water, { building: { kind: BuildingKind.PORT, level: 1 }, ownedBy: 0 });
     const m = map([portA, mid, portB]);
     const keys = waterRouteKeys(m);
     expect(keys).toContain('1,0');

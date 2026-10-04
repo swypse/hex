@@ -4,6 +4,7 @@ import type { GameEvent } from '../src/game/events';
 import type { MapTile } from '../src/game/map-gen';
 import { TileType } from '../src/game/tile-types';
 import { useGameStore } from '../src/store/game-store';
+import { GameEventType, UnitType } from '@enums';
 
 function tile(q: number, r: number): MapTile {
   return {
@@ -14,7 +15,7 @@ function tile(q: number, r: number): MapTile {
 
 function missedAttack(attackerId: string, targetId: string, from: [number, number], to: [number, number], attackerHp: number, targetHp: number): GameEvent {
   return {
-    type: 'attack',
+    type: GameEventType.ATTACK,
     attackerId,
     targetId,
     attackerIndex: 1,
@@ -26,8 +27,8 @@ function missedAttack(attackerId: string, targetId: string, from: [number, numbe
     missed: true,
     attackerDied: false,
     targetDied: false,
-    attackerPre: { type: 'warrior', owner: 1, hp: attackerHp },
-    targetPre: { type: 'warrior', owner: 0, hp: targetHp },
+    attackerPre: { type: UnitType.WARRIOR, owner: 1, hp: attackerHp },
+    targetPre: { type: UnitType.WARRIOR, owner: 0, hp: targetHp },
   };
 }
 

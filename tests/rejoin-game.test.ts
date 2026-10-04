@@ -1,4 +1,4 @@
-import { GameMode } from '@enums';
+import { GameMode, MapSize, NetMode, Screen } from '@enums';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { gameController } from '../src/controller/game-controller';
 import { NetworkController } from '../src/controller/network-controller';
@@ -48,7 +48,7 @@ describe('rejoinGame', () => {
       value: realLocalStorage,
     });
     activeMatchStore.clear();
-    useGameStore.setState({ netMode: 'single', paused: null, screen: 'start' });
+    useGameStore.setState({ netMode: NetMode.SINGLE, paused: null, screen: Screen.START });
   });
 
   it('rejoins with the stored code, name and relay url while fresh', () => {
@@ -81,14 +81,14 @@ describe('rejoinGame', () => {
   });
 
   it('confirmLeaveGame clears the saved match for a client', () => {
-    useGameStore.setState({ netMode: 'client', screen: 'game', gameOver: false });
+    useGameStore.setState({ netMode: NetMode.CLIENT, screen: Screen.GAME, gameOver: false });
     confirmLeaveGame();
     expect(activeMatchStore.loadFresh()).toBeNull();
   });
 
   it('hosting a game clears a previously saved client match', () => {
     vi.spyOn(RelayHostSession.prototype, 'open').mockImplementation(() => {});
-    network().hostGame({ mode: GameMode.CAPTURE, totalPlayers: 2, aiCount: 0, mapSize: 'normal', name: 'H', tribe: 'Cats' as never });
+    network().hostGame({ mode: GameMode.CAPTURE, totalPlayers: 2, aiCount: 0, mapSize: MapSize.NORMAL, name: 'H', tribe: 'Cats' as never });
     expect(activeMatchStore.loadFresh()).toBeNull();
   });
 });

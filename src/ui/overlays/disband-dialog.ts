@@ -7,6 +7,7 @@ import { type UIHost } from '../host';
 import { Button } from '../kit/button';
 import { makeLabel } from '../kit/label';
 import { Popup } from '../kit/popup';
+import { FontSize, OverlayKind } from '@enums';
 
 export class DisbandDialog {
   private el: Container | null = null;
@@ -16,7 +17,7 @@ export class DisbandDialog {
   mount(host: UIHost, root: Container): void {
     this.host = host;
     const s = useGameStore.getState();
-    if (s.overlay?.kind !== 'disband') return;
+    if (s.overlay?.kind !== OverlayKind.DISBAND) return;
     const unitId = s.overlay.unitId;
     const map = gameController.getMap();
     const unit = map ? map.tiles.find((t) => t.unit?.id === unitId)?.unit : null;
@@ -37,7 +38,7 @@ export class DisbandDialog {
     });
 
     const hint = makeLabel(t('action.disbandConfirm', { cost }), {
-      fontSize: 14,
+      fontSize: FontSize.SMALL,
       fill: 0xcccccc,
       wordWrap: true,
       wordWrapWidth: popup.contentWidth,

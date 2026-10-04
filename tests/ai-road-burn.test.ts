@@ -6,9 +6,10 @@ import { Tribe } from '../src/game/tribes';
 import { SeededRandom } from '../src/util/random';
 import { makeTestMap, tileAt, makeUnit } from './helpers/test-map';
 import type { GameMap } from '../src/game/map-gen';
+import { AiActionType, AiDifficulty, UnitType } from '@enums';
 
 function makeAI(): ReturnType<typeof buildPlayers>[number] {
-  return buildPlayers(Tribe.Villagers, 1, new SeededRandom(11), 'normal')[1]!;
+  return buildPlayers(Tribe.Villagers, 1, new SeededRandom(11), AiDifficulty.NORMAL)[1]!;
 }
 
 /** Player 0 owns villages at (0,0) and (3,0) joined by roads (1,0),(2,0);
@@ -28,7 +29,7 @@ function scene(extraRoute: boolean): GameMap {
     t.ownedBy = 0;
   }
   for (const t of map.tiles) t.exploredBy = [0, 1];
-  tileAt(map, 1, 0)!.unit = makeUnit('raider', 1, 'warrior', 1, 0);
+  tileAt(map, 1, 0)!.unit = makeUnit('raider', 1, UnitType.WARRIOR, 1, 0);
   return map;
 }
 
@@ -63,6 +64,6 @@ describe('AI destroys enemy roads', () => {
     const map = scene(false);
     for (const t of map.tiles) if (t.roadOwner === 0) t.roadOwner = 1;
     const actions = planAiActions(map, makeAI(), new SeededRandom(5));
-    expect(actions.some((a) => a.type === 'burnRoad')).toBe(false);
+    expect(actions.some((a) => a.type === AiActionType.BURN_ROAD)).toBe(false);
   });
 });

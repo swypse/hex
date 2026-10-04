@@ -1,6 +1,7 @@
-import { UNIT_TYPE_NAMES, UNIT_TYPES, Unit, UnitType, unitFoodEaten, unitMaintenance } from './units';
+import { UNIT_TYPE_NAMES, UNIT_TYPES, Unit, unitFoodEaten, unitMaintenance } from './units';
 import { SHIP_ATTACK, SHIP_ATTACK_DISTANCE, SHIP_MOVE_POINTS, SHIP_UPGRADE_COST, shipMovePoints } from './ship';
 import { t } from '../i18n';
+import { UnitType } from '@enums';
 
 /** i18n keys for the short feature bullets shown for each land unit. */
 const LAND_KEYS: Record<UnitType, string[]> = {

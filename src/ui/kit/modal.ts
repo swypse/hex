@@ -3,6 +3,7 @@ import { Application, Container } from 'pixi.js';
 import { Button } from './button';
 import { makeLabel } from './label';
 import { Popup } from './popup';
+import { FontSize } from '@enums';
 
 interface ModalOpts {
   app: Application;
@@ -14,7 +15,7 @@ interface ModalOpts {
   closeOnEnter?: boolean;
 }
 
-const BODY_SIZE = 14;
+const BODY_SIZE = FontSize.SMALL;
 const BODY_COLOR = 0xcccccc;
 const LINE_GAP = 6;
 

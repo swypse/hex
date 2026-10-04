@@ -7,6 +7,7 @@ import { START_RESOURCES } from '../src/game/resources';
 import { Tribe } from '../src/game/tribes';
 import type { Player } from '../src/game/players';
 import type { MapTile } from '../src/game/map-gen';
+import { GameEventType } from '@enums';
 
 describe('capture messages', () => {
   beforeEach(() => {
@@ -59,7 +60,7 @@ describe('capture messages', () => {
     useGameStore.setState({ localPlayerIndex: 0, players: [local, capturer] });
     const presenter = new EventPresenter(makeHost([local, capturer]));
     await presenter.present(
-      [{ type: 'captured', q: 0, r: 0, oldOwner: 1, newOwner: 1, ownerDied: false }],
+      [{ type: GameEventType.CAPTURED, q: 0, r: 0, oldOwner: 1, newOwner: 1, ownerDied: false }],
       new Set(),
     );
     expect(useGameStore.getState().centerMessage).toBe('V is captured by Unknown tribe!');
@@ -71,7 +72,7 @@ describe('capture messages', () => {
     useGameStore.setState({ localPlayerIndex: 0, players: [local, capturer] });
     const presenter = new EventPresenter(makeHost([local, capturer]));
     await presenter.present(
-      [{ type: 'captured', q: 0, r: 0, oldOwner: 1, newOwner: 1, ownerDied: false }],
+      [{ type: GameEventType.CAPTURED, q: 0, r: 0, oldOwner: 1, newOwner: 1, ownerDied: false }],
       new Set(),
     );
     expect(useGameStore.getState().centerMessage).toBe('V is captured by Barbarians!');
@@ -122,7 +123,7 @@ describe('pirate capture messages', () => {
     useGameStore.setState({ localPlayerIndex: 0, players: [owner] });
     const presenter = new EventPresenter(makeHost([owner]));
     await presenter.present(
-      [{ type: 'pirateCapture', q: 0, r: 0, playerIndex: 0, success: true }],
+      [{ type: GameEventType.PIRATE_CAPTURE, q: 0, r: 0, playerIndex: 0, success: true }],
       new Set(),
     );
     expect(useGameStore.getState().centerMessage).toBe('Your ship is captured by pirates!');
@@ -133,7 +134,7 @@ describe('pirate capture messages', () => {
     useGameStore.setState({ localPlayerIndex: 0, players: [owner] });
     const presenter = new EventPresenter(makeHost([owner]));
     await presenter.present(
-      [{ type: 'pirateCapture', q: 0, r: 0, playerIndex: 0, success: false }],
+      [{ type: GameEventType.PIRATE_CAPTURE, q: 0, r: 0, playerIndex: 0, success: false }],
       new Set(),
     );
     expect(useGameStore.getState().centerMessage).toBe('The attempt to capture your ship has failed');
@@ -144,7 +145,7 @@ describe('pirate capture messages', () => {
     useGameStore.setState({ localPlayerIndex: 0, players: [owner] });
     const presenter = new EventPresenter(makeHost([owner]));
     await presenter.present(
-      [{ type: 'pirateDeal', unitId: 'pirate-1', q: 0, r: 0, playerIndex: 0 }],
+      [{ type: GameEventType.PIRATE_DEAL, unitId: 'pirate-1', q: 0, r: 0, playerIndex: 0 }],
       new Set(),
     );
     expect(useGameStore.getState().centerMessage).toBe('Deal with the pirates — they will not attack your tribe anymore!');
@@ -155,7 +156,7 @@ describe('pirate capture messages', () => {
     useGameStore.setState({ localPlayerIndex: 0, players: [owner] });
     const presenter = new EventPresenter(makeHost([owner]));
     await presenter.present(
-      [{ type: 'pirateDealCanceled', unitId: 'pirate-1', q: 0, r: 0, playerIndex: 0 }],
+      [{ type: GameEventType.PIRATE_DEAL_CANCELED, unitId: 'pirate-1', q: 0, r: 0, playerIndex: 0 }],
       new Set(),
     );
     expect(useGameStore.getState().centerMessage).toBe('The deal with the pirates is broken!');

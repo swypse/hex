@@ -1,4 +1,4 @@
-import { GameMode } from '@enums';
+import { GameEventType, GameMode, NetMode, SelectionKind, UnitType } from '@enums';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Application, Container, Graphics, ImageSource, Sprite, Text, Texture } from 'pixi.js';
 import { gameController } from '../src/controller/game-controller';
@@ -101,7 +101,7 @@ function unitAt(map: GameMap, q: number, r: number): MapTile {
 
 function makeUnit(id: string, owner: number, q: number, r: number, hp: number): Unit {
   return {
-    id, owner, type: 'warrior', q, r,
+    id, owner, type: UnitType.WARRIOR, q, r,
     hasMoved: false, hasAttacked: false, hasHealed: false,
     hp, attack: UNIT_TYPES.warrior.attack, attackDistance: UNIT_TYPES.warrior.attackDistance,
     spawnVillage: null,
@@ -161,7 +161,7 @@ function setup(map: GameMap, players: Player[]): Harness {
 
   const store = useGameStore.getState();
   store.setLocalPlayerIndex(0);
-  store.setNetMode('single');
+  store.setNetMode(NetMode.SINGLE);
   store.setAiActive(false);
   store.setSelection(null);
   store.setPlayers(players);
@@ -229,13 +229,13 @@ describe('combat animation ordering', () => {
     });
 
     const attack: GameEvent = {
-      type: 'attack', attackerId: 'att', targetId: 'def',
+      type: GameEventType.ATTACK, attackerId: 'att', targetId: 'def',
       attackerIndex: 0, targetIndex: 1,
       attackerTile: { q: 0, r: 0 }, targetTile: { q: 1, r: 0 },
       attackerDamage: 5, targetDamage: 0, missed: false,
       attackerDied: false, targetDied: true,
-      attackerPre: { type: 'warrior', owner: 0, hp: 5 },
-      targetPre: { type: 'warrior', owner: 1, hp: 5 },
+      attackerPre: { type: UnitType.WARRIOR, owner: 0, hp: 5 },
+      targetPre: { type: UnitType.WARRIOR, owner: 1, hp: 5 },
     };
     const p = h.gc.presentEvents([attack], h.gc.exploredKeysFor(0));
 
@@ -271,7 +271,7 @@ describe('combat animation ordering', () => {
     h = setup(map, players);
 
     const rider = makeUnit('rd', 0, 0, 0, 4);
-    rider.type = 'rider';
+    rider.type = UnitType.RIDER;
     unitAt(map, 0, 0).unit = rider;
     unitAt(map, 1, 0).unit = makeUnit('def', 1, 1, 0, 5);
     h.mapView.update(map, players, null, new Set(), new Set(), 0, new Set(), {
@@ -279,13 +279,13 @@ describe('combat animation ordering', () => {
     });
 
     const attack: GameEvent = {
-      type: 'attack', attackerId: 'rd', targetId: 'def',
+      type: GameEventType.ATTACK, attackerId: 'rd', targetId: 'def',
       attackerIndex: 0, targetIndex: 1,
       attackerTile: { q: 0, r: 0 }, targetTile: { q: 1, r: 0 },
       attackerDamage: 2, targetDamage: 1, missed: false,
       attackerDied: false, targetDied: false,
-      attackerPre: { type: 'rider', owner: 0, hp: 4 },
-      targetPre: { type: 'warrior', owner: 1, hp: 5 },
+      attackerPre: { type: UnitType.RIDER, owner: 0, hp: 4 },
+      targetPre: { type: UnitType.WARRIOR, owner: 1, hp: 5 },
     };
     const p = h.gc.presentEvents([attack], h.gc.exploredKeysFor(0));
     let settled = false;
@@ -297,7 +297,7 @@ describe('combat animation ordering', () => {
     await pEnd;
 
     const s = useGameStore.getState();
-    expect(s.selection).toEqual({ kind: 'unit', q: 0, r: 0 });
+    expect(s.selection).toEqual({ kind: SelectionKind.UNIT, q: 0, r: 0 });
   });
 
   it('plays a death burst for a ranged kill while the attacker stays put', async () => {
@@ -307,20 +307,20 @@ describe('combat animation ordering', () => {
 
     // Pirate-like attacker that does not move onto the killed tile.
     const attacker = makeUnit('att', 0, 0, 0, 15);
-    attacker.type = 'pirate';
+    attacker.type = UnitType.PIRATE;
     unitAt(map, 0, 0).unit = attacker;
     h.mapView.update(map, players, null, new Set(), new Set(), 0, new Set(), {
       x: 0, y: 0, scale: 1, width: 800, height: 600,
     });
 
     const attack: GameEvent = {
-      type: 'attack', attackerId: 'att', targetId: 'def',
+      type: GameEventType.ATTACK, attackerId: 'att', targetId: 'def',
       attackerIndex: -1, targetIndex: 1,
       attackerTile: { q: 0, r: 0 }, targetTile: { q: 1, r: 0 },
       attackerDamage: 5, targetDamage: 0, missed: false,
       attackerDied: false, targetDied: true,
-      attackerPre: { type: 'pirate', owner: -1, hp: 15 },
-      targetPre: { type: 'warrior', owner: 1, hp: 5 },
+      attackerPre: { type: UnitType.PIRATE, owner: -1, hp: 15 },
+      targetPre: { type: UnitType.WARRIOR, owner: 1, hp: 5 },
     };
     const p = h.gc.presentEvents([attack], h.gc.exploredKeysFor(0));
 
@@ -365,13 +365,13 @@ describe('combat animation ordering', () => {
     const dx0 = tiles.get(dKey)!.unitSprite!.x;
 
     const attack: GameEvent = {
-      type: 'attack', attackerId: 'att', targetId: 'def',
+      type: GameEventType.ATTACK, attackerId: 'att', targetId: 'def',
       attackerIndex: 0, targetIndex: 1,
       attackerTile: { q: 0, r: 0 }, targetTile: { q: 1, r: 0 },
       attackerDamage: 2, targetDamage: 1, missed: false,
       attackerDied: false, targetDied: false,
-      attackerPre: { type: 'warrior', owner: 0, hp: 4 },
-      targetPre: { type: 'warrior', owner: 1, hp: 5 },
+      attackerPre: { type: UnitType.WARRIOR, owner: 0, hp: 4 },
+      targetPre: { type: UnitType.WARRIOR, owner: 1, hp: 5 },
     };
     const p = h.gc.presentEvents([attack], h.gc.exploredKeysFor(0));
 
@@ -407,7 +407,7 @@ describe('combat animation ordering', () => {
     unitAt(map, -1, 0).unit = decoy;
     const pirate = (id: string, q: number, r: number): Unit => {
       const u = makeUnit(id, -1, q, r, 15);
-      u.type = 'pirate';
+      u.type = UnitType.PIRATE;
       return u;
     };
     unitAt(map, 1, 0).unit = pirate('p1', 1, 0);
@@ -420,22 +420,22 @@ describe('combat animation ordering', () => {
 
     const events: GameEvent[] = [
       {
-        type: 'attack', attackerId: 'p1', targetId: 'decoy',
+        type: GameEventType.ATTACK, attackerId: 'p1', targetId: 'decoy',
         attackerIndex: -1, targetIndex: 0,
         attackerTile: { q: 1, r: 0 }, targetTile: { q: -1, r: 0 },
         attackerDamage: 3, targetDamage: 0, missed: false,
         attackerDied: false, targetDied: false,
-        attackerPre: { type: 'pirate', owner: -1, hp: 15 },
-        targetPre: { type: 'warrior', owner: 0, hp: 50 },
+        attackerPre: { type: UnitType.PIRATE, owner: -1, hp: 15 },
+        targetPre: { type: UnitType.WARRIOR, owner: 0, hp: 50 },
       },
       {
-        type: 'attack', attackerId: 'p2', targetId: 'mine',
+        type: GameEventType.ATTACK, attackerId: 'p2', targetId: 'mine',
         attackerIndex: -1, targetIndex: 0,
         attackerTile: { q: 2, r: 0 }, targetTile: { q: 0, r: 0 },
         attackerDamage: 3, targetDamage: 0, missed: false,
         attackerDied: false, targetDied: true,
-        attackerPre: { type: 'pirate', owner: -1, hp: 15 },
-        targetPre: { type: 'warrior', owner: 0, hp: 50 },
+        attackerPre: { type: UnitType.PIRATE, owner: -1, hp: 15 },
+        targetPre: { type: UnitType.WARRIOR, owner: 0, hp: 50 },
       },
     ];
     const p = h.gc.presentEvents(events, h.gc.exploredKeysFor(0));
@@ -482,22 +482,22 @@ describe('combat animation ordering', () => {
 
     const events: GameEvent[] = [
       {
-        type: 'attack', attackerId: 'ea', targetId: 'decoy',
+        type: GameEventType.ATTACK, attackerId: 'ea', targetId: 'decoy',
         attackerIndex: 1, targetIndex: 0,
         attackerTile: { q: 2, r: 0 }, targetTile: { q: -1, r: 0 },
         attackerDamage: 10, targetDamage: 0, missed: false,
         attackerDied: false, targetDied: false,
-        attackerPre: { type: 'warrior', owner: 1, hp: 50 },
-        targetPre: { type: 'warrior', owner: 0, hp: 50 },
+        attackerPre: { type: UnitType.WARRIOR, owner: 1, hp: 50 },
+        targetPre: { type: UnitType.WARRIOR, owner: 0, hp: 50 },
       },
       {
-        type: 'attack', attackerId: 'att', targetId: 'mine',
+        type: GameEventType.ATTACK, attackerId: 'att', targetId: 'mine',
         attackerIndex: 1, targetIndex: 0,
         attackerTile: { q: 1, r: 0 }, targetTile: { q: 0, r: 0 },
         attackerDamage: 40, targetDamage: 0, missed: false,
         attackerDied: false, targetDied: true,
-        attackerPre: { type: 'warrior', owner: 1, hp: 50 },
-        targetPre: { type: 'warrior', owner: 0, hp: 50 },
+        attackerPre: { type: UnitType.WARRIOR, owner: 1, hp: 50 },
+        targetPre: { type: UnitType.WARRIOR, owner: 0, hp: 50 },
       },
     ];
     const p = h.gc.presentEvents(events, h.gc.exploredKeysFor(0));
@@ -526,7 +526,7 @@ describe('combat animation ordering', () => {
     h = setup(map, players);
 
     const archer = makeUnit('att', 0, 0, 0, 30);
-    archer.type = 'archer';
+    archer.type = UnitType.ARCHER;
     unitAt(map, 0, 0).unit = archer;
     unitAt(map, 1, 0).unit = makeUnit('def', 1, 1, 0, 40);
     h.mapView.update(map, players, null, new Set(), new Set(), 0, new Set(), {
@@ -537,13 +537,13 @@ describe('combat animation ordering', () => {
     const spy = vi.spyOn(sfx, 'play').mockImplementation((name) => { played.push(name); });
     try {
       const attack: GameEvent = {
-        type: 'attack', attackerId: 'att', targetId: 'def',
+        type: GameEventType.ATTACK, attackerId: 'att', targetId: 'def',
         attackerIndex: 0, targetIndex: 1,
         attackerTile: { q: 0, r: 0 }, targetTile: { q: 1, r: 0 },
         attackerDamage: 10, targetDamage: 0, missed: false,
         attackerDied: false, targetDied: false,
-        attackerPre: { type: 'archer', owner: 0, hp: 30 },
-        targetPre: { type: 'warrior', owner: 1, hp: 40 },
+        attackerPre: { type: UnitType.ARCHER, owner: 0, hp: 30 },
+        targetPre: { type: UnitType.WARRIOR, owner: 1, hp: 40 },
       };
       const p = h.gc.presentEvents([attack], h.gc.exploredKeysFor(0));
 
@@ -574,7 +574,7 @@ describe('combat animation ordering', () => {
     h = setup(map, players);
 
     const swordsman = makeUnit('att', 0, 0, 0, 80);
-    swordsman.type = 'swordsman';
+    swordsman.type = UnitType.SWORDSMAN;
     unitAt(map, 0, 0).unit = swordsman;
     unitAt(map, 1, 0).unit = makeUnit('def', 1, 1, 0, 40);
     h.mapView.update(map, players, null, new Set(), new Set(), 0, new Set(), {
@@ -585,13 +585,13 @@ describe('combat animation ordering', () => {
     const spy = vi.spyOn(sfx, 'play').mockImplementation((name) => { played.push(name); });
     try {
       const attack: GameEvent = {
-        type: 'attack', attackerId: 'att', targetId: 'def',
+        type: GameEventType.ATTACK, attackerId: 'att', targetId: 'def',
         attackerIndex: 0, targetIndex: 1,
         attackerTile: { q: 0, r: 0 }, targetTile: { q: 1, r: 0 },
         attackerDamage: 20, targetDamage: 0, missed: false,
         attackerDied: false, targetDied: false,
-        attackerPre: { type: 'swordsman', owner: 0, hp: 80 },
-        targetPre: { type: 'warrior', owner: 1, hp: 40 },
+        attackerPre: { type: UnitType.SWORDSMAN, owner: 0, hp: 80 },
+        targetPre: { type: UnitType.WARRIOR, owner: 1, hp: 40 },
       };
       const p = h.gc.presentEvents([attack], h.gc.exploredKeysFor(0));
 
@@ -618,7 +618,7 @@ describe('combat animation ordering', () => {
     h = setup(map, players);
 
     const ship = makeUnit('att', 0, 0, 0, 30);
-    ship.type = 'archer';
+    ship.type = UnitType.ARCHER;
     ship.shipLevel = 1;
     unitAt(map, 0, 0).unit = ship;
     unitAt(map, 1, 0).unit = makeUnit('def', 1, 1, 0, 40);
@@ -630,13 +630,13 @@ describe('combat animation ordering', () => {
     const spy = vi.spyOn(sfx, 'play').mockImplementation((name) => { played.push(name); });
     try {
       const attack: GameEvent = {
-        type: 'attack', attackerId: 'att', targetId: 'def',
+        type: GameEventType.ATTACK, attackerId: 'att', targetId: 'def',
         attackerIndex: 0, targetIndex: 1,
         attackerTile: { q: 0, r: 0 }, targetTile: { q: 1, r: 0 },
         attackerDamage: 10, targetDamage: 0, missed: false,
         attackerDied: false, targetDied: false,
-        attackerPre: { type: 'archer', owner: 0, hp: 30, shipLevel: 1 },
-        targetPre: { type: 'warrior', owner: 1, hp: 40 },
+        attackerPre: { type: UnitType.ARCHER, owner: 0, hp: 30, shipLevel: 1 },
+        targetPre: { type: UnitType.WARRIOR, owner: 1, hp: 40 },
       };
       const p = h.gc.presentEvents([attack], h.gc.exploredKeysFor(0));
 
@@ -663,7 +663,7 @@ describe('combat animation ordering', () => {
     h = setup(map, players);
 
     const archer = makeUnit('att', 0, 0, 0, 30);
-    archer.type = 'archer';
+    archer.type = UnitType.ARCHER;
     unitAt(map, 0, 0).unit = archer;
     unitAt(map, 1, 0).unit = makeUnit('def', 1, 1, 0, 40);
     h.mapView.update(map, players, null, new Set(), new Set(), 0, new Set(), {
@@ -671,13 +671,13 @@ describe('combat animation ordering', () => {
     });
 
     const attack: GameEvent = {
-      type: 'attack', attackerId: 'att', targetId: 'def',
+      type: GameEventType.ATTACK, attackerId: 'att', targetId: 'def',
       attackerIndex: 0, targetIndex: 1,
       attackerTile: { q: 0, r: 0 }, targetTile: { q: 1, r: 0 },
       attackerDamage: 10, targetDamage: 0, missed: false,
       attackerDied: false, targetDied: false,
-      attackerPre: { type: 'archer', owner: 0, hp: 30 },
-      targetPre: { type: 'warrior', owner: 1, hp: 40 },
+      attackerPre: { type: UnitType.ARCHER, owner: 0, hp: 30 },
+      targetPre: { type: UnitType.WARRIOR, owner: 1, hp: 40 },
     };
     const p = h.gc.presentEvents([attack], h.gc.exploredKeysFor(0));
     const findArrow = (): Sprite =>
@@ -716,7 +716,7 @@ h.advanceTicks(100);
     h = setup(map, players);
 
     const archer = makeUnit('att', 0, 0, 0, 30);
-    archer.type = 'archer';
+    archer.type = UnitType.ARCHER;
     unitAt(map, 0, 0).unit = archer;
     unitAt(map, 1, 0).unit = makeUnit('def', 1, 1, 0, 40);
     h.mapView.update(map, players, null, new Set(), new Set(), 0, new Set(), {
@@ -724,13 +724,13 @@ h.advanceTicks(100);
     });
 
     const attack: GameEvent = {
-      type: 'attack', attackerId: 'att', targetId: 'def',
+      type: GameEventType.ATTACK, attackerId: 'att', targetId: 'def',
       attackerIndex: 0, targetIndex: 1,
       attackerTile: { q: 0, r: 0 }, targetTile: { q: 1, r: 0 },
       attackerDamage: 10, targetDamage: 0, missed: false,
       attackerDied: false, targetDied: false,
-      attackerPre: { type: 'archer', owner: 0, hp: 30 },
-      targetPre: { type: 'warrior', owner: 1, hp: 40 },
+      attackerPre: { type: UnitType.ARCHER, owner: 0, hp: 30 },
+      targetPre: { type: UnitType.WARRIOR, owner: 1, hp: 40 },
     };
     const p = h.gc.presentEvents([attack], h.gc.exploredKeysFor(0));
     const findArrow = (): Sprite =>
@@ -762,7 +762,7 @@ h.advanceTicks(100);
     h = setup(map, players);
 
     const archer = makeUnit('att', 0, 0, 0, 30);
-    archer.type = 'archer';
+    archer.type = UnitType.ARCHER;
     unitAt(map, 0, 0).unit = archer;
     unitAt(map, 1, 0).unit = makeUnit('def', 1, 1, 0, 40);
     h.mapView.update(map, players, null, new Set(), new Set(), 0, new Set(), {
@@ -770,13 +770,13 @@ h.advanceTicks(100);
     });
 
     const attack: GameEvent = {
-      type: 'attack', attackerId: 'att', targetId: 'def',
+      type: GameEventType.ATTACK, attackerId: 'att', targetId: 'def',
       attackerIndex: 0, targetIndex: 1,
       attackerTile: { q: 0, r: 0 }, targetTile: { q: 1, r: 0 },
       attackerDamage: 10, targetDamage: 0, missed: false,
       attackerDied: false, targetDied: false,
-      attackerPre: { type: 'archer', owner: 0, hp: 30 },
-      targetPre: { type: 'warrior', owner: 1, hp: 40 },
+      attackerPre: { type: UnitType.ARCHER, owner: 0, hp: 30 },
+      targetPre: { type: UnitType.WARRIOR, owner: 1, hp: 40 },
     };
     const p = h.gc.presentEvents([attack], h.gc.exploredKeysFor(0));
     const findArrow = (): Sprite =>
@@ -806,7 +806,7 @@ h.advanceTicks(100);
     h = setup(map, players);
 
     const ship = makeUnit('att', 0, 0, 0, 30);
-    ship.type = 'archer';
+    ship.type = UnitType.ARCHER;
     ship.shipLevel = 1;
     unitAt(map, 0, 0).unit = ship;
     unitAt(map, 2, 0).unit = makeUnit('def', 1, 2, 0, 40);
@@ -815,13 +815,13 @@ h.advanceTicks(100);
     });
 
     const attack: GameEvent = {
-      type: 'attack', attackerId: 'att', targetId: 'def',
+      type: GameEventType.ATTACK, attackerId: 'att', targetId: 'def',
       attackerIndex: 0, targetIndex: 1,
       attackerTile: { q: 0, r: 0 }, targetTile: { q: 2, r: 0 },
       attackerDamage: 10, targetDamage: 0, missed: false,
       attackerDied: false, targetDied: false,
-      attackerPre: { type: 'warrior', owner: 0, hp: 30, shipLevel: 1 },
-      targetPre: { type: 'warrior', owner: 1, hp: 40 },
+      attackerPre: { type: UnitType.WARRIOR, owner: 0, hp: 30, shipLevel: 1 },
+      targetPre: { type: UnitType.WARRIOR, owner: 1, hp: 40 },
     };
     const p = h.gc.presentEvents([attack], h.gc.exploredKeysFor(0));
     const findCannonball = (): Sprite =>
@@ -851,7 +851,7 @@ h.advanceTicks(100);
 
     // A captured ship becomes a pirate unit but keeps its ship level.
     const pirateShip = makeUnit('att', -1, 0, 0, 30);
-    pirateShip.type = 'pirate';
+    pirateShip.type = UnitType.PIRATE;
     pirateShip.shipLevel = 2;
     unitAt(map, 0, 0).unit = pirateShip;
     unitAt(map, 1, 0).unit = makeUnit('def', 0, 1, 0, 20);
@@ -860,13 +860,13 @@ h.advanceTicks(100);
     });
 
     const attack: GameEvent = {
-      type: 'attack', attackerId: 'att', targetId: 'def',
+      type: GameEventType.ATTACK, attackerId: 'att', targetId: 'def',
       attackerIndex: -1, targetIndex: 0,
       attackerTile: { q: 0, r: 0 }, targetTile: { q: 1, r: 0 },
       attackerDamage: 6, targetDamage: 0, missed: false,
       attackerDied: false, targetDied: false,
-      attackerPre: { type: 'pirate', owner: -1, hp: 30, shipLevel: 2 },
-      targetPre: { type: 'warrior', owner: 0, hp: 20 },
+      attackerPre: { type: UnitType.PIRATE, owner: -1, hp: 30, shipLevel: 2 },
+      targetPre: { type: UnitType.WARRIOR, owner: 0, hp: 20 },
     };
     const p = h.gc.presentEvents([attack], h.gc.exploredKeysFor(0));
     const findCannonball = (): Sprite =>
@@ -896,7 +896,7 @@ h.advanceTicks(100);
     h = setup(map, players);
 
     const pirate = makeUnit('att', -1, 0, 0, 30);
-    pirate.type = 'pirate';
+    pirate.type = UnitType.PIRATE;
     unitAt(map, 0, 0).unit = pirate;
     unitAt(map, 1, 0).unit = makeUnit('def', 0, 1, 0, 20);
     h.mapView.update(map, players, null, new Set(), new Set(), 0, new Set(), {
@@ -904,13 +904,13 @@ h.advanceTicks(100);
     });
 
     const attack: GameEvent = {
-      type: 'attack', attackerId: 'att', targetId: 'def',
+      type: GameEventType.ATTACK, attackerId: 'att', targetId: 'def',
       attackerIndex: -1, targetIndex: 0,
       attackerTile: { q: 0, r: 0 }, targetTile: { q: 1, r: 0 },
       attackerDamage: 6, targetDamage: 0, missed: false,
       attackerDied: false, targetDied: false,
-      attackerPre: { type: 'pirate', owner: -1, hp: 30 },
-      targetPre: { type: 'warrior', owner: 0, hp: 20 },
+      attackerPre: { type: UnitType.PIRATE, owner: -1, hp: 30 },
+      targetPre: { type: UnitType.WARRIOR, owner: 0, hp: 20 },
     };
     const p = h.gc.presentEvents([attack], h.gc.exploredKeysFor(0));
     const findCannonball = (): Sprite =>
@@ -948,7 +948,7 @@ h.advanceTicks(100);
     const attacker = makeUnit('att', 0, 0, 0, 50);
     unitAt(map, 0, 0).unit = attacker;
     const pirateShip = makeUnit('def', -1, 1, 0, 30);
-    pirateShip.type = 'pirate';
+    pirateShip.type = UnitType.PIRATE;
     pirateShip.shipLevel = 2;
     unitAt(map, 1, 0).unit = pirateShip;
     h.mapView.update(map, players, null, new Set(), new Set(), 0, new Set(), {
@@ -956,13 +956,13 @@ h.advanceTicks(100);
     });
 
     const attack: GameEvent = {
-      type: 'attack', attackerId: 'att', targetId: 'def',
+      type: GameEventType.ATTACK, attackerId: 'att', targetId: 'def',
       attackerIndex: 0, targetIndex: -1,
       attackerTile: { q: 0, r: 0 }, targetTile: { q: 1, r: 0 },
       attackerDamage: 5, targetDamage: 5, missed: false,
       attackerDied: false, targetDied: false,
-      attackerPre: { type: 'warrior', owner: 0, hp: 50 },
-      targetPre: { type: 'pirate', owner: -1, hp: 30, shipLevel: 2 },
+      attackerPre: { type: UnitType.WARRIOR, owner: 0, hp: 50 },
+      targetPre: { type: UnitType.PIRATE, owner: -1, hp: 30, shipLevel: 2 },
     };
     const p = h.gc.presentEvents([attack], h.gc.exploredKeysFor(0));
     const findCannonball = (): Sprite =>
@@ -994,20 +994,20 @@ h.advanceTicks(100);
     const attacker = makeUnit('att', 0, 0, 0, 50);
     unitAt(map, 0, 0).unit = attacker;
     const pirate = makeUnit('def', -1, 1, 0, 30);
-    pirate.type = 'pirate';
+    pirate.type = UnitType.PIRATE;
     unitAt(map, 1, 0).unit = pirate;
     h.mapView.update(map, players, null, new Set(), new Set(), 0, new Set(), {
       x: 0, y: 0, scale: 1, width: 800, height: 600,
     });
 
     const attack: GameEvent = {
-      type: 'attack', attackerId: 'att', targetId: 'def',
+      type: GameEventType.ATTACK, attackerId: 'att', targetId: 'def',
       attackerIndex: 0, targetIndex: -1,
       attackerTile: { q: 0, r: 0 }, targetTile: { q: 1, r: 0 },
       attackerDamage: 5, targetDamage: 5, missed: false,
       attackerDied: false, targetDied: false,
-      attackerPre: { type: 'warrior', owner: 0, hp: 50 },
-      targetPre: { type: 'pirate', owner: -1, hp: 30 },
+      attackerPre: { type: UnitType.WARRIOR, owner: 0, hp: 50 },
+      targetPre: { type: UnitType.PIRATE, owner: -1, hp: 30 },
     };
     const p = h.gc.presentEvents([attack], h.gc.exploredKeysFor(0));
     const findCannonball = (): Sprite =>
@@ -1043,23 +1043,23 @@ h.advanceTicks(100);
     h = setup(map, players);
 
     const attackerPirate = makeUnit('att', -1, 0, 0, 40);
-    attackerPirate.type = 'pirate';
+    attackerPirate.type = UnitType.PIRATE;
     unitAt(map, 0, 0).unit = attackerPirate;
     const targetPirate = makeUnit('def', -1, 2, 0, 40);
-    targetPirate.type = 'pirate';
+    targetPirate.type = UnitType.PIRATE;
     unitAt(map, 2, 0).unit = targetPirate;
     h.mapView.update(map, players, null, new Set(), new Set(), 0, new Set(), {
       x: 0, y: 0, scale: 1, width: 800, height: 600,
     });
 
     const attack: GameEvent = {
-      type: 'attack', attackerId: 'att', targetId: 'def',
+      type: GameEventType.ATTACK, attackerId: 'att', targetId: 'def',
       attackerIndex: -1, targetIndex: -1,
       attackerTile: { q: 0, r: 0 }, targetTile: { q: 2, r: 0 },
       attackerDamage: 5, targetDamage: 5, missed: false,
       attackerDied: false, targetDied: false,
-      attackerPre: { type: 'pirate', owner: -1, hp: 40 },
-      targetPre: { type: 'pirate', owner: -1, hp: 40 },
+      attackerPre: { type: UnitType.PIRATE, owner: -1, hp: 40 },
+      targetPre: { type: UnitType.PIRATE, owner: -1, hp: 40 },
     };
     const p = h.gc.presentEvents([attack], h.gc.exploredKeysFor(0));
     const balls = (): number =>
@@ -1093,20 +1093,20 @@ h.advanceTicks(100);
     const attacker = makeUnit('att', 0, 0, 0, 50);
     unitAt(map, 0, 0).unit = attacker;
     const archer = makeUnit('def', 1, 1, 0, 30);
-    archer.type = 'archer';
+    archer.type = UnitType.ARCHER;
     unitAt(map, 1, 0).unit = archer;
     h.mapView.update(map, players, null, new Set(), new Set(), 0, new Set(), {
       x: 0, y: 0, scale: 1, width: 800, height: 600,
     });
 
     const attack: GameEvent = {
-      type: 'attack', attackerId: 'att', targetId: 'def',
+      type: GameEventType.ATTACK, attackerId: 'att', targetId: 'def',
       attackerIndex: 0, targetIndex: 1,
       attackerTile: { q: 0, r: 0 }, targetTile: { q: 1, r: 0 },
       attackerDamage: 5, targetDamage: 5, missed: false,
       attackerDied: false, targetDied: false,
-      attackerPre: { type: 'warrior', owner: 0, hp: 50 },
-      targetPre: { type: 'archer', owner: 1, hp: 30 },
+      attackerPre: { type: UnitType.WARRIOR, owner: 0, hp: 50 },
+      targetPre: { type: UnitType.ARCHER, owner: 1, hp: 30 },
     };
     const p = h.gc.presentEvents([attack], h.gc.exploredKeysFor(0));
     const findCounterArrow = (): Sprite =>
@@ -1143,7 +1143,7 @@ h.advanceTicks(100);
     const attacker = makeUnit('att', 0, 0, 0, 50);
     unitAt(map, 0, 0).unit = attacker;
     const ship = makeUnit('def', 1, 1, 0, 30);
-    ship.type = 'archer';
+    ship.type = UnitType.ARCHER;
     ship.shipLevel = 1;
     unitAt(map, 1, 0).unit = ship;
     h.mapView.update(map, players, null, new Set(), new Set(), 0, new Set(), {
@@ -1151,13 +1151,13 @@ h.advanceTicks(100);
     });
 
     const attack: GameEvent = {
-      type: 'attack', attackerId: 'att', targetId: 'def',
+      type: GameEventType.ATTACK, attackerId: 'att', targetId: 'def',
       attackerIndex: 0, targetIndex: 1,
       attackerTile: { q: 0, r: 0 }, targetTile: { q: 1, r: 0 },
       attackerDamage: 5, targetDamage: 5, missed: false,
       attackerDied: false, targetDied: false,
-      attackerPre: { type: 'warrior', owner: 0, hp: 50 },
-      targetPre: { type: 'archer', owner: 1, hp: 30, shipLevel: 1 },
+      attackerPre: { type: UnitType.WARRIOR, owner: 0, hp: 50 },
+      targetPre: { type: UnitType.ARCHER, owner: 1, hp: 30, shipLevel: 1 },
     };
     const p = h.gc.presentEvents([attack], h.gc.exploredKeysFor(0));
     const findCounterCannonball = (): Sprite =>
@@ -1188,7 +1188,7 @@ h.advanceTicks(100);
     h = setup(map, players);
 
     const archer = makeUnit('att', 0, 0, 0, 30);
-    archer.type = 'archer';
+    archer.type = UnitType.ARCHER;
     unitAt(map, 0, 0).unit = archer;
     unitAt(map, -1, 0).unit = makeUnit('def', 1, -1, 0, 40);
     h.mapView.update(map, players, null, new Set(), new Set(), 0, new Set(), {
@@ -1196,13 +1196,13 @@ h.advanceTicks(100);
     });
 
     const attack: GameEvent = {
-      type: 'attack', attackerId: 'att', targetId: 'def',
+      type: GameEventType.ATTACK, attackerId: 'att', targetId: 'def',
       attackerIndex: 0, targetIndex: 1,
       attackerTile: { q: 0, r: 0 }, targetTile: { q: -1, r: 0 },
       attackerDamage: 10, targetDamage: 0, missed: false,
       attackerDied: false, targetDied: false,
-      attackerPre: { type: 'archer', owner: 0, hp: 30 },
-      targetPre: { type: 'warrior', owner: 1, hp: 40 },
+      attackerPre: { type: UnitType.ARCHER, owner: 0, hp: 30 },
+      targetPre: { type: UnitType.WARRIOR, owner: 1, hp: 40 },
     };
     const p = h.gc.presentEvents([attack], h.gc.exploredKeysFor(0));
     const findArrow = (): Sprite =>
@@ -1227,7 +1227,7 @@ h.advanceTicks(100);
     h = setup(map, players);
 
     const archer = makeUnit('att', 0, 0, 0, 30);
-    archer.type = 'archer';
+    archer.type = UnitType.ARCHER;
     unitAt(map, 0, 0).unit = archer;
     unitAt(map, 1, 0).unit = makeUnit('def', 1, 1, 0, 40);
     h.mapView.update(map, players, null, new Set(), new Set(), 0, new Set(), {
@@ -1235,13 +1235,13 @@ h.advanceTicks(100);
     });
 
     const attack: GameEvent = {
-      type: 'attack', attackerId: 'att', targetId: 'def',
+      type: GameEventType.ATTACK, attackerId: 'att', targetId: 'def',
       attackerIndex: 0, targetIndex: 1,
       attackerTile: { q: 0, r: 0 }, targetTile: { q: 1, r: 0 },
       attackerDamage: 0, targetDamage: 0, missed: true,
       attackerDied: false, targetDied: false,
-      attackerPre: { type: 'archer', owner: 0, hp: 30 },
-      targetPre: { type: 'warrior', owner: 1, hp: 40 },
+      attackerPre: { type: UnitType.ARCHER, owner: 0, hp: 30 },
+      targetPre: { type: UnitType.WARRIOR, owner: 1, hp: 40 },
     };
     const p = h.gc.presentEvents([attack], h.gc.exploredKeysFor(0));
     const findArrow = (): Sprite =>
@@ -1264,7 +1264,7 @@ h.advanceTicks(100);
     h = setup(map, players);
 
     const ship = makeUnit('att', 0, 0, 0, 30);
-    ship.type = 'archer';
+    ship.type = UnitType.ARCHER;
     ship.shipLevel = 1;
     unitAt(map, 0, 0).unit = ship;
     unitAt(map, 1, 0).unit = makeUnit('def', 1, 1, 0, 40);
@@ -1273,13 +1273,13 @@ h.advanceTicks(100);
     });
 
     const attack: GameEvent = {
-      type: 'attack', attackerId: 'att', targetId: 'def',
+      type: GameEventType.ATTACK, attackerId: 'att', targetId: 'def',
       attackerIndex: 0, targetIndex: 1,
       attackerTile: { q: 0, r: 0 }, targetTile: { q: 1, r: 0 },
       attackerDamage: 10, targetDamage: 0, missed: false,
       attackerDied: false, targetDied: false,
-      attackerPre: { type: 'warrior', owner: 0, hp: 30, shipLevel: 1 },
-      targetPre: { type: 'warrior', owner: 1, hp: 40 },
+      attackerPre: { type: UnitType.WARRIOR, owner: 0, hp: 30, shipLevel: 1 },
+      targetPre: { type: UnitType.WARRIOR, owner: 1, hp: 40 },
     };
     const p = h.gc.presentEvents([attack], h.gc.exploredKeysFor(0));
     const findCannonball = (): Sprite =>
@@ -1312,7 +1312,7 @@ h.advanceTicks(100);
     h = setup(map, players);
 
     const ship = makeUnit('att', 0, 0, 0, 30);
-    ship.type = 'archer';
+    ship.type = UnitType.ARCHER;
     ship.shipLevel = 1;
     unitAt(map, 0, 0).unit = ship;
     unitAt(map, -1, 0).unit = makeUnit('def', 1, -1, 0, 40);
@@ -1321,13 +1321,13 @@ h.advanceTicks(100);
     });
 
     const attack: GameEvent = {
-      type: 'attack', attackerId: 'att', targetId: 'def',
+      type: GameEventType.ATTACK, attackerId: 'att', targetId: 'def',
       attackerIndex: 0, targetIndex: 1,
       attackerTile: { q: 0, r: 0 }, targetTile: { q: -1, r: 0 },
       attackerDamage: 10, targetDamage: 0, missed: false,
       attackerDied: false, targetDied: false,
-      attackerPre: { type: 'warrior', owner: 0, hp: 30, shipLevel: 1 },
-      targetPre: { type: 'warrior', owner: 1, hp: 40 },
+      attackerPre: { type: UnitType.WARRIOR, owner: 0, hp: 30, shipLevel: 1 },
+      targetPre: { type: UnitType.WARRIOR, owner: 1, hp: 40 },
     };
     const p = h.gc.presentEvents([attack], h.gc.exploredKeysFor(0));
     const findCannonball = (): Sprite =>
@@ -1352,7 +1352,7 @@ h.advanceTicks(100);
     h = setup(map, players);
 
     const catapult = makeUnit('att', 0, 0, 0, 30);
-    catapult.type = 'catapult';
+    catapult.type = UnitType.CATAPULT;
     unitAt(map, 0, 0).unit = catapult;
     unitAt(map, 1, 0).unit = makeUnit('def', 1, 1, 0, 40);
     h.mapView.update(map, players, null, new Set(), new Set(), 0, new Set(), {
@@ -1360,13 +1360,13 @@ h.advanceTicks(100);
     });
 
     const attack: GameEvent = {
-      type: 'attack', attackerId: 'att', targetId: 'def',
+      type: GameEventType.ATTACK, attackerId: 'att', targetId: 'def',
       attackerIndex: 0, targetIndex: 1,
       attackerTile: { q: 0, r: 0 }, targetTile: { q: 1, r: 0 },
       attackerDamage: 20, targetDamage: 0, missed: false,
       attackerDied: false, targetDied: false,
-      attackerPre: { type: 'catapult', owner: 0, hp: 30 },
-      targetPre: { type: 'warrior', owner: 1, hp: 40 },
+      attackerPre: { type: UnitType.CATAPULT, owner: 0, hp: 30 },
+      targetPre: { type: UnitType.WARRIOR, owner: 1, hp: 40 },
     };
     const p = h.gc.presentEvents([attack], h.gc.exploredKeysFor(0));
     const findCannonball = (): Sprite =>
@@ -1396,7 +1396,7 @@ h.advanceTicks(100);
     h = setup(map, players);
 
     const ship = makeUnit('att', 0, 0, 0, 30);
-    ship.type = 'archer';
+    ship.type = UnitType.ARCHER;
     ship.shipLevel = 1;
     unitAt(map, 0, 0).unit = ship;
     unitAt(map, 1, 0).unit = makeUnit('def', 1, 1, 0, 40);
@@ -1405,13 +1405,13 @@ h.advanceTicks(100);
     });
 
     const attack: GameEvent = {
-      type: 'attack', attackerId: 'att', targetId: 'def',
+      type: GameEventType.ATTACK, attackerId: 'att', targetId: 'def',
       attackerIndex: 0, targetIndex: 1,
       attackerTile: { q: 0, r: 0 }, targetTile: { q: 1, r: 0 },
       attackerDamage: 10, targetDamage: 0, missed: false,
       attackerDied: false, targetDied: false,
-      attackerPre: { type: 'warrior', owner: 0, hp: 30, shipLevel: 1 },
-      targetPre: { type: 'warrior', owner: 1, hp: 40 },
+      attackerPre: { type: UnitType.WARRIOR, owner: 0, hp: 30, shipLevel: 1 },
+      targetPre: { type: UnitType.WARRIOR, owner: 1, hp: 40 },
     };
     const p = h.gc.presentEvents([attack], h.gc.exploredKeysFor(0));
     const findCannonball = (): Sprite =>
@@ -1446,7 +1446,7 @@ h.advanceTicks(100);
 
     // Enemy unit far to the right (screen x ~1093 with pan 400 + 2-tile margin).
     const attacker = makeUnit('att', 1, 10, 0, 5);
-    attacker.type = 'warrior';
+    attacker.type = UnitType.WARRIOR;
     unitAt(map, 10, 0).unit = attacker;
     unitAt(map, 9, 0).unit = makeUnit('def', 0, 9, 0, 5);
     h.mapView.update(map, players, null, new Set(), new Set(), 0, new Set(), {
@@ -1454,13 +1454,13 @@ h.advanceTicks(100);
     });
 
     const attack: GameEvent = {
-      type: 'attack', attackerId: 'att', targetId: 'def',
+      type: GameEventType.ATTACK, attackerId: 'att', targetId: 'def',
       attackerIndex: 1, targetIndex: 0,
       attackerTile: { q: 10, r: 0 }, targetTile: { q: 9, r: 0 },
       attackerDamage: 2, targetDamage: 1, missed: false,
       attackerDied: false, targetDied: false,
-      attackerPre: { type: 'warrior', owner: 1, hp: 5 },
-      targetPre: { type: 'warrior', owner: 0, hp: 5 },
+      attackerPre: { type: UnitType.WARRIOR, owner: 1, hp: 5 },
+      targetPre: { type: UnitType.WARRIOR, owner: 0, hp: 5 },
     };
     const p = h.gc.presentEvents([attack], h.gc.exploredKeysFor(0));
 
@@ -1488,7 +1488,7 @@ h.advanceTicks(100);
     const panBefore = { ...camera.pan };
 
     const pirate = makeUnit('pirate', -1, 10, 0, 15);
-    pirate.type = 'pirate';
+    pirate.type = UnitType.PIRATE;
     unitAt(map, 10, 0).unit = pirate;
     unitAt(map, 9, 0).unit = makeUnit('def', 0, 9, 0, 5);
     h.mapView.update(map, players, null, new Set(), new Set(), 0, new Set(), {
@@ -1496,13 +1496,13 @@ h.advanceTicks(100);
     });
 
     const attack: GameEvent = {
-      type: 'attack', attackerId: 'pirate', targetId: 'def',
+      type: GameEventType.ATTACK, attackerId: 'pirate', targetId: 'def',
       attackerIndex: -1, targetIndex: 0,
       attackerTile: { q: 10, r: 0 }, targetTile: { q: 9, r: 0 },
       attackerDamage: 3, targetDamage: 0, missed: false,
       attackerDied: false, targetDied: false,
-      attackerPre: { type: 'pirate', owner: -1, hp: 15 },
-      targetPre: { type: 'warrior', owner: 0, hp: 5 },
+      attackerPre: { type: UnitType.PIRATE, owner: -1, hp: 15 },
+      targetPre: { type: UnitType.WARRIOR, owner: 0, hp: 5 },
     };
     const p = h.gc.presentEvents([attack], h.gc.exploredKeysFor(0));
 
@@ -1529,7 +1529,7 @@ h.advanceTicks(100);
     const panBefore = { ...camera.pan };
 
     const attacker = makeUnit('att', 1, 1, 0, 5);
-    attacker.type = 'warrior';
+    attacker.type = UnitType.WARRIOR;
     unitAt(map, 1, 0).unit = attacker;
     unitAt(map, 0, 0).unit = makeUnit('def', 0, 0, 0, 5);
     h.mapView.update(map, players, null, new Set(), new Set(), 0, new Set(), {
@@ -1537,13 +1537,13 @@ h.advanceTicks(100);
     });
 
     const attack: GameEvent = {
-      type: 'attack', attackerId: 'att', targetId: 'def',
+      type: GameEventType.ATTACK, attackerId: 'att', targetId: 'def',
       attackerIndex: 1, targetIndex: 0,
       attackerTile: { q: 1, r: 0 }, targetTile: { q: 0, r: 0 },
       attackerDamage: 2, targetDamage: 1, missed: false,
       attackerDied: false, targetDied: false,
-      attackerPre: { type: 'warrior', owner: 1, hp: 5 },
-      targetPre: { type: 'warrior', owner: 0, hp: 5 },
+      attackerPre: { type: UnitType.WARRIOR, owner: 1, hp: 5 },
+      targetPre: { type: UnitType.WARRIOR, owner: 0, hp: 5 },
     };
     const p = h.gc.presentEvents([attack], h.gc.exploredKeysFor(0));
 
@@ -1570,13 +1570,13 @@ h.advanceTicks(100);
     });
 
     const attack: GameEvent = {
-      type: 'attack', attackerId: 'att', targetId: 'def',
+      type: GameEventType.ATTACK, attackerId: 'att', targetId: 'def',
       attackerIndex: 0, targetIndex: 1,
       attackerTile: { q: 0, r: 0 }, targetTile: { q: 1, r: 0 },
       attackerDamage: 5, targetDamage: 5, missed: false,
       attackerDied: false, targetDied: false,
-      attackerPre: { type: 'warrior', owner: 0, hp: 50 },
-      targetPre: { type: 'warrior', owner: 1, hp: 50 },
+      attackerPre: { type: UnitType.WARRIOR, owner: 0, hp: 50 },
+      targetPre: { type: UnitType.WARRIOR, owner: 1, hp: 50 },
     };
     const p = h.gc.presentEvents([attack], h.gc.exploredKeysFor(0));
 

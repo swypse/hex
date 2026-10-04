@@ -5,7 +5,7 @@ import { TileType } from '@/game/tile-types';
 import { Tribe } from '@/game/tribes';
 import { Unit } from '@/game/units';
 import { SeededRandom } from '@/util';
-import { GameMode } from '@enums';
+import { CommandType, GameMode, UnitType } from '@enums';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { giveResources, makeTestMap, makeUnit, tileAt } from './helpers/test-map';
 
@@ -55,17 +55,17 @@ function findUnit(id: string): Unit {
 }
 
 function ship(owner: number, q: number, r: number): Unit {
-  return place(owner, 'warrior', q, r, { hp: 200, shipLevel: 1 });
+  return place(owner, UnitType.WARRIOR, q, r, { hp: 200, shipLevel: 1 });
 }
 
 describe('stormcaller storm', () => {
   it('is refused without a village, and refused on an unowned tile', () => {
-    const stormcaller = place(0, 'stormcaller', 2, 0); // land, no village claims it
-    expect(sim.applyCommand({ type: 'storm', unitId: stormcaller.id })).toBe(false);
+    const stormcaller = place(0, UnitType.STORMCALLER, 2, 0); // land, no village claims it
+    expect(sim.applyCommand({ type: CommandType.STORM, unitId: stormcaller.id })).toBe(false);
   });
 
   it('strikes enemy and pirate ships on the village water tiles only, not own ships nor other village water', () => {
-    const stormcaller = place(0, 'stormcaller', 1, 0);
+    const stormcaller = place(0, UnitType.STORMCALLER, 1, 0);
     tileAt(map, 1, 0)!.ownedBy = 0;
     tileAt(map, 1, 0)!.claimedByVillage = { q: 0, r: 0 };
     const villageA = { q: 0, r: 0 };
@@ -76,9 +76,9 @@ describe('stormcaller storm', () => {
     void villageA;
     const enemyShip = ship(1, 1, 1);
     const ownShip = ship(0, 1, -1);
-    const pirateShip = place(-1, 'pirate', 1, 2, { hp: 200, shipLevel: 1 });
+    const pirateShip = place(-1, UnitType.PIRATE, 1, 2, { hp: 200, shipLevel: 1 });
     const otherShip = ship(1, 0, 1); // village B water (0,1) claimed by (-1,0)
-    const ok = sim.applyCommand({ type: 'storm', unitId: stormcaller.id });
+    const ok = sim.applyCommand({ type: CommandType.STORM, unitId: stormcaller.id });
     expect(ok).toBe(true);
     expect(findUnit(enemyShip.id).hp).toBe(200 - stormDamage());
     expect(findUnit(ownShip.id).hp).toBe(200); // own ship untouched
@@ -89,9 +89,9 @@ describe('stormcaller storm', () => {
   });
 
   it('is allowed from a ship standing on an owned village water tile', () => {
-    const stormcaller = place(0, 'stormcaller', 1, 1, { shipLevel: 1 });
+    const stormcaller = place(0, UnitType.STORMCALLER, 1, 1, { shipLevel: 1 });
     const enemyShip = ship(1, 1, -1); // another village-A water tile
-    expect(sim.applyCommand({ type: 'storm', unitId: stormcaller.id })).toBe(true);
+    expect(sim.applyCommand({ type: CommandType.STORM, unitId: stormcaller.id })).toBe(true);
     expect(findUnit(enemyShip.id).hp).toBe(110);
   });
 });

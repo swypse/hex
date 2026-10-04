@@ -1,5 +1,5 @@
-export const SEASONS = ['spring', 'summer', 'autumn', 'winter'] as const;
-export type Season = (typeof SEASONS)[number];
+import { Season } from '@enums';
+export const SEASONS: readonly Season[] = [Season.SPRING, Season.SUMMER, Season.AUTUMN, Season.WINTER];
 
 /** Number of turns each season lasts. The game starts in spring. */
 export const SEASON_LENGTH = 6;

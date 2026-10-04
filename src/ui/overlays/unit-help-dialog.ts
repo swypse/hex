@@ -20,6 +20,7 @@ import { Button } from '../kit/button';
 import { makeLabel } from '../kit/label';
 import { makeIcon } from '../kit/icon';
 import { Popup } from '../kit/popup';
+import { FontSize, OverlayKind } from '@enums';
 
 export class UnitHelpDialog {
   private el: Container | null = null;
@@ -46,7 +47,7 @@ export class UnitHelpDialog {
     let title: string;
     let lines: string[];
     switch (s.overlay?.kind) {
-      case 'settlementHelp':
+      case OverlayKind.SETTLEMENT_HELP:
         if (!tile.settlement) {
           this.close();
           return;
@@ -54,7 +55,7 @@ export class UnitHelpDialog {
         title = settlementHelpTitle(tile);
         lines = settlementHelpLines(map, tile);
         break;
-      case 'buildingHelp':
+      case OverlayKind.BUILDING_HELP:
         if (!tile.building) {
           this.close();
           return;
@@ -62,7 +63,7 @@ export class UnitHelpDialog {
         title = buildingHelpTitle(tile);
         lines = buildingHelpLines(map, tile);
         break;
-      case 'buildingLimitHelp':
+      case OverlayKind.BUILDING_LIMIT_HELP:
         if (!tile.settlement) {
           this.close();
           return;
@@ -70,7 +71,7 @@ export class UnitHelpDialog {
         title = buildingLimitHelpTitle(tile);
         lines = buildingLimitHelpLines(map, tile);
         break;
-      case 'bridgeHelp':
+      case OverlayKind.BRIDGE_HELP:
         if (!hasBridge(tile)) {
           this.close();
           return;
@@ -96,10 +97,10 @@ export class UnitHelpDialog {
     });
 
     let y = 0;
-    if (s.overlay?.kind !== 'unitHelp' && s.overlay?.kind !== undefined) {
+    if (s.overlay?.kind !== OverlayKind.UNIT_HELP && s.overlay?.kind !== undefined) {
       for (const line of lines) {
         const bullet = makeLabel(line, {
-          fontSize: 14,
+          fontSize: FontSize.SMALL,
           fill: 0xeeeeee,
           wordWrap: true,
           wordWrapWidth: popup.contentWidth,
@@ -118,7 +119,7 @@ export class UnitHelpDialog {
     // Unit info: description, then stat icon rows, then feature bullets.
     const unit = tile.unit!;
     const desc = makeLabel(unitHelpDescription(unit), {
-      fontSize: 14,
+      fontSize: FontSize.SMALL,
       fill: 0xeeeeee,
       wordWrap: true,
       wordWrapWidth: popup.contentWidth,
@@ -132,7 +133,7 @@ export class UnitHelpDialog {
       const icon = makeIcon(stat.icon, 16);
       icon.anchor.set(0, 0);
       icon.position.set(0, y + (statH - 16) / 2);
-      const label = makeLabel(stat.text, { fontSize: 14, fill: 0xeeeeee });
+      const label = makeLabel(stat.text, { fontSize: FontSize.SMALL, fill: 0xeeeeee });
       label.position.set(19, y);
       popup.content.addChild(icon, label);
       y += statH;
@@ -141,7 +142,7 @@ export class UnitHelpDialog {
 
     for (const line of lines) {
       const bullet = makeLabel(line, {
-        fontSize: 14,
+        fontSize: FontSize.SMALL,
         fill: 0xeeeeee,
         wordWrap: true,
         wordWrapWidth: popup.contentWidth,

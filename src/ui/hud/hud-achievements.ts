@@ -4,6 +4,7 @@ import { type UIHost, type Widget } from '../host';
 import { IconButton } from '../kit/icon-button';
 import { ACTION_BUTTON_ICON_FILES, makeActionButtonIcon } from '../kit/action-button-icons';
 import { SKILLS_BUTTON_SIZE, scoreButtonsPosition, SCORE_ACTION_BG, SCORE_ACTION_BG_ACTIVE } from '../layout';
+import { OverlayKind } from '@enums';
 
 export class HudAchievements implements Widget {
   private el: Container | null = null;
@@ -20,7 +21,7 @@ export class HudAchievements implements Widget {
       color: SCORE_ACTION_BG,
       hoverColor: SCORE_ACTION_BG_ACTIVE,
       pressedColor: SCORE_ACTION_BG_ACTIVE,
-      onClick: () => useGameStore.getState().setOverlay({ kind: 'achievements' }),
+      onClick: () => useGameStore.getState().setOverlay({ kind: OverlayKind.ACHIEVEMENTS }),
       iconFactory: makeActionButtonIcon,
     });
     btn.position.set(0, 0);

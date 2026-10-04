@@ -7,6 +7,7 @@ import { Button } from '../kit/button';
 import { makeLabel } from '../kit/label';
 import { makeAchievementChip } from '../kit/achievement-icons';
 import { Popup } from '../kit/popup';
+import { FontSize } from '@enums';
 
 const ROW_ICON = 64;
 const ICON_LABEL_GAP = 18;
@@ -63,7 +64,7 @@ export class AchievementsDialog {
         border: opened.has(a.id) ? { width: OPENED_BORDER_WIDTH, color: OPENED_BORDER_COLOR } : undefined,
       });
       const name = makeLabel(t(a.nameKey), {
-        fontSize: 14,
+        fontSize: FontSize.SMALL,
         fill: opened.has(a.id) ? 0xffffff : 0x999999,
         wordWrap: true,
         wordWrapWidth: labelW,
@@ -72,7 +73,7 @@ export class AchievementsDialog {
       name.position.set(ROW_ICON + ICON_LABEL_GAP, (rowH - name.height) / 2);
       chip.position.set(ROW_ICON / 2, rowH / 2);
       const score = makeLabel(`+${a.points}`, {
-        fontSize: 14,
+        fontSize: FontSize.SMALL,
         fill: opened.has(a.id) ? 0xffd700 : 0x777777,
         fontWeight: '700',
       });
@@ -116,7 +117,7 @@ export class AchievementsDialog {
     chip.position.set(cw / 2, DETAIL_ICON / 2);
     popup.content.addChild(chip);
     const desc = makeLabel(t(a.descKey), {
-      fontSize: 14,
+      fontSize: FontSize.SMALL,
       fill: 0xeeeeee,
       wordWrap: true,
       wordWrapWidth: cw,
@@ -124,7 +125,7 @@ export class AchievementsDialog {
     desc.position.set(0, DETAIL_ICON + DETAIL_GAP);
     popup.content.addChild(desc);
     const score = makeLabel(t('ach.scoreLine', { points: a.points }), {
-      fontSize: 14,
+      fontSize: FontSize.SMALL,
       fill: 0xffd700,
       fontWeight: '700',
       wordWrap: true,

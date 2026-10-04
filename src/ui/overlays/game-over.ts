@@ -11,6 +11,7 @@ import { makeActionButtonIcon } from '../kit/action-button-icons';
 import { makeLabel } from '../kit/label';
 import { Popup } from '../kit/popup';
 import { drawPlayerStatsBlock, placeColor } from './player-stats-block';
+import { FontSize, GameMode, Screen } from '@enums';
 
 export { placeColor };
 
@@ -37,8 +38,8 @@ export class GameOver {
     if (!winner) return;
     const tribe = tribeById(winner.tribe)!;
 
-    const again = new Button({ label: t('ui.playagain'), width: 180, onClick: () => useGameStore.getState().setScreen('setup') });
-    const menu = new Button({ label: t('ui.mainmenu'), width: 180, onClick: () => useGameStore.getState().setScreen('start') });
+    const again = new Button({ label: t('ui.playagain'), width: 180, onClick: () => useGameStore.getState().setScreen(Screen.SETUP) });
+    const menu = new Button({ label: t('ui.mainmenu'), width: 180, onClick: () => useGameStore.getState().setScreen(Screen.START) });
     const popup = new Popup({
       app: host.app,
       title: t('gameover.title'),
@@ -53,7 +54,7 @@ export class GameOver {
 
     let y = 0;
     const banner = makeLabel(t('gameover.wins', { name: winner.name, tribe: tribe.name }), {
-      fontSize: 24,
+      fontSize: FontSize.BIG,
       fill: tribe.color,
       fontWeight: '800',
       wordWrap: true,
@@ -82,8 +83,8 @@ export class GameOver {
     content.addChild(starRow);
     y += STAR_SIZE + STAR_MARGIN * 2;
 
-    const mode = makeLabel(t('gameover.modeTurns', { mode: t(s.mode === 'capture' ? 'mode.capture' : 'mode.turns30'), turns: s.turn }), {
-      fontSize: 14,
+    const mode = makeLabel(t('gameover.modeTurns', { mode: t(s.mode === GameMode.CAPTURE ? 'mode.capture' : 'mode.turns30'), turns: s.turn }), {
+      fontSize: FontSize.SMALL,
       fill: 0xcccccc,
       wordWrap: true,
       wordWrapWidth: cw,
@@ -93,9 +94,9 @@ export class GameOver {
     content.addChild(mode);
     y += mode.height + 14;
 
-    if (s.mode === 'capture') {
+    if (s.mode === GameMode.CAPTURE) {
       const quick = makeLabel(t('gameover.quickCapture', { turns: quickCaptureTurnsCount(s.players.length) }), {
-        fontSize: 14,
+        fontSize: FontSize.SMALL,
         fill: 0xcccccc,
         wordWrap: true,
         wordWrapWidth: cw,
@@ -111,7 +112,7 @@ export class GameOver {
 
     ranked.forEach((p, rank) => {
       const fastBonus =
-        p.index === s.winnerIndex && s.mode === 'capture' && s.turn <= quickCaptureTurnsCount(s.players.length)
+        p.index === s.winnerIndex && s.mode === GameMode.CAPTURE && s.turn <= quickCaptureTurnsCount(s.players.length)
           ? quickCaptureScore(s.players.length)
           : 0;
       y = drawPlayerStatsBlock(content, cw, y, rank === 0, { player: p, place: rank + 1, map, known, fastBonus });

@@ -5,6 +5,7 @@ import { Tribe } from '../src/game/tribes';
 import { Player } from '../src/game/players';
 import { Unit } from '../src/game/units';
 import { unitCanAct } from '../src/game/unit-actions';
+import { UnitType } from '@enums';
 
 function tile(q: number, r: number, terrain: TileType, unit: Unit | null = null, settlement: MapTile['settlement'] = null): MapTile {
   return { q, r, terrain, settlement, unit, ownedBy: settlement ? settlement.owner : null, claimedByVillage: null, building: null, exploredBy: [0] };
@@ -12,7 +13,7 @@ function tile(q: number, r: number, terrain: TileType, unit: Unit | null = null,
 
 function unit(overrides: Partial<Unit> = {}): Unit {
   return {
-    id: 'u', owner: 0, type: 'warrior', q: 0, r: 0,
+    id: 'u', owner: 0, type: UnitType.WARRIOR, q: 0, r: 0,
     hasMoved: false, hasAttacked: false, hasHealed: false,
     hp: 5, attack: 2, attackDistance: 1, spawnVillage: null,
     ...overrides,

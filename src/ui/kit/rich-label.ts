@@ -1,13 +1,14 @@
 import { Container } from 'pixi.js';
 import { makeIcon } from './icon';
 import { makeLabel } from './label';
+import { FontSize } from '@enums';
 
 /** Inline resource tokens in rich text: `[money:15]` renders as "15" + the resource icon. */
 const TOKEN = /\[(money|wood|stone|ore|food):(\d+)\]/;
 const ICONS: Record<string, string> = { money: 'gold-32', wood: 'wood-32', stone: 'stone-32', ore: 'ore-32', food: 'food-32' };
 
 /** Word-wrapped text with inline resource icons (see TOKEN). */
-export function makeRichLabel(text: string, opts: { fontSize: number; fill: number; width: number }): Container {
+export function makeRichLabel(text: string, opts: { fontSize: FontSize; fill: number; width: number }): Container {
   const root = new Container();
   const { fontSize, fill, width } = opts;
   const lineH = Math.round(fontSize * 1.5);

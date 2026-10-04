@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { TRIBES, Tribe } from '../src/game/tribes';
 import { buildPlayers, buildMultiplayerPlayers } from '../src/game/players';
 import { SeededRandom } from '../src/util/random';
+import { AiDifficulty } from '@enums';
 
 describe('buildMultiplayerPlayers', () => {
   it('assigns humans indices 0..n-1 then AI, with unique tribes', () => {
@@ -146,19 +147,19 @@ describe('buildPlayers', () => {
 
 describe('AI difficulty on players', () => {
   it('stamps difficulty onto AI players in single player', () => {
-    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1), 'hard');
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1), AiDifficulty.HARD);
     expect(players[0]!.difficulty).toBeUndefined();
-    expect(players[1]!.difficulty).toBe('hard');
+    expect(players[1]!.difficulty).toBe(AiDifficulty.HARD);
   });
 
   it('defaults to normal', () => {
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
     expect(players[0]!.difficulty).toBeUndefined();
-    expect(players[1]!.difficulty).toBe('normal');
+    expect(players[1]!.difficulty).toBe(AiDifficulty.NORMAL);
   });
 
   it('stamps difficulty onto multiplayer AI players', () => {
-    const players = buildMultiplayerPlayers([{ name: 'A', tribe: Tribe.Cats }], 1, new SeededRandom(1), 'easy');
-    expect(players.find((p) => !p.isHuman)!.difficulty).toBe('easy');
+    const players = buildMultiplayerPlayers([{ name: 'A', tribe: Tribe.Cats }], 1, new SeededRandom(1), AiDifficulty.EASY);
+    expect(players.find((p) => !p.isHuman)!.difficulty).toBe(AiDifficulty.EASY);
   });
 });

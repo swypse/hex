@@ -6,6 +6,7 @@ import { Tribe } from '../src/game/tribes';
 import { SKILLS_BUTTON_SIZE, scoreButtonsPosition } from '../src/ui/layout';
 import { type UIHost } from '../src/ui/host';
 import { type Player } from '../src/game/players';
+import { NetMode, Screen } from '@enums';
 
 function fakeCanvasContext() {
   return { measureText: (s: string) => ({ width: s.length * 8 }) };
@@ -39,8 +40,8 @@ describe('HudPlayers', () => {
     host = makeHost();
     root = new Container();
     useGameStore.setState({
-      screen: 'game',
-      netMode: 'host',
+      screen: Screen.GAME,
+      netMode: NetMode.HOST,
       localPlayerIndex: 0,
       players: [
         player(0, Tribe.Cats, 'Host', true),
@@ -52,7 +53,7 @@ describe('HudPlayers', () => {
   });
 
   afterEach(() => {
-    useGameStore.setState({ screen: 'start', netMode: 'single', players: [], playersOnline: [] });
+    useGameStore.setState({ screen: Screen.START, netMode: NetMode.SINGLE, players: [], playersOnline: [] });
   });
 
   const allTexts = (c: Container): string[] => {
@@ -79,7 +80,7 @@ describe('HudPlayers', () => {
     );
 
   it('is hidden in single-player mode', () => {
-    useGameStore.setState({ netMode: 'single' });
+    useGameStore.setState({ netMode: NetMode.SINGLE });
     const w = new HudPlayers();
     w.mount(host, root);
     const el = (w as unknown as { el: Container }).el!;

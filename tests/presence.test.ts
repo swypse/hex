@@ -1,13 +1,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { gameController } from '../src/controller/game-controller';
 import { NetworkController } from '../src/controller/network-controller';
-import { GameMode } from '../src/game/game-mode';
 import { buildPlayers } from '../src/game/players';
 import { Simulator } from '../src/game/simulator';
 import { Tribe } from '../src/game/tribes';
 import { useGameStore } from '../src/store/game-store';
 import { SeededRandom } from '../src/util';
 import { makeTestMap } from './helpers/test-map';
+import { GameMode, LobbyRole, MapSize } from '@enums';
 
 const controller = gameController as unknown as {
   getNetwork: () => NetworkController;
@@ -65,9 +65,9 @@ describe('multiplayer presence', () => {
 
   it('removes a disconnected player from the lobby list before the game starts', () => {
     useGameStore.setState({
-      lobby: { role: 'host', code: 'ABC123', mode: GameMode.CAPTURE, totalPlayers: 2, aiCount: 0, players: [] },
+      lobby: { role: LobbyRole.HOST, code: 'ABC123', mode: GameMode.CAPTURE, totalPlayers: 2, aiCount: 0, players: [] },
     });
-    net().hostConfig = { mode: GameMode.CAPTURE, totalPlayers: 2, aiCount: 0, mapSize: 'normal' };
+    net().hostConfig = { mode: GameMode.CAPTURE, totalPlayers: 2, aiCount: 0, mapSize: MapSize.NORMAL };
     net().hostName = 'Host';
     net().hostTribe = Tribe.Cats;
     net().hostPlayers = [

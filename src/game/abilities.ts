@@ -2,6 +2,7 @@ import { hexDistance } from './hex';
 import { GameMap } from './map-gen';
 import { isShip, shipAttack } from './ship';
 import { UNIT_TYPES, Unit } from './units';
+import { UnitType } from '@enums';
 
 export const BANNER_BONUS = 5;
 export const RAGE_BONUS = 10;
@@ -13,7 +14,7 @@ export function isStunned(unit: Unit): boolean {
 
 /** +10 atk while the unit has <= 35% max hp (berserker rage), else 0. */
 export function berserkerRage(unit: Unit): number {
-  if (unit.type !== 'berserker') return 0;
+  if (unit.type !== UnitType.BERSERKER) return 0;
   return unit.hp <= UNIT_TYPES.berserker.maxHp * RAGE_THRESHOLD_PCT ? RAGE_BONUS : 0;
 }
 
@@ -22,7 +23,7 @@ export function berserkerRage(unit: Unit): number {
 export function bannerAttackBonus(map: GameMap | null, unit: Unit): number {
   if (!map || isShip(unit)) return 0;
   for (const t of map.tiles) {
-    if (!t.unit || t.unit.type !== 'banner' || t.unit.owner !== unit.owner) continue;
+    if (!t.unit || t.unit.type !== UnitType.BANNER || t.unit.owner !== unit.owner) continue;
     if (t.unit === unit) continue;
     if (hexDistance(unit, t) <= 2) return BANNER_BONUS;
   }

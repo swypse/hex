@@ -2,19 +2,20 @@ import { describe, it, expect } from 'vitest';
 import { GameMap, MapTile } from '../src/game/map-gen';
 import { TileType } from '../src/game/tile-types';
 import { portWaterClusterJumps, waterRouteEdges } from '../src/game/water-roads';
+import { BridgeDir, BuildingKind } from '@enums';
 
 function tile(q: number, r: number, terrain: TileType, ownedBy: number | null = null, opts: { port?: boolean; bridge?: boolean } = {}): MapTile {
   const t: MapTile = {
     q, r, terrain,
     settlement: null,
-    building: opts.port ? { kind: 'port', level: 1 } : null,
+    building: opts.port ? { kind: BuildingKind.PORT, level: 1 } : null,
     unit: null,
     ownedBy,
     claimedByVillage: null,
     roadOwner: null,
   };
   if (opts.bridge) {
-    t.bridge = { owner: ownedBy ?? 0, dir: 'we' };
+    t.bridge = { owner: ownedBy ?? 0, dir: BridgeDir.WE };
     t.roadOwner = ownedBy ?? 0;
   }
   return t;

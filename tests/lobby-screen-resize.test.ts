@@ -3,6 +3,7 @@ import { Container, Text } from 'pixi.js';
 import { LobbyScreen } from '../src/ui/screens/lobby-screen';
 import { useGameStore } from '../src/store/game-store';
 import { type UIHost } from '../src/ui/host';
+import { Screen } from '@enums';
 
 function fakeCanvasContext() {
   return {
@@ -48,7 +49,7 @@ describe('LobbyScreen resize handling', () => {
     host = makeHost();
     screen = new LobbyScreen();
     screen.mount(host);
-    useGameStore.setState({ screen: 'lobby', lobby: null });
+    useGameStore.setState({ screen: Screen.LOBBY, lobby: null });
   });
 
   afterEach(() => {

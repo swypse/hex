@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { Container, Sprite } from 'pixi.js';
-import { countRenderObjects, summarizeFrameTimes, wrapGlDrawCalls, type GlDrawCallContext } from '../src/render/perf-stats';
+import { countRenderObjects, summarizeFrameTimes, summarizeSpikes, wrapGlDrawCalls, type GlDrawCallContext } from '../src/render/perf-stats';
 
 describe('countRenderObjects', () => {
   it('counts visible renderables including the root and containers', () => {
@@ -109,5 +109,15 @@ describe('wrapGlDrawCalls', () => {
     second.restore();
     gl.drawArrays(4, 0, 3);
     expect(second.count).toBe(3);
+  });
+});
+describe('summarizeSpikes', () => {
+  it('reports the worst frame and counts frames over 33 ms and 50 ms', () => {
+    const out = summarizeSpikes([16.7, 16.7, 40, 120, 16.7, 51]);
+    expect(out).toEqual({ maxMs: 120, slow33: 3, slow50: 2 });
+  });
+
+  it('is all zeros for an empty window', () => {
+    expect(summarizeSpikes([])).toEqual({ maxMs: 0, slow33: 0, slow50: 0 });
   });
 });

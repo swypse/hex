@@ -8,7 +8,7 @@ import { isShip } from '@/game/ship';
 import { Simulator } from '@/game/simulator';
 import { TileType } from '@/game/tile-types';
 import { makeUnit } from '@/game/units';
-import { GameMode } from '@enums';
+import { BuildingKind, CommandType, GameEventType, GameMode, Season, UnitType } from '@enums';
 import { describe, expect, it } from 'vitest';
 
 function tile(q: number, r: number, terrain: TileType): MapTile {
@@ -43,7 +43,7 @@ describe('freezeCoast / thawIce', () => {
 
   it('does not freeze water with a port or a bridge', () => {
     const m = strip();
-    at(m, 1).building = { kind: 'port' } as MapTile['building'];
+    at(m, 1).building = { kind: BuildingKind.PORT } as MapTile['building'];
     expect(freezeCoast(m).frozen).toEqual([]);
     const m2 = strip();
     at(m2, 1).bridge = { dir: 'we' } as unknown as MapTile['bridge'];
@@ -52,7 +52,7 @@ describe('freezeCoast / thawIce', () => {
 
   it('lands a ship on freezing water as a land unit', () => {
     const m = strip();
-    const ship = makeUnit(0, 'warrior', 1, 0, { shipLevel: 2 });
+    const ship = makeUnit(0, UnitType.WARRIOR, 1, 0, { shipLevel: 2 });
     at(m, 1).unit = ship;
     const r = freezeCoast(m);
     expect(r.landed).toEqual([{ unitId: ship.id, owner: 0 }]);
@@ -62,7 +62,7 @@ describe('freezeCoast / thawIce', () => {
 
   it('makes a pirate ship on freezing water disappear', () => {
     const m = strip();
-    at(m, 1).unit = makeUnit(-1, 'pirate', 1, 0, { shipLevel: 1 });
+    at(m, 1).unit = makeUnit(-1, UnitType.PIRATE, 1, 0, { shipLevel: 1 });
     const r = freezeCoast(m);
     expect(r.removed).toEqual([{ q: 1, r: 0 }]);
     expect(at(m, 1).unit).toBeNull();
@@ -70,7 +70,7 @@ describe('freezeCoast / thawIce', () => {
 
   it('leaves a ship on non-coast water alone', () => {
     const m = strip();
-    const ship = makeUnit(0, 'warrior', 2, 0, { shipLevel: 1 });
+    const ship = makeUnit(0, UnitType.WARRIOR, 2, 0, { shipLevel: 1 });
     at(m, 2).unit = ship;
     freezeCoast(m);
     expect(isShip(ship)).toBe(true);
@@ -79,7 +79,7 @@ describe('freezeCoast / thawIce', () => {
   it('thaws ice back to water and kills units standing on it', () => {
     const m = strip();
     freezeCoast(m);
-    const u = makeUnit(0, 'warrior', 1, 0);
+    const u = makeUnit(0, UnitType.WARRIOR, 1, 0);
     at(m, 1).unit = u;
     const r = thawIce(m);
     expect(r.thawed).toEqual([{ q: 1, r: 0 }]);
@@ -99,7 +99,7 @@ describe('ice as ground', () => {
   it('lets a land unit walk onto it', () => {
     const m = strip();
     freezeCoast(m);
-    const u = makeUnit(0, 'warrior', 0, 0);
+    const u = makeUnit(0, UnitType.WARRIOR, 0, 0);
     at(m, 0).unit = u;
     (at(m, 0) as MapTile).exploredBy = [0];
     for (const t of m.tiles) t.exploredBy = [0];
@@ -135,13 +135,13 @@ describe('season transitions in the simulator', () => {
       { disablePirates: true },
     );
     sim.turn = 18;
-    sim.applyCommand({ type: 'endTurn' });
+    sim.applyCommand({ type: CommandType.END_TURN });
     expect(sim.turn).toBe(19);
-    expect(seasonForTurn(sim.turn)).toBe('winter');
+    expect(seasonForTurn(sim.turn)).toBe(Season.WINTER);
     expect(at(m, 1).terrain).toBe(TileType.Ice);
-    expect(sim.drainEvents().some((e) => e.type === 'seasonChanged')).toBe(true);
+    expect(sim.drainEvents().some((e) => e.type === GameEventType.SEASON_CHANGED)).toBe(true);
     sim.turn = 24;
-    sim.applyCommand({ type: 'endTurn' });
+    sim.applyCommand({ type: CommandType.END_TURN });
     expect(at(m, 1).terrain).toBe(TileType.Water);
   });
 
@@ -163,15 +163,15 @@ describe('season transitions in the simulator', () => {
       GameMode.TURNS30 as never,
       { disablePirates: true },
     );
-    expect(sim.forceSeason('spring')).toBe(false);
-    expect(sim.forceSeason('winter')).toBe(true);
+    expect(sim.forceSeason(Season.SPRING)).toBe(false);
+    expect(sim.forceSeason(Season.WINTER)).toBe(true);
     expect(sim.turn).toBe(19);
     expect(at(m, 1).terrain).toBe(TileType.Ice);
-    expect(sim.drainEvents().some((e) => e.type === 'seasonChanged' && e.frozen.length === 1)).toBe(true);
-    expect(sim.forceSeason('summer')).toBe(true);
+    expect(sim.drainEvents().some((e) => e.type === GameEventType.SEASON_CHANGED && e.frozen.length === 1)).toBe(true);
+    expect(sim.forceSeason(Season.SUMMER)).toBe(true);
     expect(sim.turn).toBe(31);
-    expect(seasonForTurn(sim.turn)).toBe('summer');
+    expect(seasonForTurn(sim.turn)).toBe(Season.SUMMER);
     expect(at(m, 1).terrain).toBe(TileType.Water);
-    expect(sim.drainEvents().some((e) => e.type === 'seasonChanged' && e.thawed.length === 1)).toBe(true);
+    expect(sim.drainEvents().some((e) => e.type === GameEventType.SEASON_CHANGED && e.thawed.length === 1)).toBe(true);
   });
 });

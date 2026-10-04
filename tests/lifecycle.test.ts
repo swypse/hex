@@ -1,15 +1,15 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { gameController } from '../src/controller/game-controller';
 import { NetworkController } from '../src/controller/network-controller';
-import { GameMode } from '../src/game/game-mode';
 import { totalStock } from '../src/game/stock';
 import { TRIBES } from '../src/game/tribes';
 import { useGameStore } from '../src/store/game-store';
+import { CommandType, GameMode, NetMode, Screen, SelectionKind } from '@enums';
 
 describe('GameController lifecycle', () => {
   beforeEach(() => {
     useGameStore.setState({
-      screen: 'start',
+      screen: Screen.START,
       players: [],
       turn: 1,
       currentPlayerIndex: 0,
@@ -66,7 +66,7 @@ describe('GameController lifecycle', () => {
     await gameController.startGame(TRIBES[0]!.id, 1, GameMode.CAPTURE);
     const sim = gameController.getSim()!;
     const before = { ...sim.players[0]!.resources };
-    useGameStore.setState({ netMode: 'host' });
+    useGameStore.setState({ netMode: NetMode.HOST });
     expect(gameController.cheatResources()).toBe(false);
     expect(sim.players[0]!.resources).toEqual(before);
   });
@@ -79,7 +79,7 @@ describe('GameController lifecycle', () => {
     expect(sim.players[1]!.isActive).toBe(false);
     // The game is not over until the local player ends their turn.
     expect(sim.gameOver).toBe(false);
-    sim.applyCommand({ type: 'endTurn' });
+    sim.applyCommand({ type: CommandType.END_TURN });
     expect(sim.gameOver).toBe(true);
     expect(sim.winnerIndex).toBe(0);
   });
@@ -87,7 +87,7 @@ describe('GameController lifecycle', () => {
   it('does not clear the selected cell when ending the turn', async () => {
     await gameController.startGame(TRIBES[0]!.id, 1, GameMode.CAPTURE);
     const store = useGameStore.getState();
-    const selection: import('../src/game/selection').Selection = { kind: 'tile', q: 2, r: 1 };
+    const selection: import('../src/game/selection').Selection = { kind: SelectionKind.TILE, q: 2, r: 1 };
     store.setSelection(selection);
     gameController.endTurn();
     // The AI turn runs asynchronously; the important regression is that

@@ -4,17 +4,9 @@ import type { Player } from './players';
 import { awardScore, EMPTY_STATS, type PlayerStats } from './score';
 import { SKILLS } from './skills';
 import { roadNetworkComponents } from './roads';
+import { AchievementId } from '@enums';
 
-export type AchievementId =
-  | 'greatConnector'
-  | 'perfectChain'
-  | 'piratePurger'
-  | 'pirateLuckyDay'
-  | 'nothingLeftToLearn'
-  | 'tenFoesNoSurvivors'
-  | 'tripleSinkJob'
-  | 'bonusHunter'
-  | 'masterCartographer';
+
 
 export interface AchievementInfo {
   id: AchievementId;
@@ -72,7 +64,7 @@ function allExplored(map: GameMap, player: Player): boolean {
 
 export const ACHIEVEMENTS: readonly AchievementInfo[] = [
   {
-    id: 'greatConnector',
+    id: AchievementId.GREAT_CONNECTOR,
     nameKey: 'ach.greatConnector.name',
     descKey: 'ach.greatConnector.desc',
     icon: ACHIEVEMENT_ICON.greatConnector,
@@ -80,7 +72,7 @@ export const ACHIEVEMENTS: readonly AchievementInfo[] = [
     met: (map, player) => largestVillageCluster(map, player) >= 4,
   },
   {
-    id: 'perfectChain',
+    id: AchievementId.PERFECT_CHAIN,
     nameKey: 'ach.perfectChain.name',
     descKey: 'ach.perfectChain.desc',
     icon: ACHIEVEMENT_ICON.perfectChain,
@@ -88,7 +80,7 @@ export const ACHIEVEMENTS: readonly AchievementInfo[] = [
     met: (map, player) => statsOf(player).knightCombos >= 3,
   },
   {
-    id: 'piratePurger',
+    id: AchievementId.PIRATE_PURGER,
     nameKey: 'ach.piratePurger.name',
     descKey: 'ach.piratePurger.desc',
     icon: ACHIEVEMENT_ICON.piratePurger,
@@ -96,7 +88,7 @@ export const ACHIEVEMENTS: readonly AchievementInfo[] = [
     met: (map, player) => statsOf(player).pirateKills >= 3,
   },
   {
-    id: 'pirateLuckyDay',
+    id: AchievementId.PIRATE_LUCKY_DAY,
     nameKey: 'ach.pirateLuckyDay.name',
     descKey: 'ach.pirateLuckyDay.desc',
     icon: ACHIEVEMENT_ICON.pirateLuckyDay,
@@ -104,7 +96,7 @@ export const ACHIEVEMENTS: readonly AchievementInfo[] = [
     met: (map, player) => statsOf(player).shipsCapturedByPirates >= 3,
   },
   {
-    id: 'nothingLeftToLearn',
+    id: AchievementId.NOTHING_LEFT_TO_LEARN,
     nameKey: 'ach.nothingLeftToLearn.name',
     descKey: 'ach.nothingLeftToLearn.desc',
     icon: ACHIEVEMENT_ICON.nothingLeftToLearn,
@@ -112,7 +104,7 @@ export const ACHIEVEMENTS: readonly AchievementInfo[] = [
     met: (map, player) => allSkillsOpened(player),
   },
   {
-    id: 'tenFoesNoSurvivors',
+    id: AchievementId.TEN_FOES_NO_SURVIVORS,
     nameKey: 'ach.tenFoesNoSurvivors.name',
     descKey: 'ach.tenFoesNoSurvivors.desc',
     icon: ACHIEVEMENT_ICON.tenFoesNoSurvivors,
@@ -120,7 +112,7 @@ export const ACHIEVEMENTS: readonly AchievementInfo[] = [
     met: (map, player) => player.kills >= 10,
   },
   {
-    id: 'tripleSinkJob',
+    id: AchievementId.TRIPLE_SINK_JOB,
     nameKey: 'ach.tripleSinkJob.name',
     descKey: 'ach.tripleSinkJob.desc',
     icon: ACHIEVEMENT_ICON.tripleSinkJob,
@@ -128,7 +120,7 @@ export const ACHIEVEMENTS: readonly AchievementInfo[] = [
     met: (map, player) => statsOf(player).enemyShipsKilled >= 3,
   },
   {
-    id: 'bonusHunter',
+    id: AchievementId.BONUS_HUNTER,
     nameKey: 'ach.bonusHunter.name',
     descKey: 'ach.bonusHunter.desc',
     icon: ACHIEVEMENT_ICON.bonusHunter,
@@ -136,7 +128,7 @@ export const ACHIEVEMENTS: readonly AchievementInfo[] = [
     met: (map, player) => statsOf(player).bonusesCollected >= 3,
   },
   {
-    id: 'masterCartographer',
+    id: AchievementId.MASTER_CARTOGRAPHER,
     nameKey: 'ach.masterCartographer.name',
     descKey: 'ach.masterCartographer.desc',
     icon: ACHIEVEMENT_ICON.masterCartographer,

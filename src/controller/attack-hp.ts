@@ -1,8 +1,9 @@
 import { GameEvent } from '../game/events';
+import { GameEventType } from '@enums';
 
 /** HP the given unit has just before `e` resolves (as recorded by the sim). */
 function preHpOf(e: GameEvent, unitId: string): number | undefined {
-  if (e.type !== 'attack') return undefined;
+  if (e.type !== GameEventType.ATTACK) return undefined;
   if (e.attackerId === unitId) return e.attackerPre?.hp;
   if (e.targetId === unitId) return e.targetPre?.hp;
   return undefined;
@@ -14,7 +15,7 @@ function preHpOf(e: GameEvent, unitId: string): number | undefined {
 export function initialAttackHpOverrides(events: GameEvent[]): Map<string, number> {
   const out = new Map<string, number>();
   for (const e of events) {
-    if (e.type !== 'attack') continue;
+    if (e.type !== GameEventType.ATTACK) continue;
     for (const unitId of [e.attackerId, e.targetId]) {
       if (out.has(unitId)) continue;
       const hp = preHpOf(e, unitId);
@@ -32,7 +33,7 @@ export function hpOverrideAfterAttack(
   index: number,
 ): { unitId: string; hp: number | null }[] {
   const e = events[index];
-  if (!e || e.type !== 'attack') return [];
+  if (!e || e.type !== GameEventType.ATTACK) return [];
   const out: { unitId: string; hp: number | null }[] = [];
   for (const unitId of [e.attackerId, e.targetId]) {
     let hp: number | null = null;

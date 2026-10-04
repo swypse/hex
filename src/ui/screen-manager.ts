@@ -1,11 +1,12 @@
 import { Application, Container } from 'pixi.js';
-import { useGameStore, type Screen } from '../store/game-store';
+import { useGameStore } from '../store/game-store';
 import { type ScreenController, type UIHost } from './host';
 import { StartScreen } from './screens/start-screen';
 import { SetupScreen } from './screens/setup-screen';
 import { LobbyScreen } from './screens/lobby-screen';
 import { GameScreen } from './screens/game-screen';
 import { OverlayManager } from './overlays/overlay-manager';
+import { Screen } from '@enums';
 
 const SCREENS: Record<Screen, new () => ScreenController> = {
   start: StartScreen,

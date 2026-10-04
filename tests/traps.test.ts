@@ -6,7 +6,7 @@ import { TRAP_COST, trapDamage } from '@/game/traps';
 import { Tribe } from '@/game/tribes';
 import { Unit } from '@/game/units';
 import { SeededRandom } from '@/util';
-import { GameMode } from '@enums';
+import { CommandType, GameEventType, GameMode, UnitType } from '@enums';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { giveResources, makeTestMap, makeUnit, tileAt } from './helpers/test-map';
 
@@ -43,8 +43,8 @@ function findUnit(id: string): Unit {
 
 describe('trapper traps', () => {
   it('places a trap on an adjacent unowned land tile, paying 5 money + 3 ore', () => {
-    const trapper = place(0, 'trapper', 0, 0);
-    const ok = sim.applyCommand({ type: 'trap', unitId: trapper.id, q: 1, r: 0 });
+    const trapper = place(0, UnitType.TRAPPER, 0, 0);
+    const ok = sim.applyCommand({ type: CommandType.TRAP, unitId: trapper.id, q: 1, r: 0 });
     expect(ok).toBe(true);
     expect(tileAt(map, 1, 0)!.trap).toMatchObject({ owner: 0, placedTurn: sim.turn });
     expect(findUnit(trapper.id).hasMoved).toBe(true);
@@ -54,44 +54,44 @@ describe('trapper traps', () => {
   });
 
   it('places a trap on its own cell, the one the trapper stands on', () => {
-    const trapper = place(0, 'trapper', 0, 0);
-    expect(sim.applyCommand({ type: 'trap', unitId: trapper.id, q: 0, r: 0 })).toBe(true);
+    const trapper = place(0, UnitType.TRAPPER, 0, 0);
+    expect(sim.applyCommand({ type: CommandType.TRAP, unitId: trapper.id, q: 0, r: 0 })).toBe(true);
     expect(tileAt(map, 0, 0)!.trap).toMatchObject({ owner: 0 });
   });
 
   it('refuses traps beyond radius 1, even on enemy-owned land', () => {
-    const trapper = place(0, 'trapper', 0, 0);
+    const trapper = place(0, UnitType.TRAPPER, 0, 0);
     tileAt(map, 3, 0)!.ownedBy = 1;
-    expect(sim.applyCommand({ type: 'trap', unitId: trapper.id, q: 3, r: 0 })).toBe(false);
+    expect(sim.applyCommand({ type: CommandType.TRAP, unitId: trapper.id, q: 3, r: 0 })).toBe(false);
   });
 
   it('refuses traps on water, villages, occupied tiles, or tiles already trapped', () => {
-    const trapper = place(0, 'trapper', 0, 0);
+    const trapper = place(0, UnitType.TRAPPER, 0, 0);
     tileAt(map, 1, 0)!.terrain = TileType.Water;
-    expect(sim.applyCommand({ type: 'trap', unitId: trapper.id, q: 1, r: 0 })).toBe(false);
+    expect(sim.applyCommand({ type: CommandType.TRAP, unitId: trapper.id, q: 1, r: 0 })).toBe(false);
     tileAt(map, 1, 0)!.terrain = TileType.GrasslandLand;
     tileAt(map, 1, 0)!.settlement = { owner: 1, level: 1, captureReady: false };
-    expect(sim.applyCommand({ type: 'trap', unitId: trapper.id, q: 1, r: 0 })).toBe(false);
+    expect(sim.applyCommand({ type: CommandType.TRAP, unitId: trapper.id, q: 1, r: 0 })).toBe(false);
     tileAt(map, 1, 0)!.settlement = null;
-    tileAt(map, 0, 1)!.unit = makeUnit('other', 1, 'warrior', 0, 1);
-    expect(sim.applyCommand({ type: 'trap', unitId: trapper.id, q: 0, r: 1 })).toBe(false);
+    tileAt(map, 0, 1)!.unit = makeUnit('other', 1, UnitType.WARRIOR, 0, 1);
+    expect(sim.applyCommand({ type: CommandType.TRAP, unitId: trapper.id, q: 0, r: 1 })).toBe(false);
     tileAt(map, 0, 1)!.unit = null;
     tileAt(map, 0, 1)!.trap = { owner: 0, placedTurn: 0 };
-    expect(sim.applyCommand({ type: 'trap', unitId: trapper.id, q: 0, r: 1 })).toBe(false);
+    expect(sim.applyCommand({ type: CommandType.TRAP, unitId: trapper.id, q: 0, r: 1 })).toBe(false);
   });
 
   it('an enemy unit stepping onto a trap is stopped there, killed, trap consumed', () => {
-    const trapper = place(0, 'trapper', 0, 0);
-    expect(sim.applyCommand({ type: 'trap', unitId: trapper.id, q: 1, r: 0 })).toBe(true);
+    const trapper = place(0, UnitType.TRAPPER, 0, 0);
+    expect(sim.applyCommand({ type: CommandType.TRAP, unitId: trapper.id, q: 1, r: 0 })).toBe(true);
     sim.currentPlayerIndex = 1;
     sim.drainEvents();
-    const enemy = place(1, 'swordsman', 0, 1, { hp: 40 }); // 40 hp < 45 => dies on the trap
+    const enemy = place(1, UnitType.SWORDSMAN, 0, 1, { hp: 40 }); // 40 hp < 45 => dies on the trap
     // move from (0,1) onto (1,0): adjacent land, the trap waits there
-    const ok = sim.applyCommand({ type: 'move', unitId: enemy.id, q: 1, r: 0 });
+    const ok = sim.applyCommand({ type: CommandType.MOVE, unitId: enemy.id, q: 1, r: 0 });
     expect(ok).toBe(true);
     expect(tileAt(map, 1, 0)!.unit).toBeNull(); // victim died on the trap
     expect(tileAt(map, 1, 0)!.trap).toBeNull(); // consumed
-    expect(sim.drainEvents().some((e) => e.type === 'trapTriggered')).toBe(true);
+    expect(sim.drainEvents().some((e) => e.type === GameEventType.TRAP_TRIGGERED)).toBe(true);
   });
 
   it('a melee killer that advances onto the dead unit trapped cell trips the trap', () => {
@@ -100,19 +100,19 @@ describe('trapper traps', () => {
     const trapped = tileAt(map, 1, 0)!;
     trapped.ownedBy = 1;
     trapped.trap = { owner: 1, placedTurn: sim.turn };
-    place(1, 'warrior', 1, 0, { hp: 5 });
-    const swordsman = place(0, 'swordsman', 0, 0, { hp: 80 });
-    expect(sim.applyCommand({ type: 'attack', unitId: swordsman.id, q: 1, r: 0 })).toBe(true);
+    place(1, UnitType.WARRIOR, 1, 0, { hp: 5 });
+    const swordsman = place(0, UnitType.SWORDSMAN, 0, 0, { hp: 80 });
+    expect(sim.applyCommand({ type: CommandType.ATTACK, unitId: swordsman.id, q: 1, r: 0 })).toBe(true);
     // 45 trap damage on top of the clean kill (no counter: the victim died).
     expect(findUnit(swordsman.id).hp).toBe(80 - trapDamage());
     expect(tileAt(map, 1, 0)!.unit?.id).toBe(swordsman.id); // advanced onto the trap
     expect(tileAt(map, 1, 0)!.trap).toBeNull();             // consumed
-    expect(sim.drainEvents().some((e) => e.type === 'trapTriggered' && e.q === 1 && e.r === 0)).toBe(true);
+    expect(sim.drainEvents().some((e) => e.type === GameEventType.TRAP_TRIGGERED && e.q === 1 && e.r === 0)).toBe(true);
   });
 
   it('expires a trap after 10 turns', () => {
-    const trapper = place(0, 'trapper', 0, 0);
-    expect(sim.applyCommand({ type: 'trap', unitId: trapper.id, q: 1, r: 0 })).toBe(true);
+    const trapper = place(0, UnitType.TRAPPER, 0, 0);
+    expect(sim.applyCommand({ type: CommandType.TRAP, unitId: trapper.id, q: 1, r: 0 })).toBe(true);
     // placed on turn 1; alive through turns 1..10, gone from turn 11.
     sim.turn = 9;
     sim['sweepTraps']();
@@ -123,11 +123,11 @@ describe('trapper traps', () => {
   });
 
   it('a trap that fails to kill its victim leaves it standing but damaged', () => {
-    const trapper = place(0, 'trapper', 0, 0);
-    expect(sim.applyCommand({ type: 'trap', unitId: trapper.id, q: 1, r: 0 })).toBe(true);
+    const trapper = place(0, UnitType.TRAPPER, 0, 0);
+    expect(sim.applyCommand({ type: CommandType.TRAP, unitId: trapper.id, q: 1, r: 0 })).toBe(true);
     sim.currentPlayerIndex = 1;
-    const tough = place(1, 'warrior', 0, 1, { hp: 200 }); // outlive the 90 damage
-    expect(sim.applyCommand({ type: 'move', unitId: tough.id, q: 1, r: 0 })).toBe(true);
+    const tough = place(1, UnitType.WARRIOR, 0, 1, { hp: 200 }); // outlive the 90 damage
+    expect(sim.applyCommand({ type: CommandType.MOVE, unitId: tough.id, q: 1, r: 0 })).toBe(true);
     expect(tileAt(map, 1, 0)!.unit?.hp).toBe(200 - trapDamage());
     expect(tileAt(map, 1, 0)!.trap).toBeNull();
   });

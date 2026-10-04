@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { Application, Container, Graphics, ImageSource, Text, Texture } from 'pixi.js';
 import { gameController } from '../src/controller/game-controller';
 import { Simulator } from '../src/game/simulator';
-import { GameMode } from '@enums';
+import { CommandType, GameMode, NetMode, UnitType } from '@enums';
 import { GameMap, MapTile } from '../src/game/map-gen';
 import { TileType } from '../src/game/tile-types';
 import { Player } from '../src/game/players';
@@ -71,7 +71,7 @@ function tile(q: number, r: number, explored: number[]): MapTile {
 }
 function makeUnit(id: string, owner: number, q: number, r: number): Unit {
   return {
-    id, owner, type: 'warrior', q, r, hasMoved: false, hasAttacked: false, hasHealed: false,
+    id, owner, type: UnitType.WARRIOR, q, r, hasMoved: false, hasAttacked: false, hasHealed: false,
     hp: UNIT_TYPES.warrior.maxHp, attack: UNIT_TYPES.warrior.attack, attackDistance: UNIT_TYPES.warrior.attackDistance, spawnVillage: { q, r },
   };
 }
@@ -105,16 +105,16 @@ describe('client discovery notification', () => {
     sim.startGame();
     sim.drainEvents();
     // Player 1 discovers the enemy tribe via a command that triggers syncDiscoveries.
-    sim.applyCommand({ type: 'endTurn' });
+    sim.applyCommand({ type: CommandType.END_TURN });
     sim.drainEvents();
-    sim.applyCommand({ type: 'heal', unitId: 'nope' });
+    sim.applyCommand({ type: CommandType.HEAL, unitId: 'nope' });
     sim.drainEvents();
 
     const app = { screen: { width: 800, height: 600 }, ticker: { add: (): void => {}, remove: (): void => {} } } as unknown as Application;
     const textures = buildTextures(map);
     mapView = new MapView(app, textures, 40, 0.5, 2);
 
-    useGameStore.setState({ localPlayerIndex: 1, netMode: 'client', players, centerMessage: null });
+    useGameStore.setState({ localPlayerIndex: 1, netMode: NetMode.CLIENT, players, centerMessage: null });
     gc = gameController as unknown as Record<string, unknown>;
     (gc as { app: unknown }).app = app;
     (gc as { sim: unknown }).sim = sim;
@@ -157,7 +157,7 @@ describe('client discovery notification', () => {
 
   it('animates the client own unit move when presenting events', async () => {
     const sim = (gc as { sim: Simulator }).sim!;
-    expect(sim.applyCommand({ type: 'move', unitId: 'my', q: 1, r: 0 })).toBe(true);
+    expect(sim.applyCommand({ type: CommandType.MOVE, unitId: 'my', q: 1, r: 0 })).toBe(true);
     const events = sim.drainEvents();
     const present = (gc as { presentEvents: (events: GameEvent[], pre: Set<string>) => Promise<void> }).presentEvents;
     const p = present.call(gc as never, events, new Set());
@@ -170,7 +170,7 @@ describe('client discovery notification', () => {
 
   it('still animates the own move in the full state-then-events client flow', async () => {
     const sim = (gc as { sim: Simulator }).sim!;
-    expect(sim.applyCommand({ type: 'move', unitId: 'my', q: 1, r: 0 })).toBe(true);
+    expect(sim.applyCommand({ type: CommandType.MOVE, unitId: 'my', q: 1, r: 0 })).toBe(true);
     const events = sim.drainEvents();
     const onMsg = (gameController as unknown as { onHostMessage: (m: { type: string; state?: unknown; playerIndex?: number; events?: GameEvent[] }) => void }).onHostMessage;
     onMsg.call(gameController, { type: 'state', state: sim.snapshot(), playerIndex: 1 });

@@ -1,4 +1,4 @@
-import { GameMode } from '@enums';
+import { BridgeDir, BuildingKind, GameMode, OverlayKind, SelectionKind, UnitType } from '@enums';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Container, Sprite, BitmapText } from 'pixi.js';
 import { UnitHelpDialog } from '../src/ui/overlays/unit-help-dialog';
@@ -76,15 +76,15 @@ describe('UnitHelpDialog', () => {
     win.removeEventListener = () => {};
 
     map = makeTestMap(1);
-    tileAt(map, 0, 0)!.unit = makeUnit('u1', 0, 'warrior', 0, 0);
+    tileAt(map, 0, 0)!.unit = makeUnit('u1', 0, UnitType.WARRIOR, 0, 0);
     tileAt(map, 0, 0)!.exploredBy = [0];
     const players = buildPlayers(Tribe.Cats, 1, new SeededRandom(1));
     (gameController as unknown as { sim: Simulator | null }).sim = new Simulator(map, players, GameMode.CAPTURE);
     useGameStore.setState({
-      selection: { kind: 'unit', q: 0, r: 0 },
+      selection: { kind: SelectionKind.UNIT, q: 0, r: 0 },
       players,
       localPlayerIndex: 0,
-      overlay: { kind: 'unitHelp' },
+      overlay: { kind: OverlayKind.UNIT_HELP },
     });
 
     host = makeHost();
@@ -126,7 +126,7 @@ describe('UnitHelpDialog', () => {
   it('closes the overlay on Escape', () => {
     const dialog = new UnitHelpDialog();
     dialog.mount(host, root);
-    expect(useGameStore.getState().overlay).toEqual({ kind: 'unitHelp' });
+    expect(useGameStore.getState().overlay).toEqual({ kind: OverlayKind.UNIT_HELP });
     keyHandler!({ key: 'Escape', preventDefault: () => {} });
     expect(useGameStore.getState().overlay).toBeNull();
     dialog.destroy();
@@ -144,7 +144,7 @@ describe('UnitHelpDialog', () => {
 
   it('mounts a settlement help popup', () => {
     tileAt(map, 0, 0)!.settlement = { owner: 0, level: 1, captureReady: false, name: 'Omega' };
-    useGameStore.setState({ overlay: { kind: 'settlementHelp' } });
+    useGameStore.setState({ overlay: { kind: OverlayKind.SETTLEMENT_HELP } });
     const dialog = new UnitHelpDialog();
     dialog.mount(host, root);
     const card = (root.children[0] as Container).children[2] as Container;
@@ -154,8 +154,8 @@ describe('UnitHelpDialog', () => {
 
   it('mounts a building help popup', () => {
     tileAt(map, 0, 0)!.settlement = null;
-    tileAt(map, 0, 0)!.building = { kind: 'mine', level: 1 };
-    useGameStore.setState({ overlay: { kind: 'buildingHelp' } });
+    tileAt(map, 0, 0)!.building = { kind: BuildingKind.MINE, level: 1 };
+    useGameStore.setState({ overlay: { kind: OverlayKind.BUILDING_HELP } });
     const dialog = new UnitHelpDialog();
     dialog.mount(host, root);
     const card = (root.children[0] as Container).children[2] as Container;
@@ -166,8 +166,8 @@ describe('UnitHelpDialog', () => {
   it('mounts a building limits popup when an owned village is selected without a unit', () => {
     tileAt(map, 0, 0)!.settlement = { owner: 0, level: 2, captureReady: false, name: 'Omega' };
     useGameStore.setState({
-      selection: { kind: 'tile', q: 0, r: 0 },
-      overlay: { kind: 'buildingLimitHelp' },
+      selection: { kind: SelectionKind.TILE, q: 0, r: 0 },
+      overlay: { kind: OverlayKind.BUILDING_LIMIT_HELP },
     });
     const dialog = new UnitHelpDialog();
     dialog.mount(host, root);
@@ -180,9 +180,9 @@ describe('UnitHelpDialog', () => {
     tileAt(map, 0, 0)!.unit = null;
     tileAt(map, 0, 0)!.settlement = null;
     tileAt(map, 0, 0)!.terrain = TileType.Water;
-    tileAt(map, 0, 0)!.bridge = { owner: 0, dir: 'we' };
+    tileAt(map, 0, 0)!.bridge = { owner: 0, dir: BridgeDir.WE };
     tileAt(map, 0, 0)!.roadOwner = 0;
-    useGameStore.setState({ overlay: { kind: 'bridgeHelp' } });
+    useGameStore.setState({ overlay: { kind: OverlayKind.BRIDGE_HELP } });
     const dialog = new UnitHelpDialog();
     dialog.mount(host, root);
     const card = (root.children[0] as Container).children[2] as Container;
@@ -194,8 +194,8 @@ describe('UnitHelpDialog', () => {
     tileAt(map, 0, 0)!.unit = null;
     tileAt(map, 0, 0)!.settlement = { owner: null, level: 1, captureReady: false };
     useGameStore.setState({
-      selection: { kind: 'tile', q: 0, r: 0 },
-      overlay: { kind: 'settlementHelp' },
+      selection: { kind: SelectionKind.TILE, q: 0, r: 0 },
+      overlay: { kind: OverlayKind.SETTLEMENT_HELP },
     });
     const dialog = new UnitHelpDialog();
     dialog.mount(host, root);

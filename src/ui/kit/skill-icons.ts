@@ -1,8 +1,8 @@
 import { Rectangle, Sprite, Texture } from 'pixi.js';
-import type { SkillId } from '../../game/skills';
 import { SKILL_ATLAS_FILE, SKILL_ATLAS_CELL, SKILL_ATLAS_FRAMES } from '../../game/skill-atlas-data.gen';
 import { ensureCanvasResource } from '../../render/image-texture';
 import { markDirty } from '../../render/render-gate';
+import { SkillId } from '@enums';
 
 const TEXTURE_BASE = `${import.meta.env.BASE_URL}textures/`;
 

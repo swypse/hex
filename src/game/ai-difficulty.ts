@@ -1,4 +1,5 @@
-export type AiDifficulty = 'easy' | 'normal' | 'hard';
+import { AiDifficulty } from '@enums';
+
 
 interface AiStrategyProfile {
   planIntervalTurns: number;
@@ -24,7 +25,7 @@ export interface AiDifficultyProfile {
   strategy: AiStrategyProfile;
 }
 
-export const DEFAULT_AI_DIFFICULTY: AiDifficulty = 'normal';
+export const DEFAULT_AI_DIFFICULTY: AiDifficulty = AiDifficulty.NORMAL;
 
 export const AI_DIFFICULTY_PROFILES: Record<AiDifficulty, AiDifficultyProfile> = {
   easy: { mistakeChance: 0.25, guardWindow: 1, warRatio: 2.5, checkTrades: false, spawnReserve: 8, navalThreatRadius: 6, strategy: { planIntervalTurns: 6, musterFactor: 0.6, assaultRatio: 1.8, economyCap: 1 } },

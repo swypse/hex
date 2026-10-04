@@ -1,6 +1,7 @@
 import { BitmapText, Container, Graphics } from 'pixi.js';
 import { makeIcon } from './icon';
 import { makeLabel } from './label';
+import { FontSize } from '@enums';
 
 export interface TribeOption {
   el: Container;
@@ -38,7 +39,7 @@ export function makeTribeOption(
   icon.mask = clip;
   const lines = nameLines(name);
   const labels = lines.map((text, i) => {
-    const label = makeLabel(text, { fontSize: 14, fill: 0xeeeeee });
+    const label = makeLabel(text, { fontSize: FontSize.SMALL, fill: 0xeeeeee });
     label.anchor.set(0.5, 0);
     label.position.set(0, RADIUS + 6 + i * (14 + LINE_GAP));
     el.addChild(label);

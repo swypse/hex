@@ -3,6 +3,7 @@ import type { Axial } from './hex';
 import type { GameMap, MapTile } from './map-gen';
 import { revertShip } from './ship';
 import { TileType } from './tile-types';
+import { UnitType } from '@enums';
 
 export function countIceTiles(map: GameMap): number {
   let n = 0;
@@ -47,7 +48,7 @@ export function freezeCoast(map: GameMap): FreezeReport {
     report.frozen.push({ q: tile.q, r: tile.r });
     const unit = tile.unit;
     if (!unit) continue;
-    if (unit.type === 'pirate') {
+    if (unit.type === UnitType.PIRATE) {
       tile.unit = null;
       report.removed.push({ q: tile.q, r: tile.r });
     } else if (unit.shipLevel !== undefined) {

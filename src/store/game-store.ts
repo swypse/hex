@@ -1,14 +1,12 @@
 import { Player } from '@/game/players';
 import { Selection } from '@/game/selection';
-import type { SkillId } from '@/game/skills';
 import { GameStateSnapshot } from '@/game/state';
-import type { TutorialStepId } from '@/game/tutorial/tutorial-steps';
 import type { LobbyPlayer } from '@/net/peer-session';
 import { activeMatchStore } from '@/storage/active-match';
-import { GameMode } from '@enums';
+import { ConnectionState, GameMode, LobbyRole, NetMode, OverlayKind, PauseReason, Screen, SkillId, TutorialStepId } from '@enums';
 import { create } from 'zustand';
 
-export type Screen = 'start' | 'setup' | 'lobby' | 'game';
+
 
 export type { LobbyPlayer };
 
@@ -20,28 +18,28 @@ interface IconChipStyle {
 
 type OverlayState =
   | null
-  | { kind: 'spawn' }
-  | { kind: 'skill' }
-  | { kind: 'stats' }
-  | { kind: 'achievements' }
-  | { kind: 'welcome' }
-  | { kind: 'leave' }
-  | { kind: 'unitHelp' }
-  | { kind: 'settlementHelp' }
-  | { kind: 'buildingHelp' }
-  | { kind: 'buildingLimitHelp' }
-  | { kind: 'bridgeHelp' }
-  | { kind: 'shipLanding'; target: { q: number; r: number } }
-  | { kind: 'moveAttack'; target: { q: number; r: number } }
-  | { kind: 'stalkerReveal'; target: { q: number; r: number } }
-  | { kind: 'stunChoice'; target: { q: number; r: number } }
-  | { kind: 'builderBuild' }
-  | { kind: 'thornTrap' }
-  | { kind: 'disband'; unitId: string }
-  | { kind: 'watchingPrompt' };
+  | { kind: OverlayKind.SPAWN }
+  | { kind: OverlayKind.SKILL }
+  | { kind: OverlayKind.STATS }
+  | { kind: OverlayKind.ACHIEVEMENTS }
+  | { kind: OverlayKind.WELCOME }
+  | { kind: OverlayKind.LEAVE }
+  | { kind: OverlayKind.UNIT_HELP }
+  | { kind: OverlayKind.SETTLEMENT_HELP }
+  | { kind: OverlayKind.BUILDING_HELP }
+  | { kind: OverlayKind.BUILDING_LIMIT_HELP }
+  | { kind: OverlayKind.BRIDGE_HELP }
+  | { kind: OverlayKind.SHIP_LANDING; target: { q: number; r: number } }
+  | { kind: OverlayKind.MOVE_ATTACK; target: { q: number; r: number } }
+  | { kind: OverlayKind.STALKER_REVEAL; target: { q: number; r: number } }
+  | { kind: OverlayKind.STUN_CHOICE; target: { q: number; r: number } }
+  | { kind: OverlayKind.BUILDER_BUILD }
+  | { kind: OverlayKind.THORN_TRAP }
+  | { kind: OverlayKind.DISBAND; unitId: string }
+  | { kind: OverlayKind.WATCHING_PROMPT };
 
 interface LobbyState {
-  role: 'host' | 'client';
+  role: LobbyRole;
   code: string;
   mode: GameMode;
   totalPlayers: number;
@@ -70,15 +68,15 @@ interface GameStore {
   centerChipStyle: IconChipStyle | null;
   centerChipQueue: (IconChipStyle | null)[];
   localPlayerIndex: number;
-  netMode: 'single' | 'host' | 'client';
+  netMode: NetMode;
   lobby: LobbyState | null;
-  connection: 'idle' | 'connecting' | 'connected' | 'error';
+  connection: ConnectionState;
   connectionMessage: string;
   pendingSnapshot: GameStateSnapshot | null;
   myPeerId: string;
   playersOnline: boolean[];
   texturesLoading: boolean;
-  paused: 'disconnect' | null;
+  paused: PauseReason | null;
   pausedName: string;
   tutorial: boolean;
   tutorialStep: TutorialStepId | null;
@@ -100,15 +98,15 @@ interface GameStore {
   setBonusAwarded: (awarded: boolean) => void;
   setCenterMessage: (message: string | null, iconFile?: string | null, chipStyle?: IconChipStyle | null) => void;
   setLocalPlayerIndex: (index: number) => void;
-  setNetMode: (mode: 'single' | 'host' | 'client') => void;
+  setNetMode: (mode: NetMode) => void;
   setLobby: (lobby: LobbyState | null) => void;
-  setConnection: (connection: 'idle' | 'connecting' | 'connected' | 'error') => void;
+  setConnection: (connection: ConnectionState) => void;
   setConnectionMessage: (message: string) => void;
   setPendingSnapshot: (snapshot: GameStateSnapshot | null) => void;
   setMyPeerId: (peerId: string) => void;
   setPlayersOnline: (online: boolean[]) => void;
   setTexturesLoading: (loading: boolean) => void;
-  setPaused: (paused: 'disconnect' | null, name?: string) => void;
+  setPaused: (paused: PauseReason | null, name?: string) => void;
   setTutorial: (v: boolean) => void;
   setTutorialStep: (v: TutorialStepId | null) => void;
   setTutorialHighlightSkills: (v: SkillId[]) => void;
@@ -116,7 +114,7 @@ interface GameStore {
 }
 
 export const useGameStore = create<GameStore>((set, get) => ({
-  screen: 'start',
+  screen: Screen.START,
   players: [],
   turn: 1,
   currentPlayerIndex: 0,
@@ -136,9 +134,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
   centerChipStyle: null,
   centerChipQueue: [],
   localPlayerIndex: 0,
-  netMode: 'single',
+  netMode: NetMode.SINGLE,
   lobby: null,
-  connection: 'idle',
+  connection: ConnectionState.IDLE,
   connectionMessage: '',
   pendingSnapshot: null,
   myPeerId: '',
@@ -153,10 +151,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   setScreen: (screen) => {
     if (!suppressPush && get().screen !== screen) {
-      if (screen === 'game') replaceHistory(screen);
+      if (screen === Screen.GAME) replaceHistory(screen);
       else pushHistory(screen);
     }
-    if (get().screen === 'game' && screen !== 'game') {
+    if (get().screen === Screen.GAME && screen !== Screen.GAME) {
       set({
         centerMessage: null,
         centerMessageQueue: [],
@@ -222,7 +220,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   setTutorialHighlightEndTurn: (tutorialHighlightEndTurn) => set({ tutorialHighlightEndTurn }),
 }));
 
-const SCREENS: Screen[] = ['start', 'setup', 'lobby', 'game'];
+const SCREENS: Screen[] = [Screen.START, Screen.SETUP, Screen.LOBBY, Screen.GAME];
 
 let suppressPush = false;
 
@@ -260,10 +258,10 @@ function onPopState(event: PopStateEvent): void {
   const store = useGameStore.getState();
   const current = store.screen;
   const raw = event.state?.screen;
-  const target: Screen = SCREENS.includes(raw) ? raw : 'start';
+  const target: Screen = SCREENS.includes(raw) ? raw : Screen.START;
   if (target === current) return;
-  if (current === 'game' && !store.gameOver) {
-    store.setOverlay({ kind: 'leave' });
+  if (current === Screen.GAME && !store.gameOver) {
+    store.setOverlay({ kind: OverlayKind.LEAVE });
     pushHistory(current);
     return;
   }
@@ -282,7 +280,7 @@ export function initNavigation(): void {
 }
 
 export function confirmLeaveGame(): void {
-  if (useGameStore.getState().netMode === 'client') activeMatchStore.clear();
+  if (useGameStore.getState().netMode === NetMode.CLIENT) activeMatchStore.clear();
   useGameStore.getState().setOverlay(null);
   if (typeof window !== 'undefined' && typeof window.history?.replaceState === 'function') {
     try {
@@ -291,7 +289,7 @@ export function confirmLeaveGame(): void {
       // ignore
     }
   }
-  applyScreenFromHistory('start');
+  applyScreenFromHistory(Screen.START);
 }
 
 export function cancelLeaveGame(): void {

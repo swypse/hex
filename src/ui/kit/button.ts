@@ -2,6 +2,7 @@ import { Container, Graphics, BitmapText } from 'pixi.js';
 import { makeLabel } from './label';
 import { TEXT_BUTTON, THEME } from './theme';
 import { sfx } from '../../sound/sfx';
+import { FontSize } from '@enums';
 
 const SHADOW_OFFSET_X = 4;
 const SHADOW_OFFSET_Y = 4;
@@ -14,7 +15,7 @@ interface ButtonOpts {
   onClick: () => void;
   disabled?: boolean;
   selected?: boolean;
-  fontSize?: number;
+  fontSize?: FontSize;
   width?: number;
   paddingX?: number;
   paddingY?: number;

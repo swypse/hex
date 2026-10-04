@@ -1,4 +1,4 @@
-import { GameMode } from '@enums';
+import { BuildingKind, GameMode, OverlayKind, SelectionKind, UnitType } from '@enums';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Simulator } from '../src/game/simulator';
 import { makeTestMap, tileAt, makeUnit } from './helpers/test-map';
@@ -31,15 +31,15 @@ describe('catapult move-or-attack dialog', () => {
   });
 
   function catapultWithAdjacentBuilding(): { catapultTile: MapTile; target: MapTile } {
-    const catapult = makeUnit('c', 0, 'catapult', 0, 0);
+    const catapult = makeUnit('c', 0, UnitType.CATAPULT, 0, 0);
     const catapultTile = tileAt(map, 0, 0)!;
     catapultTile.unit = catapult;
     catapultTile.ownedBy = 0;
     const target = tileAt(map, 1, 0)!;
     target.ownedBy = 1;
-    target.building = { kind: 'sawmill', level: 1 };
+    target.building = { kind: BuildingKind.SAWMILL, level: 1 };
     const store = useGameStore.getState();
-    store.setSelection({ kind: 'unit', q: 0, r: 0 });
+    store.setSelection({ kind: SelectionKind.UNIT, q: 0, r: 0 });
     (gameController as unknown as { app: unknown }).app = { screen: {} };
     (gameController as unknown as { reachableKeys: Set<string> }).reachableKeys = new Set([axialKey(target)]);
     (gameController as unknown as { attackableKeys: Set<string> }).attackableKeys = new Set([axialKey(target)]);
@@ -52,14 +52,14 @@ describe('catapult move-or-attack dialog', () => {
       .spyOn(gameController as unknown as { runCommand: (c: unknown) => Promise<void> }, 'runCommand')
       .mockResolvedValue(undefined);
     await gameController.handleMapClick(target.q, target.r);
-    expect(useGameStore.getState().overlay).toEqual({ kind: 'moveAttack', target: { q: target.q, r: target.r } });
+    expect(useGameStore.getState().overlay).toEqual({ kind: OverlayKind.MOVE_ATTACK, target: { q: target.q, r: target.r } });
     expect(spy).not.toHaveBeenCalled();
     spy.mockRestore();
   });
 
   it('moves onto the tile when the player picks Move', async () => {
     const { target } = catapultWithAdjacentBuilding();
-    useGameStore.getState().setOverlay({ kind: 'moveAttack', target: { q: target.q, r: target.r } });
+    useGameStore.getState().setOverlay({ kind: OverlayKind.MOVE_ATTACK, target: { q: target.q, r: target.r } });
     const spy = vi
       .spyOn(gameController as unknown as { runCommand: (c: unknown) => Promise<void> }, 'runCommand')
       .mockResolvedValue(undefined);
@@ -67,13 +67,13 @@ describe('catapult move-or-attack dialog', () => {
     expect(spy).toHaveBeenCalledWith({ type: 'move', unitId: 'c', q: target.q, r: target.r });
     const store = useGameStore.getState();
     expect(store.overlay).toBeNull();
-    expect(store.selection).toEqual({ kind: 'unit', q: target.q, r: target.r });
+    expect(store.selection).toEqual({ kind: SelectionKind.UNIT, q: target.q, r: target.r });
     spy.mockRestore();
   });
 
   it('attacks the building when the player picks Attack', async () => {
     const { target } = catapultWithAdjacentBuilding();
-    useGameStore.getState().setOverlay({ kind: 'moveAttack', target: { q: target.q, r: target.r } });
+    useGameStore.getState().setOverlay({ kind: OverlayKind.MOVE_ATTACK, target: { q: target.q, r: target.r } });
     const spy = vi
       .spyOn(gameController as unknown as { runCommand: (c: unknown) => Promise<void> }, 'runCommand')
       .mockResolvedValue(undefined);
@@ -85,7 +85,7 @@ describe('catapult move-or-attack dialog', () => {
 
   it('cancels the dialog without acting', async () => {
     const { target } = catapultWithAdjacentBuilding();
-    useGameStore.getState().setOverlay({ kind: 'moveAttack', target: { q: target.q, r: target.r } });
+    useGameStore.getState().setOverlay({ kind: OverlayKind.MOVE_ATTACK, target: { q: target.q, r: target.r } });
     const spy = vi
       .spyOn(gameController as unknown as { runCommand: (c: unknown) => Promise<void> }, 'runCommand')
       .mockResolvedValue(undefined);

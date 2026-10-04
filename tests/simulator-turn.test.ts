@@ -1,4 +1,4 @@
-import { GameMode } from '@enums';
+import { CommandType, GameEventType, GameMode, UnitType } from '@enums';
 import { describe, expect, it } from 'vitest';
 import { hexNeighbors } from '../src/game/hex';
 import { buildMultiplayerPlayers, buildPlayers } from '../src/game/players';
@@ -23,12 +23,12 @@ describe('Simulator turn engine', () => {
     const sim = new Simulator(map, players, GameMode.TURNS30, { rng: () => 0.5 });
     sim.startGame();
     sim.drainEvents();
-    sim.applyCommand({ type: 'endTurn' });
+    sim.applyCommand({ type: CommandType.END_TURN });
     const events = sim.drainEvents();
     expect(sim.currentPlayerIndex).toBe(0);
     expect(sim.turn).toBe(2);
     const last = events[events.length - 1];
-    expect(last).toMatchObject({ type: 'turnStarted', playerIndex: 0, turn: 2 });
+    expect(last).toMatchObject({ type: GameEventType.TURN_STARTED, playerIndex: 0, turn: 2 });
     expect(players[0]!.resources.money).toBe(16 + 5);
   });
 
@@ -44,11 +44,11 @@ describe('Simulator turn engine', () => {
     const sim = new Simulator(map, players, GameMode.TURNS30, { rng: () => 0.5 });
     sim.startGame();
     sim.drainEvents();
-    sim.applyCommand({ type: 'endTurn' });
+    sim.applyCommand({ type: CommandType.END_TURN });
     expect(sim.currentPlayerIndex).toBe(1);
     expect(sim.turn).toBe(1);
     expect(players[0]!.resources.money).toBe(8);
-    sim.applyCommand({ type: 'endTurn' });
+    sim.applyCommand({ type: CommandType.END_TURN });
     expect(sim.currentPlayerIndex).toBe(0);
     expect(sim.turn).toBe(2);
     expect(players[0]!.resources.money).toBe(13);
@@ -61,11 +61,11 @@ describe('Simulator turn engine', () => {
     const sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5 });
     sim.startGame();
     sim.drainEvents();
-    sim.applyCommand({ type: 'endTurn' });
+    sim.applyCommand({ type: CommandType.END_TURN });
     const events = sim.drainEvents();
     expect(sim.gameOver).toBe(true);
     expect(sim.winnerIndex).toBe(0);
-    expect(events.some((e) => e.type === 'gameOver')).toBe(true);
+    expect(events.some((e) => e.type === GameEventType.GAME_OVER)).toBe(true);
   });
 
   it('turns30 win triggers gameOver once turn reaches 30', () => {
@@ -77,7 +77,7 @@ describe('Simulator turn engine', () => {
     sim.turn = 29;
     sim.startGame();
     sim.drainEvents();
-    sim.applyCommand({ type: 'endTurn' });
+    sim.applyCommand({ type: CommandType.END_TURN });
     expect(sim.gameOver).toBe(true);
     expect(sim.turn).toBe(30);
   });
@@ -86,30 +86,30 @@ describe('Simulator turn engine', () => {
     const map = makeTestMap();
     villageFor(map, 0, 0, 0);
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
-    const u = makeUnit('me', 0, 'warrior', 0, 0);
+    const u = makeUnit('me', 0, UnitType.WARRIOR, 0, 0);
     u.hp = 40;
     tileAt(map, 0, 0)!.unit = u;
     const sim = new Simulator(map, players, GameMode.TURNS30, { rng: () => 0.5, aiRng: () => new SeededRandom(2) });
     sim.startGame();
     sim.drainEvents();
-    sim.applyCommand({ type: 'endTurn' });
+    sim.applyCommand({ type: CommandType.END_TURN });
     expect(u.hp).toBe(50);
     const events = sim.drainEvents();
-    expect(events.some((e) => e.type === 'healed' && e.unitId === 'me')).toBe(true);
+    expect(events.some((e) => e.type === GameEventType.HEALED && e.unitId === 'me')).toBe(true);
   });
 
   it('does not auto-heal a damaged unit that already acted', () => {
     const map = makeTestMap();
     villageFor(map, 0, 0, 0);
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
-    const u = makeUnit('me', 0, 'warrior', 0, 0);
+    const u = makeUnit('me', 0, UnitType.WARRIOR, 0, 0);
     u.hp = 3;
     u.hasAttacked = true;
     tileAt(map, 0, 0)!.unit = u;
     const sim = new Simulator(map, players, GameMode.TURNS30, { rng: () => 0.5, aiRng: () => new SeededRandom(2) });
     sim.startGame();
     sim.drainEvents();
-    sim.applyCommand({ type: 'endTurn' });
+    sim.applyCommand({ type: CommandType.END_TURN });
     expect(u.hp).toBe(3);
   });
 
@@ -117,7 +117,7 @@ describe('Simulator turn engine', () => {
     const map = makeTestMap();
     villageFor(map, 0, 0, 0);
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
-    const u = makeUnit('spawned', 0, 'warrior', 0, 0);
+    const u = makeUnit('spawned', 0, UnitType.WARRIOR, 0, 0);
     u.hp = 3;
     u.hasMoved = true;
     u.hasAttacked = true;
@@ -126,7 +126,7 @@ describe('Simulator turn engine', () => {
     const sim = new Simulator(map, players, GameMode.TURNS30, { rng: () => 0.5, aiRng: () => new SeededRandom(2) });
     sim.startGame();
     sim.drainEvents();
-    sim.applyCommand({ type: 'endTurn' });
+    sim.applyCommand({ type: CommandType.END_TURN });
     expect(u.hp).toBe(3);
   });
 
@@ -135,22 +135,22 @@ describe('Simulator turn engine', () => {
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
     // Broke, so it cannot open Climbing and stays boxed in by mountains.
     players[1]!.resources.money = 0;
-    const aiUnit = makeUnit('ai', 1, 'warrior', 0, 2);
+    const aiUnit = makeUnit('ai', 1, UnitType.WARRIOR, 0, 2);
     aiUnit.hp = 2;
     tileAt(map, 0, 2)!.unit = aiUnit;
     for (const n of hexNeighbors({ q: 0, r: 2 })) {
       const t = tileAt(map, n.q, n.r);
       if (t) t.terrain = TileType.GrasslandMountain;
     }
-    const archer = makeUnit('arc', 0, 'archer', 2, 2);
+    const archer = makeUnit('arc', 0, UnitType.ARCHER, 2, 2);
     tileAt(map, 2, 2)!.unit = archer;
     const sim = new Simulator(map, players, GameMode.TURNS30, { rng: () => 0.5, aiRng: () => new SeededRandom(2) });
     sim.startGame();
     sim.drainEvents();
-    sim.applyCommand({ type: 'endTurn' });
+    sim.applyCommand({ type: CommandType.END_TURN });
     expect(aiUnit.hp).toBe(17);
     const events = sim.drainEvents();
-    expect(events.some((e) => e.type === 'healed' && e.unitId === 'ai')).toBe(true);
+    expect(events.some((e) => e.type === GameEventType.HEALED && e.unitId === 'ai')).toBe(true);
   });
 });
 
@@ -166,7 +166,7 @@ describe('spectate turn advance', () => {
     sim.startGame();
     sim.drainEvents();
     const startTurn = sim.turn;
-    sim.applyCommand({ type: 'endTurn' });
+    sim.applyCommand({ type: CommandType.END_TURN });
     expect(sim.turn).toBe(startTurn + 1);
     expect(sim.currentPlayerIndex).not.toBe(0);
   });
@@ -201,9 +201,9 @@ describe('capture readiness', () => {
     const enemyVillage = tileAt(map, 1, 0)!;
     enemyVillage.settlement = { owner: 1, level: 1, captureReady: false };
     enemyVillage.ownedBy = 1;
-    const a1 = makeUnit('a1', 0, 'warrior', 0, 0);
+    const a1 = makeUnit('a1', 0, UnitType.WARRIOR, 0, 0);
     home.unit = a1;
-    const a2 = makeUnit('a2', 0, 'warrior', 2, 0);
+    const a2 = makeUnit('a2', 0, UnitType.WARRIOR, 2, 0);
     tileAt(map, 2, 0)!.unit = a2;
 
     const sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5, aiRng: () => new SeededRandom(2) });
@@ -211,25 +211,25 @@ describe('capture readiness', () => {
     sim.drainEvents();
 
     // A enters B's village (first turn, not capturable yet).
-    sim.applyCommand({ type: 'move', unitId: 'a1', q: 1, r: 0 });
+    sim.applyCommand({ type: CommandType.MOVE, unitId: 'a1', q: 1, r: 0 });
     sim.drainEvents();
     expect(enemyVillage.settlement!.captureReady).toBe(false);
 
     // Full round: A's turn ends, B's turn ends, back to A (second turn).
-    sim.applyCommand({ type: 'endTurn' });
+    sim.applyCommand({ type: CommandType.END_TURN });
     sim.drainEvents();
-    sim.applyCommand({ type: 'endTurn' });
+    sim.applyCommand({ type: CommandType.END_TURN });
     sim.drainEvents();
     expect(sim.currentPlayerIndex).toBe(0);
     expect(enemyVillage.settlement!.captureReady).toBe(true);
 
     // A steps out of the village: readiness is lost...
-    sim.applyCommand({ type: 'move', unitId: 'a1', q: 0, r: 0 });
+    sim.applyCommand({ type: CommandType.MOVE, unitId: 'a1', q: 0, r: 0 });
     sim.drainEvents();
     expect(enemyVillage.settlement!.captureReady).toBe(false);
 
     // ...and another unit stepping in the same turn does not restore it.
-    sim.applyCommand({ type: 'move', unitId: 'a2', q: 1, r: 0 });
+    sim.applyCommand({ type: CommandType.MOVE, unitId: 'a2', q: 1, r: 0 });
     sim.drainEvents();
     expect(enemyVillage.settlement!.captureReady).toBe(false);
   });

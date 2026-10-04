@@ -1,4 +1,4 @@
-import { GameMode } from '@enums';
+import { GameMode, Screen } from '@enums';
 import { describe, it, expect } from 'vitest';
 import { gameController } from '../src/controller/game-controller';
 import { useGameStore } from '../src/store/game-store';
@@ -7,7 +7,7 @@ import { Tribe } from '../src/game/tribes';
 describe('scratch host start 2h+4ai', () => {
   it('starts a 6-player host game with one joined guest', async () => {
     useGameStore.setState({
-      screen: 'start',
+      screen: Screen.START,
       players: [],
       turn: 1,
       currentPlayerIndex: 0,

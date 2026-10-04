@@ -19,6 +19,7 @@ import { DisconnectDialog } from './disconnect-dialog';
 import { WatchPromptDialog } from './watch-prompt-dialog';
 import { StunChoiceDialog } from './stun-choice-dialog';
 import { BuilderBuildDialog } from './builder-build-dialog';
+import { OverlayKind, PauseReason, Screen } from '@enums';
 
 interface Overlay {
   mount(host: UIHost, root: Container): void;
@@ -73,66 +74,66 @@ export class OverlayManager {
 
   private active(): Set<string> {
     const s = useGameStore.getState();
-    const inGame = s.screen === 'game';
+    const inGame = s.screen === Screen.GAME;
     const active = new Set<string>();
     if (inGame && s.centerMessage !== null) active.add('center');
     if (inGame && s.tutorial) active.add('tutorial');
     if (inGame && s.gameOver && s.winnerIndex !== null) active.add('gameover');
-    if (inGame && s.paused === 'disconnect') active.add('disconnect');
+    if (inGame && s.paused === PauseReason.DISCONNECT) active.add('disconnect');
     if (inGame) {
       switch (s.overlay?.kind) {
-        case 'disband':
+        case OverlayKind.DISBAND:
           active.add('disband');
           break;
-        case 'leave':
+        case OverlayKind.LEAVE:
           active.add('leave');
           break;
-        case 'shipLanding':
+        case OverlayKind.SHIP_LANDING:
           active.add('ship');
           break;
-        case 'moveAttack':
+        case OverlayKind.MOVE_ATTACK:
           active.add('moveattack');
           break;
-        case 'stalkerReveal':
+        case OverlayKind.STALKER_REVEAL:
           active.add('stalkerreveal');
           break;
-        case 'spawn':
+        case OverlayKind.SPAWN:
           active.add('spawn');
           break;
-        case 'skill':
+        case OverlayKind.SKILL:
           active.add('skill');
           break;
-        case 'stats':
+        case OverlayKind.STATS:
           active.add('stats');
           break;
-        case 'achievements':
+        case OverlayKind.ACHIEVEMENTS:
           active.add('achievements');
           break;
-        case 'welcome':
+        case OverlayKind.WELCOME:
           active.add('welcome');
           break;
-        case 'unitHelp':
+        case OverlayKind.UNIT_HELP:
           active.add('unithelp');
           break;
-        case 'settlementHelp':
+        case OverlayKind.SETTLEMENT_HELP:
           active.add('settlementhelp');
           break;
-        case 'buildingHelp':
+        case OverlayKind.BUILDING_HELP:
           active.add('buildinghelp');
           break;
-        case 'buildingLimitHelp':
+        case OverlayKind.BUILDING_LIMIT_HELP:
           active.add('buildinglimithelp');
           break;
-        case 'bridgeHelp':
+        case OverlayKind.BRIDGE_HELP:
           active.add('bridgehelp');
           break;
-        case 'watchingPrompt':
+        case OverlayKind.WATCHING_PROMPT:
           active.add('watchingprompt');
           break;
-        case 'stunChoice':
+        case OverlayKind.STUN_CHOICE:
           active.add('stunchoice');
           break;
-        case 'builderBuild':
+        case OverlayKind.BUILDER_BUILD:
           active.add('builderbuild');
           break;
       }

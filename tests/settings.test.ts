@@ -10,6 +10,7 @@ import {
   playerName,
   setPlayerName,
 } from '../src/storage/settings';
+import { AiDifficulty, Language } from '@enums';
 
 function fakeStorage(): Map<string, string> {
   const store = new Map<string, string>();
@@ -28,8 +29,8 @@ describe('settings storage', () => {
   it('loads defaults when storage is empty', () => {
     fakeStorage();
     const s = loadSettings();
-    expect(s.aiDifficulty).toBe('normal');
-    expect(s.lang).toBe('en');
+    expect(s.aiDifficulty).toBe(AiDifficulty.NORMAL);
+    expect(s.lang).toBe(Language.EN);
     expect(s.soundOn).toBe(true);
   });
 });
@@ -37,11 +38,11 @@ describe('settings storage', () => {
 describe('AI difficulty setting', () => {
   it('defaults to normal and round-trips', () => {
     fakeStorage();
-    expect(loadSettings().aiDifficulty).toBe('normal');
-    setAiDifficulty('hard');
-    expect(loadSettings().aiDifficulty).toBe('hard');
-    setAiDifficulty('normal');
-    expect(loadSettings().aiDifficulty).toBe('normal');
+    expect(loadSettings().aiDifficulty).toBe(AiDifficulty.NORMAL);
+    setAiDifficulty(AiDifficulty.HARD);
+    expect(loadSettings().aiDifficulty).toBe(AiDifficulty.HARD);
+    setAiDifficulty(AiDifficulty.NORMAL);
+    expect(loadSettings().aiDifficulty).toBe(AiDifficulty.NORMAL);
   });
 });
 

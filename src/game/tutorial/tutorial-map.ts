@@ -8,6 +8,7 @@ import { Player } from '../players';
 import { EMPTY_STATS } from '../score';
 import { makeUnit } from '../units';
 import { Tribe } from '../tribes';
+import { UnitType } from '@enums';
 
 export const TUTORIAL_RADIUS = 5;
 export const TUTORIAL_CAPITAL = { q: 0, r: 0 };
@@ -63,7 +64,7 @@ export function buildTutorialMap(): GameMap {
     capital: true,
     stock: { wood: 60, stone: 60, ore: 30, food: 20 },
   };
-  capital.unit = makeUnit(TUTORIAL_HUMAN, 'warrior', TUTORIAL_CAPITAL.q, TUTORIAL_CAPITAL.r, {
+  capital.unit = makeUnit(TUTORIAL_HUMAN, UnitType.WARRIOR, TUTORIAL_CAPITAL.q, TUTORIAL_CAPITAL.r, {
     id: TUTORIAL_START_WARRIOR_ID,
     spawnVillage: { q: TUTORIAL_CAPITAL.q, r: TUTORIAL_CAPITAL.r },
   });

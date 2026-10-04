@@ -4,6 +4,7 @@ import { SetupScreen } from '../src/ui/screens/setup-screen';
 import { useGameStore } from '../src/store/game-store';
 import { type UIHost } from '../src/ui/host';
 import { TRIBE_BG_DEPTH } from '../src/ui/screens/tribe-bg-shader';
+import { Screen } from '@enums';
 
 function makeHost(): UIHost {
   return {
@@ -57,11 +58,11 @@ describe('SetupScreen', () => {
 
   it('goes back to the start screen on backspace', () => {
     keyHandler!({ key: 'Backspace', preventDefault: () => {} });
-    expect(useGameStore.getState().screen).toBe('start');
+    expect(useGameStore.getState().screen).toBe(Screen.START);
   });
 
   it('reaches the back button as the last selector and triggers it with Enter', () => {
-    useGameStore.setState({ screen: 'setup' });
+    useGameStore.setState({ screen: Screen.SETUP });
     keyHandler!({ key: 'ArrowDown', preventDefault: () => {} }); // enemies
     keyHandler!({ key: 'ArrowDown', preventDefault: () => {} }); // mode
     keyHandler!({ key: 'ArrowDown', preventDefault: () => {} }); // difficulty
@@ -69,7 +70,7 @@ describe('SetupScreen', () => {
     keyHandler!({ key: 'ArrowDown', preventDefault: () => {} }); // back
     expect((screen as unknown as { selector: number }).selector).toBe(5);
     keyHandler!({ key: 'Enter', preventDefault: () => {} });
-    expect(useGameStore.getState().screen).toBe('start');
+    expect(useGameStore.getState().screen).toBe(Screen.START);
   });
 
   it('highlights the start button as a selectable element before back', () => {

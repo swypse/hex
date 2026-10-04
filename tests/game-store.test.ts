@@ -1,10 +1,11 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useGameStore, initNavigation, confirmLeaveGame } from '../src/store/game-store';
+import { OverlayKind, PauseReason, Screen, SelectionKind } from '@enums';
 
 describe('gameStore', () => {
   beforeEach(() => {
     useGameStore.setState({
-      screen: 'start',
+      screen: Screen.START,
       players: [],
       turn: 1,
       currentPlayerIndex: 0,
@@ -16,40 +17,40 @@ describe('gameStore', () => {
 
   it('starts on the start screen', () => {
     const s = useGameStore.getState();
-    expect(s.screen).toBe('start');
+    expect(s.screen).toBe(Screen.START);
   });
 
   it('setScreen updates the screen', () => {
-    useGameStore.getState().setScreen('setup');
-    expect(useGameStore.getState().screen).toBe('setup');
+    useGameStore.getState().setScreen(Screen.SETUP);
+    expect(useGameStore.getState().screen).toBe(Screen.SETUP);
   });
 
   it('setOverlay opens and closes a simple overlay', () => {
-    useGameStore.getState().setOverlay({ kind: 'stats' });
-    expect(useGameStore.getState().overlay).toEqual({ kind: 'stats' });
+    useGameStore.getState().setOverlay({ kind: OverlayKind.STATS });
+    expect(useGameStore.getState().overlay).toEqual({ kind: OverlayKind.STATS });
     useGameStore.getState().setOverlay(null);
     expect(useGameStore.getState().overlay).toBeNull();
   });
 
   it('setOverlay carries the target for the shipLanding overlay', () => {
-    useGameStore.getState().setOverlay({ kind: 'shipLanding', target: { q: 1, r: 2 } });
-    expect(useGameStore.getState().overlay).toEqual({ kind: 'shipLanding', target: { q: 1, r: 2 } });
+    useGameStore.getState().setOverlay({ kind: OverlayKind.SHIP_LANDING, target: { q: 1, r: 2 } });
+    expect(useGameStore.getState().overlay).toEqual({ kind: OverlayKind.SHIP_LANDING, target: { q: 1, r: 2 } });
     useGameStore.getState().setOverlay(null);
     expect(useGameStore.getState().overlay).toBeNull();
   });
 
   it('opening one overlay replaces another', () => {
-    useGameStore.getState().setOverlay({ kind: 'spawn' });
-    useGameStore.getState().setOverlay({ kind: 'skill' });
-    expect(useGameStore.getState().overlay).toEqual({ kind: 'skill' });
+    useGameStore.getState().setOverlay({ kind: OverlayKind.SPAWN });
+    useGameStore.getState().setOverlay({ kind: OverlayKind.SKILL });
+    expect(useGameStore.getState().overlay).toEqual({ kind: OverlayKind.SKILL });
   });
 
   it('setSelection and setAiActive update state', () => {
     const store = useGameStore;
     store.getState().setAiActive(true);
-    store.getState().setSelection({ kind: 'tile', q: 1, r: 2 });
+    store.getState().setSelection({ kind: SelectionKind.TILE, q: 1, r: 2 });
     expect(store.getState().aiActive).toBe(true);
-    expect(store.getState().selection).toEqual({ kind: 'tile', q: 1, r: 2 });
+    expect(store.getState().selection).toEqual({ kind: SelectionKind.TILE, q: 1, r: 2 });
   });
 
   it('setLocalPlayerIndex updates localPlayerIndex', () => {
@@ -77,8 +78,8 @@ describe('gameStore', () => {
   });
 
   it('setPaused stores the disconnect pause and its label', () => {
-    useGameStore.getState().setPaused('disconnect', 'Guest');
-    expect(useGameStore.getState().paused).toBe('disconnect');
+    useGameStore.getState().setPaused(PauseReason.DISCONNECT, 'Guest');
+    expect(useGameStore.getState().paused).toBe(PauseReason.DISCONNECT);
     expect(useGameStore.getState().pausedName).toBe('Guest');
     useGameStore.getState().setPaused(null);
     expect(useGameStore.getState().paused).toBeNull();
@@ -143,12 +144,12 @@ describe('gameStore', () => {
   });
 
   it('clears pending center messages when leaving the game screen', () => {
-    useGameStore.setState({ screen: 'game' });
+    useGameStore.setState({ screen: Screen.GAME });
     const store = () => useGameStore.getState();
     store().setCenterMessage('a');
     store().setCenterMessage('b');
     expect(store().centerMessageQueue).toEqual(['b']);
-    store().setScreen('start');
+    store().setScreen(Screen.START);
     expect(store().centerMessage).toBeNull();
     expect(store().centerMessageQueue).toEqual([]);
   });
@@ -183,7 +184,7 @@ describe('browser back from the game screen', () => {
 
   beforeEach(() => {
     useGameStore.setState({
-      screen: 'start',
+      screen: Screen.START,
       gameOver: false,
       overlay: null,
     });
@@ -193,22 +194,22 @@ describe('browser back from the game screen', () => {
     const { back } = installFakeWindow();
     initNavigation();
     const s = useGameStore.getState();
-    s.setScreen('setup');
-    s.setScreen('game');
+    s.setScreen(Screen.SETUP);
+    s.setScreen(Screen.GAME);
     s.setGameOver(true);
     back();
-    expect(useGameStore.getState().screen).toBe('start');
+    expect(useGameStore.getState().screen).toBe(Screen.START);
   });
 
   it('still asks before leaving a live game, and Leave goes to main', () => {
     const { back } = installFakeWindow();
     initNavigation();
     const s = useGameStore.getState();
-    s.setScreen('setup');
-    s.setScreen('game');
+    s.setScreen(Screen.SETUP);
+    s.setScreen(Screen.GAME);
     back();
-    expect(useGameStore.getState().overlay).toEqual({ kind: 'leave' });
+    expect(useGameStore.getState().overlay).toEqual({ kind: OverlayKind.LEAVE });
     confirmLeaveGame();
-    expect(useGameStore.getState().screen).toBe('start');
+    expect(useGameStore.getState().screen).toBe(Screen.START);
   });
 });

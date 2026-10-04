@@ -3,6 +3,7 @@ import { GameMap, MapTile, Settlement } from '../src/game/map-gen';
 import { TileType } from '../src/game/tile-types';
 import { Unit } from '../src/game/units';
 import { captureVillage, setCaptureReady, villageIncome, villageIncomeTotal } from '../src/game/capture';
+import { UnitType } from '@enums';
 
 function makeTile(
   q: number,
@@ -14,7 +15,7 @@ function makeTile(
 }
 
 function makeUnit(id: string, owner: number, q: number, r: number): Unit {
-  return { id, owner, type: 'warrior', q, r, hasMoved: true, hasAttacked: false, hasHealed: false, hp: 5, attack: 2, attackDistance: 1, spawnVillage: { q: 99, r: 99 } };
+  return { id, owner, type: UnitType.WARRIOR, q, r, hasMoved: true, hasAttacked: false, hasHealed: false, hp: 5, attack: 2, attackDistance: 1, spawnVillage: { q: 99, r: 99 } };
 }
 
 function makeRoadTile(q: number, r: number, owner: number): MapTile {
@@ -133,7 +134,7 @@ describe('villageIncome', () => {
 
   it('subtracts the upkeep of the units the village raised', () => {
     const { map, village } = mapWithVillage(2); // base 7
-    for (const [id, type] of [['a', 'warrior'], ['b', 'rider']] as const) {
+    for (const [id, type] of [['a', UnitType.WARRIOR], ['b', UnitType.RIDER]] as const) {
       const t = makeTile(1, 0, null, makeUnit(id, 0, 1, 0));
       t.unit!.type = type;
       t.unit!.spawnVillage = { q: 0, r: 0 };
@@ -145,7 +146,7 @@ describe('villageIncome', () => {
   it('clamps income to zero when upkeep exceeds the base', () => {
     const { map, village } = mapWithVillage(2); // base 7
     const costs: { type: Unit['type']; cost: number }[] = [
-      { type: 'knight', cost: 4 }, { type: 'catapult', cost: 5 },
+      { type: UnitType.KNIGHT, cost: 4 }, { type: UnitType.CATAPULT, cost: 5 },
     ];
     for (const [i, c] of costs.entries()) {
       const t = makeTile(1 + i, 0, null, makeUnit(`u${i}`, 0, 1 + i, 0));

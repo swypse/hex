@@ -19,9 +19,10 @@ import {
   ORE_TO_MONEY,
   type Duels,
 } from './balance';
-import { UNIT_TYPES, unitTypeMaintenance, type UnitType } from './units';
+import { UNIT_TYPES, unitTypeMaintenance } from './units';
 import { MELEE_SLOTS, armyFor, armyUnitCost, runSkirmishMatrix, skirmishMeans } from './balance-skirmish';
 import { BASELINE, type Baseline } from './baseline-data';
+import { UnitType } from '@enums';
 
 export const CAPTION: Record<UnitType, string> = {
   warrior: 'Warrior',
@@ -146,13 +147,13 @@ function costCurve(duels: Duels): string {
 
 function catapultSensitivity(): string {
   const rng = () => 1;
-  const foes = CORE_COMBAT.filter((t) => t !== 'catapult');
+  const foes = CORE_COMBAT.filter((t) => t !== UnitType.CATAPULT);
   const head = '| Opponent | Catapult starts in range (free volleys) | Catapult ambushed at distance 1 |';
   const sep = '|----------|:---:|:---:|';
   const rows = foes.map((f) => {
-    const a = duel('catapult', f, rng);
-    const b = duel('catapult', f, rng, 100, undefined, { startDist: 1 });
-    const label = (d: ReturnType<typeof duel>) => (d.winner === 'catapult' ? 'catapult' : d.winner === f ? CAPTION[f].toLowerCase() : 'draw');
+    const a = duel(UnitType.CATAPULT, f, rng);
+    const b = duel(UnitType.CATAPULT, f, rng, 100, undefined, { startDist: 1 });
+    const label = (d: ReturnType<typeof duel>) => (d.winner === UnitType.CATAPULT ? 'catapult' : d.winner === f ? CAPTION[f].toLowerCase() : 'draw');
     return `| ${CAPTION[f]} | ${label(a)} | ${label(b)} |`;
   });
   return [head, sep, ...rows].join('\n');

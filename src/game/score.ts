@@ -2,7 +2,7 @@ import { t } from '../i18n';
 import { isExploredFor } from './explore';
 import { GameMap } from './map-gen';
 import { Player } from './players';
-import { UnitType } from './units';
+import { BuildingKind, UnitType } from '@enums';
 
 export const VILLAGE_SCORE = 50;
 export const WARRIOR_SCORE = 5;
@@ -40,14 +40,14 @@ export function boardScore(map: GameMap, playerIndex: number): number {
     if (tile.ownedBy !== playerIndex) continue;
     if (tile.settlement) score += VILLAGE_SCORE;
     if (tile.unit) score += UNIT_SCORE[tile.unit.type] ?? 0;
-    if (tile.building && tile.building.kind !== 'temple' && tile.building.kind !== 'forestTemple') score += BUILDING_SCORE;
+    if (tile.building && tile.building.kind !== BuildingKind.TEMPLE && tile.building.kind !== BuildingKind.FOREST_TEMPLE) score += BUILDING_SCORE;
   }
   return score;
 }
 
 export function awardTempleScores(map: GameMap, players: Player[]): void {
   for (const tile of map.tiles) {
-    if (!tile.building || (tile.building.kind !== 'temple' && tile.building.kind !== 'forestTemple') || tile.ownedBy === null) continue;
+    if (!tile.building || (tile.building.kind !== BuildingKind.TEMPLE && tile.building.kind !== BuildingKind.FOREST_TEMPLE) || tile.ownedBy === null) continue;
     const player = players[tile.ownedBy];
     if (player) player.score += TEMPLE_SCORES[tile.building.level] ?? 0;
   }
@@ -140,10 +140,10 @@ function boardCounts(map: GameMap, player: Player): PlayerBoardCounts {
       unitScore += UNIT_SCORE[t.unit.type] ?? 0;
     }
     if (!t.building) continue;
-    if (t.building.kind === 'temple') {
+    if (t.building.kind === BuildingKind.TEMPLE) {
       waterTemples += 1;
       waterTempleScore += TEMPLE_SCORES[t.building.level] ?? 0;
-    } else if (t.building.kind === 'forestTemple') {
+    } else if (t.building.kind === BuildingKind.FOREST_TEMPLE) {
       forestTemples += 1;
       forestTempleScore += TEMPLE_SCORES[t.building.level] ?? 0;
     } else {

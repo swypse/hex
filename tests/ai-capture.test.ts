@@ -1,4 +1,4 @@
-import { GameMode } from '@enums';
+import { CommandType, GameMode, UnitType } from '@enums';
 import { describe, expect, it } from 'vitest';
 import { hexNeighbors } from '../src/game/hex';
 import { GameMap, MapTile } from '../src/game/map-gen';
@@ -15,7 +15,7 @@ function foggyFreeVillageMap(): { map: GameMap; free: MapTile } {
   capital.settlement = { owner: 1, level: 1, captureReady: false, capital: true };
   capital.ownedBy = 1;
   capital.exploredBy = [1];
-  capital.unit = makeUnit('p1', 1, 'warrior', 0, 0);
+  capital.unit = makeUnit('p1', 1, UnitType.WARRIOR, 0, 0);
   for (const n of hexNeighbors({ q: 0, r: 0 })) {
     const t = tileAt(map, n.q, n.r);
     if (t) {
@@ -34,7 +34,7 @@ describe('AI captures free villages', () => {
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
     const sim = new Simulator(map, players, GameMode.TURNS30, { rng: () => 0.5, aiRng: () => new SeededRandom(2) });
     sim.startGame();
-    for (let i = 0; i < 10; i++) sim.applyCommand({ type: 'endTurn' });
+    for (let i = 0; i < 10; i++) sim.applyCommand({ type: CommandType.END_TURN });
     expect(free.settlement!.owner).toBe(1);
   });
 });

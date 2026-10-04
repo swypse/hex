@@ -1,15 +1,15 @@
 import { Container } from 'pixi.js';
 import { useGameStore } from '../../store/game-store';
-import { GameMode } from '../../game/game-mode';
 import { type UIHost } from '../host';
 import { t } from '../../i18n';
 import { Modal } from '../kit/modal';
 import { makeCheckbox } from '../kit/checkbox';
 import { setWelcomeDismissed } from '../../storage/settings';
+import { GameMode } from '@enums';
 
 function welcomeLines(mode: GameMode): string[] {
   const intro = t('welcome.intro');
-  const objective = mode === 'capture' ? t('welcome.capture') : t('welcome.score');
+  const objective = mode === GameMode.CAPTURE ? t('welcome.capture') : t('welcome.score');
   const howTo = t('welcome.howTo');
   return [intro, objective, howTo];
 }

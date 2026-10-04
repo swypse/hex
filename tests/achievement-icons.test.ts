@@ -1,7 +1,8 @@
 import { beforeEach, describe, it, expect, afterEach, vi } from 'vitest';
 import { Texture } from 'pixi.js';
 import { ACHIEVEMENT_ATLAS_FRAMES, ACHIEVEMENT_ATLAS_CELL } from '../src/game/achievement-atlas-data.gen';
-import { ACHIEVEMENTS, type AchievementId } from '../src/game/achievements';
+import { ACHIEVEMENTS } from '../src/game/achievements';
+import { AchievementId } from '@enums';
 
 class FakeImage {
   src = '';

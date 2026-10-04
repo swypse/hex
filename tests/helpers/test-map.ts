@@ -3,10 +3,11 @@ import { allTiles } from '../../src/game/hex';
 import { Biome } from '../../src/game/biomes';
 import { GameMap, MapTile } from '../../src/game/map-gen';
 import { TileType } from '../../src/game/tile-types';
-import { Unit, UNIT_TYPES, UNIT_ATTACK, UNIT_ATTACK_DISTANCE, UnitType } from '../../src/game/units';
+import { Unit, UNIT_TYPES, UNIT_ATTACK, UNIT_ATTACK_DISTANCE } from '../../src/game/units';
 import { CameraController } from '../../src/controller/camera-controller';
 import type { Player } from '../../src/game/players';
 import { capitalOf, stockOf } from '../../src/game/stock';
+import { UnitType } from '@enums';
 
 export function makeTestMap(radius = 2): GameMap {
   const tiles: MapTile[] = allTiles(radius).map((t) => ({

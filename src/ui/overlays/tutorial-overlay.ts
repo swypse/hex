@@ -5,8 +5,9 @@ import { t } from '../../i18n';
 import { Button } from '../kit/button';
 import { makeLabel } from '../kit/label';
 import { Popup } from '../kit/popup';
-import { STEP_CONFIG, stepCounter, type TutorialStepId } from '../../game/tutorial/tutorial-steps';
+import { STEP_CONFIG, stepCounter } from '../../game/tutorial/tutorial-steps';
 import { gameController } from '../../controller/game-controller';
+import { FontSize, PopupPosition, Screen, TutorialStepId } from '@enums';
 
 const WIDTH = 480;
 
@@ -33,7 +34,7 @@ export class TutorialOverlay {
   private refresh(): void {
     if (!this.el || !this.host) return;
     const s = useGameStore.getState();
-    const active = s.screen === 'game' && s.tutorial && !s.texturesLoading;
+    const active = s.screen === Screen.GAME && s.tutorial && !s.texturesLoading;
     this.el.visible = active;
     if (!active) {
       this.clearPopup();
@@ -60,7 +61,7 @@ export class TutorialOverlay {
       label: buttonLabel,
       width: 200,
       onClick: () => {
-        if (step === 'welcome') gameController.tutorialWelcomeClosed();
+        if (step === TutorialStepId.WELCOME) gameController.tutorialWelcomeClosed();
         else gameController.exitTutorial();
       },
     });
@@ -69,13 +70,13 @@ export class TutorialOverlay {
       title,
       width: WIDTH,
       buttons: [btn],
-      position: 'top',
+      position: PopupPosition.TOP,
       topY: 40,
       closeOnBackdrop: false,
       closeOnEscape: false,
     });
     const body = makeLabel(text, {
-      fontSize: 14,
+      fontSize: FontSize.SMALL,
       fill: 0xcccccc,
       wordWrap: true,
       wordWrapWidth: popup.contentWidth,
@@ -95,13 +96,13 @@ export class TutorialOverlay {
       width: WIDTH,
       modal: false,
       interactive: false,
-      position: 'top',
+      position: PopupPosition.TOP,
       topY: 40,
       closeOnBackdrop: false,
       closeOnEscape: false,
     });
     const body = makeLabel(text, {
-      fontSize: 14,
+      fontSize: FontSize.SMALL,
       fill: 0xeeeeee,
       wordWrap: true,
       wordWrapWidth: popup.contentWidth,

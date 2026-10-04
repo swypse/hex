@@ -1,19 +1,19 @@
 import { aiLoggingEnabled, setAiLogging } from '@/game/ai';
-import { AiDifficulty, DEFAULT_AI_DIFFICULTY } from '@/game/ai-difficulty';
+import { DEFAULT_AI_DIFFICULTY } from '@/game/ai-difficulty';
 import { builderBuildable, type BuilderBuildKind } from '@/game/buildings';
 import { RESOURCE_CHEAT_AMOUNT } from '@/game/cheats';
 import { attackableTargets } from '@/game/combat';
-import { BuildingKind, GameEvent } from '@/game/events';
+import { GameEvent } from '@/game/events';
 import { initialExplorationFor, isExploredFor } from '@/game/explore';
 import { shouldPromptWatch } from '@/game/game-mode';
 import { axialKey, hexDistance, hexToPixel } from '@/game/hex';
 import { countIceTiles } from '@/game/ice';
-import { type GameMap, generateMap, type MapSize, type MapTile } from '@/game/map-gen';
+import { type GameMap, generateMap, type MapTile } from '@/game/map-gen';
 import { buildPlayers } from '@/game/players';
-import { Season, seasonForTurn } from '@/game/season';
+import { seasonForTurn } from '@/game/season';
 import { cycleSelection, reachableTargets, tileAt } from '@/game/selection';
 import { type Command, Simulator } from '@/game/simulator';
-import { hasSkill, SkillId, SKILLS } from '@/game/skills';
+import { hasSkill, SKILLS } from '@/game/skills';
 import { adjacentEnemyVillages, isMoveStealthed } from '@/game/stalker';
 import { GameStateSnapshot } from '@/game/state';
 import { addStock } from '@/game/stock';
@@ -26,7 +26,7 @@ import {
   TUTORIAL_START_WARRIOR_ID,
 } from '@/game/tutorial/tutorial-map';
 import { skillPulseStep, STEP_CONFIG } from '@/game/tutorial/tutorial-steps';
-import { canAttack, canDisband, canMove, makeUnit, movePoints, PIRATE_OWNER, type UnitType } from '@/game/units';
+import { canAttack, canDisband, canMove, makeUnit, movePoints, PIRATE_OWNER } from '@/game/units';
 import { exploreVillageSights } from '@/game/village';
 import { t } from '@/i18n';
 import { localizeVillageName } from '@/i18n/lists';
@@ -42,7 +42,7 @@ import { saveRepository } from '@/storage/save-game';
 import { welcomeDismissed } from '@/storage/settings';
 import { confirmLeaveGame, useGameStore } from '@/store/game-store';
 import { SeededRandom } from '@/util';
-import { GameMode } from '@enums';
+import { AiDifficulty, BuildingKind, CommandType, GameMode, MapSize, NetMode, OverlayKind, Screen, Season, SelectionKind, SkillId, TutorialStepId, UnitType } from '@enums';
 import { Application, Container } from 'pixi.js';
 import { CAMERA_FOLLOW_MS, CameraController } from './camera-controller';
 import { damagePreviewVictim } from './damage-preview';
@@ -50,6 +50,7 @@ import { EventPresenter } from './event-presenter';
 import { HoldTimer } from './hold-timer';
 import { NetworkController } from './network-controller';
 import { TutorialDirector, type TutorialHost } from './tutorial-director';
+import { runSliced } from '@/util/time-slice';
 
 const HEX_SIZE = 40;
 const VILLAGE_START_OFFSET = 200;
@@ -72,6 +73,12 @@ class GameController {
   private sim: Simulator | null = null;
   private textures: Awaited<ReturnType<typeof createTextures>> | null = null;
   private seasonRebake = false;
+  /** True while an end-turn command plays the AI seats in slices: the sim is
+   *  mid-turn, so the map view must not be rebuilt from it until the events
+   *  are presented. */
+  private turnSliced = false;
+  /** The texture bake `init` started for the current sim, while it runs. */
+  private initBake: Promise<void> | null = null;
   private unsubSeason: (() => void) | null = null;
   private mapView: MapView | null = null;
   private overlayItems: OverlayItem[] = [];
@@ -133,7 +140,7 @@ class GameController {
     if (this.sim) {
       this.applyFitToScreen();
       useGameStore.getState().setTexturesLoading(true);
-      void createTextures(app, this.sim.map, HEX_SIZE * this.getCamera().qualityFactor, new Set(this.sim.players.map((p) => p.tribe)), seasonForTurn(this.sim.turn)).then((textures) => {
+      const bake = createTextures(app, this.sim.map, HEX_SIZE * this.getCamera().qualityFactor, new Set(this.sim.players.map((p) => p.tribe)), seasonForTurn(this.sim.turn)).then((textures) => {
         if (token === this.initToken) useGameStore.getState().setTexturesLoading(false);
         if (token !== this.initToken || !this.mapRoot) return;
         this.replaceTextures(textures);
@@ -150,13 +157,18 @@ class GameController {
           if (this.sim) this.contextLost = true;
         }
       });
+      // `startGame` awaits this instead of baking the same set a second time.
+      this.initBake = bake;
+      void bake.finally(() => {
+        if (this.initBake === bake) this.initBake = null;
+      });
     }
   }
 
   /** Whether the baked terrain textures no longer match the sim's season / ice. */
   private terrainTexturesStale(): boolean {
     if (!this.sim || !this.textures) return false;
-    return (this.textures.season ?? 'spring') !== seasonForTurn(this.sim.turn) || (this.textures.iceTiles ?? 0) !== countIceTiles(this.sim.map);
+    return (this.textures.season ?? Season.SPRING) !== seasonForTurn(this.sim.turn) || (this.textures.iceTiles ?? 0) !== countIceTiles(this.sim.map);
   }
 
   private bakeTerrain(season: Season): ReturnType<typeof createTextures> {
@@ -212,7 +224,7 @@ class GameController {
     if (this.seasonRebake) return;
     const season = seasonForTurn(useGameStore.getState().turn);
     const ice = countIceTiles(this.sim.map);
-    if ((this.textures.season ?? 'spring') === season && (this.textures.iceTiles ?? 0) === ice) return;
+    if ((this.textures.season ?? Season.SPRING) === season && (this.textures.iceTiles ?? 0) === ice) return;
     this.seasonRebake = true;
     const token = this.initToken;
     const epoch = this.lossEpoch;
@@ -329,21 +341,21 @@ class GameController {
     const step = this.tutorial.currentStep();
     const markers = new Set<string>();
     for (const m of STEP_CONFIG[step].markers) markers.add(axialKey(m));
-    if (step === 'attackEnemy') {
+    if (step === TutorialStepId.ATTACK_ENEMY) {
       const enemy = this.sim.map.tiles.find((t) => t.unit?.id === TUTORIAL_ENEMY_WARRIOR_ID);
       if (enemy) markers.add(axialKey(enemy));
     }
-    if (step === 'boardShip') {
+    if (step === TutorialStepId.BOARD_SHIP) {
       const warrior = this.sim.map.tiles.find((t) => t.unit?.id === TUTORIAL_START_WARRIOR_ID);
       if (warrior) markers.add(axialKey(warrior));
     }
-    if (step === 'upgradeShip') {
+    if (step === TutorialStepId.UPGRADE_SHIP) {
       const ship = this.sim.map.tiles.find(
         (t) => t.unit && t.unit.owner === 0 && t.unit.shipLevel !== undefined,
       );
       if (ship) markers.add(axialKey(ship));
     }
-    if (step === 'attackEnemyShip') {
+    if (step === TutorialStepId.ATTACK_ENEMY_SHIP) {
       const ship = this.sim.map.tiles.find(
         (t) => t.unit && t.unit.owner === 0 && t.unit.shipLevel !== undefined,
       );
@@ -351,11 +363,11 @@ class GameController {
       const enemy = this.sim.map.tiles.find((t) => t.unit?.id === TUTORIAL_ENEMY_SHIP_ID);
       if (enemy) markers.add(axialKey(enemy));
     }
-    if (step === 'collectBonus') {
+    if (step === TutorialStepId.COLLECT_BONUS) {
       const bonusTile = this.sim.map.tiles.find((t) => t.bonus !== undefined && t.bonus !== null);
       if (bonusTile) markers.add(axialKey(bonusTile));
     }
-    if (step === 'approachFreeVillage' || step === 'captureFreeVillage') {
+    if (step === TutorialStepId.APPROACH_FREE_VILLAGE || step === TutorialStepId.CAPTURE_FREE_VILLAGE) {
       const freeVillage = this.sim.map.tiles.find((t) => t.settlement && t.settlement.owner === null);
       if (freeVillage) markers.add(axialKey(freeVillage));
     }
@@ -422,7 +434,7 @@ class GameController {
   }
 
   saveGame(): void {
-    if (!this.sim || useGameStore.getState().netMode !== 'single') return;
+    if (!this.sim || useGameStore.getState().netMode !== NetMode.SINGLE) return;
     if (useGameStore.getState().tutorial) return;
     saveRepository.save(this.sim.snapshot());
   }
@@ -449,11 +461,11 @@ class GameController {
     store.setExpectedTurns(snap.expectedTurns);
     store.setBonusAwarded(snap.bonusAwarded);
     store.setLocalPlayerIndex(0);
-    store.setNetMode('single');
+    store.setNetMode(NetMode.SINGLE);
     store.setAiActive(snap.currentPlayerIndex !== 0);
     store.setSelection(null);
     this.startVillageIntroPending = true;
-    store.setScreen('game');
+    store.setScreen(Screen.GAME);
     this.syncKnownTribes(false);
   }
 
@@ -551,12 +563,23 @@ class GameController {
     return this.enqueue(async () => {
       if (!this.sim || this.sim.gameOver) return;
       const store = useGameStore.getState();
-      if (store.aiActive && cmd.type !== 'endTurn') return;
+      if (store.aiActive && cmd.type !== CommandType.END_TURN) return;
       const preExplored = this.exploredKeysFor(store.localPlayerIndex);
-      const ok = this.sim.applyCommand(cmd);
+      // Ending the turn runs every AI seat; do it in short slices so the page stays responsive.
+      let ok: boolean;
+      if (cmd.type === CommandType.END_TURN) {
+        this.turnSliced = true;
+        try {
+          ok = await runSliced(this.sim.applyCommandSteps(cmd));
+        } finally {
+          this.turnSliced = false;
+        }
+      } else {
+        ok = this.sim.applyCommand(cmd);
+      }
       if (ok) this.saveGame();
       const events = this.sim.drainEvents();
-      if (store.netMode === 'host') this.getNetwork().broadcastBatch(events);
+      if (store.netMode === NetMode.HOST) this.getNetwork().broadcastBatch(events);
       await this.presentEvents(events, preExplored);
       this.syncStore();
       const storeNow = useGameStore.getState();
@@ -568,7 +591,7 @@ class GameController {
         localActive: this.sim.players[storeNow.localPlayerIndex]?.isActive ?? true,
         overlayKind: storeNow.overlay?.kind ?? null,
       })) {
-        storeNow.setOverlay({ kind: 'watchingPrompt' });
+        storeNow.setOverlay({ kind: OverlayKind.WATCHING_PROMPT });
       }
       this.render();
       if (useGameStore.getState().tutorial && this.tutorial) {
@@ -578,7 +601,7 @@ class GameController {
           const s = useGameStore.getState();
           // Once a skill step completes, close the skill tree so the player can
           // see the next banner/objective on the map.
-          if (s.overlay?.kind === 'skill' && !skillPulseStep(s.tutorialStep)) {
+          if (s.overlay?.kind === OverlayKind.SKILL && !skillPulseStep(s.tutorialStep)) {
             s.setOverlay(null);
           }
           this.render();
@@ -587,7 +610,7 @@ class GameController {
     });
   }
 
-  async startGame(tribe: Tribe, enemyCount: number, mode: GameMode, difficulty: AiDifficulty = DEFAULT_AI_DIFFICULTY, mapSize: MapSize = 'normal'): Promise<void> {
+  async startGame(tribe: Tribe, enemyCount: number, mode: GameMode, difficulty: AiDifficulty = DEFAULT_AI_DIFFICULTY, mapSize: MapSize = MapSize.NORMAL): Promise<void> {
     const store = useGameStore.getState();
     this.tutorial = null;
     store.setTutorial(false);
@@ -610,19 +633,24 @@ class GameController {
     store.setWinnerIndex(null);
     store.setBonusAwarded(false);
     store.setLocalPlayerIndex(0);
-    store.setNetMode('single');
+    store.setNetMode(NetMode.SINGLE);
     store.setTurn(1);
     store.setCurrentPlayerIndex(0);
     store.setAiActive(false);
     store.setSelection(null);
-    store.setScreen('game');
-    if (!welcomeDismissed()) store.setOverlay({ kind: 'welcome' });
+    store.setScreen(Screen.GAME);
+    if (!welcomeDismissed()) store.setOverlay({ kind: OverlayKind.WELCOME });
     this.syncKnownTribes(false);
     const start = map.spawns[store.localPlayerIndex]!.start;
-    store.setSelection({ kind: 'unit', q: start.q, r: start.r });
+    store.setSelection({ kind: SelectionKind.UNIT, q: start.q, r: start.r });
     if (this.app) {
       this.applyFitToScreen();
-      this.replaceTextures(await createTextures(this.app, map, HEX_SIZE * this.getCamera().qualityFactor, new Set(this.sim!.players.map((p) => p.tribe)), seasonForTurn(this.sim!.turn)));
+      // Mounting the game screen already started baking this sim's textures
+      // (`init`): wait for that instead of baking everything twice. When the
+      // screen was already mounted `init` did not run, so bake here.
+      const inFlight = this.initBake;
+      if (inFlight) await inFlight;
+      else this.replaceTextures(await createTextures(this.app, map, HEX_SIZE * this.getCamera().qualityFactor, new Set(this.sim!.players.map((p) => p.tribe)), seasonForTurn(this.sim!.turn)));
     }
     this.render();
     this.centerOnStartVillage();
@@ -645,7 +673,7 @@ class GameController {
     store.setWinnerIndex(null);
     store.setBonusAwarded(false);
     store.setLocalPlayerIndex(0);
-    store.setNetMode('single');
+    store.setNetMode(NetMode.SINGLE);
     store.setTurn(1);
     store.setCurrentPlayerIndex(0);
     store.setAiActive(false);
@@ -654,9 +682,9 @@ class GameController {
     store.setTutorial(true);
     this.syncTutorialStore();
     this.syncKnownTribes(false);
-    store.setSelection({ kind: 'unit', q: TUTORIAL_CAPITAL.q, r: TUTORIAL_CAPITAL.r });
+    store.setSelection({ kind: SelectionKind.UNIT, q: TUTORIAL_CAPITAL.q, r: TUTORIAL_CAPITAL.r });
     this.startVillageIntroPending = true;
-    store.setScreen('game');
+    store.setScreen(Screen.GAME);
     return Promise.resolve();
   }
 
@@ -676,7 +704,7 @@ class GameController {
     useGameStore.getState().setTutorialHighlightSkills([]);
     useGameStore.getState().setTutorialHighlightEndTurn(false);
     useGameStore.getState().setSelection(null);
-    useGameStore.getState().setScreen('start');
+    useGameStore.getState().setScreen(Screen.START);
   }
 
   private mapHeight(): number {
@@ -858,7 +886,7 @@ class GameController {
     const tile = tileAt(this.sim.map, selection.q, selection.r);
     if (!tile?.unit || !tile.settlement || tile.settlement.owner === tile.unit.owner || !tile.settlement.captureReady) return;
     store.setSelection(null);
-    this.sendCommand({ type: 'capture', q: selection.q, r: selection.r, unitId: tile.unit.id });
+    this.sendCommand({ type: CommandType.CAPTURE, q: selection.q, r: selection.r, unitId: tile.unit.id });
   }
 
   async handleMapClick(q: number, r: number): Promise<void> {
@@ -891,17 +919,17 @@ class GameController {
     }
 
     const selection = store.selection;
-    if (selection && selection.kind === 'unit' && canAct) {
+    if (selection && selection.kind === SelectionKind.UNIT && canAct) {
       const unit = tileAt(this.sim.map, selection.q, selection.r)?.unit;
-      if (unit && unit.type === 'stunner' && this.attackableKeys.has(axialKey(tile))) {
+      if (unit && unit.type === UnitType.STUNNER && this.attackableKeys.has(axialKey(tile))) {
         const dist = hexDistance({ q: selection.q, r: selection.r }, tile);
         if (dist === 2) {
           // Range-2 targets are always stunned.
           store.setSelection(null);
-          this.sendCommand({ type: 'stun', unitId: unit.id, q, r });
+          this.sendCommand({ type: CommandType.STUN, unitId: unit.id, q, r });
           return;
         }
-        store.setOverlay({ kind: 'stunChoice', target: { q: tile.q, r: tile.r } });
+        store.setOverlay({ kind: OverlayKind.STUN_CHOICE, target: { q: tile.q, r: tile.r } });
         return;
       }
       if (
@@ -913,39 +941,39 @@ class GameController {
         // The tile is both a siege/attack target and a reachable move
         // destination (a catapult next to an enemy building/village): let the
         // player pick move or attack instead of always attacking.
-        store.setOverlay({ kind: 'moveAttack', target: { q: tile.q, r: tile.r } });
+        store.setOverlay({ kind: OverlayKind.MOVE_ATTACK, target: { q: tile.q, r: tile.r } });
         return;
       }
       if (unit && unit.owner === store.localPlayerIndex && this.attackableKeys.has(axialKey(tile))) {
         // Attack immediately, no confirmation dialog.
         store.setSelection(null);
-        this.sendCommand({ type: 'attack', unitId: unit.id, q, r });
+        this.sendCommand({ type: CommandType.ATTACK, unitId: unit.id, q, r });
         return;
       }
       if (unit && this.reachableKeys.has(axialKey(tile))) {
         // A stealthed stalker arriving beside an enemy village will be spotted:
         // ask before committing the move.
         if (this.sim && isMoveStealthed(unit) && adjacentEnemyVillages(this.sim.map, tile, unit.owner).length > 0) {
-          store.setOverlay({ kind: 'stalkerReveal', target: { q: tile.q, r: tile.r } });
+          store.setOverlay({ kind: OverlayKind.STALKER_REVEAL, target: { q: tile.q, r: tile.r } });
           return;
         }
         if (unit.shipLevel !== undefined && tile.terrain !== TileType.Water) {
-          store.setOverlay({ kind: 'shipLanding', target: { q: tile.q, r: tile.r } });
+          store.setOverlay({ kind: OverlayKind.SHIP_LANDING, target: { q: tile.q, r: tile.r } });
           return;
         }
-        this.sendCommand({ type: 'move', unitId: unit.id, q, r });
-        store.setSelection({ kind: 'unit', q: tile.q, r: tile.r });
+        this.sendCommand({ type: CommandType.MOVE, unitId: unit.id, q, r });
+        store.setSelection({ kind: SelectionKind.UNIT, q: tile.q, r: tile.r });
         sfx.play('click');
         return;
       }
     }
 
-    if (!canAct && selection && selection.kind === 'unit' && selection.q === q && selection.r === r) return;
+    if (!canAct && selection && selection.kind === SelectionKind.UNIT && selection.q === q && selection.r === r) return;
 
     const next = cycleSelection(selection, tile);
     store.setSelection(next);
     sfx.play('click');
-    if (next.kind === 'unit') {
+    if (next.kind === SelectionKind.UNIT) {
       const u = tileAt(this.sim.map, next.q, next.r)?.unit;
       if (u && u.owner === store.localPlayerIndex) this.mapView?.bounceUnit(next.q, next.r);
     }
@@ -1025,7 +1053,7 @@ class GameController {
     if (store.aiActive) return;
     const selection = store.selection;
     if (!selection) return;
-    this.sendCommand({ type: 'upgradeVillage', q: selection.q, r: selection.r });
+    this.sendCommand({ type: CommandType.UPGRADE_VILLAGE, q: selection.q, r: selection.r });
   }
 
   upgradeSelectedVillageFromToolbar(): void {
@@ -1037,7 +1065,7 @@ class GameController {
     if (store.aiActive) return;
     const selection = store.selection;
     if (!selection) return;
-    this.sendCommand({ type: 'spawn', q: selection.q, r: selection.r, unitType: type });
+    this.sendCommand({ type: CommandType.SPAWN, q: selection.q, r: selection.r, unitType: type });
     store.setOverlay(null);
   }
 
@@ -1048,7 +1076,7 @@ class GameController {
     if (!selection || !this.sim) return;
     const unit = tileAt(this.sim.map, selection.q, selection.r)?.unit;
     if (!unit || unit.owner !== store.localPlayerIndex) return;
-    this.sendCommand({ type: 'heal', unitId: unit.id });
+    this.sendCommand({ type: CommandType.HEAL, unitId: unit.id });
     store.setSelection(null);
   }
 
@@ -1056,22 +1084,22 @@ class GameController {
     const store = useGameStore.getState();
     if (store.aiActive) return;
     const selection = store.selection;
-    if (!selection || selection.kind !== 'unit' || !this.sim) return;
+    if (!selection || selection.kind !== SelectionKind.UNIT || !this.sim) return;
     const tile = tileAt(this.sim.map, selection.q, selection.r);
     const unit = tile?.unit;
     if (!unit || unit.owner !== store.localPlayerIndex) return;
     if (!canDisband(unit)) return;
-    store.setOverlay({ kind: 'disband', unitId: unit.id });
+    store.setOverlay({ kind: OverlayKind.DISBAND, unitId: unit.id });
   }
 
   confirmDisband(): void {
     const store = useGameStore.getState();
-    const pending = store.overlay?.kind === 'disband' ? store.overlay.unitId : null;
+    const pending = store.overlay?.kind === OverlayKind.DISBAND ? store.overlay.unitId : null;
     store.setOverlay(null);
     if (!pending || !this.sim) return;
     const unit = this.sim.map.tiles.find((t) => t.unit?.id === pending)?.unit;
     if (!unit || !canDisband(unit)) return;
-    this.sendCommand({ type: 'disband', unitId: pending });
+    this.sendCommand({ type: CommandType.DISBAND, unitId: pending });
     store.setSelection(null);
   }
 
@@ -1086,7 +1114,7 @@ class GameController {
     if (!selection || !this.sim) return;
     const unit = tileAt(this.sim.map, selection.q, selection.r)?.unit;
     if (!unit || unit.owner !== store.localPlayerIndex) return;
-    this.sendCommand({ type: 'enableStealth', unitId: unit.id });
+    this.sendCommand({ type: CommandType.ENABLE_STEALTH, unitId: unit.id });
     store.setSelection(null);
   }
 
@@ -1098,7 +1126,7 @@ class GameController {
     const selection = store.selection;
     if (!selection || !this.sim) return;
     const unit = tileAt(this.sim.map, selection.q, selection.r)?.unit;
-    if (!unit || unit.owner !== store.localPlayerIndex || unit.type !== 'builder') return;
+    if (!unit || unit.owner !== store.localPlayerIndex || unit.type !== UnitType.BUILDER) return;
     this.pendingPlacement = { unitId: unit.id, kind };
     this.pendingTrap = null;
     store.setOverlay(null);
@@ -1110,7 +1138,7 @@ class GameController {
     this.pendingPlacement = null;
     this.placementKeys.clear();
     if (!pending || !this.sim) return;
-    this.sendCommand({ type: 'build', unitId: pending.unitId, q, r, kind });
+    this.sendCommand({ type: CommandType.BUILD, unitId: pending.unitId, q, r, kind });
   }
 
   cancelPlacement(): void {
@@ -1128,7 +1156,7 @@ class GameController {
     const selection = store.selection;
     if (!selection || !this.sim) return;
     const unit = tileAt(this.sim.map, selection.q, selection.r)?.unit;
-    if (!unit || unit.owner !== store.localPlayerIndex || unit.type !== 'trapper') return;
+    if (!unit || unit.owner !== store.localPlayerIndex || unit.type !== UnitType.TRAPPER) return;
     this.pendingTrap = { unitId: unit.id };
     this.pendingPlacement = null;
     this.render();
@@ -1139,7 +1167,7 @@ class GameController {
     this.pendingTrap = null;
     this.placementKeys.clear();
     if (!pending || !this.sim) return;
-    this.sendCommand({ type: 'trap', unitId: pending.unitId, q, r });
+    this.sendCommand({ type: CommandType.TRAP, unitId: pending.unitId, q, r });
   }
 
   stormSelected(): void {
@@ -1149,34 +1177,34 @@ class GameController {
     if (!selection || !this.sim) return;
     const unit = tileAt(this.sim.map, selection.q, selection.r)?.unit;
     if (!unit || unit.owner !== store.localPlayerIndex || !stormEligible(this.sim.map, unit)) return;
-    this.sendCommand({ type: 'storm', unitId: unit.id });
+    this.sendCommand({ type: CommandType.STORM, unitId: unit.id });
     store.setSelection(null);
   }
 
   chooseStunFromDialog(): void {
     const store = useGameStore.getState();
-    const pending = store.overlay?.kind === 'stunChoice' ? store.overlay.target : null;
+    const pending = store.overlay?.kind === OverlayKind.STUN_CHOICE ? store.overlay.target : null;
     store.setOverlay(null);
     if (!pending) return;
     const selection = store.selection;
-    if (!selection || selection.kind !== 'unit' || !this.sim) return;
+    if (!selection || selection.kind !== SelectionKind.UNIT || !this.sim) return;
     const unit = tileAt(this.sim.map, selection.q, selection.r)?.unit;
     if (!unit) return;
     store.setSelection(null);
-    this.sendCommand({ type: 'stun', unitId: unit.id, q: pending.q, r: pending.r });
+    this.sendCommand({ type: CommandType.STUN, unitId: unit.id, q: pending.q, r: pending.r });
   }
 
   chooseRegularAttackFromStunDialog(): void {
     const store = useGameStore.getState();
-    const pending = store.overlay?.kind === 'stunChoice' ? store.overlay.target : null;
+    const pending = store.overlay?.kind === OverlayKind.STUN_CHOICE ? store.overlay.target : null;
     store.setOverlay(null);
     if (!pending) return;
     const selection = store.selection;
-    if (!selection || selection.kind !== 'unit' || !this.sim) return;
+    if (!selection || selection.kind !== SelectionKind.UNIT || !this.sim) return;
     const unit = tileAt(this.sim.map, selection.q, selection.r)?.unit;
     if (!unit) return;
     store.setSelection(null);
-    this.sendCommand({ type: 'attack', unitId: unit.id, q: pending.q, r: pending.r });
+    this.sendCommand({ type: CommandType.ATTACK, unitId: unit.id, q: pending.q, r: pending.r });
   }
 
   cancelStun(): void {
@@ -1188,7 +1216,7 @@ class GameController {
     if (store.aiActive) return;
     const selection = store.selection;
     if (!selection) return;
-    this.sendCommand({ type: 'build', q: selection.q, r: selection.r, kind });
+    this.sendCommand({ type: CommandType.BUILD, q: selection.q, r: selection.r, kind });
   }
 
   /** The selected unit burns the enemy farm/granary it stands on. */
@@ -1196,10 +1224,10 @@ class GameController {
     const store = useGameStore.getState();
     if (store.aiActive) return;
     const selection = store.selection;
-    if (!selection || selection.kind !== 'unit' || !this.sim) return;
+    if (!selection || selection.kind !== SelectionKind.UNIT || !this.sim) return;
     const unit = tileAt(this.sim.map, selection.q, selection.r)?.unit;
     if (!unit) return;
-    this.sendCommand({ type: 'burn', unitId: unit.id });
+    this.sendCommand({ type: CommandType.BURN, unitId: unit.id });
   }
 
   /** The selected unit destroys the enemy road it stands on. */
@@ -1207,10 +1235,10 @@ class GameController {
     const store = useGameStore.getState();
     if (store.aiActive) return;
     const selection = store.selection;
-    if (!selection || selection.kind !== 'unit' || !this.sim) return;
+    if (!selection || selection.kind !== SelectionKind.UNIT || !this.sim) return;
     const unit = tileAt(this.sim.map, selection.q, selection.r)?.unit;
     if (!unit) return;
-    this.sendCommand({ type: 'burnRoad', unitId: unit.id });
+    this.sendCommand({ type: CommandType.BURN_ROAD, unitId: unit.id });
   }
 
   repairSelectedBuilding(): void {
@@ -1218,7 +1246,7 @@ class GameController {
     if (store.aiActive) return;
     const selection = store.selection;
     if (!selection) return;
-    this.sendCommand({ type: 'repair', q: selection.q, r: selection.r });
+    this.sendCommand({ type: CommandType.REPAIR, q: selection.q, r: selection.r });
   }
 
   destroySelectedBuilding(): void {
@@ -1226,7 +1254,7 @@ class GameController {
     if (store.aiActive) return;
     const selection = store.selection;
     if (!selection) return;
-    this.sendCommand({ type: 'destroyBuilding', q: selection.q, r: selection.r });
+    this.sendCommand({ type: CommandType.DESTROY_BUILDING, q: selection.q, r: selection.r });
   }
 
   buildSelectedWall(): void {
@@ -1234,7 +1262,7 @@ class GameController {
     if (store.aiActive) return;
     const selection = store.selection;
     if (!selection) return;
-    this.sendCommand({ type: 'buildWall', q: selection.q, r: selection.r });
+    this.sendCommand({ type: CommandType.BUILD_WALL, q: selection.q, r: selection.r });
   }
 
   buildSelectedRoad(): void {
@@ -1242,7 +1270,7 @@ class GameController {
     if (store.aiActive) return;
     const selection = store.selection;
     if (!selection) return;
-    this.sendCommand({ type: 'buildRoad', q: selection.q, r: selection.r });
+    this.sendCommand({ type: CommandType.BUILD_ROAD, q: selection.q, r: selection.r });
   }
 
   buildSelectedBridge(): void {
@@ -1250,13 +1278,13 @@ class GameController {
     if (store.aiActive) return;
     const selection = store.selection;
     if (!selection) return;
-    this.sendCommand({ type: 'buildBridge', q: selection.q, r: selection.r });
+    this.sendCommand({ type: CommandType.BUILD_BRIDGE, q: selection.q, r: selection.r });
   }
 
   openSkill(id: SkillId): void {
     const store = useGameStore.getState();
     if (store.aiActive) return;
-    this.sendCommand({ type: 'openSkill', skill: id });
+    this.sendCommand({ type: CommandType.OPEN_SKILL, skill: id });
   }
 
   upgradeSelectedShip(): void {
@@ -1266,18 +1294,18 @@ class GameController {
     if (!selection || !this.sim) return;
     const unit = tileAt(this.sim.map, selection.q, selection.r)?.unit;
     if (!unit || unit.shipLevel === undefined) return;
-    this.sendCommand({ type: 'upgradeShip', unitId: unit.id });
+    this.sendCommand({ type: CommandType.UPGRADE_SHIP, unitId: unit.id });
   }
 
   dealWithSelectedPirate(): void {
     const store = useGameStore.getState();
     if (store.aiActive || store.gameOver) return;
     const selection = store.selection;
-    if (!selection || selection.kind !== 'unit' || !this.sim) return;
+    if (!selection || selection.kind !== SelectionKind.UNIT || !this.sim) return;
     const unit = tileAt(this.sim.map, selection.q, selection.r)?.unit;
-    if (!unit || unit.type !== 'pirate') return;
+    if (!unit || unit.type !== UnitType.PIRATE) return;
     store.setSelection(null);
-    this.sendCommand({ type: 'deal', unitId: unit.id });
+    this.sendCommand({ type: CommandType.DEAL, unitId: unit.id });
   }
 
   /** Cheat (single-player only): grants the local player +100 of every
@@ -1285,7 +1313,7 @@ class GameController {
   cheatResources(): boolean {
     if (!this.sim) return false;
     const store = useGameStore.getState();
-    if (store.screen !== 'game' || store.netMode !== 'single') return false;
+    if (store.screen !== Screen.GAME || store.netMode !== NetMode.SINGLE) return false;
     const local = this.sim.players[store.localPlayerIndex];
     if (!local) return false;
     local.resources.money += RESOURCE_CHEAT_AMOUNT;
@@ -1309,7 +1337,7 @@ class GameController {
   cheatOpenAllSkills(): boolean {
     if (!this.sim) return false;
     const store = useGameStore.getState();
-    if (store.screen !== 'game' || store.netMode !== 'single') return false;
+    if (store.screen !== Screen.GAME || store.netMode !== NetMode.SINGLE) return false;
     const local = this.sim.players[store.localPlayerIndex];
     if (!local) return false;
     local.skills = Object.keys(SKILLS) as SkillId[];
@@ -1323,7 +1351,7 @@ class GameController {
   cheatRemoveFog(): boolean {
     if (!this.sim) return false;
     const store = useGameStore.getState();
-    if (store.screen !== 'game' || store.netMode !== 'single') return false;
+    if (store.screen !== Screen.GAME || store.netMode !== NetMode.SINGLE) return false;
     this.revealMapForLocal();
     return true;
   }
@@ -1334,7 +1362,7 @@ class GameController {
   cheatWin(): boolean {
     if (!this.sim) return false;
     const store = useGameStore.getState();
-    if (store.screen !== 'game' || store.netMode !== 'single') return false;
+    if (store.screen !== Screen.GAME || store.netMode !== NetMode.SINGLE) return false;
     const local = this.sim.players[store.localPlayerIndex];
     if (!local) return false;
     let any = false;
@@ -1372,7 +1400,7 @@ class GameController {
     for (const t of map.tiles) {
       const ownUnit = t.unit !== null && t.unit.owner === aiIndex;
       const ownSettlement = t.settlement !== null && t.settlement.owner === aiIndex;
-      const ownPort = t.building !== null && t.building.kind === 'port' && t.ownedBy === aiIndex;
+      const ownPort = t.building !== null && t.building.kind === BuildingKind.PORT && t.ownedBy === aiIndex;
       if (ownUnit || ownSettlement || ownPort) {
         const d = hexDistance(tile, t);
         if (d < best) best = d;
@@ -1404,7 +1432,7 @@ class GameController {
   /** Next free pirate unit id (`pirate-N`), matching natural spawn ids. */
   private nextPirateId(): string {
     const used = new Set<string>();
-    for (const t of this.sim!.map.tiles) if (t.unit && t.unit.type === 'pirate') used.add(t.unit.id);
+    for (const t of this.sim!.map.tiles) if (t.unit && t.unit.type === UnitType.PIRATE) used.add(t.unit.id);
     let n = 1;
     while (used.has(`pirate-${n}`)) n++;
     return `pirate-${n}`;
@@ -1416,7 +1444,7 @@ class GameController {
   cheatSpawnPirates(): boolean {
     if (!this.sim) return false;
     const store = useGameStore.getState();
-    if (store.screen !== 'game' || store.netMode !== 'single') return false;
+    if (store.screen !== Screen.GAME || store.netMode !== NetMode.SINGLE) return false;
     const local = this.sim.players[store.localPlayerIndex];
     if (!local) return false;
     const ais = this.sim.players.filter(
@@ -1429,7 +1457,7 @@ class GameController {
       const ai = ais[Math.floor(Math.random() * ais.length)]!;
       const tile = this.pirateSpawnTileFor(ai.index);
       if (!tile) continue;
-      tile.unit = makeUnit(PIRATE_OWNER, 'pirate', tile.q, tile.r, {
+      tile.unit = makeUnit(PIRATE_OWNER, UnitType.PIRATE, tile.q, tile.r, {
         id: this.nextPirateId(),
       });
       spawned++;
@@ -1445,7 +1473,7 @@ class GameController {
    *  change (ice freezing / thawing). Returns true when applied. */
   cheatSetSeason(season: Season): Promise<boolean> {
     const store = useGameStore.getState();
-    if (!this.sim || store.screen !== 'game' || store.netMode !== 'single') return Promise.resolve(false);
+    if (!this.sim || store.screen !== Screen.GAME || store.netMode !== NetMode.SINGLE) return Promise.resolve(false);
     let applied = false;
     return this.enqueue(async () => {
       if (!this.sim || this.sim.gameOver) return;
@@ -1465,14 +1493,14 @@ class GameController {
 
   confirmShipLanding(): void {
     const store = useGameStore.getState();
-    const pending = store.overlay?.kind === 'shipLanding' ? store.overlay.target : null;
+    const pending = store.overlay?.kind === OverlayKind.SHIP_LANDING ? store.overlay.target : null;
     store.setOverlay(null);
     if (!pending) return;
     const selection = store.selection;
-    if (!selection || selection.kind !== 'unit' || !this.sim) return;
+    if (!selection || selection.kind !== SelectionKind.UNIT || !this.sim) return;
     const unit = tileAt(this.sim.map, selection.q, selection.r)!.unit;
     if (!unit) return;
-    this.sendCommand({ type: 'shipLanding', unitId: unit.id, q: pending.q, r: pending.r });
+    this.sendCommand({ type: CommandType.SHIP_LANDING, unitId: unit.id, q: pending.q, r: pending.r });
     store.setSelection(null);
   }
 
@@ -1482,15 +1510,15 @@ class GameController {
 
   confirmStalkerApproach(): void {
     const store = useGameStore.getState();
-    const pending = store.overlay?.kind === 'stalkerReveal' ? store.overlay.target : null;
+    const pending = store.overlay?.kind === OverlayKind.STALKER_REVEAL ? store.overlay.target : null;
     store.setOverlay(null);
     if (!pending) return;
     const selection = store.selection;
-    if (!selection || selection.kind !== 'unit' || !this.sim) return;
+    if (!selection || selection.kind !== SelectionKind.UNIT || !this.sim) return;
     const unit = tileAt(this.sim.map, selection.q, selection.r)?.unit;
     if (!unit) return;
-    this.sendCommand({ type: 'move', unitId: unit.id, q: pending.q, r: pending.r });
-    store.setSelection({ kind: 'unit', q: pending.q, r: pending.r });
+    this.sendCommand({ type: CommandType.MOVE, unitId: unit.id, q: pending.q, r: pending.r });
+    store.setSelection({ kind: SelectionKind.UNIT, q: pending.q, r: pending.r });
     sfx.play('click');
   }
 
@@ -1500,29 +1528,29 @@ class GameController {
 
   chooseMoveFromDialog(): void {
     const store = useGameStore.getState();
-    const pending = store.overlay?.kind === 'moveAttack' ? store.overlay.target : null;
+    const pending = store.overlay?.kind === OverlayKind.MOVE_ATTACK ? store.overlay.target : null;
     store.setOverlay(null);
     if (!pending) return;
     const selection = store.selection;
-    if (!selection || selection.kind !== 'unit' || !this.sim) return;
+    if (!selection || selection.kind !== SelectionKind.UNIT || !this.sim) return;
     const unit = tileAt(this.sim.map, selection.q, selection.r)?.unit;
     if (!unit) return;
-    this.sendCommand({ type: 'move', unitId: unit.id, q: pending.q, r: pending.r });
-    store.setSelection({ kind: 'unit', q: pending.q, r: pending.r });
+    this.sendCommand({ type: CommandType.MOVE, unitId: unit.id, q: pending.q, r: pending.r });
+    store.setSelection({ kind: SelectionKind.UNIT, q: pending.q, r: pending.r });
     sfx.play('click');
   }
 
   chooseAttackFromDialog(): void {
     const store = useGameStore.getState();
-    const pending = store.overlay?.kind === 'moveAttack' ? store.overlay.target : null;
+    const pending = store.overlay?.kind === OverlayKind.MOVE_ATTACK ? store.overlay.target : null;
     store.setOverlay(null);
     if (!pending) return;
     const selection = store.selection;
-    if (!selection || selection.kind !== 'unit' || !this.sim) return;
+    if (!selection || selection.kind !== SelectionKind.UNIT || !this.sim) return;
     const unit = tileAt(this.sim.map, selection.q, selection.r)?.unit;
     if (!unit) return;
     store.setSelection(null);
-    this.sendCommand({ type: 'attack', unitId: unit.id, q: pending.q, r: pending.r });
+    this.sendCommand({ type: CommandType.ATTACK, unitId: unit.id, q: pending.q, r: pending.r });
   }
 
   cancelMoveAttack(): void {
@@ -1533,12 +1561,12 @@ class GameController {
     const store = useGameStore.getState();
     if (store.aiActive || store.gameOver || store.paused) return;
     store.setAiActive(true);
-    this.sendCommand({ type: 'endTurn' });
+    this.sendCommand({ type: CommandType.END_TURN });
   }
 
   watchGame(): void {
     const store = useGameStore.getState();
-    if (store.overlay?.kind === 'watchingPrompt') store.setOverlay(null);
+    if (store.overlay?.kind === OverlayKind.WATCHING_PROMPT) store.setOverlay(null);
     this.revealMapForLocal();
     store.setWatching(true);
     void this.runWatchLoop();
@@ -1546,7 +1574,7 @@ class GameController {
 
   finishGameNow(): void {
     const store = useGameStore.getState();
-    if (store.overlay?.kind === 'watchingPrompt') store.setOverlay(null);
+    if (store.overlay?.kind === OverlayKind.WATCHING_PROMPT) store.setOverlay(null);
     if (!this.sim) return;
     this.sim.endNow();
     this.syncStore();
@@ -1562,7 +1590,7 @@ class GameController {
     this.watchingLoopRunning = true;
     try {
       while (useGameStore.getState().watching && this.sim && !this.sim.gameOver) {
-        await this.runCommand({ type: 'endTurn' });
+        await this.runCommand({ type: CommandType.END_TURN });
         await new Promise((resolve) => setTimeout(resolve, SPECTATE_ROUND_DELAY_MS));
       }
     } finally {
@@ -1643,18 +1671,18 @@ class GameController {
   claimBonus(): void {
     const store = useGameStore.getState();
     if (store.aiActive || store.gameOver) return;
-    this.sendCommand({ type: 'claimBonus' });
+    this.sendCommand({ type: CommandType.CLAIM_BONUS });
   }
 
   getBottle(): void {
     const store = useGameStore.getState();
     if (store.aiActive || store.gameOver) return;
-    this.sendCommand({ type: 'getBottle' });
+    this.sendCommand({ type: CommandType.GET_BOTTLE });
   }
 
   private sendCommand(cmd: Command): void {
     const store = useGameStore.getState();
-    if (store.netMode === 'client') {
+    if (store.netMode === NetMode.CLIENT) {
       const network = this.getNetwork();
       if (!this.tryOptimisticClientCommand(cmd)) network.sendClientCommand(cmd);
     } else {
@@ -1684,7 +1712,7 @@ class GameController {
     network.sendClientCommand(cmd);
     network.noteClientPrediction();
     void this.enqueue(async () => {
-      if (useGameStore.getState().netMode !== 'client') return;
+      if (useGameStore.getState().netMode !== NetMode.CLIENT) return;
       await this.presentEvents(predictedEvents, preExplored);
       this.render();
     });
@@ -1698,6 +1726,7 @@ class GameController {
   private render(): void {
     if (!this.app || !this.sim || !this.textures) return;
     markDirty();
+    if (this.turnSliced) return;
     const store = useGameStore.getState();
 
     if (!this.mapView) {
@@ -1756,12 +1785,12 @@ class GameController {
     }
     const isLocalTurn = store.currentPlayerIndex === store.localPlayerIndex && !store.aiActive;
     const selection = store.selection;
-    if (isLocalTurn && selection && selection.kind === 'unit') {
+    if (isLocalTurn && selection && selection.kind === SelectionKind.UNIT) {
       const tile = tileAt(this.sim.map, selection.q, selection.r);
       const unit = tile?.unit;
       if (unit && unit.owner === store.localPlayerIndex && canMove(unit)) {
-        const canClimb = hasSkill(store.players[unit.owner]!, 'climbing');
-        const canDock = hasSkill(store.players[unit.owner]!, 'navigation');
+        const canClimb = hasSkill(store.players[unit.owner]!, SkillId.CLIMBING);
+        const canDock = hasSkill(store.players[unit.owner]!, SkillId.NAVIGATION);
         this.reachableKeys = new Set(reachableTargets(this.sim.map, unit, movePoints(unit), canClimb, canDock, store.localPlayerIndex).map((t) => axialKey(t)));
       }
       if (unit && unit.owner === store.localPlayerIndex && canAttack(unit)) {

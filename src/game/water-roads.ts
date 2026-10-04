@@ -1,6 +1,7 @@
 import { axialKey, hexNeighbors } from './hex';
 import { tileMapByKey, type GameMap, type MapTile } from './map-gen';
 import { isWaterType } from './tile-types';
+import { BuildingKind } from '@enums';
 
 interface WaterComponent {
   owner: number;
@@ -15,7 +16,7 @@ function findWaterPortComponents(map: GameMap): WaterComponent[] {
   const byKey = tileMapByKey(map);
   const owners = new Set<number>();
   for (const t of map.tiles) {
-    if (t.building?.kind === 'port' && t.ownedBy !== null && t.ownedBy !== undefined) {
+    if (t.building?.kind === BuildingKind.PORT && t.ownedBy !== null && t.ownedBy !== undefined) {
       owners.add(t.ownedBy);
     }
   }
@@ -44,7 +45,7 @@ function findWaterPortComponents(map: GameMap): WaterComponent[] {
       }
       const ports = [...tiles]
         .map((k) => byKey.get(k))
-        .filter((t) => t !== undefined && t.building?.kind === 'port');
+        .filter((t) => t !== undefined && t.building?.kind === BuildingKind.PORT);
       if (ports.length >= 2) components.push({ owner, ports: ports as MapTile[], tiles });
     }
   }

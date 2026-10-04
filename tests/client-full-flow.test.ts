@@ -13,7 +13,7 @@ import { useGameStore } from '@/store/game-store';
 import type { UIHost } from '@/ui/host';
 import { GameScreen } from '@/ui/screens/game-screen';
 import { SeededRandom } from '@/util';
-import { GameMode } from '@enums';
+import { GameMode, HostMessageType, NetMode, Screen } from '@enums';
 
 vi.mock('../src/render/texture-factory', async () => {
   const { Texture, ImageSource } = await import('pixi.js');
@@ -153,12 +153,12 @@ describe('full client entry flow', () => {
     };
     controller.shutdown();
     useGameStore.setState({
-      screen: 'lobby',
+      screen: Screen.LOBBY,
       players: [],
       selection: null,
       overlay: null,
       localPlayerIndex: -1,
-      netMode: 'client',
+      netMode: NetMode.CLIENT,
       pendingSnapshot: null,
       texturesLoading: false,
       turn: 1,
@@ -173,7 +173,7 @@ describe('full client entry flow', () => {
 
   afterEach(() => {
     controller.shutdown();
-    useGameStore.getState().setScreen('start');
+    useGameStore.getState().setScreen(Screen.START);
   });
 
   it('renders the guest units for the client and keeps the end turn button', async () => {
@@ -181,10 +181,10 @@ describe('full client entry flow', () => {
     sim.startGame();
     sim.drainEvents();
 
-    controller.onHostMessage({ type: 'state', state: sim.snapshot(), playerIndex: 1 });
+    controller.onHostMessage({ type: HostMessageType.STATE, state: sim.snapshot(), playerIndex: 1 });
 
     expect(useGameStore.getState().localPlayerIndex).toBe(1);
-    expect(useGameStore.getState().screen).toBe('game');
+    expect(useGameStore.getState().screen).toBe(Screen.GAME);
 
     const app = makeApp();
     const host = makeHost(app);

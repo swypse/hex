@@ -4,11 +4,12 @@ import { Player } from './players';
 import { reachableTargets } from './selection';
 import { hasSkill } from './skills';
 import { canAttack, canHeal, canMove, movePoints, Unit } from './units';
+import { SkillId } from '@enums';
 
 export function unitCanAct(map: GameMap, tile: MapTile, unit: Unit, player: Player): boolean {
   if ((unit.stunTurns ?? 0) >= 1) return false;
-  const canClimb = hasSkill(player, 'climbing');
-  const canDock = hasSkill(player, 'navigation');
+  const canClimb = hasSkill(player, SkillId.CLIMBING);
+  const canDock = hasSkill(player, SkillId.NAVIGATION);
   const canMoveAnywhere =
     canMove(unit) && reachableTargets(map, unit, movePoints(unit), canClimb, canDock, player.index).length > 0;
   const canAttackAny = canAttack(unit) && attackableTargets(map, unit, player.index).length > 0;

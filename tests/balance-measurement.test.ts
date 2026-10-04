@@ -11,6 +11,7 @@ import {
 } from '../src/game/balance';
 import { armyFor, armyUnitCost, runSkirmishMatrix, skirmish, skirmishMeans } from '../src/game/balance-skirmish';
 import { Mulberry32 } from '../src/game/balance';
+import { UnitType } from '@enums';
 
 const duels = runDuels();
 const dom = dominance(duels);
@@ -24,12 +25,12 @@ describe('balance measurement: dominance', () => {
     // Knight attack 40 leaves the swordsman as a ~45% coin-flip counter; when
     // the knight is tuned so the swordsman beats it at >=60% this list empties
     // and the expectation must become [].
-    expect(superStrong(dom).map((d) => d.type)).toEqual(['knight']);
+    expect(superStrong(dom).map((d) => d.type)).toEqual([UnitType.KNIGHT]);
   });
 
   it('every non-knight core unit has a counter or a real loss somewhere', () => {
     for (const d of dom) {
-      if (d.type === 'knight') continue;
+      if (d.type === UnitType.KNIGHT) continue;
       expect(d.beatenBy.length, `${d.type} should be beaten by something`).toBeGreaterThan(0);
     }
   });
@@ -39,7 +40,7 @@ describe('balance measurement: dominance', () => {
   });
 
   it('is symmetric: p(a beats b) + p(b beats a) = 1', () => {
-    expect(symWin(duels, 'warrior', 'swordsman') + symWin(duels, 'swordsman', 'warrior')).toBeCloseTo(1, 10);
+    expect(symWin(duels, UnitType.WARRIOR, UnitType.SWORDSMAN) + symWin(duels, UnitType.SWORDSMAN, UnitType.WARRIOR)).toBeCloseTo(1, 10);
   });
 });
 
@@ -48,48 +49,48 @@ describe('balance measurement: duel model', () => {
     // Start at distance 5 with a slow warrior: the catapult (range 4) must
     // step in, so the warrior gets to act first in range and the catapult's
     // first attack comes a turn later than a catapult that starts in range.
-    const inRange = duel('catapult', 'warrior', () => 1, 100, undefined, { startDist: 4 });
-    const farAway = duel('catapult', 'warrior', () => 1, 100, undefined, { startDist: 6 });
+    const inRange = duel(UnitType.CATAPULT, UnitType.WARRIOR, () => 1, 100, undefined, { startDist: 4 });
+    const farAway = duel(UnitType.CATAPULT, UnitType.WARRIOR, () => 1, 100, undefined, { startDist: 6 });
     expect(farAway.turnsForA).toBeLessThanOrEqual(inRange.turnsForA + 2);
     expect(farAway.hpB).toBe(0);
   });
 
   it('an ambushed catapult (distance 1) loses to a warrior it would beat with free volleys', () => {
-    expect(duel('catapult', 'warrior').winner).toBe('catapult');
-    expect(duel('catapult', 'swordsman', () => 1, 100, undefined, { startDist: 1 }).winner).toBe('swordsman');
+    expect(duel(UnitType.CATAPULT, UnitType.WARRIOR).winner).toBe(UnitType.CATAPULT);
+    expect(duel(UnitType.CATAPULT, UnitType.SWORDSMAN, () => 1, 100, undefined, { startDist: 1 }).winner).toBe(UnitType.SWORDSMAN);
   });
 
   it('a raging berserker does not counter-attack', () => {
     // Shield (def 20) would hurt a 50hp berserker with counters; at <=35% hp the
     // berserker deals +10 attack and ignores the counter side. Just assert the
     // duel finishes deterministically and the berserker never wins vs a shield.
-    expect(duel('berserker', 'shield').winner).toBe('shield');
+    expect(duel(UnitType.BERSERKER, UnitType.SHIELD).winner).toBe(UnitType.SHIELD);
   });
 
   it('a stalker first strike ignores defense', () => {
     // Against a shield (def 20) the stalker's first hit is the full 15 dmg
     // instead of 3, so the shield loses hp to a stalker it could otherwise ignore.
-    const d = duel('stalker', 'shield');
+    const d = duel(UnitType.STALKER, UnitType.SHIELD);
     expect(d.hpB).toBeLessThan(80);
   });
 });
 
 describe('balance measurement: skirmish', () => {
   it('sizes armies to the budget (at least one unit)', () => {
-    expect(armyFor('warrior', 96)).toHaveLength(24);
-    expect(armyFor('catapult', 96).length).toBe(Math.max(1, Math.round(96 / armyUnitCost('catapult'))));
-    expect(armyFor('catapult', 1)).toHaveLength(1);
+    expect(armyFor(UnitType.WARRIOR, 96)).toHaveLength(24);
+    expect(armyFor(UnitType.CATAPULT, 96).length).toBe(Math.max(1, Math.round(96 / armyUnitCost(UnitType.CATAPULT))));
+    expect(armyFor(UnitType.CATAPULT, 1)).toHaveLength(1);
   });
 
   it('is deterministic for a seed and initiative-averaged', () => {
-    const a = runSkirmishMatrix(96, 0, ['warrior', 'swordsman'], 1, 20);
-    const b = runSkirmishMatrix(96, 0, ['warrior', 'swordsman'], 1, 20);
+    const a = runSkirmishMatrix(96, 0, [UnitType.WARRIOR, UnitType.SWORDSMAN], 1, 20);
+    const b = runSkirmishMatrix(96, 0, [UnitType.WARRIOR, UnitType.SWORDSMAN], 1, 20);
     expect(a.win).toEqual(b.win);
   });
 
   it('a lone unit fights to a finish or a draw, never throws', () => {
     const rng = new Mulberry32(3);
-    const r = skirmish(['knight'], ['warrior', 'warrior'], true, () => rng.next());
+    const r = skirmish([UnitType.KNIGHT], [UnitType.WARRIOR, UnitType.WARRIOR], true, () => rng.next());
     expect([0, 0.5, 1]).toContain(r);
   });
 

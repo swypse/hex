@@ -1,9 +1,9 @@
 import { Container, Rectangle, Sprite, Texture } from 'pixi.js';
-import type { AchievementId } from '../../game/achievements';
 import { ACHIEVEMENT_ATLAS_FILE, ACHIEVEMENT_ATLAS_CELL, ACHIEVEMENT_ATLAS_FRAMES } from '../../game/achievement-atlas-data.gen';
 import { ensureCanvasResource } from '../../render/image-texture';
 import { makeCircleChip } from './tribe-chip';
 import { markDirty } from '../../render/render-gate';
+import { AchievementId } from '@enums';
 
 const TEXTURE_BASE = `${import.meta.env.BASE_URL}textures/`;
 

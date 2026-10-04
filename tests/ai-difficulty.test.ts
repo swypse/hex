@@ -1,16 +1,17 @@
 import { describe, it, expect } from 'vitest';
 import { AI_DIFFICULTY_PROFILES, DEFAULT_AI_DIFFICULTY, difficultyFor, profileFor } from '../src/game/ai-difficulty';
+import { AiDifficulty } from '@enums';
 
 describe('AI difficulty', () => {
   it('defaults to normal', () => {
-    expect(DEFAULT_AI_DIFFICULTY).toBe('normal');
-    expect(difficultyFor({})).toBe('normal');
-    expect(difficultyFor({ difficulty: undefined })).toBe('normal');
+    expect(DEFAULT_AI_DIFFICULTY).toBe(AiDifficulty.NORMAL);
+    expect(difficultyFor({})).toBe(AiDifficulty.NORMAL);
+    expect(difficultyFor({ difficulty: undefined })).toBe(AiDifficulty.NORMAL);
   });
 
   it('returns the stored difficulty', () => {
-    expect(difficultyFor({ difficulty: 'easy' })).toBe('easy');
-    expect(difficultyFor({ difficulty: 'hard' })).toBe('hard');
+    expect(difficultyFor({ difficulty: AiDifficulty.EASY })).toBe(AiDifficulty.EASY);
+    expect(difficultyFor({ difficulty: AiDifficulty.HARD })).toBe(AiDifficulty.HARD);
   });
 
   it('easy makes mistakes, hard defends earlier and presses war', () => {
@@ -27,6 +28,6 @@ describe('AI difficulty', () => {
     expect(easy.checkTrades).toBe(false);
     expect(normal.checkTrades).toBe(true);
     expect(hard.checkTrades).toBe(true);
-    expect(profileFor({ difficulty: 'hard' })).toBe(AI_DIFFICULTY_PROFILES.hard);
+    expect(profileFor({ difficulty: AiDifficulty.HARD })).toBe(AI_DIFFICULTY_PROFILES.hard);
   });
 });

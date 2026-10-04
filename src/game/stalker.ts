@@ -1,6 +1,7 @@
 import { hexNeighbors, type Axial } from './hex';
 import type { GameMap, MapTile } from './map-gen';
 import type { Unit } from './units';
+import { UnitType } from '@enums';
 
 /** Settlement tiles at hex distance 1 of `pos` owned by a tribe other than
  *  `owner` (free or the owner's own villages never count). */
@@ -21,7 +22,7 @@ export function adjacentEnemyVillages(map: GameMap, pos: Axial, owner: number): 
 export function isMoveStealthed(unit: Unit): boolean {
   if (unit.shipLevel !== undefined) return false;
   if (unit.isStealthed === true) return true;
-  return unit.type === 'stalker' && unit.firstMoveStealthDone !== true;
+  return unit.type === UnitType.STALKER && unit.firstMoveStealthDone !== true;
 }
 
 /** A stealthed stalker may never step onto an enemy village's own cell. */

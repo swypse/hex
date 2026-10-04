@@ -1,7 +1,7 @@
 import { Application, Container, Sprite } from 'pixi.js';
 import type { Texture } from 'pixi.js';
-import type { Settlement, SettlementBuild, VillageBlockVariant } from '../game/map-gen';
-import { villageColumnBlocks, VillageBuildSide } from '../game/village-build';
+import type { Settlement, SettlementBuild } from '../game/map-gen';
+import { villageColumnBlocks } from '../game/village-build';
 import {
   ensureVillageAquaAtlas,
   ensureVillageBarbariansAtlas,
@@ -19,6 +19,7 @@ import {
   villageWarriorFrameTexture,
 } from './village-build-atlas';
 import type { TileTexture } from './texture-factory';
+import { VillageBlockVariant, VillageBuildSide } from '@enums';
 
 export const VILLAGE_BUILD_BLOCK_W = 90;
 export const VILLAGE_BUILD_BLOCK_H = 90;
@@ -55,14 +56,14 @@ interface ColumnLayout {
  *  back-right column; within a column blocks emit bottom-first so the upper
  *  block covers the one below. */
 const COLUMN_LAYOUT: ColumnLayout[] = [
-  { side: 'lBack', column: 1, x: 50, y: -20 },
-  { side: 'rBack', column: 0, x: 75, y: -10 },
-  { side: 'r', column: 1, x: 100, y: 0 },
-  { side: 'r', column: 0, x: 75, y: 10 },
-  { side: 'lBack', column: 0, x: 25, y: -10 },
-  { side: 'l', column: 0, x: 0, y: 0 },
-  { side: 'l', column: 1, x: 25, y: 10 },
-  { side: 'l', column: 2, x: 50, y: 20 },
+  { side: VillageBuildSide.LEFT_BACK, column: 1, x: 50, y: -20 },
+  { side: VillageBuildSide.RIGHT_BACK, column: 0, x: 75, y: -10 },
+  { side: VillageBuildSide.RIGHT, column: 1, x: 100, y: 0 },
+  { side: VillageBuildSide.RIGHT, column: 0, x: 75, y: 10 },
+  { side: VillageBuildSide.LEFT_BACK, column: 0, x: 25, y: -10 },
+  { side: VillageBuildSide.LEFT, column: 0, x: 0, y: 0 },
+  { side: VillageBuildSide.LEFT, column: 1, x: 25, y: 10 },
+  { side: VillageBuildSide.LEFT, column: 2, x: 50, y: 20 },
 ];
 
 function layoutExtent(): { minX: number; maxX: number; minY: number; maxY: number } {
@@ -97,7 +98,7 @@ function villageBuildWidth(): number {
 /** Resolves the below-top variant for a column block (j = 0 is the block
  *  directly under the top), falling back to 'm1' for missing data. */
 function variantAt(build: SettlementBuild | undefined, side: BuildSide, column: number, j: number): VillageBlockVariant {
-  return build?.[side]?.[column]?.[j] ?? 'm1';
+  return build?.[side]?.[column]?.[j] ?? VillageBlockVariant.M1;
 }
 
 /** Ordered list of every block texture in draw order plus the composite size.

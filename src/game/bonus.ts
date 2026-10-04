@@ -5,8 +5,9 @@ import { SeededRandom } from '../util/random';
 import { exploreUnitPath, isExploredFor } from './explore';
 import { makeUnit, Unit } from './units';
 import { tileAt } from './selection';
+import { BonusKind, UnitType } from '@enums';
 
-export type BonusKind = 'money' | 'resources' | 'villageUpgrade' | 'explorer' | 'skill';
+
 
 export interface Bonus {
   kind: BonusKind;
@@ -20,7 +21,7 @@ const BONUS_MIN_DIST = 4;
 const START_AREA_DIST = 3;
 
 export function randomBonusKind(rng: () => number): BonusKind {
-  const kinds: BonusKind[] = ['money', 'resources', 'villageUpgrade', 'explorer', 'skill'];
+  const kinds: BonusKind[] = [BonusKind.MONEY, BonusKind.RESOURCES, BonusKind.VILLAGE_UPGRADE, BonusKind.EXPLORER, BonusKind.SKILL];
   return kinds[Math.floor(rng() * kinds.length)]!;
 }
 
@@ -119,6 +120,6 @@ export function explorerPath(
 }
 
 export function revealExplorerPath(map: GameMap, start: MapTile, path: { q: number; r: number }[], playerIndex: number): void {
-  const unit: Unit = makeUnit(playerIndex, 'warrior', start.q, start.r, { id: '__explorer__' });
+  const unit: Unit = makeUnit(playerIndex, UnitType.WARRIOR, start.q, start.r, { id: '__explorer__' });
   exploreUnitPath(map, [{ q: start.q, r: start.r }, ...path], unit, playerIndex);
 }

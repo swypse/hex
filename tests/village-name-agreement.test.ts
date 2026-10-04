@@ -4,6 +4,7 @@ import { setLanguage } from '../src/storage/settings';
 import { generateVillageNames } from '../src/game/names';
 import { localizeVillageName } from '../src/i18n/lists';
 import { SeededRandom } from '../src/util/random';
+import { Language } from '@enums';
 
 function fakeStorage(): Map<string, string> {
   const store = new Map<string, string>();
@@ -21,7 +22,7 @@ describe('Russian village name agreement', () => {
 
   it('localizes English names with the adjective agreeing with the noun', () => {
     fakeStorage();
-    setLanguage('ru');
+    setLanguage(Language.RU);
     expect(localizeVillageName('Old Pines')).toBe('Старые Сосны');
     expect(localizeVillageName('Old Rock')).toBe('Старая Скала');
     expect(localizeVillageName('Old Gate')).toBe('Старые Ворота');
@@ -32,7 +33,7 @@ describe('Russian village name agreement', () => {
 
   it('fixes legacy mismatched Russian names and is idempotent on agreed ones', () => {
     fakeStorage();
-    setLanguage('ru');
+    setLanguage(Language.RU);
     // Names saved before the fix stored the adjective in masculine form for every noun.
     expect(localizeVillageName('Старый Сосны')).toBe('Старые Сосны');
     expect(localizeVillageName('Старый Скала')).toBe('Старая Скала');
@@ -43,7 +44,7 @@ describe('Russian village name agreement', () => {
 
   it('round-trips inflected Russian names back to English', () => {
     fakeStorage();
-    setLanguage('en');
+    setLanguage(Language.EN);
     expect(localizeVillageName('Старые Сосны')).toBe('Old Pines');
     expect(localizeVillageName('Старая Скала')).toBe('Old Rock');
     expect(localizeVillageName('Золотые Ворота')).toBe('Golden Gate');
@@ -51,7 +52,7 @@ describe('Russian village name agreement', () => {
 
   it('generates only agreeing Russian names for every adjective/noun pair', () => {
     fakeStorage();
-    setLanguage('ru');
+    setLanguage(Language.RU);
     // 10x10 pools → 100 combos; requesting the full pool exercises every pair.
     const names = generateVillageNames(100, new SeededRandom(3));
     expect(names).toHaveLength(100);

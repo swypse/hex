@@ -1,4 +1,7 @@
 import { Assets, BitmapFontManager, type BitmapFont, type TextStyleFontWeight } from 'pixi.js';
+import { FontSize } from '@enums';
+import { storageService } from '../../storage/storage-service';
+import { forEachIdle } from '../../util/time-slice';
 
 export const FONT_REGULAR = 'Roboto Regular';
 export const FONT_BLACK = 'Roboto Black';
@@ -35,6 +38,68 @@ export async function loadBitmapFonts(): Promise<unknown> {
 const MAX_SIZED_RESOLUTION = 3;
 
 const sizedFamilies = new Map<string, string>();
+
+/** Text sizes the UI may use, most used first (see `FontSize`). */
+const SCALE_SIZES: readonly FontSize[] = [FontSize.SMALL, FontSize.NORMAL, FontSize.VERY_SMALL, FontSize.BIG];
+/** Largest `bake` multiplier a label uses (the skill tree bakes its text 3x). */
+const MAX_BAKE = 3;
+
+/** Sized fonts to bake ahead of time: every scale size in both weights, plus the
+ *  3x variants the magnified skill tree uses. Anything else the game asks for is
+ *  baked on first use and remembered for the next start-up. */
+const SEED_FONT_SIZES: readonly (readonly [string, number])[] = [
+  ...SCALE_SIZES.flatMap((size): [string, number][] => [[FONT_REGULAR, size], [FONT_BLACK, size]]),
+  [FONT_REGULAR, FontSize.VERY_SMALL * MAX_BAKE],
+  [FONT_REGULAR, FontSize.SMALL * MAX_BAKE],
+];
+const LEARNED_SIZES_KEY = 'hex-font-sizes-v1';
+
+/** Whether `size` is a `FontSize` or a `bake` multiple of one. */
+function isScaleSize(size: number): boolean {
+  return SCALE_SIZES.some((s) => Array.from({ length: MAX_BAKE }, (_, i) => s * (i + 1)).includes(size));
+}
+
+/** Sizes remembered from earlier sessions. Sizes that are no longer on the scale
+ *  (saved before the scale existed, or by a bug) are dropped, and dropped from
+ *  storage too, so they are never baked ahead of time. */
+function learnedFontSizes(): [string, number][] {
+  try {
+    const raw = storageService.getItem(LEARNED_SIZES_KEY);
+    const parsed: unknown = raw ? JSON.parse(raw) : [];
+    if (!Array.isArray(parsed)) return [];
+    const valid = parsed.filter((e): e is [string, number] => Array.isArray(e) && typeof e[0] === 'string' && typeof e[1] === 'number');
+    const onScale = valid.filter(([, size]) => isScaleSize(size));
+    if (onScale.length !== parsed.length) storageService.setItem(LEARNED_SIZES_KEY, JSON.stringify(onScale));
+    return onScale;
+  } catch {
+    return [];
+  }
+}
+
+/** Remembers a size that was not in the seed list, so the next start-up bakes
+ *  it ahead of time too. Off-scale sizes are a bug to fix, not to remember.
+ *  Best effort: storage may be unavailable. */
+function rememberFontSize(family: string, size: number): void {
+  if (!isScaleSize(size)) return;
+  if (SEED_FONT_SIZES.some(([f, s]) => f === family && s === size)) return;
+  try {
+    const known = learnedFontSizes();
+    if (known.some(([f, s]) => f === family && s === size)) return;
+    storageService.setItem(LEARNED_SIZES_KEY, JSON.stringify([...known, [family, size]]));
+  } catch {
+    // ignore
+  }
+}
+
+/** Bakes the sized fonts the game will need, one per idle period, so entering
+ *  the game screen finds them ready instead of rasterising a dozen glyph atlases
+ *  in one task. Safe to call any time after `enableSizedFonts`; sizes already
+ *  baked cost nothing. */
+export function prewarmSizedFonts(idle?: () => Promise<void>): Promise<void> {
+  const wanted: [string, number][] = [...SEED_FONT_SIZES.map(([f, s]): [string, number] => [f, s]), ...learnedFontSizes()];
+  return forEachIdle(wanted, ([family, size]) => void sizedFontFamily(family, size), idle);
+}
+
 let sizedFontsEnabled = false;
 
 /** Turns on per-size font baking (see `sizedFontFamily`). Called once from the
@@ -42,6 +107,16 @@ let sizedFontsEnabled = false;
  *  have no canvas to rasterise glyphs with. */
 export function enableSizedFonts(): void {
   sizedFontsEnabled = true;
+}
+
+const warnedSizes = new Set<number>();
+
+/** Dev aid: every extra size costs another baked font per weight, so say so when
+ *  a label asks for something that is not a `FontSize` (times a bake factor). */
+function warnIfOffScale(size: number): void {
+  if (!import.meta.env.DEV || warnedSizes.has(size) || isScaleSize(size)) return;
+  warnedSizes.add(size);
+  console.warn(`[fonts] ${size}px is not on the FontSize scale; use a FontSize so no extra font is baked`);
 }
 
 /** Family name of a bitmap font baked for exactly `fontSize` CSS px at the
@@ -53,6 +128,7 @@ export function enableSizedFonts(): void {
 export function sizedFontFamily(family: string, fontSize: number): string {
   if (!sizedFontsEnabled) return family;
   const size = Math.max(1, Math.round(fontSize));
+  warnIfOffScale(size);
   const name = `${family}@${size}`;
   const known = sizedFamilies.get(name);
   if (known !== undefined) return known;
@@ -75,5 +151,6 @@ export function sizedFontFamily(family: string, fontSize: number): string {
     // keep the shipped atlas
   }
   sizedFamilies.set(name, resolved);
+  rememberFontSize(family, size);
   return resolved;
 }

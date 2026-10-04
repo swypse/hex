@@ -1,4 +1,5 @@
-export const THEME = {
+
+import { FontSize } from '@enums';export const THEME = {
   bg: 0x1a1a2e,
   button: 0x4b516f,
   buttonHover: 0x5297FF,
@@ -33,7 +34,7 @@ export const THEME = {
 } as const;
 
 export const TEXT_BUTTON = {
-  fontSize: 16,
+  fontSize: FontSize.NORMAL,
   paddingX: 16,
   paddingY: 8,
   minHeight: 34,

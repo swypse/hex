@@ -4,7 +4,7 @@ import { hasAnyAvailableAction } from '@/game/player-actions';
 import { skillPulseStep, STEP_CONFIG } from '@/game/tutorial/tutorial-steps';
 import { t } from '@/i18n';
 import { useGameStore } from '@/store/game-store';
-import { GameMode } from '@enums';
+import { FontSize, GameMode, OverlayKind } from '@enums';
 import { Container, Graphics, Rectangle } from 'pixi.js';
 import { type UIHost, type Widget } from '../host';
 import { ACTION_BUTTON_ICON_FILES, makeActionButtonIcon } from '../kit/action-button-icons';
@@ -146,7 +146,7 @@ export class HudToolbar implements Widget {
     };
 
     const addText = (label: string, disabled: boolean, onClick: () => void, paddingX: number, key: string): void => {
-      const btn = new Button({ label, disabled, onClick, paddingX, paddingY: 10, fontSize: 20 });
+      const btn = new Button({ label, disabled, onClick, paddingX, paddingY: 10, fontSize: FontSize.BIG });
       btn.position.set(x, 0);
       this.row!.addChild(btn);
       x += btn.width + GAP;
@@ -178,7 +178,7 @@ export class HudToolbar implements Widget {
 
     const skillsBtn = new IconButton({
       icon: ACTION_BUTTON_ICON_FILES['skills']!,
-      onClick: () => useGameStore.getState().setOverlay({ kind: 'skill' }),
+      onClick: () => useGameStore.getState().setOverlay({ kind: OverlayKind.SKILL }),
       size: 48,
       iconFactory: makeActionButtonIcon,
       ...ACTION_BTN,

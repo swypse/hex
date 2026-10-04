@@ -1,11 +1,10 @@
 import { gameController } from '@/controller/game-controller';
-import { type AiDifficulty } from '@/game/ai-difficulty';
 import { type Tribe, tribeById, TRIBES } from '@/game/tribes';
 import { t } from '@/i18n';
 import { loadSettings } from '@/storage/settings';
 import { useGameStore } from '@/store/game-store';
 import { mixColor } from '@/util';
-import { GameMode } from '@enums';
+import { AiDifficulty, FontSize, GameMode, Screen } from '@enums';
 import { BitmapText, Container, FillGradient, Graphics, RendererType } from 'pixi.js';
 import { type ScreenController, type UIHost } from '../host';
 import { Button } from '../kit/button';
@@ -23,7 +22,7 @@ import {
 
 const ENEMY_OPTIONS = [1, 2, 3, 4, 5, 6];
 const MODE_OPTIONS: GameMode[] = [GameMode.CAPTURE, GameMode.TURNS30];
-const DIFFICULTY_OPTIONS: AiDifficulty[] = ['easy', 'normal', 'hard'];
+const DIFFICULTY_OPTIONS: AiDifficulty[] = [AiDifficulty.EASY, AiDifficulty.NORMAL, AiDifficulty.HARD];
 const SELECTOR_COUNT = 6;
 // Horizontal margin kept clear on each side when laying out the tribe grid.
 const SIDE_MARGIN = 24;
@@ -85,13 +84,13 @@ export class SetupScreen implements ScreenController {
 
     this.paintBackground();
 
-    this.tribeTitle = makeLabel(t('common.chooseTribe'), { fontSize: 16, fill: 0xffffff });
+    this.tribeTitle = makeLabel(t('common.chooseTribe'), { fontSize: FontSize.NORMAL, fill: 0xffffff });
     this.tribeTitle.anchor.set(0.5, 0.5);
-    this.enemiesTitle = makeLabel(t('setup.enemies'), { fontSize: 16, fill: 0xffffff });
+    this.enemiesTitle = makeLabel(t('setup.enemies'), { fontSize: FontSize.NORMAL, fill: 0xffffff });
     this.enemiesTitle.anchor.set(0.5, 0.5);
-    this.modeTitle = makeLabel(t('common.mode'), { fontSize: 16, fill: 0xffffff });
+    this.modeTitle = makeLabel(t('common.mode'), { fontSize: FontSize.NORMAL, fill: 0xffffff });
     this.modeTitle.anchor.set(0.5, 0.5);
-    this.difficultyTitle = makeLabel(t('setup.difficulty'), { fontSize: 16, fill: 0xffffff });
+    this.difficultyTitle = makeLabel(t('setup.difficulty'), { fontSize: FontSize.NORMAL, fill: 0xffffff });
     this.difficultyTitle.anchor.set(0.5, 0.5);
 
     for (const tr of TRIBES) {
@@ -122,7 +121,7 @@ export class SetupScreen implements ScreenController {
 
     this.modeGroup = new ButtonGroup({
       items: MODE_OPTIONS.map((m) => ({
-        label: m === 'capture' ? t('mode.capture') : t('mode.turns30'),
+        label: m === GameMode.CAPTURE ? t('mode.capture') : t('mode.turns30'),
         onClick: () => {
           useGameStore.getState().setMode(m);
           this.refresh();
@@ -133,7 +132,7 @@ export class SetupScreen implements ScreenController {
 
     this.difficultyGroup = new ButtonGroup({
       items: DIFFICULTY_OPTIONS.map((d) => ({
-        label: t(d === 'easy' ? 'difficulty.easy' : d === 'normal' ? 'difficulty.normal' : 'difficulty.hard'),
+        label: t(d === AiDifficulty.EASY ? 'difficulty.easy' : d === AiDifficulty.NORMAL ? 'difficulty.normal' : 'difficulty.hard'),
         onClick: () => {
           this.difficulty = d;
           this.refresh();
@@ -144,12 +143,12 @@ export class SetupScreen implements ScreenController {
 
     this.startBtn = new Button({
       label: t('setup.start'),
-      fontSize: 24,
+      fontSize: FontSize.BIG,
       paddingX: 48,
       paddingY: 14,
       onClick: () => gameController.startGame(this.tribe, this.enemies, useGameStore.getState().mode, this.difficulty),
     });
-    this.hint = makeLabel(t('setup.hint'), { fontSize: 14, fill: 0xeeeeee });
+    this.hint = makeLabel(t('setup.hint'), { fontSize: FontSize.SMALL, fill: 0xeeeeee });
     this.hint.visible = !isTouchDevice();
     this.hint.alpha = 0.7;
     this.hint.anchor.set(0.5, 0.5);
@@ -157,8 +156,8 @@ export class SetupScreen implements ScreenController {
     this.backBtn = new Button({
       label: t('common.back'),
       width: 96,
-      fontSize: 14,
-      onClick: () => useGameStore.getState().setScreen('start')
+      fontSize: FontSize.SMALL,
+      onClick: () => useGameStore.getState().setScreen(Screen.START)
     });
 
     this.scroll!.content.addChild(
@@ -202,13 +201,13 @@ export class SetupScreen implements ScreenController {
     } else if (e.key === 'Enter') {
       e.preventDefault();
       if (this.selector === SELECTOR_COUNT - 1) {
-        useGameStore.getState().setScreen('start');
+        useGameStore.getState().setScreen(Screen.START);
       } else {
         gameController.startGame(this.tribe, this.enemies, store.mode, this.difficulty);
       }
     } else if (e.key === 'Backspace') {
       e.preventDefault();
-      useGameStore.getState().setScreen('start');
+      useGameStore.getState().setScreen(Screen.START);
     }
   };
 
@@ -331,7 +330,7 @@ export class SetupScreen implements ScreenController {
     }
     const wrapW = Math.max(120, Math.min(720, w - SIDE_MARGIN * 2));
     const opts = {
-      fontSize: 16,
+      fontSize: FontSize.NORMAL,
       fill: 0xcccccc,
       wordWrap: true,
       wordWrapWidth: wrapW,

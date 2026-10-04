@@ -8,7 +8,6 @@ import { makeTestMap, tileAt, makeUnit } from './helpers/test-map';
 import { buildPlayers } from '../src/game/players';
 import { Tribe } from '../src/game/tribes';
 import { SeededRandom } from '../src/util/random';
-import { type BonusKind } from '../src/game/bonus';
 import { Simulator } from '../src/game/simulator';
 import { TileType } from '../src/game/tile-types';
 import { UNIT_TYPES } from '../src/game/units';
@@ -16,7 +15,7 @@ import { TRAP_TURNS } from '../src/game/traps';
 import { hexNeighbors } from '../src/game/hex';
 import { t } from '../src/i18n';
 import type { GameMap, MapTile } from '../src/game/map-gen';
-import { GameMode } from '@enums';
+import { BonusKind, BridgeDir, BuildingKind, GameMode, NetMode, Screen, SelectionKind, SkillId, TutorialStepId, UnitType } from '@enums';
 
 function fakeCanvasContext() {
   return {
@@ -64,7 +63,7 @@ describe('HudSelected village building constraints', () => {
     const map = makeTestMap(2);
     const village = tileAt(map, 0, 0)!;
     village.settlement = { owner, level, captureReady: false, name: 'Alpha', ...(opts.wall ? { wall: true } : {}) };
-    if (opts.unitOnVillage) village.unit = makeUnit('u1', 0, 'warrior', 0, 0);
+    if (opts.unitOnVillage) village.unit = makeUnit('u1', 0, UnitType.WARRIOR, 0, 0);
     const buildingTiles = [
       [1, 0],
       [0, 1],
@@ -76,16 +75,16 @@ describe('HudSelected village building constraints', () => {
       const t = tileAt(map, q, r)!;
       t.ownedBy = owner;
       t.claimedByVillage = { q: 0, r: 0 };
-      t.building = { kind: 'mine', level: 1 };
+      t.building = { kind: BuildingKind.MINE, level: 1 };
     }
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
     const sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5 });
     (gameController as unknown as { sim: Simulator | null }).sim = sim;
     useGameStore.setState({
-      screen: 'game',
+      screen: Screen.GAME,
       players,
       localPlayerIndex: 0,
-      selection: { kind: 'tile', q: 0, r: 0 },
+      selection: { kind: SelectionKind.TILE, q: 0, r: 0 },
       tutorial: false,
       tutorialStep: null,
     });
@@ -120,7 +119,7 @@ describe('HudSelected village building constraints', () => {
     expect(texts().some((s) => s.startsWith('Starving!'))).toBe(false);
     const village = tileAt(gameController.getMap()!, 0, 0)!;
     village.settlement!.starving = true;
-    useGameStore.setState({ selection: { kind: 'tile', q: 0, r: 0 } });
+    useGameStore.setState({ selection: { kind: SelectionKind.TILE, q: 0, r: 0 } });
     expect(texts().some((s) => s.startsWith('Starving!'))).toBe(true);
   });
 
@@ -130,13 +129,13 @@ describe('HudSelected village building constraints', () => {
     const tile = tileAt(map, 1, 0)!;
     tile.ownedBy = 0;
     const human = useGameStore.getState().players[0]!;
-    useGameStore.setState({ selection: { kind: 'tile', q: 1, r: 0 } });
+    useGameStore.setState({ selection: { kind: SelectionKind.TILE, q: 1, r: 0 } });
     expect(texts()).toContain('Open Agriculture');
-    human.skills.push('agriculture');
+    human.skills.push(SkillId.AGRICULTURE);
     const farm = tileAt(map, 1, -1)!;
     farm.ownedBy = 0;
-    farm.building = { kind: 'farm', level: 1 };
-    useGameStore.setState({ selection: { kind: 'tile', q: 1, r: 0 } });
+    farm.building = { kind: BuildingKind.FARM, level: 1 };
+    useGameStore.setState({ selection: { kind: SelectionKind.TILE, q: 1, r: 0 } });
     expect(texts()).not.toContain('Open Agriculture');
     expect(texts()).toContain('Open Granary');
   });
@@ -146,10 +145,10 @@ describe('HudSelected village building constraints', () => {
     const map = gameController.getMap()!;
     const granary = tileAt(map, 1, 0)!;
     granary.ownedBy = 0;
-    granary.building = { kind: 'granary', level: 1, food: 7 };
+    granary.building = { kind: BuildingKind.GRANARY, level: 1, food: 7 };
     tileAt(map, 1, -1)!.ownedBy = 0;
-    tileAt(map, 1, -1)!.building = { kind: 'farm', level: 1 };
-    useGameStore.setState({ selection: { kind: 'tile', q: 1, r: 0 } });
+    tileAt(map, 1, -1)!.building = { kind: BuildingKind.FARM, level: 1 };
+    useGameStore.setState({ selection: { kind: SelectionKind.TILE, q: 1, r: 0 } });
     expect(texts()).toContain('Stored food: 7/50 (collects what adjacent farms do not use)');
   });
 
@@ -267,7 +266,7 @@ describe('HudSelected village building constraints', () => {
     mount(2, 2, 0);
     const st = useGameStore.getState();
     st.setTutorial(true);
-    st.setTutorialStep('upgradeVillage3');
+    st.setTutorialStep(TutorialStepId.UPGRADE_VILLAGE3);
     const gold = findText((hud as unknown as { el: Container }).el!, 'Buildings:');
     expect(gold).toBeDefined();
     expect(gold!.style.fill).toBe(0xffd700);
@@ -277,7 +276,7 @@ describe('HudSelected village building constraints', () => {
     mount(2, 2, 0);
     const st = useGameStore.getState();
     st.setTutorial(true);
-    st.setTutorialStep('buildPort');
+    st.setTutorialStep(TutorialStepId.BUILD_PORT);
     const text = findText((hud as unknown as { el: Container }).el!, 'Buildings:');
     expect(text).toBeDefined();
     expect(text!.style.fill).not.toBe(0xffd700);
@@ -348,10 +347,10 @@ describe('HudSelected building produce and bridge info lines', () => {
     const sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5 });
     (gameController as unknown as { sim: Simulator | null }).sim = sim;
     useGameStore.setState({
-      screen: 'game',
+      screen: Screen.GAME,
       players,
       localPlayerIndex: 0,
-      selection: { kind: 'tile', q: tile.q, r: tile.r },
+      selection: { kind: SelectionKind.TILE, q: tile.q, r: tile.r },
       tutorial: false,
       tutorialStep: null,
     });
@@ -368,7 +367,7 @@ describe('HudSelected building produce and bridge info lines', () => {
     boot((map) => {
       const t = map.tiles.find((x) => x.settlement === null && x.unit === null)!;
       t.ownedBy = 0;
-      t.building = { kind: 'mine', level: 1 };
+      t.building = { kind: BuildingKind.MINE, level: 1 };
       return t;
     });
     const all = texts().join('\n');
@@ -380,7 +379,7 @@ describe('HudSelected building produce and bridge info lines', () => {
     boot((map) => {
       const t = map.tiles.find((x) => x.settlement === null && x.unit === null)!;
       t.ownedBy = 0;
-      t.building = { kind: 'mine', level: 1 };
+      t.building = { kind: BuildingKind.MINE, level: 1 };
       return t;
     });
     const squares = hpSquares();
@@ -394,7 +393,7 @@ describe('HudSelected building produce and bridge info lines', () => {
     boot((map) => {
       const t = map.tiles.find((x) => x.settlement === null && x.unit === null)!;
       t.ownedBy = 0;
-      t.building = { kind: 'mine', level: 1, hp: 1 };
+      t.building = { kind: BuildingKind.MINE, level: 1, hp: 1 };
       return t;
     });
     expect(hpSquares()).toHaveLength(1);
@@ -408,7 +407,7 @@ describe('HudSelected building produce and bridge info lines', () => {
       )!;
       neighbor.terrain = TileType.GrasslandForest;
       t.ownedBy = 0;
-      t.building = { kind: 'sawmill', level: 1 };
+      t.building = { kind: BuildingKind.SAWMILL, level: 1 };
       return t;
     });
     const all = texts().join('\n');
@@ -421,7 +420,7 @@ describe('HudSelected building produce and bridge info lines', () => {
     boot((map) => {
       const t = tileAt(map, 0, 0)!;
       t.terrain = TileType.Water;
-      t.bridge = { owner: 0, dir: 'we' };
+      t.bridge = { owner: 0, dir: BridgeDir.WE };
       t.roadOwner = 0;
       return t;
     });
@@ -465,10 +464,10 @@ describe('HudSelected connected village income bonus', () => {
     const sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5 });
     (gameController as unknown as { sim: Simulator | null }).sim = sim;
     useGameStore.setState({
-      screen: 'game',
+      screen: Screen.GAME,
       players,
       localPlayerIndex: 0,
-      selection: { kind: 'tile', q: 0, r: 0 },
+      selection: { kind: SelectionKind.TILE, q: 0, r: 0 },
       tutorial: false,
       tutorialStep: null,
     });
@@ -529,7 +528,7 @@ describe('HudSelected pirate deal info', () => {
     const tile = tileAt(map, 0, 0)!;
     tile.terrain = TileType.Water;
     tile.unit = {
-      id: 'p1', owner: -1, type: 'pirate', q: 0, r: 0,
+      id: 'p1', owner: -1, type: UnitType.PIRATE, q: 0, r: 0,
       hasMoved: false, hasAttacked: false, hasHealed: false,
       hp: 80, attack: 30, attackDistance: 3, defense: 5, spawnVillage: null,
       ...(paidBy ? { paidBy } : {}),
@@ -538,10 +537,10 @@ describe('HudSelected pirate deal info', () => {
     const sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5 });
     (gameController as unknown as { sim: Simulator | null }).sim = sim;
     useGameStore.setState({
-      screen: 'game',
+      screen: Screen.GAME,
       players,
       localPlayerIndex: 0,
-      selection: { kind: 'unit', q: 0, r: 0 },
+      selection: { kind: SelectionKind.UNIT, q: 0, r: 0 },
       tutorial: false,
       tutorialStep: null,
     });
@@ -600,16 +599,16 @@ describe('HudSelected berserker rage attack info', () => {
     };
     const map = makeTestMap(2);
     const tile = tileAt(map, 0, 0)!;
-    tile.unit = makeUnit('b1', 0, 'berserker', 0, 0);
+    tile.unit = makeUnit('b1', 0, UnitType.BERSERKER, 0, 0);
     tile.unit.hp = hp;
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
     const sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5 });
     (gameController as unknown as { sim: Simulator | null }).sim = sim;
     useGameStore.setState({
-      screen: 'game',
+      screen: Screen.GAME,
       players,
       localPlayerIndex: 0,
-      selection: { kind: 'unit', q: 0, r: 0 },
+      selection: { kind: SelectionKind.UNIT, q: 0, r: 0 },
       tutorial: false,
       tutorialStep: null,
     });
@@ -664,7 +663,7 @@ describe('HudSelected stealth info', () => {
     tile.terrain = TileType.GrasslandLand;
     tile.ownedBy = 0;
     tile.unit = {
-      id: 'st', owner: 0, type: 'stalker', q: 0, r: 0,
+      id: 'st', owner: 0, type: UnitType.STALKER, q: 0, r: 0,
       hasMoved: true, hasAttacked: true, hasHealed: true,
       hp: UNIT_TYPES.stalker.maxHp, attack: 10, attackDistance: 1, spawnVillage: null,
       ...(stealthed ? { isStealthed: true } : {}),
@@ -673,10 +672,10 @@ describe('HudSelected stealth info', () => {
     const sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5 });
     (gameController as unknown as { sim: Simulator | null }).sim = sim;
     useGameStore.setState({
-      screen: 'game',
+      screen: Screen.GAME,
       players,
       localPlayerIndex: 0,
-      selection: { kind: 'unit', q: 0, r: 0 },
+      selection: { kind: SelectionKind.UNIT, q: 0, r: 0 },
       tutorial: false,
       tutorialStep: null,
     });
@@ -732,11 +731,11 @@ describe('HudSelected trap info', () => {
     const sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5 });
     (gameController as unknown as { sim: Simulator | null }).sim = sim;
     useGameStore.setState({
-      screen: 'game',
+      screen: Screen.GAME,
       players,
       localPlayerIndex: 0,
       turn,
-      selection: { kind: 'tile', q: 0, r: 0 },
+      selection: { kind: SelectionKind.TILE, q: 0, r: 0 },
       tutorial: false,
       tutorialStep: null,
     });
@@ -805,10 +804,10 @@ describe('HudSelected bonus info', () => {
     const sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5 });
     (gameController as unknown as { sim: Simulator | null }).sim = sim;
     useGameStore.setState({
-      screen: 'game',
+      screen: Screen.GAME,
       players,
       localPlayerIndex: 0,
-      selection: { kind: 'tile', q: 0, r: 0 },
+      selection: { kind: SelectionKind.TILE, q: 0, r: 0 },
       tutorial: false,
       tutorialStep: null,
     });
@@ -822,32 +821,32 @@ describe('HudSelected bonus info', () => {
   });
 
   it('describes a money bonus', () => {
-    boot('money');
+    boot(BonusKind.MONEY);
     expect(texts().join('\n')).toContain(t('hud.selected.bonus.info'));
   });
 
   it('describes an explorer bonus', () => {
-    boot('explorer');
+    boot(BonusKind.EXPLORER);
     expect(texts().join('\n')).toContain(t('hud.selected.bonus.info'));
   });
 
   it('describes a skill bonus', () => {
-    boot('skill');
+    boot(BonusKind.SKILL);
     expect(texts().join('\n')).toContain(t('hud.selected.bonus.info'));
   });
 
   it('does not describe a bonus on a plain tile', () => {
-    boot('money');
+    boot(BonusKind.MONEY);
     const map = makeTestMap(2);
     tileAt(map, 0, 0)!.bonus = null;
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
     const sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5 });
     (gameController as unknown as { sim: Simulator | null }).sim = sim;
     useGameStore.setState({
-      screen: 'game',
+      screen: Screen.GAME,
       players,
       localPlayerIndex: 0,
-      selection: { kind: 'tile', q: 0, r: 0 },
+      selection: { kind: SelectionKind.TILE, q: 0, r: 0 },
       tutorial: false,
       tutorialStep: null,
     });
@@ -868,17 +867,17 @@ describe('HudSelected turn visibility', () => {
     };
     const map = makeTestMap(2);
     const tile = tileAt(map, 0, 0)!;
-    tile.unit = makeUnit('u1', 0, 'warrior', 0, 0);
+    tile.unit = makeUnit('u1', 0, UnitType.WARRIOR, 0, 0);
     const players = buildPlayers(Tribe.Villagers, 2, new SeededRandom(1));
     const sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5 });
     (gameController as unknown as { sim: Simulator | null }).sim = sim;
     useGameStore.setState({
-      screen: 'game',
+      screen: Screen.GAME,
       players,
       localPlayerIndex: 0,
       currentPlayerIndex,
-      selection: { kind: 'unit', q: 0, r: 0 },
-      netMode: 'single',
+      selection: { kind: SelectionKind.UNIT, q: 0, r: 0 },
+      netMode: NetMode.SINGLE,
       tutorial: false,
       tutorialStep: null,
     });
@@ -968,15 +967,15 @@ describe('HudSelected close button and collapsed state', () => {
     };
     const map = makeTestMap(2);
     const village = tileAt(map, 0, 0)!;
-    village.unit = makeUnit('u1', 0, 'warrior', 0, 0);
+    village.unit = makeUnit('u1', 0, UnitType.WARRIOR, 0, 0);
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
     const sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5 });
     (gameController as unknown as { sim: Simulator | null }).sim = sim;
     useGameStore.setState({
-      screen: 'game',
+      screen: Screen.GAME,
       players,
       localPlayerIndex: 0,
-      selection: { kind: 'unit', q: 0, r: 0 },
+      selection: { kind: SelectionKind.UNIT, q: 0, r: 0 },
       tutorial: false,
       tutorialStep: null,
     });
@@ -1067,17 +1066,17 @@ describe('HudSelected building destroy and tile extras', () => {
     if (opts.village) {
       tile.settlement = { owner: opts.ownedBy ?? null, level: 1, captureReady: false, name: 'Alpha' };
     } else {
-      tile.building = { kind: 'mine', level: 1 };
+      tile.building = { kind: BuildingKind.MINE, level: 1 };
     }
     if (opts.bottle) tile.bottle = { bornTurn: 1, arrivalTurn: 1 };
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
     const sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5 });
     (gameController as unknown as { sim: Simulator | null }).sim = sim;
     useGameStore.setState({
-      screen: 'game',
+      screen: Screen.GAME,
       players,
       localPlayerIndex: 0,
-      selection: { kind: 'tile', q, r },
+      selection: { kind: SelectionKind.TILE, q, r },
       tutorial: false,
       tutorialStep: null,
     });

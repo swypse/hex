@@ -9,6 +9,7 @@ import {
   isExploredFor,
 } from '../src/game/explore';
 import { villageSightRadius, exploreVillageSight, exploreVillageSights } from '../src/game/village';
+import { UnitType } from '@enums';
 
 function makeTile(q: number, r: number, ownedBy: number | null = null): MapTile {
   return {
@@ -29,7 +30,7 @@ function makeMap(radius = 2): GameMap {
 
 function unit(attackDistance: number): Unit {
   return {
-    id: 'u', owner: 0, type: 'warrior', q: 0, r: 0,
+    id: 'u', owner: 0, type: UnitType.WARRIOR, q: 0, r: 0,
     hasMoved: false, hasAttacked: false, hasHealed: false,
     hp: 5, attack: 2, attackDistance, spawnVillage: null,
   };
@@ -133,7 +134,7 @@ describe('exploreUnitPath', () => {
 
   it('a catapult explores only within distance 1, not its attack range', () => {
     const map = makeMap();
-    const catapult: Unit = { ...unit(4), type: 'catapult' };
+    const catapult: Unit = { ...unit(4), type: UnitType.CATAPULT };
     exploreUnitPath(map, [{ q: 0, r: 0 }], catapult, 0);
     expect(isExploredFor(map.tiles.find((t) => t.q === 1 && t.r === 0)!, 0)).toBe(true);
     expect(isExploredFor(map.tiles.find((t) => t.q === 2 && t.r === 0)!, 0)).toBe(false);
@@ -142,7 +143,7 @@ describe('exploreUnitPath', () => {
   it('a ship explores by ship level, not by its original land-unit type', () => {
     // A catapult / shield on board a ship must reveal the ship's own radius
     // (level 1 => distance 2), not the land catapult's forced distance 1.
-    for (const type of ['catapult', 'shield', 'archer'] as const) {
+    for (const type of [UnitType.CATAPULT, UnitType.SHIELD, UnitType.ARCHER] as const) {
       const map = makeMap();
       const ship: Unit = { ...unit(1), type, shipLevel: 1 };
       exploreUnitPath(map, [{ q: 0, r: 0 }], ship, 0);

@@ -3,6 +3,7 @@ import { GameMap, MapTile } from '../game/map-gen';
 import { portDirection } from '../game/buildings';
 import { isExploredFor } from '../game/explore';
 import { adjacentFarmCount } from '../game/food';
+import { BuildingKind } from '@enums';
 
 export interface Viewport {
   x: number;
@@ -58,9 +59,9 @@ export function tileSignature(
     u ? (u.isStealthed ? 's' : '') : '',
     hidden ? 'h' : '',
     tile.building ? tile.building.kind : '',
-    tile.building?.kind === 'port' ? (portDirection(map, tile) ?? '-') : '',
-    tile.building?.kind === 'temple' || tile.building?.kind === 'forestTemple' ? String(tile.building.level) : '',
-    tile.building?.kind === 'granary' ? String(granaryFarmCount(map, tile)) : '',
+    tile.building?.kind === BuildingKind.PORT ? (portDirection(map, tile) ?? '-') : '',
+    tile.building?.kind === BuildingKind.TEMPLE || tile.building?.kind === BuildingKind.FOREST_TEMPLE ? String(tile.building.level) : '',
+    tile.building?.kind === BuildingKind.GRANARY ? String(granaryFarmCount(map, tile)) : '',
     tile.bottle ? tile.bottle.bornTurn : '',
     tile.trap ? `t${tile.trap.owner}` : '',
     tile.roadOwner ?? '-',

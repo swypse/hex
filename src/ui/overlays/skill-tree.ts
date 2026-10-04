@@ -1,7 +1,7 @@
 import { t } from '../../i18n';
 import { Container, Graphics, Sprite, Texture } from 'pixi.js';
 import { gameController } from '../../controller/game-controller';
-import { SKILLS, hasSkill, canOpenSkill, skillCost, type SkillId } from '../../game/skills';
+import { SKILLS, hasSkill, canOpenSkill, skillCost } from '../../game/skills';
 import { type Player } from '../../game/players';
 import { TRIBES, tribeById } from '../../game/tribes';
 import { clampZoom, zoomAroundCursor, decayVelocity, INERTIA_START_SPEED, INERTIA_STOP_SPEED } from '../../game/zoom';
@@ -17,6 +17,7 @@ import { makeIconChip } from '../kit/tribe-chip';
 import { HudResourcePanel } from '../hud/hud-resource-panel';
 import { makeSkillMedallion } from '../kit/skill-medallion';
 import { THEME } from '../kit/theme';
+import { FontSize, SkillId } from '@enums';
 
 const RING_SPACING = 150;
 /** The tree is magnified up to the max zoom: bake its text that many times
@@ -355,7 +356,7 @@ export class SkillTree {
     const tribe = tribeById(human.tribe)!;
     const highlight = new Set(useGameStore.getState().tutorialHighlightSkills);
 
-    const title = makeLabel(t('skillTree.title'), { fontSize: 24, fill: 0xffffff, fontWeight: '700' });
+    const title = makeLabel(t('skillTree.title'), { fontSize: FontSize.BIG, fill: 0xffffff, fontWeight: '700' });
     title.anchor.set(0.5, 0.5);
     title.position.set(host.app.screen.width / 2, 64);
     this.el.addChild(title);
@@ -405,7 +406,7 @@ export class SkillTree {
       node.addChild(medallion);
 
       const name = makeLabel(SKILLS[id].name, {
-        fontSize: 13,
+        fontSize: FontSize.VERY_SMALL,
         fill: opened ? THEME.skillTree.openedLabelText : THEME.skillTree.closedLabelText,
         bake: TREE_TEXT_BAKE,
       });
@@ -497,22 +498,22 @@ export class SkillTree {
     cover.addChild(medallion);
     content.addChild(cover);
     y = coverH + 8;
-    const desc = makeRichLabel(info.description, { fontSize: 14, fill: 0xcccccc, width: popup.contentWidth });
+    const desc = makeRichLabel(info.description, { fontSize: FontSize.SMALL, fill: 0xcccccc, width: popup.contentWidth });
     desc.position.set(0, y);
     content.addChild(desc);
     y += desc.height + 12;
 
     if (opened) {
-      const state = makeLabel(t('skill.opened'), { fontSize: 14, fill: 0xeeeeee, wordWrap: true, wordWrapWidth: popup.contentWidth });
+      const state = makeLabel(t('skill.opened'), { fontSize: FontSize.SMALL, fill: 0xeeeeee, wordWrap: true, wordWrapWidth: popup.contentWidth });
       state.position.set(0, y);
       content.addChild(state);
     } else {
-      const label = makeLabel(t('skill.costLabel'), { fontSize: 14, fill: 0xeeeeee });
+      const label = makeLabel(t('skill.costLabel'), { fontSize: FontSize.SMALL, fill: 0xeeeeee });
       label.position.set(0, y);
       const coin = makeIcon('gold-32', 18);
       coin.anchor.set(0, 0.5);
       coin.position.set(label.width + 6, y + label.height / 2);
-      const price = makeLabel(String(skillCost(id, human.skills.length)), { fontSize: 14, fill: 0xeeeeee });
+      const price = makeLabel(String(skillCost(id, human.skills.length)), { fontSize: FontSize.SMALL, fill: 0xeeeeee });
       price.position.set(coin.x + 22, y);
       content.addChild(label, coin, price);
     }

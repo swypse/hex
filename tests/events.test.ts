@@ -1,4 +1,4 @@
-import { GameMode } from '@enums';
+import { GameEventType, GameMode } from '@enums';
 import { describe, it, expect } from 'vitest';
 import { GameEvent } from '../src/game/events';
 import { GameStateSnapshot } from '../src/game/state';
@@ -7,7 +7,7 @@ import { Player } from '../src/game/players';
 
 describe('game events & state', () => {
   it('GameEvent objects survive JSON round-trip', () => {
-    const e: GameEvent = { type: 'unitMoved', unitId: 'u1', from: { q: 0, r: 0 }, path: [{ q: 0, r: 1 }], to: { q: 0, r: 1 } };
+    const e: GameEvent = { type: GameEventType.UNIT_MOVED, unitId: 'u1', from: { q: 0, r: 0 }, path: [{ q: 0, r: 1 }], to: { q: 0, r: 1 } };
     const copy = JSON.parse(JSON.stringify(e)) as GameEvent;
     expect(copy).toEqual(e);
   });

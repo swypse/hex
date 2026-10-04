@@ -3,6 +3,7 @@
 // are hoisted, and pixi reads `navigator` at module scope on Node 20 where it
 // does not exist.
 import { BitmapFont } from 'pixi.js';
+import { FontSize } from '@enums';
 
 function range(from: number, to: number): string {
   let out = '';
@@ -18,5 +19,5 @@ const TEST_FONT_CHARS =
   range(0x2190, 0x2193) +
   '\u2212\u2713';
 
-BitmapFont.install({ name: 'Roboto Regular', style: { fontSize: 16, fill: 0xffffff }, chars: TEST_FONT_CHARS });
-BitmapFont.install({ name: 'Roboto Black', style: { fontSize: 16, fill: 0xffffff }, chars: TEST_FONT_CHARS });
+BitmapFont.install({ name: 'Roboto Regular', style: { fontSize: FontSize.NORMAL, fill: 0xffffff }, chars: TEST_FONT_CHARS });
+BitmapFont.install({ name: 'Roboto Black', style: { fontSize: FontSize.NORMAL, fill: 0xffffff }, chars: TEST_FONT_CHARS });

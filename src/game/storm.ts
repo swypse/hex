@@ -1,6 +1,7 @@
 import { GameMap, MapTile } from './map-gen';
 import { isWaterType } from './tile-types';
 import { Unit } from './units';
+import { UnitType } from '@enums';
 
 export const STORM_ATTACK = 60;
 
@@ -25,7 +26,7 @@ export function villageWaterTiles(map: GameMap, village: MapTile): MapTile[] {
  *  village (a land tile OR a ship on an owned village water tile) and that
  *  village claims at least one water tile. */
 export function stormEligible(map: GameMap, unit: Unit): boolean {
-  if (unit.type !== 'stormcaller') return false;
+  if (unit.type !== UnitType.STORMCALLER) return false;
   const tile = map.tiles.find((t) => t.unit === unit);
   if (!tile || tile.ownedBy !== unit.owner) return false;
   const village = claimingVillage(map, tile);

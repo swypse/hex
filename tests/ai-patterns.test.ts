@@ -10,9 +10,9 @@ import { AI_PATTERNS, AiPatternContext, bestSpawnableUnitType, enemyCanAttackNex
 import { AiPlannerState } from '../src/game/ai-types';
 import { analyzeSituation } from '../src/game/ai-situation';
 import { AI_DIFFICULTY_PROFILES } from '../src/game/ai-difficulty';
-import { GameMode } from '../src/game/game-mode';
 import { TRIBE_SPECIAL_UNIT } from '../src/game/tribes';
 import { makeTestMap, tileAt } from './helpers/test-map';
+import { AiActionType, AiStance, BonusKind, GameMode, GarrisonGuardKind, SkillId, SpawnPreference, UnitType } from '@enums';
 
 function tile(
   q: number,
@@ -25,19 +25,19 @@ function tile(
 }
 
 function warrior(id: string, owner: number, q: number, r: number, hp = 50): Unit {
-  return { id, owner, type: 'warrior', q, r, hasMoved: false, hasAttacked: false, hasHealed: false, hp, attack: 20, attackDistance: 1, defense: 10, spawnVillage: null };
+  return { id, owner, type: UnitType.WARRIOR, q, r, hasMoved: false, hasAttacked: false, hasHealed: false, hp, attack: 20, attackDistance: 1, defense: 10, spawnVillage: null };
 }
 
 function archer(id: string, owner: number, q: number, r: number, hp = 40): Unit {
-  return { id, owner, type: 'archer', q, r, hasMoved: false, hasAttacked: false, hasHealed: false, hp, attack: 20, attackDistance: 2, defense: 7, spawnVillage: null };
+  return { id, owner, type: UnitType.ARCHER, q, r, hasMoved: false, hasAttacked: false, hasHealed: false, hp, attack: 20, attackDistance: 2, defense: 7, spawnVillage: null };
 }
 
 function rider(id: string, owner: number, q: number, r: number): Unit {
-  return { id, owner, type: 'rider', q, r, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 40, attack: 20, attackDistance: 1, defense: 7, spawnVillage: null };
+  return { id, owner, type: UnitType.RIDER, q, r, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 40, attack: 20, attackDistance: 1, defense: 7, spawnVillage: null };
 }
 
 function knight(id: string, owner: number, q: number, r: number): Unit {
-  return { id, owner, type: 'knight', q, r, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 60, attack: 40, attackDistance: 1, defense: 7, spawnVillage: null };
+  return { id, owner, type: UnitType.KNIGHT, q, r, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 60, attack: 40, attackDistance: 1, defense: 7, spawnVillage: null };
 }
 
 function player(money: number, skills: Player['skills'] = []): Player {
@@ -85,10 +85,10 @@ describe('AI patterns', () => {
     const map: GameMap = { radius: 4, tiles: [], spawns: [] };
     const village = tile(0, 0, { owner: 1, level: 1, captureReady: false, capital: true }, null, 1);
     map.tiles.push(village, tile(1, 0, null, warrior('enemy', 0, 1, 0)));
-    const actions = findPattern('defend-empty-village').evaluate(ctx(map, player(100, ['shields']), new SeededRandom(1)));
+    const actions = findPattern('defend-empty-village').evaluate(ctx(map, player(100, [SkillId.SHIELDS]), new SeededRandom(1)));
     expect(actions).not.toBeNull();
-    expect(actions![0]!.type).toBe('spawn');
-    if (actions![0]!.type === 'spawn') expect(actions![0]!.unitType).toBe('shield');
+    expect(actions![0]!.type).toBe(AiActionType.SPAWN);
+    if (actions![0]!.type === AiActionType.SPAWN) expect(actions![0]!.unitType).toBe(UnitType.SHIELD);
   });
 
   it('defend-empty-village returns null when not threatened', () => {
@@ -106,7 +106,7 @@ describe('AI patterns', () => {
     );
     const actions = findPattern('garrison-empty-village').evaluate(ctx(map, player(0), new SeededRandom(1)));
     expect(actions).not.toBeNull();
-    expect(actions![0]).toMatchObject({ type: 'move', unitId: 'defender', q: 0, r: 0 });
+    expect(actions![0]).toMatchObject({ type: AiActionType.MOVE, unitId: 'defender', q: 0, r: 0 });
   });
 
   it('garrison-empty-village returns null when no unit can reach the village', () => {
@@ -126,11 +126,11 @@ describe('AI patterns', () => {
     const actions = findPattern('defend-hurt-unit').evaluate(ctx(map, player(100), new SeededRandom(1)));
     expect(actions).not.toBeNull();
     if (actions!.length === 1) {
-      expect(actions![0]!.type).toBe('heal');
+      expect(actions![0]!.type).toBe(AiActionType.HEAL);
     } else {
       expect(actions!.length).toBe(2);
-      expect(actions![0]!.type).toBe('move');
-      expect(actions![1]!.type).toBe('spawn');
+      expect(actions![0]!.type).toBe(AiActionType.MOVE);
+      expect(actions![1]!.type).toBe(AiActionType.SPAWN);
     }
   });
 
@@ -140,18 +140,18 @@ describe('AI patterns', () => {
     map.tiles.push(village, tile(1, 0, null, warrior('enemy', 0, 1, 0)));
     const actions = findPattern('defend-hurt-unit').evaluate(ctx(map, player(0), new SeededRandom(1)));
     expect(actions).not.toBeNull();
-    expect(actions![0]).toMatchObject({ type: 'heal', unitId: 'w', q: 0, r: 0 });
+    expect(actions![0]).toMatchObject({ type: AiActionType.HEAL, unitId: 'w', q: 0, r: 0 });
   });
 
   it('defend-hurt-unit pulls out a weak garrison and spawns a fresh defender when affordable', () => {
     const map: GameMap = { radius: 4, tiles: [], spawns: [] };
     const village = tile(0, 0, { owner: 1, level: 1, captureReady: false }, warrior('w', 1, 0, 0, 5), 1);
     map.tiles.push(village, tile(1, 0, null, warrior('enemy', 0, 1, 0)), tile(0, 1));
-    const actions = findPattern('defend-hurt-unit').evaluate(ctx(map, player(100, ['shields']), new SeededRandom(1)));
+    const actions = findPattern('defend-hurt-unit').evaluate(ctx(map, player(100, [SkillId.SHIELDS]), new SeededRandom(1)));
     expect(actions).not.toBeNull();
     expect(actions!.length).toBe(2);
-    expect(actions![0]).toMatchObject({ type: 'move', unitId: 'w' });
-    expect(actions![1]).toMatchObject({ type: 'spawn', q: 0, r: 0, unitType: 'shield' });
+    expect(actions![0]).toMatchObject({ type: AiActionType.MOVE, unitId: 'w' });
+    expect(actions![1]).toMatchObject({ type: AiActionType.SPAWN, q: 0, r: 0, unitType: UnitType.SHIELD });
   });
 
   it('defend-hurt-unit keeps and heals a low-hp garrison when it cannot afford a replacement', () => {
@@ -160,7 +160,7 @@ describe('AI patterns', () => {
     map.tiles.push(village, tile(1, 0, null, warrior('enemy', 0, 1, 0)), tile(0, 1));
     const actions = findPattern('defend-hurt-unit').evaluate(ctx(map, player(0), new SeededRandom(1)));
     expect(actions).not.toBeNull();
-    expect(actions![0]).toMatchObject({ type: 'heal', unitId: 'w', q: 0, r: 0 });
+    expect(actions![0]).toMatchObject({ type: AiActionType.HEAL, unitId: 'w', q: 0, r: 0 });
   });
 
   it('defend-hurt-unit leaves a healthy threatened garrison alone', () => {
@@ -180,13 +180,13 @@ describe('AI patterns', () => {
     const actions = findPattern('archer-kite').evaluate(ctx(map, player(100), new SeededRandom(1)));
     expect(actions).not.toBeNull();
     expect(actions!.length).toBe(2);
-    expect(actions![0]!.type).toBe('move');
-    if (actions![0]!.type === 'move') {
+    expect(actions![0]!.type).toBe(AiActionType.MOVE);
+    if (actions![0]!.type === AiActionType.MOVE) {
       expect(actions![0]!.q).toBe(0);
       expect(actions![0]!.r).toBe(-1);
     }
-    expect(actions![1]!.type).toBe('attack');
-    if (actions![1]!.type === 'attack') {
+    expect(actions![1]!.type).toBe(AiActionType.ATTACK);
+    if (actions![1]!.type === AiActionType.ATTACK) {
       expect(actions![1]!.q).toBe(1);
       expect(actions![1]!.r).toBe(0);
     }
@@ -198,7 +198,7 @@ describe('AI patterns', () => {
     map.tiles.push(village, tile(1, 0, null, warrior('ai1', 1, 1, 0)));
     const actions = findPattern('attack-enemy-in-village').evaluate(ctx(map, player(100), new SeededRandom(1)));
     expect(actions).not.toBeNull();
-    expect(actions!.some((a) => a.type === 'attack')).toBe(true);
+    expect(actions!.some((a) => a.type === AiActionType.ATTACK)).toBe(true);
   });
 
   it('attack-enemy-in-village moves a farther unit adjacent then attacks', () => {
@@ -207,15 +207,15 @@ describe('AI patterns', () => {
     map.tiles.push(village, tile(1, 0), tile(2, 0, null, warrior('ai1', 1, 2, 0)));
     const actions = findPattern('attack-enemy-in-village').evaluate(ctx(map, player(100), new SeededRandom(1)));
     expect(actions).not.toBeNull();
-    const move = actions!.find((a) => a.type === 'move');
-    const attack = actions!.find((a) => a.type === 'attack');
+    const move = actions!.find((a) => a.type === AiActionType.MOVE);
+    const attack = actions!.find((a) => a.type === AiActionType.ATTACK);
     expect(move).toBeDefined();
     expect(attack).toBeDefined();
-    if (move && move.type === 'move') {
+    if (move && move.type === AiActionType.MOVE) {
       expect(move.q).toBe(1);
       expect(move.r).toBe(0);
     }
-    if (attack && attack.type === 'attack') {
+    if (attack && attack.type === AiActionType.ATTACK) {
       expect(attack.q).toBe(0);
       expect(attack.r).toBe(0);
     }
@@ -239,7 +239,7 @@ describe('AI patterns', () => {
     );
     const actions = findPattern('focus-fire').evaluate(ctx(map, player(100), new SeededRandom(1)));
     expect(actions).not.toBeNull();
-    expect(actions!.filter((a) => a.type === 'attack').length).toBe(2);
+    expect(actions!.filter((a) => a.type === AiActionType.ATTACK).length).toBe(2);
   });
 
   it('capture-push parks a unit on a nearby enemy village', () => {
@@ -251,8 +251,8 @@ describe('AI patterns', () => {
     );
     const actions = findPattern('capture-push').evaluate(ctx(map, player(100), new SeededRandom(1)));
     expect(actions).not.toBeNull();
-    expect(actions![0]!.type).toBe('move');
-    if (actions![0]!.type === 'move') {
+    expect(actions![0]!.type).toBe(AiActionType.MOVE);
+    if (actions![0]!.type === AiActionType.MOVE) {
       expect(actions![0]!.q).toBe(1);
       expect(actions![0]!.r).toBe(0);
     }
@@ -267,8 +267,8 @@ describe('AI patterns', () => {
     );
     const actions = findPattern('capture-free-village').evaluate(ctx(map, player(100), new SeededRandom(1)));
     expect(actions).not.toBeNull();
-    expect(actions![0]!.type).toBe('move');
-    if (actions![0]!.type === 'move') {
+    expect(actions![0]!.type).toBe(AiActionType.MOVE);
+    if (actions![0]!.type === AiActionType.MOVE) {
       expect(actions![0]!.q).toBe(1);
       expect(actions![0]!.r).toBe(0);
     }
@@ -294,7 +294,7 @@ describe('AI patterns', () => {
     map.tiles.push(fog);
     const actions = findPattern('explore-frontier').evaluate(ctx(map, player(100), new SeededRandom(1)));
     expect(actions).not.toBeNull();
-    expect(actions![0]!.type).toBe('move');
+    expect(actions![0]!.type).toBe(AiActionType.MOVE);
   });
 
   it('counter-threat retreats a unit an enemy can kill', () => {
@@ -306,7 +306,7 @@ describe('AI patterns', () => {
     );
     const actions = findPattern('counter-threat').evaluate(ctx(map, player(100), new SeededRandom(1)));
     expect(actions).not.toBeNull();
-    expect(actions![0]!.type).toBe('move');
+    expect(actions![0]!.type).toBe(AiActionType.MOVE);
   });
 
   it('retreat-heal pulls a wounded threatened unit back', () => {
@@ -319,7 +319,7 @@ describe('AI patterns', () => {
     );
     const actions = findPattern('retreat-heal').evaluate(ctx(map, player(100), new SeededRandom(1)));
     expect(actions).not.toBeNull();
-    expect(actions![0]!.type).toBe('move');
+    expect(actions![0]!.type).toBe(AiActionType.MOVE);
   });
 
   it('enemyCanReach ignores enemies hidden in fog', () => {
@@ -377,9 +377,9 @@ describe('AI patterns', () => {
     );
     const actions = findPattern('focus-fire').evaluate(ctx(map, player(100), new SeededRandom(1)));
     expect(actions).not.toBeNull();
-    expect(actions!.filter((a) => a.type === 'attack').length).toBe(2);
+    expect(actions!.filter((a) => a.type === AiActionType.ATTACK).length).toBe(2);
     for (const a of actions!) {
-      if (a.type === 'attack') {
+      if (a.type === AiActionType.ATTACK) {
         expect(a.q).toBe(1);
         expect(a.r).toBe(0);
       }
@@ -390,18 +390,18 @@ describe('AI patterns', () => {
     const map: GameMap = { radius: 4, tiles: [], spawns: [] };
     map.tiles.push(tile(0, 0, null, warrior('ai1', 1, 0, 0)));
     const goal = tile(1, 0);
-    goal.bonus = { kind: 'money', claimer: null, arrivalTurn: 0 };
+    goal.bonus = { kind: BonusKind.MONEY, claimer: null, arrivalTurn: 0 };
     map.tiles.push(goal);
     const actions = findPattern('collect-bonus').evaluate(ctx(map, player(100), new SeededRandom(1)));
     expect(actions).not.toBeNull();
-    expect(actions![0]).toMatchObject({ type: 'move', unitId: 'ai1', q: 1, r: 0 });
+    expect(actions![0]).toMatchObject({ type: AiActionType.MOVE, unitId: 'ai1', q: 1, r: 0 });
   });
 
   it('collect-bonus ignores bonuses hidden in fog', () => {
     const map: GameMap = { radius: 4, tiles: [], spawns: [] };
     map.tiles.push(tile(0, 0, null, warrior('ai1', 1, 0, 0)));
     const goal = tile(1, 0);
-    goal.bonus = { kind: 'money', claimer: null, arrivalTurn: 0 };
+    goal.bonus = { kind: BonusKind.MONEY, claimer: null, arrivalTurn: 0 };
     goal.exploredBy = [0];
     map.tiles.push(goal);
     expect(findPattern('collect-bonus').evaluate(ctx(map, player(100), new SeededRandom(1)))).toBeNull();
@@ -413,7 +413,7 @@ describe('AI patterns', () => {
     map.tiles.push(tile(1, 0));
     map.tiles.push(tile(2, 0, null, warrior('enemy', 0, 2, 0)));
     const goal = tile(4, 0);
-    goal.bonus = { kind: 'money', claimer: null, arrivalTurn: 0 };
+    goal.bonus = { kind: BonusKind.MONEY, claimer: null, arrivalTurn: 0 };
     map.tiles.push(goal);
     expect(findPattern('collect-bonus').evaluate(ctx(map, player(100), new SeededRandom(1)))).toBeNull();
   });
@@ -436,7 +436,7 @@ describe('AI patterns', () => {
     small.resources.wood = 10; // enough left for a farm after the upgrade
     const actions = findPattern('economy-opening').evaluate(ctx(map, small, new SeededRandom(1)));
     expect(actions).not.toBeNull();
-    expect(actions![0]!.type).toBe('upgrade');
+    expect(actions![0]!.type).toBe(AiActionType.UPGRADE);
   });
 
   it('economy-opening keeps the wood and stone of the first farm', () => {
@@ -446,7 +446,7 @@ describe('AI patterns', () => {
       tile(1, 0, null, warrior('ai1', 1, 1, 0)),
     );
     const poor = player(100); // wood 5: an upgrade (2 wood) would leave less than a farm needs
-    expect(findPattern('economy-opening').evaluate(ctx(map, poor, new SeededRandom(1)))?.[0]?.type).not.toBe('upgrade');
+    expect(findPattern('economy-opening').evaluate(ctx(map, poor, new SeededRandom(1)))?.[0]?.type).not.toBe(AiActionType.UPGRADE);
   });
 
   it('bestSpawnableUnitType offers catapult only with the skill and resources', () => {
@@ -455,13 +455,13 @@ describe('AI patterns', () => {
       return { map: { radius: 4, tiles: [village], spawns: [] }, village };
     };
     const noSkill = villageMap();
-    expect(bestSpawnableUnitType(player(100), 'offense', noSkill.map, noSkill.village)).not.toBe('catapult');
+    expect(bestSpawnableUnitType(player(100), SpawnPreference.OFFENSE, noSkill.map, noSkill.village)).not.toBe(UnitType.CATAPULT);
     const skilled = villageMap();
-    expect(bestSpawnableUnitType(player(100, ['catapult']), 'offense', skilled.map, skilled.village)).toBe('catapult');
+    expect(bestSpawnableUnitType(player(100, [SkillId.CATAPULT]), SpawnPreference.OFFENSE, skilled.map, skilled.village)).toBe(UnitType.CATAPULT);
     // The village's own wood and ore decide: an empty village cannot afford it.
     const broke = villageMap();
     broke.village.settlement!.stock = { wood: 0, stone: 0, ore: 0, food: 20 };
-    expect(bestSpawnableUnitType(player(100, ['catapult']), 'offense', broke.map, broke.village)).not.toBe('catapult');
+    expect(bestSpawnableUnitType(player(100, [SkillId.CATAPULT]), SpawnPreference.OFFENSE, broke.map, broke.village)).not.toBe(UnitType.CATAPULT);
   });
 
   it('reinforce-endangered-village sends the closest unit to an endangered empty village', () => {
@@ -473,8 +473,8 @@ describe('AI patterns', () => {
     );
     const actions = findPattern('reinforce-endangered-village').evaluate(situCtx(map, player(100)));
     expect(actions).not.toBeNull();
-    expect(actions![0]!.type).toBe('move');
-    if (actions![0]!.type === 'move') {
+    expect(actions![0]!.type).toBe(AiActionType.MOVE);
+    if (actions![0]!.type === AiActionType.MOVE) {
       expect(actions![0]!.unitId).toBe('ai1');
       expect(actions![0]!.q).toBe(0);
       expect(actions![0]!.r).toBe(0);
@@ -500,8 +500,8 @@ describe('AI patterns', () => {
     );
     const actions = findPattern('hunt-idle-enemy').evaluate(situCtx(map, player(100)));
     expect(actions).not.toBeNull();
-    expect(actions![0]!.type).toBe('move');
-    if (actions![0]!.type === 'move') {
+    expect(actions![0]!.type).toBe(AiActionType.MOVE);
+    if (actions![0]!.type === AiActionType.MOVE) {
       expect(actions![0]!.q).toBe(1);
       expect(actions![0]!.r).toBe(0);
     }
@@ -521,7 +521,7 @@ describe('AI patterns', () => {
     );
     const actions = findPattern('hunt-idle-enemy').evaluate(situCtx(map, player(100)));
     expect(actions).not.toBeNull();
-    expect(actions!.some((a) => a.type === 'attack')).toBe(true);
+    expect(actions!.some((a) => a.type === AiActionType.ATTACK)).toBe(true);
   });
 
   it('guardGarrisonAttack holds a garrison that would die to the counter with no replacement funds', () => {
@@ -532,7 +532,7 @@ describe('AI patterns', () => {
       tile(1, 0, null, knight('enemy', 0, 1, 0)),
     );
     const result = guardGarrisonAttack(map, player(0), garrison, map.tiles[1]!);
-    expect(result.kind).toBe('hold');
+    expect(result.kind).toBe(GarrisonGuardKind.HOLD);
   });
 
   it('guardGarrisonAttack allows the attack and demands a spawn when the AI can afford a replacement', () => {
@@ -543,8 +543,8 @@ describe('AI patterns', () => {
       tile(1, 0, null, knight('enemy', 0, 1, 0)),
     );
     const result = guardGarrisonAttack(map, player(100), garrison, map.tiles[1]!);
-    expect(result.kind).toBe('attack');
-    if (result.kind === 'attack') expect(result.guardType).toBe('archer');
+    expect(result.kind).toBe(GarrisonGuardKind.ATTACK);
+    if (result.kind === GarrisonGuardKind.ATTACK) expect(result.guardType).toBe(UnitType.ARCHER);
   });
 
   it('guardGarrisonAttack leaves a garrison free to attack when the counter cannot kill it', () => {
@@ -555,8 +555,8 @@ describe('AI patterns', () => {
       tile(1, 0, null, warrior('enemy', 0, 1, 0)),
     );
     const result = guardGarrisonAttack(map, player(0), garrison, map.tiles[1]!);
-    expect(result.kind).toBe('attack');
-    if (result.kind === 'attack') expect(result.guardType).toBeUndefined();
+    expect(result.kind).toBe(GarrisonGuardKind.ATTACK);
+    if (result.kind === GarrisonGuardKind.ATTACK) expect(result.guardType).toBeUndefined();
   });
 
   it('guardGarrisonAttack ignores units not standing on their own village', () => {
@@ -564,7 +564,7 @@ describe('AI patterns', () => {
     const unit = archer('a', 1, 2, 0);
     map.tiles.push(tile(0, 0, { owner: 1, level: 1, captureReady: false }, null, 1), tile(2, 0, null, unit), tile(1, 0, null, knight('enemy', 0, 1, 0)));
     const result = guardGarrisonAttack(map, player(0), unit, map.tiles[2]!);
-    expect(result.kind).toBe('attack');
+    expect(result.kind).toBe(GarrisonGuardKind.ATTACK);
   });
 
   it('attack-enemy-in-village does not empty the defending units own village', () => {
@@ -579,7 +579,7 @@ describe('AI patterns', () => {
       tile(1, 0, { owner: 1, level: 1, captureReady: false }, garrison, 1),
     );
     const actions = findPattern('attack-enemy-in-village').evaluate(ctx(map, player(0), new SeededRandom(1)));
-    expect(actions === null || !actions.some((a) => a.type === 'attack' && a.unitId === 'g')).toBe(true);
+    expect(actions === null || !actions.some((a) => a.type === AiActionType.ATTACK && a.unitId === 'g')).toBe(true);
   });
 
   it('attack-enemy-in-village lets a garrison attack when it can respawn a guard', () => {
@@ -591,27 +591,27 @@ describe('AI patterns', () => {
     );
     const actions = findPattern('attack-enemy-in-village').evaluate(ctx(map, player(100), new SeededRandom(1)));
     expect(actions).not.toBeNull();
-    expect(actions!.some((a) => a.type === 'spawn' && a.q === 1 && a.r === 0)).toBe(true);
+    expect(actions!.some((a) => a.type === AiActionType.SPAWN && a.q === 1 && a.r === 0)).toBe(true);
   });
 
   it('bestSpawnableUnitType never returns another tribe\'s special unit', () => {
     const cats = { ...player(100), tribe: Tribe.Cats };
-    for (const prefer of ['offense', 'defense', 'scout', 'naval'] as const) {
+    for (const prefer of [SpawnPreference.OFFENSE, SpawnPreference.DEFENSE, SpawnPreference.SCOUT, SpawnPreference.NAVAL]) {
       const type = bestSpawnableUnitType(cats, prefer);
-      expect(type).not.toBe('builder');
-      expect(type).not.toBe('banner');
-      expect(type).not.toBe('berserker');
-      expect(type).not.toBe('trapper');
-      expect(type).not.toBe('stormcaller');
-      expect(type).not.toBe('stunner');
+      expect(type).not.toBe(UnitType.BUILDER);
+      expect(type).not.toBe(UnitType.BANNER);
+      expect(type).not.toBe(UnitType.BERSERKER);
+      expect(type).not.toBe(UnitType.TRAPPER);
+      expect(type).not.toBe(UnitType.STORMCALLER);
+      expect(type).not.toBe(UnitType.STUNNER);
     }
-    expect(TRIBE_SPECIAL_UNIT[Tribe.Cats]).toBe('stalker');
+    expect(TRIBE_SPECIAL_UNIT[Tribe.Cats]).toBe(UnitType.STALKER);
   });
 
   it('stalker-restealth hides an idle visible stalker near an enemy', () => {
     const map: GameMap = { radius: 4, tiles: [], spawns: [] };
     const stalker = tile(0, 0, null, {
-      id: 'st', owner: 1, type: 'stalker', q: 0, r: 0,
+      id: 'st', owner: 1, type: UnitType.STALKER, q: 0, r: 0,
       hasMoved: false, hasAttacked: false, hasHealed: false,
       hp: 60, attack: 30, attackDistance: 1, spawnVillage: null,
     });
@@ -623,7 +623,7 @@ describe('AI patterns', () => {
   it('stalker-restealth does not hide a stalker far from the enemy', () => {
     const map: GameMap = { radius: 4, tiles: [], spawns: [] };
     map.tiles.push(tile(0, 0, null, {
-      id: 'st', owner: 1, type: 'stalker', q: 0, r: 0,
+      id: 'st', owner: 1, type: UnitType.STALKER, q: 0, r: 0,
       hasMoved: false, hasAttacked: false, hasHealed: false,
       hp: 60, attack: 30, attackDistance: 1, spawnVillage: null,
     }), tile(9, 0, null, warrior('enemy', 0, 9, 0)));
@@ -633,7 +633,7 @@ describe('AI patterns', () => {
   it('stalker-restealth does not hide an already hidden stalker', () => {
     const map: GameMap = { radius: 4, tiles: [], spawns: [] };
     map.tiles.push(tile(0, 0, null, {
-      id: 'st', owner: 1, type: 'stalker', q: 0, r: 0,
+      id: 'st', owner: 1, type: UnitType.STALKER, q: 0, r: 0,
       hasMoved: false, hasAttacked: false, hasHealed: false,
       hp: 60, attack: 30, attackDistance: 1, spawnVillage: null, isStealthed: true,
     }), tile(2, 0, null, warrior('enemy', 0, 2, 0)));
@@ -644,8 +644,8 @@ describe('AI patterns', () => {
     const map: GameMap = { radius: 4, tiles: [], spawns: [] };
     map.tiles.push(
       tile(-1, 0, { owner: 1, level: 1, captureReady: false }, null, 1), // village claim
-      tile(0, 0, null, { id: 'sc', owner: 1, type: 'stormcaller', q: 0, r: 0, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 50, attack: 20, attackDistance: 1, spawnVillage: null }, 1),
-      tile(1, 0, null, { id: 'enemy', owner: 0, type: 'warrior', q: 1, r: 0, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 50, attack: 20, attackDistance: 1, spawnVillage: null, shipLevel: 1 }, 1),
+      tile(0, 0, null, { id: 'sc', owner: 1, type: UnitType.STORMCALLER, q: 0, r: 0, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 50, attack: 20, attackDistance: 1, spawnVillage: null }, 1),
+      tile(1, 0, null, { id: 'enemy', owner: 0, type: UnitType.WARRIOR, q: 1, r: 0, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 50, attack: 20, attackDistance: 1, spawnVillage: null, shipLevel: 1 }, 1),
     );
     // (1,0) claimed by village at (-1,0)? No — a village claims its own claim
     // circle; mark the two tiles as claimed by (-1,0) so stormTargetShips binds.
@@ -662,7 +662,7 @@ describe('AI special unit patterns', () => {
   it('stunner-prefer-stun stuns a range-2 enemy instead of attacking', () => {
     const map: GameMap = { radius: 4, tiles: [], spawns: [] };
     map.tiles.push(
-      tile(0, 0, null, { id: 'su', owner: 1, type: 'stunner', q: 0, r: 0, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 40, attack: 20, attackDistance: 2, spawnVillage: null }),
+      tile(0, 0, null, { id: 'su', owner: 1, type: UnitType.STUNNER, q: 0, r: 0, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 40, attack: 20, attackDistance: 2, spawnVillage: null }),
       tile(1, 0, null, warrior('adjacent', 0, 1, 0)),
       tile(2, 0, null, warrior('far', 0, 2, 0)),
     );
@@ -673,7 +673,7 @@ describe('AI special unit patterns', () => {
   it('stunner-prefer-stun returns nothing when no enemy sits at range 2', () => {
     const map: GameMap = { radius: 4, tiles: [], spawns: [] };
     map.tiles.push(
-      tile(0, 0, null, { id: 'su', owner: 1, type: 'stunner', q: 0, r: 0, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 40, attack: 20, attackDistance: 2, spawnVillage: null }),
+      tile(0, 0, null, { id: 'su', owner: 1, type: UnitType.STUNNER, q: 0, r: 0, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 40, attack: 20, attackDistance: 2, spawnVillage: null }),
       tile(1, 0, null, warrior('adjacent', 0, 1, 0)),
     );
     expect(findPattern('stunner-prefer-stun').evaluate(ctx(map, player(100), new SeededRandom(1)))).toBeNull();
@@ -682,7 +682,7 @@ describe('AI special unit patterns', () => {
   it('stalker-scout attacks only when it can kill an enemy standing in a village', () => {
     const map: GameMap = { radius: 4, tiles: [], spawns: [] };
     map.tiles.push(
-      tile(0, 0, null, { id: 'st', owner: 1, type: 'stalker', q: 0, r: 0, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 20, attack: 10, attackDistance: 1, spawnVillage: null }),
+      tile(0, 0, null, { id: 'st', owner: 1, type: UnitType.STALKER, q: 0, r: 0, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 20, attack: 10, attackDistance: 1, spawnVillage: null }),
       tile(1, 0, { owner: 0, level: 1, captureReady: false }, warrior('guard', 0, 1, 0, 5), 0),
     );
     const actions = findPattern('stalker-scout').evaluate(ctx(map, player(100), new SeededRandom(1)));
@@ -692,7 +692,7 @@ describe('AI special unit patterns', () => {
   it('stalker-scout never attacks a village guard it cannot kill', () => {
     const map: GameMap = { radius: 4, tiles: [], spawns: [] };
     map.tiles.push(
-      tile(0, 0, null, { id: 'st', owner: 1, type: 'stalker', q: 0, r: 0, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 20, attack: 10, attackDistance: 1, spawnVillage: null }),
+      tile(0, 0, null, { id: 'st', owner: 1, type: UnitType.STALKER, q: 0, r: 0, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 20, attack: 10, attackDistance: 1, spawnVillage: null }),
       tile(1, 0, { owner: 0, level: 1, captureReady: false }, warrior('guard', 0, 1, 0, 50), 0),
     );
     expect(findPattern('stalker-scout').evaluate(ctx(map, player(100), new SeededRandom(1)))).toBeNull();
@@ -700,7 +700,7 @@ describe('AI special unit patterns', () => {
 
   it('stalker-scout moves onto a free village to claim it', () => {
     const map = makeTestMap(4);
-    tileAt(map, 0, 0)!.unit = { id: 'st', owner: 1, type: 'stalker', q: 0, r: 0, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 20, attack: 10, attackDistance: 1, spawnVillage: null };
+    tileAt(map, 0, 0)!.unit = { id: 'st', owner: 1, type: UnitType.STALKER, q: 0, r: 0, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 20, attack: 10, attackDistance: 1, spawnVillage: null };
     tileAt(map, 2, 0)!.settlement = { owner: null, level: 1, captureReady: false };
     const actions = findPattern('stalker-scout').evaluate(ctx(map, player(100), new SeededRandom(1)));
     expect(actions).toEqual([{ type: 'move', unitId: 'st', q: 2, r: 0 }]);
@@ -709,7 +709,7 @@ describe('AI special unit patterns', () => {
   it('banner-position holds still when it already covers two friendly units', () => {
     const map: GameMap = { radius: 4, tiles: [], spawns: [] };
     map.tiles.push(
-      tile(0, 0, null, { id: 'bn', owner: 1, type: 'banner', q: 0, r: 0, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 40, attack: 20, attackDistance: 1, spawnVillage: null }),
+      tile(0, 0, null, { id: 'bn', owner: 1, type: UnitType.BANNER, q: 0, r: 0, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 40, attack: 20, attackDistance: 1, spawnVillage: null }),
       tile(0, 1, null, warrior('f1', 1, 0, 1)),
       tile(1, 0, null, warrior('f2', 1, 1, 0)),
     );
@@ -718,7 +718,7 @@ describe('AI special unit patterns', () => {
 
   it('builder-work builds an adjacent mine without the smithery skill', () => {
     const map: GameMap = { radius: 4, tiles: [], spawns: [] };
-    const village = tile(0, 0, { owner: 1, level: 1, captureReady: false }, { id: 'bd', owner: 1, type: 'builder', q: 0, r: 0, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 40, attack: 10, attackDistance: 1, spawnVillage: null }, 1);
+    const village = tile(0, 0, { owner: 1, level: 1, captureReady: false }, { id: 'bd', owner: 1, type: UnitType.BUILDER, q: 0, r: 0, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 40, attack: 10, attackDistance: 1, spawnVillage: null }, 1);
     village.claimedByVillage = { q: 0, r: 0 };
     const mountain = tile(1, 0, null, null, 1);
     mountain.terrain = TileType.GrasslandMountain;
@@ -731,7 +731,7 @@ describe('AI special unit patterns', () => {
   it('trapper-lay plants a trap on an owned frontier cell', () => {
     const map: GameMap = { radius: 4, tiles: [], spawns: [] };
     map.tiles.push(
-      tile(0, 0, null, { id: 'tp', owner: 1, type: 'trapper', q: 0, r: 0, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 40, attack: 20, attackDistance: 1, spawnVillage: null }, 1),
+      tile(0, 0, null, { id: 'tp', owner: 1, type: UnitType.TRAPPER, q: 0, r: 0, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 40, attack: 20, attackDistance: 1, spawnVillage: null }, 1),
       tile(1, 0, null, null, 1),
       // A village of the AI pays the trap's ore.
       tile(3, 0, { owner: 1, level: 1, captureReady: false }, null, 1),
@@ -755,7 +755,7 @@ describe('AI special unit patterns', () => {
 
   it('spawn-special-unit does not spawn a second copy of the special unit', () => {
     const map: GameMap = { radius: 4, tiles: [], spawns: [] };
-    const village = tile(0, 0, { owner: 1, level: 1, captureReady: false }, { id: 'bd', owner: 1, type: 'builder', q: 0, r: 0, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 40, attack: 10, attackDistance: 1, spawnVillage: null }, 1);
+    const village = tile(0, 0, { owner: 1, level: 1, captureReady: false }, { id: 'bd', owner: 1, type: UnitType.BUILDER, q: 0, r: 0, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 40, attack: 10, attackDistance: 1, spawnVillage: null }, 1);
     village.claimedByVillage = { q: 0, r: 0 };
     const mountain = tile(1, 0, null, null, 1);
     mountain.terrain = TileType.GrasslandMountain;
@@ -768,7 +768,7 @@ describe('AI special unit patterns', () => {
     const map: GameMap = { radius: 4, tiles: [], spawns: [] };
     map.tiles.push(tile(0, 0, { owner: 1, level: 1, captureReady: false }, null, 1));
     const situation = {
-      stance: 'defend' as const, enemies: [], dangers: [], endangered: true, frontTarget: null,
+      stance: AiStance.DEFEND, enemies: [], dangers: [], endangered: true, frontTarget: null,
       freeVillages: [], ownPower: 1, enemyPower: 1, navalThreat: true, navalEnemies: [], nearestNaval: null,
     };
     const aqua = { ...player(100), tribe: Tribe.Aqua };

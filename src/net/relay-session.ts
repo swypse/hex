@@ -1,3 +1,4 @@
+import { ClientMessageType, RelayClientMessageType, RelayServerMessageType } from '@enums';
 import { ClientMessage, HostMessage } from './peer-session';
 import { t } from '../i18n';
 
@@ -85,13 +86,13 @@ function withRoomCode(base: string, code: string): string {
 }
 
 type ServerMessage =
-  | { type: 'registered'; id: string }
-  | { type: 'room-not-found' }
-  | { type: 'host-left' }
-  | { type: 'client-joined'; clientId: string }
-  | { type: 'client-left'; clientId: string }
-  | { type: 'error'; message: string }
-  | { type: 'data'; from: string; data: unknown };
+  | { type: RelayServerMessageType.REGISTERED; id: string }
+  | { type: RelayServerMessageType.ROOM_NOT_FOUND }
+  | { type: RelayServerMessageType.HOST_LEFT }
+  | { type: RelayServerMessageType.CLIENT_JOINED; clientId: string }
+  | { type: RelayServerMessageType.CLIENT_LEFT; clientId: string }
+  | { type: RelayServerMessageType.ERROR; message: string }
+  | { type: RelayServerMessageType.DATA; from: string; data: unknown };
 
 const MAX_ATTEMPTS = 12;
 /** Once a game has started a client keeps trying to reach the host for ~5
@@ -230,43 +231,43 @@ export class RelayHostSession extends RelaySessionBase {
   }
 
   sendTo(clientId: string, msg: HostMessage): void {
-    this.sendRaw({ type: 'data', to: clientId, data: msg });
+    this.sendRaw({ type: RelayClientMessageType.DATA, to: clientId, data: msg });
   }
 
   broadcast(msg: HostMessage): void {
-    this.sendRaw({ type: 'data', to: 'all', data: msg });
+    this.sendRaw({ type: RelayClientMessageType.DATA, to: 'all', data: msg });
   }
 
   protected onSocketOpen(): void {
     this.attempts++;
-    this.sendRaw({ type: 'register', role: 'host', code: this.code });
+    this.sendRaw({ type: RelayClientMessageType.REGISTER, role: 'host', code: this.code });
   }
 
   protected onSocketMessage(raw: string): void {
     const msg = parseServerMessage(raw);
     if (!msg) return;
     switch (msg.type) {
-      case 'registered':
+      case RelayServerMessageType.REGISTERED:
         this.clearRetry();
         this.attempts = 0;
         this.events.onReady();
         break;
-      case 'client-joined':
+      case RelayServerMessageType.CLIENT_JOINED:
         this.events.onClientJoined(msg.clientId);
         break;
-      case 'client-left':
+      case RelayServerMessageType.CLIENT_LEFT:
         this.events.onClientClosed(msg.clientId);
         break;
-      case 'data':
+      case RelayServerMessageType.DATA:
         if (msg.data !== null && typeof msg.data === 'object' && 'type' in (msg.data as object)) {
           this.events.onData(msg.from, msg.data as ClientMessage);
         }
         break;
-      case 'error':
+      case RelayServerMessageType.ERROR:
         this.events.onError(new Error(msg.message));
         break;
-      case 'room-not-found':
-      case 'host-left':
+      case RelayServerMessageType.ROOM_NOT_FOUND:
+      case RelayServerMessageType.HOST_LEFT:
         break;
     }
   }
@@ -315,36 +316,36 @@ export class RelayClientSession extends RelaySessionBase {
   }
 
   send(msg: ClientMessage): void {
-    if (this.joined) this.sendRaw({ type: 'data', data: msg });
+    if (this.joined) this.sendRaw({ type: RelayClientMessageType.DATA, data: msg });
   }
 
   protected onSocketOpen(): void {
     this.attempts++;
-    this.sendRaw({ type: 'register', role: 'client', code: this.code });
+    this.sendRaw({ type: RelayClientMessageType.REGISTER, role: 'client', code: this.code });
   }
 
   protected onSocketMessage(raw: string): void {
     const msg = parseServerMessage(raw);
     if (!msg) return;
     switch (msg.type) {
-      case 'registered':
+      case RelayServerMessageType.REGISTERED:
         this.clearRetry();
         this.attempts = 0;
         this.selfId = msg.id;
         this.events.onRegistered(msg.id);
         this.joined = true;
-        this.sendRaw({ type: 'data', data: { type: 'join', name: this.name } });
+        this.sendRaw({ type: RelayClientMessageType.DATA, data: { type: ClientMessageType.JOIN, name: this.name } });
         this.events.onJoined();
         break;
-      case 'room-not-found':
+      case RelayServerMessageType.ROOM_NOT_FOUND:
         this.socket?.close();
         this.socket = null;
         this.scheduleRetry(() => this.openSocket());
         break;
-      case 'host-left':
+      case RelayServerMessageType.HOST_LEFT:
         this.reconnect();
         break;
-      case 'data':
+      case RelayServerMessageType.DATA:
         if (msg.from === 'host' && msg.data !== null && typeof msg.data === 'object' && 'type' in (msg.data as object)) {
           try {
             this.events.onData(msg.data as HostMessage);
@@ -353,11 +354,11 @@ export class RelayClientSession extends RelaySessionBase {
           }
         }
         break;
-      case 'error':
+      case RelayServerMessageType.ERROR:
         this.fail(new Error(msg.message));
         break;
-      case 'client-joined':
-      case 'client-left':
+      case RelayServerMessageType.CLIENT_JOINED:
+      case RelayServerMessageType.CLIENT_LEFT:
         break;
     }
   }

@@ -3,7 +3,7 @@ import { GameMap, MapTile, Building, Settlement } from '../src/game/map-gen';
 import { TileType } from '../src/game/tile-types';
 import { Tribe } from '../src/game/tribes';
 import { Player } from '../src/game/players';
-import { Unit, UnitType } from '../src/game/units';
+import { Unit } from '../src/game/units';
 import {
   ARCHER_SCORE,
   awardScore,
@@ -25,6 +25,7 @@ import {
   VILLAGE_SCORE,
   WARRIOR_SCORE,
 } from '../src/game/score';
+import { BridgeDir, BuildingKind, SkillId, UnitType } from '@enums';
 
 function unit(type: UnitType, owner: number): Unit {
   return {
@@ -89,11 +90,11 @@ describe('boardScore', () => {
     const map: GameMap = { radius: 2, tiles: [], spawns: [] };
     map.tiles.push(
       tile(0, 0, 0, { owner: 0, level: 1, captureReady: false }),
-      tile(1, 0, 0, null, unit('warrior', 0)),
-      tile(2, 0, 0, null, unit('rider', 0)),
-      tile(3, 0, 0, null, unit('archer', 0)),
-      tile(4, 0, 0, null, null, { kind: 'sawmill', level: 1 }),
-      tile(5, 0, 0, null, null, { kind: 'mine', level: 1 }),
+      tile(1, 0, 0, null, unit(UnitType.WARRIOR, 0)),
+      tile(2, 0, 0, null, unit(UnitType.RIDER, 0)),
+      tile(3, 0, 0, null, unit(UnitType.ARCHER, 0)),
+      tile(4, 0, 0, null, null, { kind: BuildingKind.SAWMILL, level: 1 }),
+      tile(5, 0, 0, null, null, { kind: BuildingKind.MINE, level: 1 }),
     );
     expect(boardScore(map, 0)).toBe(
       VILLAGE_SCORE + WARRIOR_SCORE + RIDER_SCORE + ARCHER_SCORE + BUILDING_SCORE + BUILDING_SCORE,
@@ -105,7 +106,7 @@ describe('boardScore', () => {
     map.tiles.push(
       tile(0, 0, 0, { owner: 0, level: 1, captureReady: false }),
       tile(1, 0, 1, { owner: 1, level: 1, captureReady: false }),
-      tile(2, 0, 1, null, unit('warrior', 1)),
+      tile(2, 0, 1, null, unit(UnitType.WARRIOR, 1)),
     );
     expect(boardScore(map, 0)).toBe(VILLAGE_SCORE);
     expect(boardScore(map, 1)).toBe(VILLAGE_SCORE + WARRIOR_SCORE);
@@ -134,8 +135,8 @@ describe('boardScore', () => {
   it('does not count temples in the generic building score', () => {
     const map: GameMap = { radius: 2, tiles: [], spawns: [] };
     map.tiles.push(
-      tile(0, 0, 0, null, null, { kind: 'temple', level: 4 }),
-      tile(1, 0, 0, null, null, { kind: 'sawmill', level: 1 }),
+      tile(0, 0, 0, null, null, { kind: BuildingKind.TEMPLE, level: 4 }),
+      tile(1, 0, 0, null, null, { kind: BuildingKind.SAWMILL, level: 1 }),
     );
     expect(boardScore(map, 0)).toBe(BUILDING_SCORE);
   });
@@ -143,7 +144,7 @@ describe('boardScore', () => {
   it('does not count forest temples in the generic building score', () => {
     const map: GameMap = {
       radius: 2,
-      tiles: [tile(0, 0, 0, null, null, { kind: 'forestTemple', level: 4 })],
+      tiles: [tile(0, 0, 0, null, null, { kind: BuildingKind.FOREST_TEMPLE, level: 4 })],
       spawns: [],
     };
     expect(boardScore(map, 0)).toBe(0);
@@ -162,10 +163,10 @@ describe('awardTempleScores', () => {
   it('grants 10/15/20/25 by temple level at game end for own temples only', () => {
     const map: GameMap = { radius: 2, tiles: [], spawns: [] };
     map.tiles.push(
-      tile(0, 0, 0, null, null, { kind: 'temple', level: 1 }),
-      tile(1, 0, 0, null, null, { kind: 'temple', level: 2 }),
-      tile(2, 0, 0, null, null, { kind: 'temple', level: 4 }),
-      tile(3, 0, 1, null, null, { kind: 'temple', level: 4 }),
+      tile(0, 0, 0, null, null, { kind: BuildingKind.TEMPLE, level: 1 }),
+      tile(1, 0, 0, null, null, { kind: BuildingKind.TEMPLE, level: 2 }),
+      tile(2, 0, 0, null, null, { kind: BuildingKind.TEMPLE, level: 4 }),
+      tile(3, 0, 1, null, null, { kind: BuildingKind.TEMPLE, level: 4 }),
     );
     const p0 = player();
     const p1 = { ...player(), index: 1 };
@@ -178,8 +179,8 @@ describe('awardTempleScores', () => {
     const map: GameMap = {
       radius: 2,
       tiles: [
-        tile(0, 0, 0, null, null, { kind: 'forestTemple', level: 1 }),
-        tile(1, 0, 0, null, null, { kind: 'forestTemple', level: 3 }),
+        tile(0, 0, 0, null, null, { kind: BuildingKind.FOREST_TEMPLE, level: 1 }),
+        tile(1, 0, 0, null, null, { kind: BuildingKind.FOREST_TEMPLE, level: 3 }),
       ],
       spawns: [],
     };
@@ -202,16 +203,16 @@ describe('scoreBreakdown', () => {
   it('itemizes action scores and board scores, summing to totalScore', () => {
     const map: GameMap = { radius: 2, tiles: [], spawns: [] };
     map.tiles.push(
-      tile(0, 0, 0, { owner: 0, level: 1, captureReady: false }, unit('warrior', 0)),
-      tile(1, 0, 0, null, null, { kind: 'sawmill', level: 1 }),
-      tile(2, 0, 0, null, null, { kind: 'temple', level: 2 }),
-      tile(3, 0, 0, null, null, { kind: 'forestTemple', level: 3 }),
+      tile(0, 0, 0, { owner: 0, level: 1, captureReady: false }, unit(UnitType.WARRIOR, 0)),
+      tile(1, 0, 0, null, null, { kind: BuildingKind.SAWMILL, level: 1 }),
+      tile(2, 0, 0, null, null, { kind: BuildingKind.TEMPLE, level: 2 }),
+      tile(3, 0, 0, null, null, { kind: BuildingKind.FOREST_TEMPLE, level: 3 }),
     );
     const p: Player = {
       index: 0, tribe: Tribe.Villagers, isHuman: true, name: 'p',
       resources: { wood: 0, stone: 0, money: 0, ore: 0, food: 20 },
       score: 25 + 30 + 50 + 20 + 15 + 15 + 20 + 40,
-      kills: 2, skills: ['swordsman'], isActive: true,
+      kills: 2, skills: [SkillId.SWORDSMAN], isActive: true,
       stats: { killedUnits: 3, pirateKills: 1, villagesCaptured: 1, villageUpgrades: 1, knightCombos: 0, enemyShipsKilled: 0, shipsCapturedByPirates: 0, bonusesCollected: 0, tribesEliminated: 0, skillsOpened: 0 },
     };
     const items = scoreBreakdown(map, p, 40);
@@ -241,18 +242,18 @@ describe('gameOverRows', () => {
   it('covers every score source in fixed order, summing to totalScore', () => {
     const village = tile(0, 0, 0, { owner: 0, level: 1, captureReady: false });
     village.exploredBy = [0];
-    const sawmill = tile(1, 0, 0, null, null, { kind: 'sawmill', level: 1 });
+    const sawmill = tile(1, 0, 0, null, null, { kind: BuildingKind.SAWMILL, level: 1 });
     sawmill.exploredBy = [0];
-    const temple = tile(2, 0, 0, null, null, { kind: 'temple', level: 2 });
+    const temple = tile(2, 0, 0, null, null, { kind: BuildingKind.TEMPLE, level: 2 });
     temple.exploredBy = [0];
-    const forestTemple = tile(3, 0, 0, null, null, { kind: 'forestTemple', level: 3 });
+    const forestTemple = tile(3, 0, 0, null, null, { kind: BuildingKind.FOREST_TEMPLE, level: 3 });
     forestTemple.exploredBy = [0];
     const bridge = {
       q: 4, r: 0, terrain: TileType.Water, settlement: null, building: null,
       unit: null, ownedBy: null, claimedByVillage: null, exploredBy: [0],
-      bridge: { owner: 0, dir: 'we' as const },
+      bridge: { owner: 0, dir: BridgeDir.WE },
     };
-    const warriorTile = tile(5, 0, 0, null, unit('warrior', 0));
+    const warriorTile = tile(5, 0, 0, null, unit(UnitType.WARRIOR, 0));
     warriorTile.exploredBy = [0];
     const map: GameMap = { radius: 2, tiles: [village, sawmill, temple, forestTemple, bridge, warriorTile], spawns: [] };
 
@@ -262,7 +263,7 @@ describe('gameOverRows', () => {
       // Award-stock total: 2 normal kills + 1 pirate kill + 2 combos + 1 capture
       // + 2 upgrades + 1 skill + temples (15 + 20).
       score: 2 * KILL_SCORE + PIRATE_KILL_SCORE + 2 * COMBO_SCORE + CAPTURE_SCORE + 2 * UPGRADE_SCORE + SKILL_SCORE + 15 + 20,
-      kills: 3, skills: ['shields'], isActive: true,
+      kills: 3, skills: [SkillId.SHIELDS], isActive: true,
       stats: { killedUnits: 5, pirateKills: 1, villagesCaptured: 1, villageUpgrades: 2, knightCombos: 2, enemyShipsKilled: 0, shipsCapturedByPirates: 0, bonusesCollected: 0, tribesEliminated: 2, skillsOpened: 1 },
     };
     const rows = gameOverRows(map, p, 0);
@@ -313,7 +314,7 @@ describe('gameOverRows', () => {
     const p: Player = {
       index: 0, tribe: Tribe.Cats, isHuman: true, name: 'p',
       resources: { wood: 0, stone: 0, money: 0, ore: 0, food: 20 },
-      score: SKILL_SCORE, kills: 0, skills: ['shields', 'science'], isActive: true,
+      score: SKILL_SCORE, kills: 0, skills: [SkillId.SHIELDS, SkillId.SCIENCE], isActive: true,
       stats: { ...EMPTY_STATS, skillsOpened: 1 },
     };
     const row = gameOverRows(map, p, 0).find((r) => r.label === 'Skills opened')!;
@@ -337,7 +338,7 @@ describe('bridge score', () => {
     return {
       q: 0, r: 0, terrain: TileType.Water, settlement: null, building: null,
       unit: null, ownedBy: null, claimedByVillage: null, exploredBy: [0],
-      bridge: { owner, dir: 'we' as const },
+      bridge: { owner, dir: BridgeDir.WE as const },
     };
   }
 

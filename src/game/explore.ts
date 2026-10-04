@@ -3,6 +3,7 @@ import { GameMap, MapTile } from './map-gen';
 import { shipAttackDistance } from './ship';
 import { isMountainType } from './tile-types';
 import { Unit } from './units';
+import { UnitType } from '@enums';
 
 export function isExploredFor(tile: MapTile, playerIndex: number): boolean {
   return tile.exploredBy !== undefined && tile.exploredBy.includes(playerIndex);
@@ -36,7 +37,7 @@ export function exploreUnitPath(
 ): MapTile[] {
   const baseRadius = unit.shipLevel !== undefined
     ? shipAttackDistance(unit)
-    : unit.type === 'catapult'
+    : unit.type === UnitType.CATAPULT
       ? 1
       : unit.attackDistance;
   // A visited cell always reveals at least its own surrounding ring.

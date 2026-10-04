@@ -3,12 +3,13 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { runDuels, PLAYABLE_UNITS, cheapBeatsCostly } from '../src/game/balance';
 import { buildReport, CAPTION } from '../src/game/balance-report';
+import { UnitType } from '@enums';
 
 const OUT = resolve(__dirname, '../combat-balance.md');
 
 /** The 7 base combat units; tribe special units are utility unlocks and sit
  *  outside the raw duel-balance verdict. */
-const CORE = ['warrior', 'rider', 'archer', 'swordsman', 'shield', 'catapult', 'knight'] as (typeof PLAYABLE_UNITS)[number][];
+const CORE = [UnitType.WARRIOR, UnitType.RIDER, UnitType.ARCHER, UnitType.SWORDSMAN, UnitType.SHIELD, UnitType.CATAPULT, UnitType.KNIGHT] as (typeof PLAYABLE_UNITS)[number][];
 
 describe('combat-balance report', () => {
   it('contains the duel matrices and the balance verdict', () => {
@@ -39,7 +40,7 @@ describe('combat-balance report', () => {
     // The only pair that may remain is the accepted knight-vs-catapult siege
     // counter (documented in the report). Special units are utility unlocks
     // and are excluded from this verdict.
-    const catastrophes = flags.filter((f) => f.win > 0.9 && CORE.includes(f.cheaper) && CORE.includes(f.pricier) && !(f.cheaper === 'catapult' || f.pricier === 'catapult'));
+    const catastrophes = flags.filter((f) => f.win > 0.9 && CORE.includes(f.cheaper) && CORE.includes(f.pricier) && !(f.cheaper === UnitType.CATAPULT || f.pricier === UnitType.CATAPULT));
     expect(catastrophes).toEqual([]);
   });
 });

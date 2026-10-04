@@ -10,7 +10,7 @@ import { SeededRandom } from '../src/util/random';
 import { PIRATE_OWNER, type Unit } from '../src/game/units';
 import { hexDistance } from '../src/game/hex';
 import { migrateLegacyResources } from '../src/game/stock';
-import { GameMode } from '@enums';
+import { AiActionType, AiDifficulty, BuildingKind, GameMode, SkillId, UnitType } from '@enums';
 
 /** Moves the legacy-literal materials of a test player into its capital before planning. */
 function fund<T extends import('../src/game/players').Player>(map: import('../src/game/map-gen').GameMap, player: T): T {
@@ -30,21 +30,21 @@ function aiPlayer(over: Partial<Player> = {}): Player {
     kills: 0,
     skills: [],
     isActive: true,
-    difficulty: 'normal',
+    difficulty: AiDifficulty.NORMAL,
     ...over,
   };
 }
 
 function pirate(id: string, q: number, r: number): Unit {
   return {
-    id, owner: PIRATE_OWNER, type: 'pirate', q, r,
+    id, owner: PIRATE_OWNER, type: UnitType.PIRATE, q, r,
     hasMoved: false, hasAttacked: false, hasHealed: false,
     hp: 20, attack: 30, attackDistance: 3, defense: 10, spawnVillage: null,
   };
 }
 
 function shipUnit(id: string, owner: number, q: number, r: number): Unit {
-  const u = makeUnit(id, owner, 'warrior', q, r);
+  const u = makeUnit(id, owner, UnitType.WARRIOR, q, r);
   u.shipLevel = 1;
   return u;
 }
@@ -53,7 +53,7 @@ describe('Naval threat detection', () => {
   it('isNavalEnemy flags pirates and ships but not land units', () => {
     const p = pirate('p', 0, 0);
     const s = shipUnit('s', 0, 0, 0);
-    const w = makeUnit('w', 0, 'warrior', 0, 0);
+    const w = makeUnit('w', 0, UnitType.WARRIOR, 0, 0);
     expect(isNavalEnemy(p)).toBe(true);
     expect(isNavalEnemy(s)).toBe(true);
     expect(isNavalEnemy(w)).toBe(false);
@@ -125,18 +125,18 @@ describe('Naval skill priority', () => {
   it('opens Water first while threatened instead of the economy order', () => {
     const player = aiPlayer({ resources: { wood: 0, stone: 0, money: 10, ore: 0, food: 20 } });
     const actions = planAiActions(coastalMap(), player, new SeededRandom(1), GameMode.CAPTURE);
-    const firstSkill = actions.find((a) => a.type === 'openSkill');
+    const firstSkill = actions.find((a) => a.type === AiActionType.OPEN_SKILL);
     expect(firstSkill).toBeDefined();
-    if (firstSkill && firstSkill.type === 'openSkill') expect(firstSkill.skill).toBe('water');
+    if (firstSkill && firstSkill.type === AiActionType.OPEN_SKILL) expect(firstSkill.skill).toBe(SkillId.WATER);
   });
 
   it('opens Navigation when Water is already open and the coast is threatened', () => {
     const player = aiPlayer({
-      skills: ['water'],
+      skills: [SkillId.WATER],
       resources: { wood: 0, stone: 0, money: 40, ore: 0, food: 20 },
     });
     const actions = planAiActions(coastalMap(), player, new SeededRandom(1), GameMode.CAPTURE);
-    expect(actions.some((a) => a.type === 'openSkill' && a.skill === 'navigation')).toBe(true);
+    expect(actions.some((a) => a.type === AiActionType.OPEN_SKILL && a.skill === SkillId.NAVIGATION)).toBe(true);
   });
 
   it('does not prioritize Water when no naval enemy is near', () => {
@@ -145,11 +145,11 @@ describe('Naval skill priority', () => {
     tileAt(map, 0, 0)!.settlement = { owner: 1, level: 1, captureReady: false };
     const player = aiPlayer({ resources: { wood: 0, stone: 0, money: 10, ore: 0, food: 20 } });
     const actions = planAiActions(map, fund(map, player), new SeededRandom(1), GameMode.CAPTURE);
-    const firstSkill = actions.find((a) => a.type === 'openSkill');
+    const firstSkill = actions.find((a) => a.type === AiActionType.OPEN_SKILL);
     // Without a threat the economy order leads with an economy skill — the
     // exact first pick is jitter-sensitive, but Water must never be first.
     expect(firstSkill).toBeDefined();
-    if (firstSkill && firstSkill.type === 'openSkill') expect(firstSkill.skill).not.toBe('water');
+    if (firstSkill && firstSkill.type === AiActionType.OPEN_SKILL) expect(firstSkill.skill).not.toBe(SkillId.WATER);
   });
 
   it('opens only the naval skill chain while threatened, never economy skills', () => {
@@ -158,7 +158,7 @@ describe('Naval skill priority', () => {
     const map = coastalMap();
     const actions = planAiActions(map, fund(map, player), new SeededRandom(1), GameMode.CAPTURE);
     for (const a of actions) {
-      if (a.type === 'openSkill') expect(allowed.has(a.skill), a.skill).toBe(true);
+      if (a.type === AiActionType.OPEN_SKILL) expect(allowed.has(a.skill), a.skill).toBe(true);
     }
   });
 });
@@ -175,14 +175,14 @@ describe('Naval port building', () => {
     tileAt(map, 4, 0)!.terrain = TileType.Water;
     tileAt(map, 4, 0)!.unit = pirate('p1', 4, 0);
     const player = aiPlayer({
-      skills: ['water'],
+      skills: [SkillId.WATER],
       resources: { wood: 20, stone: 0, money: 100, ore: 5, food: 20 },
     });
     const actions = planAiActions(map, fund(map, player), new SeededRandom(1), GameMode.CAPTURE);
-    const build = actions.find((a) => a.type === 'build');
+    const build = actions.find((a) => a.type === AiActionType.BUILD);
     expect(build).toBeDefined();
-    if (build && build.type === 'build') {
-      expect(build.kind).toBe('port');
+    if (build && build.type === AiActionType.BUILD) {
+      expect(build.kind).toBe(BuildingKind.PORT);
       expect(build.q).toBe(1);
       expect(build.r).toBe(0);
     }
@@ -203,14 +203,14 @@ describe('Naval port building', () => {
     tileAt(map, 0, 4)!.terrain = TileType.Water;
     tileAt(map, 0, 4)!.unit = pirate('p1', 0, 4);
     const player = aiPlayer({
-      skills: ['water'],
+      skills: [SkillId.WATER],
       resources: { wood: 20, stone: 0, money: 100, ore: 5, food: 20 },
     });
     const actions = planAiActions(map, fund(map, player), new SeededRandom(1), GameMode.CAPTURE);
-    const build = actions.find((a) => a.type === 'build');
+    const build = actions.find((a) => a.type === AiActionType.BUILD);
     expect(build).toBeDefined();
-    if (build && build.type === 'build') {
-      expect(build.kind).toBe('port');
+    if (build && build.type === AiActionType.BUILD) {
+      expect(build.kind).toBe(BuildingKind.PORT);
       expect(build.q).toBe(0);
       expect(build.r).toBe(2);
     }
@@ -220,20 +220,20 @@ describe('Naval port building', () => {
 describe('Naval boarding', () => {
   it('walks a spare unit onto an owned port to become a ship', () => {
     const map = makeTestMap(6);
-    tileAt(map, 0, 0)!.unit = makeUnit('crew', 1, 'warrior', 0, 0);
+    tileAt(map, 0, 0)!.unit = makeUnit('crew', 1, UnitType.WARRIOR, 0, 0);
     tileAt(map, 0, 1)!.terrain = TileType.Water;
     tileAt(map, 0, 1)!.ownedBy = 1;
-    tileAt(map, 0, 1)!.building = { kind: 'port', level: 1 };
+    tileAt(map, 0, 1)!.building = { kind: BuildingKind.PORT, level: 1 };
     tileAt(map, 4, 0)!.terrain = TileType.Water;
     tileAt(map, 4, 0)!.unit = pirate('p1', 4, 0);
     const player = aiPlayer({
-      skills: ['water', 'navigation'],
+      skills: [SkillId.WATER, SkillId.NAVIGATION],
       resources: { wood: 0, stone: 0, money: 100, ore: 0, food: 20 },
     });
     const actions = planAiActions(map, fund(map, player), new SeededRandom(1), GameMode.CAPTURE);
-    const board = actions.find((a) => a.type === 'move' && a.unitId === 'crew');
+    const board = actions.find((a) => a.type === AiActionType.MOVE && a.unitId === 'crew');
     expect(board).toBeDefined();
-    if (board && board.type === 'move') {
+    if (board && board.type === AiActionType.MOVE) {
       expect(board.q).toBe(0);
       expect(board.r).toBe(1);
     }
@@ -241,20 +241,20 @@ describe('Naval boarding', () => {
 
   it('does not board when the AI already has a ship', () => {
     const map = makeTestMap(6);
-    tileAt(map, 0, 0)!.unit = makeUnit('crew', 1, 'warrior', 0, 0);
+    tileAt(map, 0, 0)!.unit = makeUnit('crew', 1, UnitType.WARRIOR, 0, 0);
     tileAt(map, 0, 1)!.terrain = TileType.Water;
     tileAt(map, 0, 1)!.ownedBy = 1;
-    tileAt(map, 0, 1)!.building = { kind: 'port', level: 1 };
+    tileAt(map, 0, 1)!.building = { kind: BuildingKind.PORT, level: 1 };
     tileAt(map, 2, 0)!.terrain = TileType.Water;
     tileAt(map, 2, 0)!.unit = shipUnit('s1', 1, 2, 0);
     tileAt(map, 4, 0)!.terrain = TileType.Water;
     tileAt(map, 4, 0)!.unit = pirate('p1', 4, 0);
     const player = aiPlayer({
-      skills: ['water', 'navigation'],
+      skills: [SkillId.WATER, SkillId.NAVIGATION],
       resources: { wood: 0, stone: 0, money: 100, ore: 0, food: 20 },
     });
     const actions = planAiActions(map, fund(map, player), new SeededRandom(1), GameMode.CAPTURE);
-    expect(actions.some((a) => a.type === 'move' && a.unitId === 'crew')).toBe(false);
+    expect(actions.some((a) => a.type === AiActionType.MOVE && a.unitId === 'crew')).toBe(false);
   });
 });
 
@@ -273,20 +273,20 @@ describe('Naval hunting', () => {
     tileAt(map, 3, 0)!.unit = p;
     tileAt(map, 0, 0)!.unit = shipUnit('ship1', 1, 0, 0);
     const player = aiPlayer({
-      skills: ['water', 'navigation'],
+      skills: [SkillId.WATER, SkillId.NAVIGATION],
       resources: { wood: 0, stone: 0, money: 100, ore: 0, food: 20 },
     });
     const actions = planAiActions(map, fund(map, player), new SeededRandom(1), GameMode.CAPTURE);
-    const moveIdx = actions.findIndex((a) => a.type === 'move' && a.unitId === 'ship1');
-    const attackIdx = actions.findIndex((a) => a.type === 'attack' && a.unitId === 'ship1');
+    const moveIdx = actions.findIndex((a) => a.type === AiActionType.MOVE && a.unitId === 'ship1');
+    const attackIdx = actions.findIndex((a) => a.type === AiActionType.ATTACK && a.unitId === 'ship1');
     expect(moveIdx).toBeGreaterThanOrEqual(0);
     expect(attackIdx).toBe(moveIdx + 1);
     const move = actions[moveIdx]!;
-    if (move.type === 'move') {
+    if (move.type === AiActionType.MOVE) {
       expect(hexDistance({ q: move.q, r: move.r }, { q: 3, r: 0 })).toBe(2);
     }
     const attack = actions[attackIdx]!;
-    if (attack.type === 'attack') {
+    if (attack.type === AiActionType.ATTACK) {
       expect(attack.q).toBe(3);
       expect(attack.r).toBe(0);
     }
@@ -306,11 +306,11 @@ describe('Naval ship upgrades', () => {
     tileAt(map, -2, 2)!.settlement = { owner: 1, level: 1, captureReady: false, capital: true };
     tileAt(map, -2, 2)!.ownedBy = 1;
     const player = aiPlayer({
-      skills: ['water', 'navigation'],
+      skills: [SkillId.WATER, SkillId.NAVIGATION],
       resources: { wood: 10, stone: 0, money: 100, ore: 0, food: 20 },
     });
     const actions = planAiActions(map, fund(map, player), new SeededRandom(1), GameMode.CAPTURE);
-    const up = actions.find((a) => a.type === 'upgradeShip' && a.unitId === 'ship1');
+    const up = actions.find((a) => a.type === AiActionType.UPGRADE_SHIP && a.unitId === 'ship1');
     expect(up).toBeDefined();
   });
 });
@@ -322,7 +322,7 @@ describe('Naval catapults', () => {
     // land step that closes to firing range (distance 4) is (1,0); the two
     // alternate approach tiles (1,1) and (1,-1) are water so the choice is
     // deterministic. (1,0) is distance 4 -> safe from the pirate's range 3.
-    tileAt(map, 0, 0)!.unit = makeUnit('cat1', 1, 'catapult', 0, 0);
+    tileAt(map, 0, 0)!.unit = makeUnit('cat1', 1, UnitType.CATAPULT, 0, 0);
     tileAt(map, 1, 0);
     tileAt(map, 1, 1)!.terrain = TileType.Water;
     tileAt(map, 1, -1)!.terrain = TileType.Water;
@@ -333,13 +333,13 @@ describe('Naval catapults', () => {
 
   it('moves an idle catapult into firing range of the pirate', () => {
     const player = aiPlayer({
-      skills: ['science', 'catapult'],
+      skills: [SkillId.SCIENCE, SkillId.CATAPULT],
       resources: { wood: 0, stone: 0, money: 100, ore: 0, food: 20 },
     });
     const actions = planAiActions(catapultMap(), player, new SeededRandom(1), GameMode.CAPTURE);
-    const move = actions.find((a) => a.type === 'move' && a.unitId === 'cat1');
+    const move = actions.find((a) => a.type === AiActionType.MOVE && a.unitId === 'cat1');
     expect(move).toBeDefined();
-    if (move && move.type === 'move') {
+    if (move && move.type === AiActionType.MOVE) {
       expect(move.q).toBe(1);
       expect(move.r).toBe(0);
     }
@@ -355,27 +355,27 @@ describe('Naval catapults', () => {
     tileAt(map, 4, 0)!.terrain = TileType.Water;
     tileAt(map, 4, 0)!.unit = pirate('p1', 4, 0);
     const player = aiPlayer({
-      skills: ['science', 'catapult', 'water'],
+      skills: [SkillId.SCIENCE, SkillId.CATAPULT, SkillId.WATER],
       resources: { wood: 100, stone: 0, money: 100, ore: 10, food: 20 },
     });
     const actions = planAiActions(map, fund(map, player), new SeededRandom(1), GameMode.CAPTURE);
-    expect(actions.some((a) => a.type === 'spawn' && a.unitType === 'catapult')).toBe(true);
+    expect(actions.some((a) => a.type === AiActionType.SPAWN && a.unitType === UnitType.CATAPULT)).toBe(true);
   });
 });
 
 describe('Naval defensive guards', () => {
   it('keeps a melee unit from marching toward or attacking an unreachable pirate', () => {
     const map = makeTestMap(6);
-    tileAt(map, 0, 0)!.unit = makeUnit('w1', 1, 'warrior', 0, 0);
+    tileAt(map, 0, 0)!.unit = makeUnit('w1', 1, UnitType.WARRIOR, 0, 0);
     tileAt(map, 1, 0)!.terrain = TileType.Water;
     tileAt(map, 2, 0)!.terrain = TileType.Water;
     tileAt(map, 2, 0)!.unit = pirate('p1', 2, 0);
     const player = aiPlayer({ resources: { wood: 0, stone: 0, money: 100, ore: 0, food: 20 } });
     const actions = planAiActions(map, fund(map, player), new SeededRandom(1), GameMode.CAPTURE);
-    expect(actions.some((a) => a.type === 'attack' && a.q === 2 && a.r === 0)).toBe(false);
+    expect(actions.some((a) => a.type === AiActionType.ATTACK && a.q === 2 && a.r === 0)).toBe(false);
     const start = hexDistance({ q: 0, r: 0 }, { q: 2, r: 0 });
     for (const a of actions) {
-      if (a.type === 'move' && a.unitId === 'w1') {
+      if (a.type === AiActionType.MOVE && a.unitId === 'w1') {
         expect(hexDistance({ q: a.q, r: a.r }, { q: 2, r: 0 })).toBeGreaterThanOrEqual(start);
       }
     }
@@ -388,11 +388,11 @@ describe('Naval defensive guards', () => {
     tileAt(map, 1, 0)!.terrain = TileType.Water;
     tileAt(map, 1, 0)!.unit = pirate('p1', 1, 0);
     const player = aiPlayer({
-      skills: ['shields'],
+      skills: [SkillId.SHIELDS],
       resources: { wood: 0, stone: 0, money: 100, ore: 3, food: 20 },
     });
     const actions = planAiActions(map, fund(map, player), new SeededRandom(1), GameMode.CAPTURE);
-    expect(actions.some((a) => a.type === 'spawn' && a.unitType === 'shield')).toBe(true);
+    expect(actions.some((a) => a.type === AiActionType.SPAWN && a.unitType === UnitType.SHIELD)).toBe(true);
   });
 
   it('skips bridge building while a naval threat is active', () => {
@@ -404,13 +404,13 @@ describe('Naval defensive guards', () => {
     // Pirate elsewhere on the coast to create the threat.
     tileAt(map, 0, -3)!.terrain = TileType.Water;
     tileAt(map, 0, -3)!.unit = pirate('p1', 0, -3);
-    tileAt(map, 0, 0)!.unit = makeUnit('w1', 1, 'warrior', 0, 0);
+    tileAt(map, 0, 0)!.unit = makeUnit('w1', 1, UnitType.WARRIOR, 0, 0);
     const player = aiPlayer({
-      skills: ['riding', 'bridges'],
+      skills: [SkillId.RIDING, SkillId.BRIDGES],
       resources: { wood: 100, stone: 100, money: 100, ore: 0, food: 20 },
     });
     const actions = planAiActions(map, fund(map, player), new SeededRandom(1), GameMode.CAPTURE);
-    expect(actions.some((a) => a.type === 'buildBridge')).toBe(false);
+    expect(actions.some((a) => a.type === AiActionType.BUILD_BRIDGE)).toBe(false);
   });
 
   it('does not build a pointless bridge across a gap between two quiet own tiles when unthreatened', () => {
@@ -419,10 +419,10 @@ describe('Naval defensive guards', () => {
     tileAt(map, 2, 0)!.ownedBy = 1;
     tileAt(map, 1, 0)!.terrain = TileType.Water;
     const player = aiPlayer({
-      skills: ['riding', 'bridges'],
+      skills: [SkillId.RIDING, SkillId.BRIDGES],
       resources: { wood: 100, stone: 100, money: 100, ore: 0, food: 20 },
     });
     const actions = planAiActions(map, fund(map, player), new SeededRandom(1), GameMode.CAPTURE);
-    expect(actions.some((a) => a.type === 'buildBridge')).toBe(false);
+    expect(actions.some((a) => a.type === AiActionType.BUILD_BRIDGE)).toBe(false);
   });
 });

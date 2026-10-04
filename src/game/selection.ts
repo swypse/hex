@@ -5,10 +5,9 @@ import { isExploredFor } from './explore';
 import { movePoints as unitMovePoints, Unit } from './units';
 import { tileMoveCost, waterRouteKeys } from './movement-cost';
 import { isMoveStealthed } from './stalker';
+import { BuildingKind, SelectionKind } from '@enums';
 
-/** `tile`: the hex is selected. `unit`: the hex is selected and the unit standing
- *  on it is armed (move/attack highlights, unit actions, glow). */
-type SelectionKind = 'unit' | 'tile';
+
 
 export interface Selection {
   kind: SelectionKind;
@@ -33,8 +32,8 @@ export function tileAt(map: GameMap, q: number, r: number): MapTile | undefined 
 
 export function contentLayers(tile: MapTile): SelectionKind[] {
   const layers: SelectionKind[] = [];
-  if (tile.unit) layers.push('unit');
-  layers.push('tile');
+  if (tile.unit) layers.push(SelectionKind.UNIT);
+  layers.push(SelectionKind.TILE);
   return layers;
 }
 
@@ -86,7 +85,7 @@ function isEnterable(
  *  (turns into a ship, ending its turn), so it may be a destination but never
  *  a bridge to the shore beyond. */
 function isOwnDock(tile: MapTile, canDock: boolean, playerIndex: number): boolean {
-  return canDock && tile.building?.kind === 'port' && tile.ownedBy === playerIndex;
+  return canDock && tile.building?.kind === BuildingKind.PORT && tile.ownedBy === playerIndex;
 }
 
 function isAdjacentToEnemy(map: GameMap, tile: MapTile, playerIndex: number): boolean {
@@ -208,7 +207,7 @@ function pathBetweenSteps(
       if (!isExploredFor(tile, playerIndex)) continue;
       if (tile.terrain === TileType.Water && !canSail) {
         const bridged = tile.bridge !== undefined && tile.bridge !== null;
-        const dockHere = tile.building !== null && tile.building.kind === 'port' && tile.ownedBy === playerIndex && canDock;
+        const dockHere = tile.building !== null && tile.building.kind === BuildingKind.PORT && tile.ownedBy === playerIndex && canDock;
         if (!bridged && !dockHere) continue;
       } else if (canSail && tile.terrain !== TileType.Water && !(n.q === to.q && n.r === to.r)) {
         continue;

@@ -8,6 +8,7 @@ import { ROAD_COST, roadNetworkComponents } from './roads';
 import { hasSkill } from './skills';
 import { isWaterType } from './tile-types';
 import type { Resources } from './resources';
+import { BuildingKind, FoodPressure, SkillId } from '@enums';
 
 /** The AI's answer to networks that cannot feed their units. */
 export interface FoodPlan {
@@ -15,9 +16,9 @@ export interface FoodPlan {
    *  food surplus (roads and/or ports): they build no farms until it is done. */
   linkFirst: Set<string>;
   /** Road tiles to build now, each with the pressure of the starving network. */
-  roads: { tile: MapTile; pressure: 'low' | 'urgent' }[];
+  roads: { tile: MapTile; pressure: FoodPressure.LOW | FoodPressure.URGENT }[];
   /** Port tiles to build now. */
-  ports: { tile: MapTile; pressure: 'low' | 'urgent' }[];
+  ports: { tile: MapTile; pressure: FoodPressure.LOW | FoodPressure.URGENT }[];
 }
 
 /** Rough price of a bundle of resources, to compare a farm to a road or port. */
@@ -30,7 +31,7 @@ function roadSite(tile: MapTile, owner: number): boolean {
   if (tile.roadOwner !== null && tile.roadOwner !== undefined) return false;
   if (tile.ownedBy !== null && tile.ownedBy !== owner) return false;
   if (isWaterType(tile.terrain) || tile.settlement !== null) return false;
-  if (tile.building !== null && tile.building.kind === 'port') return false;
+  if (tile.building !== null && tile.building.kind === BuildingKind.PORT) return false;
   return !(tile.unit && tile.unit.owner !== owner);
 }
 
@@ -147,7 +148,7 @@ function portSideCosts(
   for (const k of comp) {
     const t = byKey.get(k);
     const c = clusters.get(k);
-    if (t?.building?.kind === 'port' && t.ownedBy === player.index && c !== undefined) out.set(c, { cost: 0, path: [], ports: [] });
+    if (t?.building?.kind === BuildingKind.PORT && t.ownedBy === player.index && c !== undefined) out.set(c, { cost: 0, path: [], ports: [] });
   }
   const portCost = weigh(BUILDING_COSTS.port);
   for (const site of map.tiles) {
@@ -178,9 +179,9 @@ function portSideCosts(
  *  to them) that put both networks on one water route. */
 export function planFoodFixes(map: GameMap, player: Player, states: FoodNetworkState[]): FoodPlan {
   const plan: FoodPlan = { linkFirst: new Set(), roads: [], ports: [] };
-  const hungry = states.filter((n) => n.balance < 0 && n.pressure !== 'none');
-  const canRoad = hasSkill(player, 'roads');
-  const canPort = hasSkill(player, 'water');
+  const hungry = states.filter((n) => n.balance < 0 && n.pressure !== FoodPressure.NONE);
+  const canRoad = hasSkill(player, SkillId.ROADS);
+  const canPort = hasSkill(player, SkillId.WATER);
   if (hungry.length === 0 || (!canRoad && !canPort)) return plan;
   const comps = roadNetworkComponents(map, player.index);
   const compOf = (n: FoodNetworkState): Set<string> | undefined => comps.find((c) => c.has([...n.keys][0]!));
@@ -229,7 +230,7 @@ export function planFoodFixes(map: GameMap, player: Player, states: FoodNetworkS
     const chosen = best as { sides: Link[]; ratio: number } | null;
     if (!chosen || chosen.ratio <= farmRatio) continue;
     plan.linkFirst.add(axialKey(d.villages[0]!));
-    const pressure = d.pressure === 'urgent' ? 'urgent' : 'low';
+    const pressure = d.pressure === FoodPressure.URGENT ? FoodPressure.URGENT : FoodPressure.LOW;
     for (const side of chosen.sides) {
       // Build what touches the network now: the port when no roads are needed,
       // otherwise the road tile next to the network (and the far end of a

@@ -1,7 +1,8 @@
 import { BANNER_BONUS } from './abilities';
 import { CORE_COMBAT, Mulberry32, statsFor, strike, type UnitStats } from './balance';
 import { MISS_CHANCE } from './combat';
-import { UNIT_TYPES, unitTypeMaintenance, type UnitType } from './units';
+import { UNIT_TYPES, unitTypeMaintenance } from './units';
+import { UnitType } from '@enums';
 
 /** Purchase price in money-equivalents (money + wood + 2×ore), no skill gate. */
 export function armyUnitCost(type: UnitType, upkeepTurns = 0): number {
@@ -53,14 +54,14 @@ function pickTarget(att: Fighter, foes: Fighter[], bonus: number, slots: Map<Fig
  *  attack distance, so a defender counters only when it reaches that far. At
  *  most MELEE_SLOTS melee attackers may hit one target per turn. */
 function playTurn(side: Fighter[], foes: Fighter[], rng: () => number, eligible: (f: Fighter) => boolean = () => true): void {
-  const banner = side.some((u) => u.type === 'banner' && u.hp > 0);
+  const banner = side.some((u) => u.type === UnitType.BANNER && u.hp > 0);
   const slots = new Map<Fighter, number>();
   for (const att of side) {
     if (!eligible(att)) continue;
     let again = true;
     while (att.hp > 0 && again) {
       again = false;
-      const bonus = banner && att.type !== 'banner' ? BANNER_BONUS : 0;
+      const bonus = banner && att.type !== UnitType.BANNER ? BANNER_BONUS : 0;
       const target = pickTarget(att, foes, bonus, slots);
       if (!target) return;
       if (att.stats.attackDistance <= 1) slots.set(target, (slots.get(target) ?? 0) + 1);
@@ -71,7 +72,7 @@ function playTurn(side: Fighter[], foes: Fighter[], rng: () => number, eligible:
       });
       target.hp -= dmg;
       if (target.hp <= 0) {
-        again = att.type === 'knight';
+        again = att.type === UnitType.KNIGHT;
       } else {
         att.hp -= counter;
       }

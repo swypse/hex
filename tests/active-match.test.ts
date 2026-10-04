@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ACTIVE_MATCH_TTL_MS, createActiveMatchStore, type ActiveMatchStore } from '../src/storage/active-match';
 import { type StorageService } from '../src/storage/storage-service';
+import { LobbyRole } from '@enums';
 
 const KEY = 'hex-active-match-v1';
 
@@ -28,7 +29,7 @@ describe('activeMatchStore', () => {
     const store: ActiveMatchStore = createActiveMatchStore(storage);
     store.save('ABC234', 'Guest', 'wss://relay.example/ws');
     expect(store.loadFresh()).toEqual({
-      role: 'client',
+      role: LobbyRole.CLIENT,
       code: 'ABC234',
       name: 'Guest',
       relayUrl: 'wss://relay.example/ws',

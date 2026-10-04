@@ -4,6 +4,7 @@ import { axialKey, hexNeighbors } from '../src/game/hex';
 import { TileType } from '../src/game/tile-types';
 import { tileSignature, tileInView } from '../src/render/tile-signature';
 import { Viewport } from '../src/render/tile-signature';
+import { BridgeDir, UnitType } from '@enums';
 
 describe('tileSignature', () => {
   it('changes when terrain changes', () => {
@@ -19,7 +20,7 @@ describe('tileSignature', () => {
     const map = generateMap(2, 42);
     const t = map.tiles[0]!;
     const a = tileSignature(t, map, 0, new Set());
-    t.unit = { id: 'u1', owner: 0, type: 'warrior', q: t.q, r: t.r, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 5, attack: 2, attackDistance: 1, spawnVillage: { q: t.q, r: t.r } };
+    t.unit = { id: 'u1', owner: 0, type: UnitType.WARRIOR, q: t.q, r: t.r, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 5, attack: 2, attackDistance: 1, spawnVillage: { q: t.q, r: t.r } };
     const b = tileSignature(t, map, 0, new Set());
     expect(a).not.toBe(b);
   });
@@ -98,7 +99,7 @@ describe('tileSignature', () => {
     const map = generateMap(2, 42);
     const t = map.tiles[0]!;
     const a = tileSignature(t, map, 0, new Set());
-    t.bridge = { owner: 0, dir: 'we' };
+    t.bridge = { owner: 0, dir: BridgeDir.WE };
     const b = tileSignature(t, map, 0, new Set());
     expect(a).not.toBe(b);
   });

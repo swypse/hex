@@ -4,7 +4,7 @@ import { gameController } from '../../controller/game-controller';
 import { hasSkill } from '../../game/skills';
 import { tileAt } from '../../game/selection';
 import { networkStock } from '../../game/stock';
-import { UNIT_TYPES, UNIT_TYPE_NAMES, type UnitType } from '../../game/units';
+import { UNIT_TYPES, UNIT_TYPE_NAMES } from '../../game/units';
 import { TRIBE_SPECIAL_UNIT, TRIBES } from '../../game/tribes';
 import type { Player } from '../../game/players';
 import { useGameStore } from '../../store/game-store';
@@ -14,6 +14,7 @@ import { makeActionButtonIcon } from '../kit/action-button-icons';
 import { makeIcon } from '../kit/icon';
 import { makeLabel } from '../kit/label';
 import { Popup } from '../kit/popup';
+import { FontSize, SkillId, UnitType } from '@enums';
 
 // Fixed 3-icon grid: 3 columns, 4px margins around each cell.
 const COLS = 3;
@@ -39,7 +40,7 @@ function tribeCodeFor(type: UnitType): string {
 }
 
 /** The 7 base playable units every tribe can spawn. */
-const BASE_PLAYABLE: Exclude<UnitType, 'pirate'>[] = ['warrior', 'rider', 'archer', 'swordsman', 'shield', 'catapult', 'knight'];
+const BASE_PLAYABLE: Exclude<UnitType, 'pirate'>[] = [UnitType.WARRIOR, UnitType.RIDER, UnitType.ARCHER, UnitType.SWORDSMAN, UnitType.SHIELD, UnitType.CATAPULT, UnitType.KNIGHT];
 
 /** Types shown in the spawn popup for a player: the 7 base units plus that
  *  player's tribe special unit. */
@@ -113,11 +114,11 @@ export class SpawnDialog {
       need: info.priceOre,
       have: stock.ore
     }));
-    if (type === 'rider' && !hasSkill(player, 'riding')) out.push(t('spawn.reasonSkill', { skill: t('skill.riding.name') }));
-    if (type === 'knight' && !hasSkill(player, 'knights')) out.push(t('spawn.reasonSkill', { skill: t('skill.knights.name') }));
-    if (type === 'swordsman' && !hasSkill(player, 'swordsman')) out.push(t('spawn.reasonSkill', { skill: t('skill.swordsman.name') }));
-    if (type === 'shield' && !hasSkill(player, 'shields')) out.push(t('spawn.reasonSkill', { skill: t('skill.shields.name') }));
-    if (type === 'catapult' && !hasSkill(player, 'catapult')) out.push(t('spawn.reasonSkill', { skill: t('skill.catapult.name') }));
+    if (type === UnitType.RIDER && !hasSkill(player, SkillId.RIDING)) out.push(t('spawn.reasonSkill', { skill: t('skill.riding.name') }));
+    if (type === UnitType.KNIGHT && !hasSkill(player, SkillId.KNIGHTS)) out.push(t('spawn.reasonSkill', { skill: t('skill.knights.name') }));
+    if (type === UnitType.SWORDSMAN && !hasSkill(player, SkillId.SWORDSMAN)) out.push(t('spawn.reasonSkill', { skill: t('skill.swordsman.name') }));
+    if (type === UnitType.SHIELD && !hasSkill(player, SkillId.SHIELDS)) out.push(t('spawn.reasonSkill', { skill: t('skill.shields.name') }));
+    if (type === UnitType.CATAPULT && !hasSkill(player, SkillId.CATAPULT)) out.push(t('spawn.reasonSkill', { skill: t('skill.catapult.name') }));
     return out;
   }
 
@@ -157,7 +158,7 @@ export class SpawnDialog {
       icon.mask = clip;
       item.addChild(icon);
 
-      const name = makeLabel(UNIT_TYPE_NAMES[type], { fontSize: 14, fill: 0xffffff });
+      const name = makeLabel(UNIT_TYPE_NAMES[type], { fontSize: FontSize.SMALL, fill: 0xffffff });
       name.position.set((CELL_W - name.width) / 2, 66);
       item.addChild(name);
 
@@ -189,7 +190,7 @@ export class SpawnDialog {
     const row = new Container();
     let x = 0;
     for (const p of parts) {
-      const value = makeLabel(p.label, { fontSize: 14, fill: 0xffffff });
+      const value = makeLabel(p.label, { fontSize: FontSize.SMALL, fill: 0xffffff });
       const icon = makeIcon(p.icon, RESOURCE_ICON_SIZE);
       icon.position.set(x + value.width + RESOURCE_ICON_SIZE / 2 + 2, RESOURCE_ICON_SIZE / 2);
       value.position.set(x, 0);
@@ -207,7 +208,7 @@ export class SpawnDialog {
     const content = this.popup.content;
     const lines = this.reasons(type);
     const name = makeLabel(t('spawn.cannot', { unit: UNIT_TYPE_NAMES[type] }), {
-      fontSize: 14,
+      fontSize: FontSize.SMALL,
       fill: 0xffffff,
       fontWeight: '700'
     });
@@ -216,7 +217,7 @@ export class SpawnDialog {
     let y = name.height + 8;
     for (const line of lines) {
       const t = makeLabel(line, {
-        fontSize: 14,
+        fontSize: FontSize.SMALL,
         fill: 0xcccccc,
         wordWrap: true,
         wordWrapWidth: this.popup.contentWidth

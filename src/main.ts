@@ -7,9 +7,11 @@ import { installRenderGate, markDirty } from './render/render-gate';
 import { sfx } from './sound/sfx';
 import { initNavigation, useGameStore } from './store/game-store';
 import { THEME } from './ui/kit/theme';
+import { preloadStartupWork } from './controller/startup-preload';
 import { ScreenManager } from './ui/screen-manager';
 import { preferredCanvasFormat, preventBrowserZoom } from './util';
 import { loadFonts } from './util/load-fonts';
+import { Screen } from '@enums';
 
 async function boot(): Promise<void> {
   preventBrowserZoom();
@@ -59,10 +61,12 @@ async function boot(): Promise<void> {
   const joinCode = readJoinCode();
   if (joinCode) {
     setPendingJoin(joinCode);
-    useGameStore.getState().setScreen('lobby');
+    useGameStore.getState().setScreen(Screen.LOBBY);
   }
   new ScreenManager(app);
   initNavigation();
+  // The start screen is up: use its idle time to prepare what a game needs.
+  void preloadStartupWork();
 }
 
 void boot();

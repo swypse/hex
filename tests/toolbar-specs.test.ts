@@ -14,7 +14,7 @@ import { Tribe } from '../src/game/tribes';
 import { tileAt } from '../src/game/selection';
 import { addStock } from '../src/game/stock';
 import { sfx } from '../src/sound/sfx';
-import { GameMode } from '@enums';
+import { BuildingKind, GameMode, PauseReason, SelectionKind, SkillId, UnitType } from '@enums';
 
 describe('toolbarSpecs', () => {
   let map: ReturnType<typeof generateMap>;
@@ -33,11 +33,11 @@ describe('toolbarSpecs', () => {
   });
 
   function select(tile: MapTile): void {
-    useGameStore.getState().setSelection({ kind: 'unit', q: tile.q, r: tile.r });
+    useGameStore.getState().setSelection({ kind: SelectionKind.UNIT, q: tile.q, r: tile.r });
   }
 
   function selectCell(tile: MapTile): void {
-    useGameStore.getState().setSelection({ kind: 'tile', q: tile.q, r: tile.r });
+    useGameStore.getState().setSelection({ kind: SelectionKind.TILE, q: tile.q, r: tile.r });
   }
 
   it('does not offer the extract forest action on a forest tile', () => {
@@ -45,7 +45,7 @@ describe('toolbarSpecs', () => {
     tile.terrain = TileType.GrasslandForest;
     tile.ownedBy = 0;
     tile.unit = {
-      id: 'u', owner: 0, type: 'warrior', q: tile.q, r: tile.r,
+      id: 'u', owner: 0, type: UnitType.WARRIOR, q: tile.q, r: tile.r,
       hasMoved: false, hasAttacked: false, hasHealed: false,
       hp: UNIT_TYPES.warrior.maxHp, attack: 2, attackDistance: 1, spawnVillage: null,
     };
@@ -58,7 +58,7 @@ describe('toolbarSpecs', () => {
     tile.terrain = TileType.Water;
     tile.ownedBy = null;
     tile.unit = {
-      id: 's', owner: 0, type: 'warrior', q: tile.q, r: tile.r,
+      id: 's', owner: 0, type: UnitType.WARRIOR, q: tile.q, r: tile.r,
       hasMoved: false, hasAttacked: false, hasHealed: false,
       hp: 5, attack: 2, attackDistance: 1, spawnVillage: null, shipLevel: 1,
     };
@@ -76,7 +76,7 @@ describe('toolbarSpecs', () => {
     tile.terrain = TileType.Water;
     tile.ownedBy = null;
     tile.unit = {
-      id: 's', owner: 0, type: 'warrior', q: tile.q, r: tile.r,
+      id: 's', owner: 0, type: UnitType.WARRIOR, q: tile.q, r: tile.r,
       hasMoved: false, hasAttacked: false, hasHealed: false,
       hp: 5, attack: 2, attackDistance: 1, spawnVillage: null, shipLevel: 1,
     };
@@ -90,7 +90,7 @@ describe('toolbarSpecs', () => {
     const tile = map.tiles.find((t) => t.unit === null)!;
     tile.ownedBy = 0;
     tile.unit = {
-      id: 's', owner: 0, type: 'warrior', q: tile.q, r: tile.r,
+      id: 's', owner: 0, type: UnitType.WARRIOR, q: tile.q, r: tile.r,
       hasMoved: false, hasAttacked: false, hasHealed: false,
       hp: 5, attack: 2, attackDistance: 1, spawnVillage: null, shipLevel: 1,
     };
@@ -102,7 +102,7 @@ describe('toolbarSpecs', () => {
     const tile = map.tiles.find((t) => t.unit === null)!;
     tile.ownedBy = 0;
     tile.unit = {
-      id: 'w', owner: 0, type: 'warrior', q: tile.q, r: tile.r,
+      id: 'w', owner: 0, type: UnitType.WARRIOR, q: tile.q, r: tile.r,
       hasMoved: false, hasAttacked: false, hasHealed: false,
       hp: UNIT_TYPES.warrior.maxHp, attack: 2, attackDistance: 1, spawnVillage: null,
     };
@@ -117,7 +117,7 @@ describe('toolbarSpecs', () => {
     const tile = map.tiles.find((t) => t.unit === null)!;
     tile.ownedBy = 0;
     tile.unit = {
-      id: 'w', owner: 0, type: 'warrior', q: tile.q, r: tile.r,
+      id: 'w', owner: 0, type: UnitType.WARRIOR, q: tile.q, r: tile.r,
       hasMoved: true, hasAttacked: false, hasHealed: false,
       hp: UNIT_TYPES.warrior.maxHp, attack: 2, attackDistance: 1, spawnVillage: null,
     };
@@ -129,7 +129,7 @@ describe('toolbarSpecs', () => {
     const tile = map.tiles.find((t) => t.unit === null)!;
     tile.ownedBy = 0;
     tile.unit = {
-      id: 'w', owner: 0, type: 'warrior', q: tile.q, r: tile.r,
+      id: 'w', owner: 0, type: UnitType.WARRIOR, q: tile.q, r: tile.r,
       hasMoved: false, hasAttacked: true, hasHealed: false,
       hp: UNIT_TYPES.warrior.maxHp, attack: 2, attackDistance: 1, spawnVillage: null,
     };
@@ -141,7 +141,7 @@ describe('toolbarSpecs', () => {
     const tile = map.tiles.find((t) => t.unit === null)!;
     tile.ownedBy = 0;
     tile.unit = {
-      id: 'h', owner: 0, type: 'warrior', q: tile.q, r: tile.r,
+      id: 'h', owner: 0, type: UnitType.WARRIOR, q: tile.q, r: tile.r,
       hasMoved: false, hasAttacked: false, hasHealed: false,
       hp: 10, attack: 2, attackDistance: 1, spawnVillage: null,
     };
@@ -161,13 +161,13 @@ describe('toolbarSpecs', () => {
     const tile = map.tiles.find((t) => t.unit === null)!;
     tile.ownedBy = 0;
     tile.unit = {
-      id: 'w', owner: 0, type: 'warrior', q: tile.q, r: tile.r,
+      id: 'w', owner: 0, type: UnitType.WARRIOR, q: tile.q, r: tile.r,
       hasMoved: false, hasAttacked: false, hasHealed: false,
       hp: UNIT_TYPES.warrior.maxHp, attack: 2, attackDistance: 1, spawnVillage: null,
     };
     select(tile);
     expect(toolbarSpecs().length).toBeGreaterThan(0);
-    useGameStore.getState().setPaused('disconnect', 'Other');
+    useGameStore.getState().setPaused(PauseReason.DISCONNECT, 'Other');
     expect(toolbarSpecs()).toEqual([]);
     useGameStore.getState().setPaused(null);
   });
@@ -176,7 +176,7 @@ describe('toolbarSpecs', () => {
     const tile = map.tiles.find((t) => t.unit === null)!;
     tile.ownedBy = 0;
     tile.unit = {
-      id: 's', owner: 0, type: 'warrior', q: tile.q, r: tile.r,
+      id: 's', owner: 0, type: UnitType.WARRIOR, q: tile.q, r: tile.r,
       hasMoved: false, hasAttacked: false, hasHealed: false,
       hp: 5, attack: 2, attackDistance: 1, spawnVillage: null, shipLevel: 1,
     };
@@ -198,16 +198,16 @@ describe('toolbarSpecs', () => {
     own.exploredBy = [0];
     enemy.exploredBy = [0];
     own.unit = {
-      id: 'u1', owner: 0, type: 'warrior', q: own.q, r: own.r,
+      id: 'u1', owner: 0, type: UnitType.WARRIOR, q: own.q, r: own.r,
       hasMoved: false, hasAttacked: false, hasHealed: false,
       hp: UNIT_TYPES.warrior.maxHp, attack: 2, attackDistance: 1, spawnVillage: null,
     };
     enemy.unit = {
-      id: 'e1', owner: 1, type: 'warrior', q: enemy.q, r: enemy.r,
+      id: 'e1', owner: 1, type: UnitType.WARRIOR, q: enemy.q, r: enemy.r,
       hasMoved: false, hasAttacked: false, hasHealed: false,
       hp: UNIT_TYPES.warrior.maxHp, attack: 2, attackDistance: 1, spawnVillage: null,
     };
-    useGameStore.getState().setSelection({ kind: 'unit', q: own.q, r: own.r });
+    useGameStore.getState().setSelection({ kind: SelectionKind.UNIT, q: own.q, r: own.r });
     const key = `${enemy.q},${enemy.r}`;
     (gameController as unknown as { app: unknown; attackableKeys: Set<string> }).app = { screen: {} };
     (gameController as unknown as { attackableKeys: Set<string> }).attackableKeys = new Set([key]);
@@ -227,7 +227,7 @@ describe('toolbarSpecs', () => {
     tile.ownedBy = 0;
     tile.settlement = null;
     const store = useGameStore.getState();
-    store.setPlayers(store.players.map((p, i) => (i === 0 ? { ...p, skills: ['waterTemples'] } : p)));
+    store.setPlayers(store.players.map((p, i) => (i === 0 ? { ...p, skills: [SkillId.WATER_TEMPLES] } : p)));
     selectCell(tile);
     expect(toolbarSpecs().some((a) => a.key === 'temple')).toBe(true);
   });
@@ -242,8 +242,8 @@ describe('toolbarSpecs', () => {
     tile.unit = null;
     tile.ownedBy = null;
     const store = useGameStore.getState();
-    store.setPlayers(store.players.map((p, i) => (i === 0 ? { ...p, skills: ['bridges'] } : p)));
-    useGameStore.getState().setSelection({ kind: 'tile', q: 1, r: 0 });
+    store.setPlayers(store.players.map((p, i) => (i === 0 ? { ...p, skills: [SkillId.BRIDGES] } : p)));
+    useGameStore.getState().setSelection({ kind: SelectionKind.TILE, q: 1, r: 0 });
     expect(toolbarSpecs().some((a) => a.key === 'bridge')).toBe(true);
   });
 
@@ -256,7 +256,7 @@ describe('toolbarSpecs', () => {
     tile.settlement = null;
     tile.unit = null;
     tile.ownedBy = null;
-    useGameStore.getState().setSelection({ kind: 'tile', q: 1, r: 0 });
+    useGameStore.getState().setSelection({ kind: SelectionKind.TILE, q: 1, r: 0 });
     expect(toolbarSpecs().some((a) => a.key === 'bridge')).toBe(false);
   });
 
@@ -276,7 +276,7 @@ describe('toolbarSpecs', () => {
     tile.terrain = TileType.Water;
     tile.ownedBy = null;
     tile.unit = {
-      id: 'p', owner: -1, type: 'pirate', q: tile.q, r: tile.r,
+      id: 'p', owner: -1, type: UnitType.PIRATE, q: tile.q, r: tile.r,
       hasMoved: false, hasAttacked: false, hasHealed: false,
       hp: 80, attack: 30, attackDistance: 3, defense: 5, spawnVillage: null,
     };
@@ -294,7 +294,7 @@ describe('toolbarSpecs', () => {
     tile.terrain = TileType.Water;
     tile.ownedBy = null;
     tile.unit = {
-      id: 'p', owner: -1, type: 'pirate', q: tile.q, r: tile.r,
+      id: 'p', owner: -1, type: UnitType.PIRATE, q: tile.q, r: tile.r,
       hasMoved: false, hasAttacked: false, hasHealed: false,
       hp: 80, attack: 30, attackDistance: 3, defense: 5, spawnVillage: null,
     };
@@ -309,7 +309,7 @@ describe('toolbarSpecs', () => {
     tile.terrain = TileType.Water;
     tile.ownedBy = null;
     tile.unit = {
-      id: 'p', owner: -1, type: 'pirate', q: tile.q, r: tile.r,
+      id: 'p', owner: -1, type: UnitType.PIRATE, q: tile.q, r: tile.r,
       hasMoved: false, hasAttacked: false, hasHealed: false,
       hp: 80, attack: 30, attackDistance: 3, defense: 5, spawnVillage: null, paidBy: [0],
     };
@@ -325,7 +325,7 @@ describe('toolbarSpecs', () => {
     const tile = map.tiles.find((t) => t.unit === null)!;
     tile.ownedBy = 0;
     tile.unit = {
-      id: 'w', owner: 0, type: 'warrior', q: tile.q, r: tile.r,
+      id: 'w', owner: 0, type: UnitType.WARRIOR, q: tile.q, r: tile.r,
       hasMoved: false, hasAttacked: false, hasHealed: false,
       hp: UNIT_TYPES.warrior.maxHp, attack: 2, attackDistance: 1, spawnVillage: null,
     };
@@ -338,11 +338,11 @@ describe('toolbarSpecs', () => {
     tile.terrain = TileType.GrasslandLand;
     tile.ownedBy = 0;
     tile.settlement = null;
-    tile.building = { kind: 'mine', level: 1, hp: 1 };
+    tile.building = { kind: BuildingKind.MINE, level: 1, hp: 1 };
     selectCell(tile);
     expect(toolbarSpecs().some((a) => a.key === 'repair')).toBe(true);
 
-    tile.building = { kind: 'mine', level: 1 };
+    tile.building = { kind: BuildingKind.MINE, level: 1 };
     selectCell(tile);
     expect(toolbarSpecs().some((a) => a.key === 'repair')).toBe(false);
   });
@@ -355,7 +355,7 @@ describe('toolbarSpecs', () => {
     const tile = map.tiles.find((t) => t.unit === null)!;
     tile.ownedBy = 0;
     tile.unit = {
-      id: 's', owner: 0, type: 'stalker', q: tile.q, r: tile.r,
+      id: 's', owner: 0, type: UnitType.STALKER, q: tile.q, r: tile.r,
       hasMoved: false, hasAttacked: false, hasHealed: false,
       hp: UNIT_TYPES.stalker.maxHp, attack: 30, attackDistance: 1, spawnVillage: null,
     };
@@ -373,7 +373,7 @@ describe('toolbarSpecs', () => {
     const tile = map.tiles.find((t) => t.unit === null)!;
     tile.ownedBy = 0;
     tile.unit = {
-      id: 's', owner: 0, type: 'stalker', q: tile.q, r: tile.r,
+      id: 's', owner: 0, type: UnitType.STALKER, q: tile.q, r: tile.r,
       hasMoved: false, hasAttacked: false, hasHealed: false,
       hp: UNIT_TYPES.stalker.maxHp, attack: 30, attackDistance: 1, spawnVillage: null,
     };
@@ -395,7 +395,7 @@ describe('toolbarSpecs', () => {
     nb.terrain = TileType.GrasslandLand;
     nb.ownedBy = 0;
     tile.unit = {
-      id: 'b', owner: 0, type: 'builder', q: tile.q, r: tile.r,
+      id: 'b', owner: 0, type: UnitType.BUILDER, q: tile.q, r: tile.r,
       hasMoved: false, hasAttacked: false, hasHealed: false,
       hp: UNIT_TYPES.builder.maxHp, attack: 10, attackDistance: 1, spawnVillage: null,
     };
@@ -404,7 +404,7 @@ describe('toolbarSpecs', () => {
     expect(toolbarSpecs().some((a) => a.key === 'thorn-trap')).toBe(false);
 
     tile.unit = {
-      id: 'tr', owner: 0, type: 'trapper', q: tile.q, r: tile.r,
+      id: 'tr', owner: 0, type: UnitType.TRAPPER, q: tile.q, r: tile.r,
       hasMoved: false, hasAttacked: false, hasHealed: false,
       hp: UNIT_TYPES.trapper.maxHp, attack: 20, attackDistance: 1, spawnVillage: null,
     };
@@ -420,7 +420,7 @@ describe('toolbarSpecs', () => {
     tile.ownedBy = 0;
     tile.terrain = TileType.GrasslandLand;
     tile.unit = {
-      id: 'b', owner: 0, type: 'builder', q: tile.q, r: tile.r,
+      id: 'b', owner: 0, type: UnitType.BUILDER, q: tile.q, r: tile.r,
       hasMoved: false, hasAttacked: false, hasHealed: false,
       hp: UNIT_TYPES.builder.maxHp, attack: 10, attackDistance: 1, spawnVillage: null,
     };
@@ -436,7 +436,7 @@ describe('toolbarSpecs', () => {
     const tile = map.tiles.find((t) => t.unit === null)!;
     tile.ownedBy = 0;
     tile.unit = {
-      id: 'st', owner: 0, type: 'stormcaller', q: tile.q, r: tile.r,
+      id: 'st', owner: 0, type: UnitType.STORMCALLER, q: tile.q, r: tile.r,
       hasMoved: false, hasAttacked: false, hasHealed: false,
       hp: UNIT_TYPES.stormcaller.maxHp, attack: 20, attackDistance: 1, spawnVillage: null,
     };
@@ -451,7 +451,7 @@ describe('toolbarSpecs', () => {
     giveResources(map, players[0]!, { wood: 5, stone: 2, money: 15, ore: 0, food: 20 });
     selectCell(tile);
     expect(toolbarSpecs().some((a) => a.key === 'farm')).toBe(false);
-    players[0]!.skills.push('agriculture');
+    players[0]!.skills.push(SkillId.AGRICULTURE);
     const spec = toolbarSpecs().find((a) => a.key === 'farm');
     expect(spec).toBeDefined();
     expect(spec!.disabled).toBe(false);
@@ -464,10 +464,10 @@ describe('toolbarSpecs', () => {
     const farm = map.tiles.find((t) => hexNeighbors(tile).some((n) => n.q === t.q && n.r === t.r) && t.terrain === TileType.GrasslandLand && !t.settlement && !t.unit)!;
     tile.ownedBy = 0;
     farm.ownedBy = 0;
-    farm.building = { kind: 'farm', level: 1 };
+    farm.building = { kind: BuildingKind.FARM, level: 1 };
     const players = useGameStore.getState().players;
     giveResources(map, players[0]!, { wood: 10, stone: 10, money: 20, ore: 0, food: 20 });
-    players[0]!.skills.push('agriculture', 'granary');
+    players[0]!.skills.push(SkillId.AGRICULTURE, SkillId.GRANARY);
     selectCell(tile);
     expect(toolbarSpecs().some((a) => a.key === 'granary')).toBe(true);
   });
@@ -475,15 +475,15 @@ describe('toolbarSpecs', () => {
   it('offers burn-farm to an enemy unit standing on an enemy farm', () => {
     const tile = map.tiles.find((t) => t.unit === null && t.terrain === TileType.GrasslandLand && !t.settlement)!;
     tile.ownedBy = 1;
-    tile.building = { kind: 'farm', level: 1 };
+    tile.building = { kind: BuildingKind.FARM, level: 1 };
     tile.unit = {
-      id: 'raider', owner: 0, type: 'warrior', q: tile.q, r: tile.r,
+      id: 'raider', owner: 0, type: UnitType.WARRIOR, q: tile.q, r: tile.r,
       hasMoved: true, hasAttacked: false, hasHealed: false,
       hp: UNIT_TYPES.warrior.maxHp, attack: 2, attackDistance: 1, spawnVillage: null,
     };
     select(tile);
     expect(toolbarSpecs().some((a) => a.key === 'burn-farm')).toBe(true);
-    tile.building = { kind: 'granary', level: 1, food: 0 };
+    tile.building = { kind: BuildingKind.GRANARY, level: 1, food: 0 };
     expect(toolbarSpecs().some((a) => a.key === 'burn-granary')).toBe(true);
   });
 
@@ -524,7 +524,7 @@ describe('toolbarSpecs', () => {
     // Money on the player; the only wood/stone sit in village A's stock.
     players[0]!.resources.money = 100;
     addStock(a, { wood: 10, stone: 10 });
-    players[0]!.skills.push('roads');
+    players[0]!.skills.push(SkillId.ROADS);
     useGameStore.getState().setPlayers(players);
     selectCell(target);
     const spec = toolbarSpecs().find((a2) => a2.key === 'road');

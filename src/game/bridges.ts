@@ -1,18 +1,19 @@
-import { GameMap, MapTile, type BridgeDir } from './map-gen';
+import { GameMap, MapTile } from './map-gen';
 import { Player } from './players';
 import { Resources } from './resources';
 import { payAt, villagesJoinedBy } from './stock';
 import { tileAt } from './selection';
 import { hasSkill } from './skills';
 import { isSolidGround, isWaterType } from './tile-types';
+import { BridgeDir, SkillId } from '@enums';
 
 export const BRIDGE_COST: Resources = { wood: 10, stone: 5, money: 15, ore: 0, food: 0 };
 
 /** Each axis is a pair of opposite hex neighbours of the water tile. */
 const AXES: { dir: BridgeDir; offsets: { q: number; r: number }[] }[] = [
-  { dir: 'we', offsets: [{ q: 1, r: 0 }, { q: -1, r: 0 }] },
-  { dir: 'ne', offsets: [{ q: 1, r: -1 }, { q: -1, r: 1 }] },
-  { dir: 'nw', offsets: [{ q: 0, r: -1 }, { q: 0, r: 1 }] },
+  { dir: BridgeDir.WE, offsets: [{ q: 1, r: 0 }, { q: -1, r: 0 }] },
+  { dir: BridgeDir.NE, offsets: [{ q: 1, r: -1 }, { q: -1, r: 1 }] },
+  { dir: BridgeDir.NW, offsets: [{ q: 0, r: -1 }, { q: 0, r: 1 }] },
 ];
 
 function isLandShore(map: GameMap, tile: MapTile, offset: { q: number; r: number }): boolean {
@@ -39,7 +40,7 @@ export function hasBridge(tile: MapTile): boolean {
 }
 
 export function canBuildBridge(map: GameMap, tile: MapTile, player: Player): boolean {
-  if (!hasSkill(player, 'bridges')) return false;
+  if (!hasSkill(player, SkillId.BRIDGES)) return false;
   return canBuildBridgeHere(map, tile);
 }
 

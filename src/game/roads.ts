@@ -7,12 +7,13 @@ import { tileAt } from './selection';
 import { hasSkill } from './skills';
 import { isIceType, isWaterType } from './tile-types';
 import { portWaterClusterJumps } from './water-roads';
+import { BuildingKind, SkillId } from '@enums';
 
 export const ROAD_COST: Resources = { wood: 5, stone: 2, money: 10, ore: 0, food: 0 };
 
 function isRoadNode(t: MapTile, owner: number): boolean {
   if (t.roadOwner === owner) return true;
-  return t.building?.kind === 'port' && t.ownedBy === owner;
+  return t.building?.kind === BuildingKind.PORT && t.ownedBy === owner;
 }
 
 /** Connected components of a player's road/port/bridge network: own villages,
@@ -27,7 +28,7 @@ export function roadNetworkComponents(
   const isNode = (t: MapTile): boolean =>
     (t.settlement !== null && t.settlement.owner === owner) ||
     t.roadOwner === owner ||
-    (t.building?.kind === 'port' && t.ownedBy === owner);
+    (t.building?.kind === BuildingKind.PORT && t.ownedBy === owner);
   const visited = new Set<string>();
   const components: Set<string>[] = [];
   for (const start of map.tiles) {
@@ -119,7 +120,7 @@ export function canBuildRoad(
   player: Player,
   connectedNodes: Set<string> = villageConnectedNodes(map, player.index),
 ): boolean {
-  if (!hasSkill(player, 'roads')) return false;
+  if (!hasSkill(player, SkillId.ROADS)) return false;
   if (!canBuildRoadHere(map, tile, player, connectedNodes)) return false;
   return canAffordAt(map, player, tile, ROAD_COST, villagesJoinedBy(map, player.index, tile));
 }
@@ -138,7 +139,7 @@ export function canBuildRoadHere(
   if (tile.ownedBy !== null && tile.ownedBy !== player.index) return false;
   if (isWaterType(tile.terrain) || isIceType(tile.terrain)) return false;
   if (tile.settlement !== null) return false;
-  if (tile.building !== null && tile.building.kind === 'port') return false;
+  if (tile.building !== null && tile.building.kind === BuildingKind.PORT) return false;
   if (tile.unit !== null && tile.unit.owner !== player.index) return false;
   const connected = hexNeighbors(tile).some((n) => {
     const t = tileAt(map, n.q, n.r);

@@ -1,7 +1,8 @@
 import { beforeEach, describe, it, expect, afterEach, vi } from 'vitest';
 import { Texture } from 'pixi.js';
 import { SKILL_ATLAS_FRAMES, SKILL_ATLAS_CELL } from '../src/game/skill-atlas-data.gen';
-import { SKILLS, type SkillId } from '../src/game/skills';
+import { SKILLS } from '../src/game/skills';
+import { SkillId } from '@enums';
 
 class FakeImage {
   src = '';

@@ -5,6 +5,7 @@ import { type UIHost, type Widget } from '../host';
 import { makeIcon } from '../kit/icon';
 import { makeLabel } from '../kit/label';
 import { SKILLS_BUTTON_SIZE, scoreButtonsPosition } from '../layout';
+import { FontSize, NetMode, Screen } from '@enums';
 
 export const PLAYER_ONLINE_COLOR = 0x2ecc71;
 export const PLAYER_OFFLINE_COLOR = 0xe74c3c;
@@ -17,7 +18,7 @@ const READOUT_PAD_X = 8;
 const READOUT_PAD_Y = 6;
 const READOUT_RADIUS = 6;
 const READOUT_BG = { color: 0x000000, alpha: 0.8 };
-const READOUT_FONT_SIZE = 16;
+const READOUT_FONT_SIZE = FontSize.NORMAL;
 
 /** Compact online-players row: one 40px tribe circle per human player, aligned
  *  with the achievements button (top-right column) but on the left edge. The
@@ -52,7 +53,7 @@ export class HudPlayers implements Widget {
   private update(): void {
     if (!this.el || !this.host) return;
     const s = useGameStore.getState();
-    this.el.visible = s.screen === 'game' && s.netMode !== 'single';
+    this.el.visible = s.screen === Screen.GAME && s.netMode !== NetMode.SINGLE;
     this.el.removeChildren();
     if (!this.el.visible) return;
     let x = 0;

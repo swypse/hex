@@ -422,7 +422,7 @@ export default {
   'hud.selected.trap': 'Шипованная ловушка: осталось ходов: {turns}',
   'hud.selected.pirateDeal': 'Пират: договора нет',
   'hud.selected.pirateDealActive': 'Пират: договор активен — {tribes}',
-  'hud.selected.bonus.info': 'Светящийся маркер бонуса — поставьте на него отряд, завершите ход и нажмите «Забрать бонус» в следующий ход',
+  'hud.selected.bonus.info': 'Бонус: встаньте на него, завершите ход и нажмите «Забрать бонус»',
 'hud.selected.bonus.money': 'Тайник с 15 монетами',
   'hud.selected.bonus.resources': '+10 дерева, +5 камня, +5 руды',
   'hud.selected.bonus.villageUpgrade': 'Бесплатное улучшение деревни',

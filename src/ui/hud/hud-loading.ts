@@ -4,6 +4,7 @@ import { useGameStore } from '../../store/game-store';
 import { type UIHost, type Widget } from '../host';
 import { makeLabel } from '../kit/label';
 import { TOOLBAR_HEIGHT } from '../layout';
+import { FontSize, Screen } from '@enums';
 
 export class HudLoading implements Widget {
   private el: Container | null = null;
@@ -14,7 +15,7 @@ export class HudLoading implements Widget {
   mount(host: UIHost, root: Container): void {
     this.host = host;
     const el = new Container();
-    const label = makeLabel(t('loading.text'), { fontSize: 26, fill: 0xffffff, fontWeight: '700' });
+    const label = makeLabel(t('loading.text'), { fontSize: FontSize.BIG, fill: 0xffffff, fontWeight: '700' });
     label.anchor.set(0.5, 0.5);
     el.addChild(label);
     root.addChild(el);
@@ -37,7 +38,7 @@ export class HudLoading implements Widget {
   private update(): void {
     if (!this.el) return;
     const s = useGameStore.getState();
-    this.el.visible = s.screen === 'game' && s.texturesLoading;
+    this.el.visible = s.screen === Screen.GAME && s.texturesLoading;
   }
 
   destroy(): void {

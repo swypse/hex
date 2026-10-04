@@ -3,6 +3,7 @@ import { Container, Text } from 'pixi.js';
 import { HudLoading } from '../src/ui/hud/hud-loading';
 import { useGameStore } from '../src/store/game-store';
 import { type UIHost } from '../src/ui/host';
+import { Screen } from '@enums';
 
 function makeHost(width = 1280, height = 800): UIHost {
   return {
@@ -21,11 +22,11 @@ describe('HudLoading', () => {
     Object.defineProperty(Text.prototype, 'height', { configurable: true, get: () => 14 });
     host = makeHost();
     root = new Container();
-    useGameStore.setState({ screen: 'game', texturesLoading: true });
+    useGameStore.setState({ screen: Screen.GAME, texturesLoading: true });
   });
 
   afterEach(() => {
-    useGameStore.setState({ screen: 'start', texturesLoading: false });
+    useGameStore.setState({ screen: Screen.START, texturesLoading: false });
   });
 
   it('is visible on the game screen while textures are loading', () => {
@@ -49,7 +50,7 @@ describe('HudLoading', () => {
     const w = new HudLoading();
     w.mount(host, root);
     const el = (w as unknown as { el: Container }).el!;
-    useGameStore.setState({ screen: 'start' });
+    useGameStore.setState({ screen: Screen.START });
     expect(el.visible).toBe(false);
     w.destroy();
   });

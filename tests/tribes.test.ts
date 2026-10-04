@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { TRIBES, Tribe } from '../src/game/tribes';
+import { SkillId } from '@enums';
 
 describe('TRIBES', () => {
   it('keeps existing enum ids stable and adds forest/aqua/sand last', () => {
@@ -33,11 +34,11 @@ describe('TRIBES', () => {
   it('declares the tribe starting bonuses', () => {
     const byCode = new Map(TRIBES.map((t) => [t.code, t]));
     expect(byCode.get('villagers')!.startMoneyBonus).toBe(8);
-    expect(byCode.get('barbarians')!.startSkill).toBe('climbing');
-    expect(byCode.get('cats')!.startSkill).toBe('shields');
-    expect(byCode.get('warriors')!.startSkill).toBe('swordsman');
-    expect(byCode.get('forest')!.startSkill).toBe('forestry');
-    expect(byCode.get('aqua')!.startSkill).toBe('navigation');
-    expect(byCode.get('sand')!.startSkill).toBe('riding');
+    expect(byCode.get('barbarians')!.startSkill).toBe(SkillId.CLIMBING);
+    expect(byCode.get('cats')!.startSkill).toBe(SkillId.SHIELDS);
+    expect(byCode.get('warriors')!.startSkill).toBe(SkillId.SWORDSMAN);
+    expect(byCode.get('forest')!.startSkill).toBe(SkillId.FORESTRY);
+    expect(byCode.get('aqua')!.startSkill).toBe(SkillId.NAVIGATION);
+    expect(byCode.get('sand')!.startSkill).toBe(SkillId.RIDING);
   });
 });

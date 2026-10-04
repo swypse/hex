@@ -1,9 +1,5 @@
-/** Shared per-column block-count rules for the village build composite.
- *  Pure and side-effect free so both the game logic (`upgradeVillage`) and
- *  the renderer (`village-build-texture`) agree on column heights. */
+import { VillageBuildSide } from '@enums';
 
-/** Column group keys of the village block build (index into `Settlement.build`). */
-export type VillageBuildSide = 'l' | 'r' | 'lBack' | 'rBack';
 
 /** Number of columns per group. */
 export const VILLAGE_BUILD_COLUMN_COUNTS: Record<VillageBuildSide, number> = {
@@ -17,8 +13,8 @@ export const VILLAGE_BUILD_COLUMN_COUNTS: Record<VillageBuildSide, number> = {
  *  are the inner main-side ones (left 2–3, right 1–2); left column 1 and
  *  every back column stay short. */
 export function isVillageTallColumn(side: VillageBuildSide, column: number): boolean {
-  if (side === 'l') return column >= 1;
-  if (side === 'r') return column <= 1;
+  if (side === VillageBuildSide.LEFT) return column >= 1;
+  if (side === VillageBuildSide.RIGHT) return column <= 1;
   return false;
 }
 

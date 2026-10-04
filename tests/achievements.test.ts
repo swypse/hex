@@ -6,16 +6,8 @@ import { Tribe } from '../src/game/tribes';
 import { SKILLS } from '../src/game/skills';
 import { EMPTY_STATS } from '../src/game/score';
 import { Player } from '../src/game/players';
-import {
-  ACHIEVEMENTS,
-  achievementInfo,
-  achievementTotalScore,
-  awardAchievementScores,
-  evaluateAchievements,
-  currentlyMetIds,
-  unlockedAchievements,
-  type AchievementId,
-} from '../src/game/achievements';
+import { ACHIEVEMENTS, achievementInfo, achievementTotalScore, awardAchievementScores, evaluateAchievements, currentlyMetIds, unlockedAchievements } from '../src/game/achievements';
+import { AchievementId, BuildingKind } from '@enums';
 
 function tile(q: number, r: number, over: Partial<MapTile> = {}): MapTile {
   return {
@@ -56,7 +48,7 @@ describe('achievements', () => {
 
   it('unlocks Nothing Left to Learn when every skill is opened', () => {
     const p = player({ skills: Object.keys(SKILLS) as Player['skills'] });
-    expect(evaluateAchievements(mapOf([tile(0, 0)]), p)).toContain('nothingLeftToLearn');
+    expect(evaluateAchievements(mapOf([tile(0, 0)]), p)).toContain(AchievementId.NOTHING_LEFT_TO_LEARN);
   });
 
   it('unlocks kill/counter achievements from stats', () => {
@@ -96,7 +88,7 @@ describe('achievements', () => {
       tile(6, 0, { settlement: { owner: 0, level: 1, captureReady: false }, ownedBy: 0 }),
     ];
     const p = player();
-    expect(evaluateAchievements(mapOf(tiles), p)).toContain('greatConnector');
+    expect(evaluateAchievements(mapOf(tiles), p)).toContain(AchievementId.GREAT_CONNECTOR);
   });
 
   it('does not unlock The Great Connector for fewer than 4 connected villages', () => {
@@ -106,16 +98,16 @@ describe('achievements', () => {
       tile(2, 0, { settlement: { owner: 0, level: 1, captureReady: false }, ownedBy: 0 }),
     ];
     const p = player();
-    expect(evaluateAchievements(mapOf(tiles), p)).not.toContain('greatConnector');
+    expect(evaluateAchievements(mapOf(tiles), p)).not.toContain(AchievementId.GREAT_CONNECTOR);
   });
 
   it('unlocks The Great Connector when villages are linked through ports over own water', () => {
     const tiles = [
       tile(0, 0, { settlement: { owner: 0, level: 1, captureReady: false }, ownedBy: 0 }),
       tile(1, 0, { roadOwner: 0 }),
-      tile(2, 0, { terrain: TileType.Water, building: { kind: 'port', level: 1 }, ownedBy: 0 }),
+      tile(2, 0, { terrain: TileType.Water, building: { kind: BuildingKind.PORT, level: 1 }, ownedBy: 0 }),
       tile(3, 0, { terrain: TileType.Water, ownedBy: 0 }),
-      tile(4, 0, { terrain: TileType.Water, building: { kind: 'port', level: 1 }, ownedBy: 0 }),
+      tile(4, 0, { terrain: TileType.Water, building: { kind: BuildingKind.PORT, level: 1 }, ownedBy: 0 }),
       tile(5, 0, { roadOwner: 0 }),
       tile(6, 0, { settlement: { owner: 0, level: 1, captureReady: false }, ownedBy: 0 }),
       tile(7, 0, { roadOwner: 0 }),
@@ -124,16 +116,16 @@ describe('achievements', () => {
       tile(10, 0, { settlement: { owner: 0, level: 1, captureReady: false }, ownedBy: 0 }),
     ];
     const p = player();
-    expect(evaluateAchievements(mapOf(tiles), p)).toContain('greatConnector');
+    expect(evaluateAchievements(mapOf(tiles), p)).toContain(AchievementId.GREAT_CONNECTOR);
   });
 
   it('does not unlock The Great Connector when the water gap between ports is unowned', () => {
     const tiles = [
       tile(0, 0, { settlement: { owner: 0, level: 1, captureReady: false }, ownedBy: 0 }),
       tile(1, 0, { roadOwner: 0 }),
-      tile(2, 0, { terrain: TileType.Water, building: { kind: 'port', level: 1 }, ownedBy: 0 }),
+      tile(2, 0, { terrain: TileType.Water, building: { kind: BuildingKind.PORT, level: 1 }, ownedBy: 0 }),
       tile(3, 0, { terrain: TileType.Water }),
-      tile(4, 0, { terrain: TileType.Water, building: { kind: 'port', level: 1 }, ownedBy: 0 }),
+      tile(4, 0, { terrain: TileType.Water, building: { kind: BuildingKind.PORT, level: 1 }, ownedBy: 0 }),
       tile(5, 0, { roadOwner: 0 }),
       tile(6, 0, { settlement: { owner: 0, level: 1, captureReady: false }, ownedBy: 0 }),
       tile(7, 0, { roadOwner: 0 }),
@@ -142,7 +134,7 @@ describe('achievements', () => {
       tile(10, 0, { settlement: { owner: 0, level: 1, captureReady: false }, ownedBy: 0 }),
     ];
     const p = player();
-    expect(evaluateAchievements(mapOf(tiles), p)).not.toContain('greatConnector');
+    expect(evaluateAchievements(mapOf(tiles), p)).not.toContain(AchievementId.GREAT_CONNECTOR);
   });
 
   it('unlocks Master Cartographer only when every tile is explored', () => {
@@ -152,30 +144,30 @@ describe('achievements', () => {
       tile(0, 0, { exploredBy: [0] }),
       tile(1, 0, { exploredBy: [0] }),
     ]);
-    expect(evaluateAchievements(full, p)).toContain('masterCartographer');
+    expect(evaluateAchievements(full, p)).toContain(AchievementId.MASTER_CARTOGRAPHER);
   });
 
   it('records an unlock only once', () => {
     const p = player({ kills: 10 });
     const first = evaluateAchievements(mapOf([tile(0, 0)]), p);
-    expect(first).toContain('tenFoesNoSurvivors');
-    expect(unlockedAchievements(p)).toContain('tenFoesNoSurvivors');
+    expect(first).toContain(AchievementId.TEN_FOES_NO_SURVIVORS);
+    expect(unlockedAchievements(p)).toContain(AchievementId.TEN_FOES_NO_SURVIVORS);
     expect(evaluateAchievements(mapOf([tile(0, 0)]), p)).toEqual([]);
   });
 
   it('respects the start-of-game baseline skip', () => {
     const p = player();
     const met = new Set<AchievementId>(currentlyMetIds(mapOf([tile(0, 0, { exploredBy: [0] })]), p));
-    expect(met.has('masterCartographer')).toBe(true);
+    expect(met.has(AchievementId.MASTER_CARTOGRAPHER)).toBe(true);
     expect(evaluateAchievements(mapOf([tile(0, 0, { exploredBy: [0] })]), p, met)).toEqual([]);
   });
 
   it('awards the sum of unlocked achievement points at game end', () => {
     const p = player({ kills: 10 });
-    p.achievements = ['tenFoesNoSurvivors', 'bonusHunter'];
+    p.achievements = [AchievementId.TEN_FOES_NO_SURVIVORS, AchievementId.BONUS_HUNTER];
     p.stats!.bonusesCollected = 3;
     awardAchievementScores([p]);
     expect(p.score).toBe(achievementTotalScore(p));
-    expect(p.score).toBe(achievementInfo('tenFoesNoSurvivors').points + achievementInfo('bonusHunter').points);
+    expect(p.score).toBe(achievementInfo(AchievementId.TEN_FOES_NO_SURVIVORS).points + achievementInfo(AchievementId.BONUS_HUNTER).points);
   });
 });

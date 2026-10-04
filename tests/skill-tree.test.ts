@@ -5,6 +5,7 @@ import { useGameStore } from '../src/store/game-store';
 import { TRIBES } from '../src/game/tribes';
 import { START_RESOURCES } from '../src/game/resources';
 import { type UIHost } from '../src/ui/host';
+import { Screen } from '@enums';
 
 function fakeCanvasContext() {
   return {
@@ -44,7 +45,7 @@ describe('SkillTree zoom and pan', () => {
     win.addEventListener = (t, cb) => { (winListeners[t] ??= []).push(cb); };
     win.removeEventListener = (t, cb) => { winListeners[t] = (winListeners[t] ?? []).filter((f) => f !== cb); };
     useGameStore.setState({
-      screen: 'game',
+      screen: Screen.GAME,
       localPlayerIndex: 0,
       players: [{
         index: 0, tribe: TRIBES[0]!.id, isHuman: true, name: 'p',

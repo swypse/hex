@@ -1,4 +1,4 @@
-import { GameMode } from '@enums';
+import { GameMode, Screen } from '@enums';
 import { afterEach, describe, expect, it } from 'vitest';
 import { Container, Sprite, BitmapText } from 'pixi.js';
 import { GameOver, placeColor } from '../src/ui/overlays/game-over';
@@ -57,7 +57,7 @@ describe('GameOver screen', () => {
       createElement: () => ({ getContext: () => fakeCanvasContext(), width: 0, height: 0 }),
     };
     useGameStore.setState({
-      screen: 'game', players, localPlayerIndex: 0, winnerIndex: 0, mode: GameMode.CAPTURE, bonusAwarded: false, turn: opts?.turn ?? 27,
+      screen: Screen.GAME, players, localPlayerIndex: 0, winnerIndex: 0, mode: GameMode.CAPTURE, bonusAwarded: false, turn: opts?.turn ?? 27,
     });
     root = new Container();
     screen = new GameOver();

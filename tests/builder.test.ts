@@ -4,7 +4,7 @@ import { TileType } from '@/game/tile-types';
 import { Tribe } from '@/game/tribes';
 import { Unit } from '@/game/units';
 import { SeededRandom } from '@/util';
-import { GameMode } from '@enums';
+import { BuilderExtraKind, BuildingKind, CommandType, GameMode, UnitType } from '@enums';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { giveResources, makeTestMap, makeUnit, tileAt } from './helpers/test-map';
 
@@ -45,10 +45,10 @@ describe('builder', () => {
     tileAt(map, 1, 0)!.terrain = TileType.GrasslandLand;
     tileAt(map, 1, 0)!.ownedBy = 0;
     tileAt(map, 2, 0)!.terrain = TileType.GrasslandForest;
-    const builder = place(0, 'builder', 0, 0);
-    const ok = sim.applyCommand({ type: 'build', unitId: builder.id, q: 1, r: 0, kind: 'sawmill' });
+    const builder = place(0, UnitType.BUILDER, 0, 0);
+    const ok = sim.applyCommand({ type: CommandType.BUILD, unitId: builder.id, q: 1, r: 0, kind: BuildingKind.SAWMILL });
     expect(ok).toBe(true);
-    expect(tileAt(map, 1, 0)!.building?.kind).toBe('sawmill');
+    expect(tileAt(map, 1, 0)!.building?.kind).toBe(BuildingKind.SAWMILL);
     expect(findUnit(builder.id).hasMoved).toBe(true);
     expect(findUnit(builder.id).hasAttacked).toBe(true);
   });
@@ -57,8 +57,8 @@ describe('builder', () => {
     tileAt(map, 3, 0)!.terrain = TileType.GrasslandLand;
     tileAt(map, 3, 0)!.ownedBy = 0;
     tileAt(map, 2, 0)!.terrain = TileType.GrasslandForest;
-    const builder = place(0, 'builder', 0, 0);
-    const ok = sim.applyCommand({ type: 'build', unitId: builder.id, q: 3, r: 0, kind: 'sawmill' });
+    const builder = place(0, UnitType.BUILDER, 0, 0);
+    const ok = sim.applyCommand({ type: CommandType.BUILD, unitId: builder.id, q: 3, r: 0, kind: BuildingKind.SAWMILL });
     expect(ok).toBe(false);
   });
 
@@ -66,9 +66,9 @@ describe('builder', () => {
     tileAt(map, 1, 0)!.terrain = TileType.GrasslandLand;
     tileAt(map, 1, 0)!.ownedBy = 0;
     tileAt(map, 2, 0)!.terrain = TileType.GrasslandForest;
-    const builder = place(0, 'builder', 0, 0);
+    const builder = place(0, UnitType.BUILDER, 0, 0);
     builder.shipLevel = 1;
-    const ok = sim.applyCommand({ type: 'build', unitId: builder.id, q: 1, r: 0, kind: 'sawmill' });
+    const ok = sim.applyCommand({ type: CommandType.BUILD, unitId: builder.id, q: 1, r: 0, kind: BuildingKind.SAWMILL });
     expect(ok).toBe(false);
   });
 
@@ -76,8 +76,8 @@ describe('builder', () => {
     tileAt(map, 1, 0)!.terrain = TileType.Water;
     tileAt(map, 1, 0)!.ownedBy = 0;
     tileAt(map, 2, 0)!.ownedBy = 0; // opposite shore (land)
-    const builder = place(0, 'builder', 0, 0);
-    const ok = sim.applyCommand({ type: 'build', unitId: builder.id, q: 1, r: 0, kind: 'bridge' });
+    const builder = place(0, UnitType.BUILDER, 0, 0);
+    const ok = sim.applyCommand({ type: CommandType.BUILD, unitId: builder.id, q: 1, r: 0, kind: BuilderExtraKind.BRIDGE });
     expect(ok).toBe(true);
     expect(tileAt(map, 1, 0)!.bridge).not.toBeNull();
     expect(tileAt(map, 1, 0)!.bridge!.owner).toBe(0);
@@ -87,8 +87,8 @@ describe('builder', () => {
   it('cannot build onto an unowned tile', () => {
     tileAt(map, 1, 0)!.terrain = TileType.GrasslandLand;
     tileAt(map, 2, 0)!.terrain = TileType.GrasslandForest;
-    const builder = place(0, 'builder', 0, 0);
-    const ok = sim.applyCommand({ type: 'build', unitId: builder.id, q: 1, r: 0, kind: 'sawmill' });
+    const builder = place(0, UnitType.BUILDER, 0, 0);
+    const ok = sim.applyCommand({ type: CommandType.BUILD, unitId: builder.id, q: 1, r: 0, kind: BuildingKind.SAWMILL });
     expect(ok).toBe(false);
   });
 
@@ -98,9 +98,9 @@ describe('builder', () => {
     tileAt(map, 2, 0)!.terrain = TileType.GrasslandForest;
     tileAt(map, 0, 1)!.terrain = TileType.GrasslandLand;
     tileAt(map, 0, 1)!.ownedBy = 0;
-    const builder = place(0, 'builder', 0, 0);
-    expect(sim.applyCommand({ type: 'build', unitId: builder.id, q: 1, r: 0, kind: 'sawmill' })).toBe(true);
-    expect(sim.applyCommand({ type: 'build', unitId: builder.id, q: 0, r: 1, kind: 'sawmill' })).toBe(false);
+    const builder = place(0, UnitType.BUILDER, 0, 0);
+    expect(sim.applyCommand({ type: CommandType.BUILD, unitId: builder.id, q: 1, r: 0, kind: BuildingKind.SAWMILL })).toBe(true);
+    expect(sim.applyCommand({ type: CommandType.BUILD, unitId: builder.id, q: 0, r: 1, kind: BuildingKind.SAWMILL })).toBe(false);
   });
 
   it('a regular tile build still requires its skill (no unitId)', () => {
@@ -108,7 +108,7 @@ describe('builder', () => {
     tileAt(map, 1, 0)!.ownedBy = 0;
     tileAt(map, 2, 0)!.terrain = TileType.GrasslandForest;
     // Villagers player has no Forestry skill
-    const ok = sim.applyCommand({ type: 'build', q: 1, r: 0, kind: 'sawmill' });
+    const ok = sim.applyCommand({ type: CommandType.BUILD, q: 1, r: 0, kind: BuildingKind.SAWMILL });
     expect(ok).toBe(false);
   });
 });

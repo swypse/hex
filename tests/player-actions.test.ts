@@ -6,6 +6,7 @@ import { hasAnyAvailableAction } from '../src/game/player-actions';
 import { Tribe } from '../src/game/tribes';
 import { TileType } from '../src/game/tile-types';
 import { SKILLS } from '../src/game/skills';
+import { BonusKind, UnitType } from '@enums';
 
 describe('hasAnyAvailableAction', () => {
   const players = () => buildPlayers(Tribe.Villagers, 1, new SeededRandom(42));
@@ -28,7 +29,7 @@ describe('hasAnyAvailableAction', () => {
     const map = makeTestMap(2);
     const p = players();
     broke(p);
-    tileAt(map, 0, 0)!.unit = makeUnit('u', 0, 'warrior', 0, 0);
+    tileAt(map, 0, 0)!.unit = makeUnit('u', 0, UnitType.WARRIOR, 0, 0);
     expect(hasAnyAvailableAction(map, human(p), 1)).toBe(true);
   });
 
@@ -36,8 +37,8 @@ describe('hasAnyAvailableAction', () => {
     const map = makeTestMap(2);
     const p = players();
     broke(p);
-    tileAt(map, 0, 0)!.unit = makeUnit('a', 0, 'warrior', 0, 0);
-    tileAt(map, 1, 0)!.unit = makeUnit('e', 1, 'warrior', 1, 0);
+    tileAt(map, 0, 0)!.unit = makeUnit('a', 0, UnitType.WARRIOR, 0, 0);
+    tileAt(map, 1, 0)!.unit = makeUnit('e', 1, UnitType.WARRIOR, 1, 0);
     expect(hasAnyAvailableAction(map, human(p), 1)).toBe(true);
   });
 
@@ -45,7 +46,7 @@ describe('hasAnyAvailableAction', () => {
     const map = makeTestMap(2);
     const p = players();
     broke(p);
-    const u = makeUnit('h', 0, 'warrior', 0, 0);
+    const u = makeUnit('h', 0, UnitType.WARRIOR, 0, 0);
     u.hp = 1;
     tileAt(map, 0, 0)!.unit = u;
     expect(hasAnyAvailableAction(map, human(p), 1)).toBe(true);
@@ -57,7 +58,7 @@ describe('hasAnyAvailableAction', () => {
     broke(p);
     const t = tileAt(map, 1, 0)!;
     t.terrain = TileType.Water;
-    t.unit = { ...makeUnit('s', 0, 'warrior', 1, 0), shipLevel: 2 };
+    t.unit = { ...makeUnit('s', 0, UnitType.WARRIOR, 1, 0), shipLevel: 2 };
     t.bottle = { bornTurn: 1, arrivalTurn: 1 };
     expect(hasAnyAvailableAction(map, human(p), 2)).toBe(true);
   });
@@ -68,7 +69,7 @@ describe('hasAnyAvailableAction', () => {
     broke(p);
     const t = tileAt(map, 1, 0)!;
     t.terrain = TileType.Water;
-    const u: import('../src/game/units').Unit = { ...makeUnit('s', 0, 'warrior', 1, 0), shipLevel: 2, hasMoved: true, hasAttacked: true, hasHealed: true };
+    const u: import('../src/game/units').Unit = { ...makeUnit('s', 0, UnitType.WARRIOR, 1, 0), shipLevel: 2, hasMoved: true, hasAttacked: true, hasHealed: true };
     t.unit = u;
     t.bottle = { bornTurn: 1, arrivalTurn: 5 };
     expect(hasAnyAvailableAction(map, human(p), 5)).toBe(false);
@@ -102,7 +103,7 @@ describe('hasAnyAvailableAction', () => {
     const p = players();
     broke(p);
     tileAt(map, 0, 0)!.settlement = { owner: null, level: 1, captureReady: true };
-    tileAt(map, 0, 0)!.unit = makeUnit('c', 0, 'warrior', 0, 0);
+    tileAt(map, 0, 0)!.unit = makeUnit('c', 0, UnitType.WARRIOR, 0, 0);
     expect(hasAnyAvailableAction(map, human(p), 1)).toBe(true);
   });
 
@@ -111,8 +112,8 @@ describe('hasAnyAvailableAction', () => {
     const p = players();
     broke(p);
     const t = tileAt(map, 0, 0)!;
-    t.bonus = { kind: 'money', claimer: 0, arrivalTurn: 1 };
-    t.unit = makeUnit('b', 0, 'warrior', 0, 0);
+    t.bonus = { kind: BonusKind.MONEY, claimer: 0, arrivalTurn: 1 };
+    t.unit = makeUnit('b', 0, UnitType.WARRIOR, 0, 0);
     expect(hasAnyAvailableAction(map, human(p), 2)).toBe(true);
   });
 
@@ -143,7 +144,7 @@ describe('hasAnyAvailableAction', () => {
     const map = makeTestMap(2);
     const p = players();
     broke(p);
-    const u = makeUnit('x', 0, 'warrior', 0, 0);
+    const u = makeUnit('x', 0, UnitType.WARRIOR, 0, 0);
     u.hasMoved = true;
     u.hasAttacked = true;
     u.hasHealed = true;

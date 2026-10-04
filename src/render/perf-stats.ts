@@ -95,11 +95,38 @@ export function summarizeFrameTimes(deltas: number[]): { fps: number; frameMs: n
   return { fps: 1000 / frameMs, frameMs };
 }
 
+/** Spike statistics of a frame-time window: the worst frame and how many frames
+ *  missed 30 fps (> 33 ms) and 20 fps (> 50 ms). The average hides these. */
+export function summarizeSpikes(deltas: number[]): { maxMs: number; slow33: number; slow50: number } {
+  let maxMs = 0;
+  let slow33 = 0;
+  let slow50 = 0;
+  for (const d of deltas) {
+    if (d > maxMs) maxMs = d;
+    if (d > 33.4) slow33++;
+    if (d > 50) slow50++;
+  }
+  return { maxMs, slow33, slow50 };
+}
+
 export interface PerfSnapshot {
   /** Displayable frames per second. */
   fps: number;
   /** Average frame time in ms (1 decimal). */
   frameMs: number;
+  /** Worst frame interval in the window, ms (1 decimal). */
+  maxMs: number;
+  /** Frames longer than 33 ms / 50 ms in the window. */
+  slow33: number;
+  slow50: number;
+  /** Main-thread CPU time of `renderer.render` (scene traversal + command
+   *  submission, not GPU execution): average and worst, ms. A frame time far
+   *  above this points at the GPU / compositor, not JS. */
+  renderMsAvg: number;
+  renderMsMax: number;
+  /** Long animation frames (main thread busy > 50 ms) in the window and the
+   *  longest one in ms; null where the browser lacks the API. */
+  longFrames: { count: number; maxMs: number } | null;
   /** Real GL draw calls since the last sample, or null on WebGPU. */
   drawCalls: number | null;
   /** Visible renderable scene nodes under the stage. */
@@ -111,10 +138,18 @@ export interface PerfSnapshot {
 }
 
 const SAMPLE_MS = 500;
+/** Tick gaps at or above this are treated as the page being paused, not a frame. */
+const BACKGROUND_GAP_MS = 1000;
 
 const EMPTY_SNAPSHOT: PerfSnapshot = {
   fps: 0,
   frameMs: 0,
+  maxMs: 0,
+  slow33: 0,
+  slow50: 0,
+  renderMsAvg: 0,
+  renderMsMax: 0,
+  longFrames: null,
   drawCalls: null,
   renderObjects: 0,
   textures: 0,
@@ -132,7 +167,12 @@ export class PerfStats {
   private counter: GlDrawCounter | null = null;
   private prevDraws = 0;
   private readonly deltas: number[] = [];
+  private lastTickAt = 0;
   private windowStart = 0;
+  private renderTimes: number[] = [];
+  private restoreRender: (() => void) | null = null;
+  private loafObserver: PerformanceObserver | null = null;
+  private loaf: number[] = [];
   private last: PerfSnapshot = { ...EMPTY_SNAPSHOT };
 
   constructor(app: Application) {
@@ -147,7 +187,10 @@ export class PerfStats {
     this.counter = gl ? wrapGlDrawCalls(gl) : null;
     this.prevDraws = this.counter?.count ?? 0;
     this.deltas.length = 0;
-    this.windowStart = performance.now();
+    this.lastTickAt = performance.now();
+    this.windowStart = this.lastTickAt;
+    this.restoreRender = this.timeRenders();
+    this.loafObserver = this.observeLongFrames();
     this.tickerCb = () => this.onTick();
     // The sampler doesn't touch visuals, so it must not keep the render gate open.
     ignoreTickerListener(this.tickerCb);
@@ -162,6 +205,37 @@ export class PerfStats {
     this.tickerCb = null;
     this.counter?.restore();
     this.counter = null;
+    this.restoreRender?.();
+    this.restoreRender = null;
+    this.loafObserver?.disconnect();
+    this.loafObserver = null;
+  }
+
+  /** Wraps `renderer.render` to time its main-thread cost. Returns an undo. */
+  private timeRenders(): () => void {
+    const renderer = this.app.renderer as unknown as { render?: (...args: unknown[]) => void } | undefined;
+    const original = renderer?.render;
+    if (!renderer || typeof original !== 'function') return () => {};
+    renderer.render = (...args: unknown[]): void => {
+      const t0 = performance.now();
+      original.apply(renderer, args);
+      this.renderTimes.push(performance.now() - t0);
+    };
+    return () => {
+      renderer.render = original;
+    };
+  }
+
+  private observeLongFrames(): PerformanceObserver | null {
+    try {
+      const observer = new PerformanceObserver((list) => {
+        for (const entry of list.getEntries()) this.loaf.push(entry.duration);
+      });
+      observer.observe({ type: 'long-animation-frame', buffered: false });
+      return observer;
+    } catch {
+      return null; // unsupported (Safari, Firefox)
+    }
   }
 
   getSnapshot(): PerfSnapshot {
@@ -169,15 +243,29 @@ export class PerfStats {
   }
 
   private onTick(): void {
-    this.deltas.push(this.app.ticker.deltaMS);
-    if (performance.now() - this.windowStart < SAMPLE_MS) return;
+    // Raw interval between ticks: ticker.deltaMS is clamped by Pixi and would
+    // hide the very spikes this panel exists to show.
+    const now = performance.now();
+    const gap = now - this.lastTickAt;
+    this.lastTickAt = now;
+    // A gap this long is the page having been backgrounded / frozen, not a slow frame.
+    if (gap < BACKGROUND_GAP_MS) this.deltas.push(gap);
+    if (now - this.windowStart < SAMPLE_MS) return;
     const { fps, frameMs } = summarizeFrameTimes(this.deltas);
+    const spikes = summarizeSpikes(this.deltas);
+    const renders = this.renderTimes;
     const draws = this.counter ? this.counter.count : 0;
     const renderObjects = countRenderObjects(this.app.stage);
     const textures = managedTextureCount(this.app.renderer);
     this.last = {
       fps: Math.round(fps),
       frameMs: Math.round(frameMs * 10) / 10,
+      maxMs: Math.round(spikes.maxMs * 10) / 10,
+      slow33: spikes.slow33,
+      slow50: spikes.slow50,
+      renderMsAvg: renders.length ? Math.round((renders.reduce((a, b) => a + b, 0) / renders.length) * 10) / 10 : 0,
+      renderMsMax: renders.length ? Math.round(Math.max(...renders) * 10) / 10 : 0,
+      longFrames: this.loafObserver ? { count: this.loaf.length, maxMs: Math.round(Math.max(0, ...this.loaf)) } : null,
       drawCalls: this.counter ? draws - this.prevDraws : null,
       renderObjects,
       textures,
@@ -185,7 +273,9 @@ export class PerfStats {
     };
     this.prevDraws = draws;
     this.deltas.length = 0;
-    this.windowStart = performance.now();
+    this.renderTimes = [];
+    this.loaf = [];
+    this.windowStart = now;
   }
 }
 

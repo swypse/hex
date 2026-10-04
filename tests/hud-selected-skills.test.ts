@@ -10,9 +10,8 @@ import { Tribe } from '../src/game/tribes';
 import { SeededRandom } from '../src/util/random';
 import { Simulator } from '../src/game/simulator';
 import { TileType } from '../src/game/tile-types';
-import { type SkillId } from '../src/game/skills';
 import { type GameMap, type MapTile } from '../src/game/map-gen';
-import { GameMode } from '@enums';
+import { GameMode, Screen, SelectionKind, SkillId } from '@enums';
 
 function fakeCanvasContext() {
   return {
@@ -62,10 +61,10 @@ describe('HudSelected skill unlock hints', () => {
     const sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5 });
     (gameController as unknown as { sim: Simulator | null }).sim = sim;
     useGameStore.setState({
-      screen: 'game',
+      screen: Screen.GAME,
       players,
       localPlayerIndex: 0,
-      selection: { kind: 'tile', q: tile.q, r: tile.r },
+      selection: { kind: SelectionKind.TILE, q: tile.q, r: tile.r },
       tutorial: false,
       tutorialStep: null,
     });
@@ -75,14 +74,14 @@ describe('HudSelected skill unlock hints', () => {
     hud?.destroy();
     hud = null;
     (gameController as unknown as { sim: unknown }).sim = originalSim;
-    useGameStore.setState({ screen: 'start', players: [], selection: null });
+    useGameStore.setState({ screen: Screen.START, players: [], selection: null });
   });
 
   it('suggests Open Defense on an owned wall-less village after Shields', () => {
     const map = makeTestMap(2);
     const village = tileAt(map, 0, 0)!;
     village.settlement = { owner: 0, level: 1, captureReady: false, name: 'Alpha' };
-    setup(map, village, ['shields']);
+    setup(map, village, [SkillId.SHIELDS]);
     hud = new HudSelected();
     hud.mount(makeHost(), new Container());
     expect(allTexts().join('\n')).toContain('Open Defense');
@@ -102,7 +101,7 @@ describe('HudSelected skill unlock hints', () => {
     const map = makeTestMap(2);
     const village = tileAt(map, 0, 0)!;
     village.settlement = { owner: 0, level: 1, captureReady: false, name: 'Alpha' };
-    setup(map, tileAt(map, 1, 0)!, ['forestry']);
+    setup(map, tileAt(map, 1, 0)!, [SkillId.FORESTRY]);
     hud = new HudSelected();
     hud.mount(makeHost(), new Container());
     expect(allTexts().join('\n')).toContain('Open Roads');
@@ -113,7 +112,7 @@ describe('HudSelected skill unlock hints', () => {
     const water = tileAt(map, 0, 0)!;
     water.terrain = TileType.Water;
     water.height = 0;
-    setup(map, water, ['riding']);
+    setup(map, water, [SkillId.RIDING]);
     hud = new HudSelected();
     hud.mount(makeHost(), new Container());
     expect(allTexts().join('\n')).toContain('Open Bridges');
@@ -123,7 +122,7 @@ describe('HudSelected skill unlock hints', () => {
     const map = makeTestMap(2);
     const peak = tileAt(map, 0, 0)!;
     peak.terrain = TileType.GrasslandMountain;
-    setup(map, peak, ['science']);
+    setup(map, peak, [SkillId.SCIENCE]);
     hud = new HudSelected();
     hud.mount(makeHost(), new Container());
     expect(allTexts().join('\n')).toContain('Open Geology');

@@ -8,13 +8,15 @@ import { isForestType, isLandType, isMountainType, isSolidGround, isWaterType } 
 import { buildingsInVillage, villageBuildingLimit } from './village';
 import { villageEnemyOccupied } from './capture';
 import type { Unit } from './units';
-import type { BuildingKind } from './events';
 import { t } from '../i18n';
 import { canBuildBridgeHere, BRIDGE_COST } from './bridges';
+import { BuilderExtraKind, BuildingKind, PortDirection, SkillId } from '@enums';
 
-export type BuilderBuildKind = BuildingKind | 'bridge';
-export type BuilderBuildableKind = 'sawmill' | 'mine' | 'port' | 'bridge';
-export const BUILDER_KINDS: BuilderBuildableKind[] = ['sawmill', 'mine', 'port', 'bridge'];
+export type BuilderBuildKind = BuildingKind | BuilderExtraKind;
+/** The structures a builder unit can place from its build menu. */
+export type BuilderBuildableKind = BuildingKind.SAWMILL | BuildingKind.MINE | BuildingKind.PORT | BuilderExtraKind.BRIDGE;
+
+export const BUILDER_KINDS: BuilderBuildableKind[] = [BuildingKind.SAWMILL, BuildingKind.MINE, BuildingKind.PORT, BuilderExtraKind.BRIDGE];
 
 export const SAWMILL_COST = 10;
 export const MINE_COST = 15;
@@ -29,7 +31,7 @@ export function buildingHp(building: { hp?: number } | null | undefined): number
   return building?.hp ?? BUILDING_MAX_HP;
 }
 
-export type PortDirection = 'nw' | 'ne' | 'sw' | 'se' | 'e' | 'w';
+
 
 /** The village whose territory claims this tile, or null when unclaimed. */
 function claimingVillageFor(map: GameMap, tile: MapTile): MapTile | null {
@@ -86,7 +88,7 @@ function neighborTile(map: GameMap, n: { q: number; r: number }): MapTile | unde
 }
 
 export function canBuildSawmill(map: GameMap, tile: MapTile, player: Player): boolean {
-  if (!hasSkill(player, 'forestry')) return false;
+  if (!hasSkill(player, SkillId.FORESTRY)) return false;
   if (tile.ownedBy !== player.index) return false;
   if (tile.settlement || tile.building) return false;
   if (!isLandType(tile.terrain)) return false;
@@ -98,7 +100,7 @@ export function canBuildSawmill(map: GameMap, tile: MapTile, player: Player): bo
 }
 
 export function canBuildMine(map: GameMap, tile: MapTile, player: Player): boolean {
-  if (!hasSkill(player, 'smithery')) return false;
+  if (!hasSkill(player, SkillId.SMITHERY)) return false;
   if (tile.ownedBy !== player.index) return false;
   if (tile.settlement || tile.building) return false;
   if (!villageHasBuildingSlot(map, tile, player)) return false;
@@ -106,7 +108,7 @@ export function canBuildMine(map: GameMap, tile: MapTile, player: Player): boole
 }
 
 export function canBuildPort(map: GameMap, tile: MapTile, player: Player): boolean {
-  if (!hasSkill(player, 'water')) return false;
+  if (!hasSkill(player, SkillId.WATER)) return false;
   if (tile.bridge !== undefined && tile.bridge !== null) return false;
   if (tile.ownedBy !== player.index) return false;
   if (tile.settlement || tile.building) return false;
@@ -121,7 +123,7 @@ export function canBuildPort(map: GameMap, tile: MapTile, player: Player): boole
 }
 
 export function canBuildTemple(map: GameMap, tile: MapTile, player: Player): boolean {
-  if (!hasSkill(player, 'waterTemples')) return false;
+  if (!hasSkill(player, SkillId.WATER_TEMPLES)) return false;
   if (tile.bridge !== undefined && tile.bridge !== null) return false;
   if (tile.ownedBy !== player.index) return false;
   if (tile.settlement || tile.building) return false;
@@ -130,7 +132,7 @@ export function canBuildTemple(map: GameMap, tile: MapTile, player: Player): boo
 }
 
 export function canBuildForestTemple(map: GameMap, tile: MapTile, player: Player): boolean {
-  if (!hasSkill(player, 'forestTemple')) return false;
+  if (!hasSkill(player, SkillId.FOREST_TEMPLE)) return false;
   if (tile.ownedBy !== player.index) return false;
   if (tile.settlement || tile.building) return false;
   if (!villageHasBuildingSlot(map, tile, player)) return false;
@@ -150,22 +152,22 @@ export function canPlaceFoodBuilding(tile: MapTile, player: Player): boolean {
 }
 
 export function canBuildFarm(map: GameMap, tile: MapTile, player: Player): boolean {
-  if (!hasSkill(player, 'agriculture')) return false;
+  if (!hasSkill(player, SkillId.AGRICULTURE)) return false;
   return canPlaceFoodBuilding(tile, player);
 }
 
 /** A granary must stand next to one of the player's farms. */
 export function canBuildGranary(map: GameMap, tile: MapTile, player: Player): boolean {
-  if (!hasSkill(player, 'granary')) return false;
+  if (!hasSkill(player, SkillId.GRANARY)) return false;
   if (!canPlaceFoodBuilding(tile, player)) return false;
   return hexNeighbors(tile).some((n) => {
     const t = neighborTile(map, n);
-    return t !== undefined && t.building?.kind === 'farm' && t.ownedBy === player.index;
+    return t !== undefined && t.building?.kind === BuildingKind.FARM && t.ownedBy === player.index;
   });
 }
 
-export function isFoodBuilding(building: { kind: string } | null | undefined): boolean {
-  return building?.kind === 'farm' || building?.kind === 'granary';
+export function isFoodBuilding(building: { kind: BuildingKind } | null | undefined): boolean {
+  return building?.kind === BuildingKind.FARM || building?.kind === BuildingKind.GRANARY;
 }
 
 /** Whether `unit`, standing on an enemy farm or granary, may burn it: the unit
@@ -223,14 +225,14 @@ export function canBuildKindIgnoringSkill(
   tile: MapTile,
   player: Player,
 ): boolean {
-  if (kind === 'temple' || kind === 'forestTemple' || kind === 'farm' || kind === 'granary') return false;
+  if (kind === BuildingKind.TEMPLE || kind === BuildingKind.FOREST_TEMPLE || kind === BuildingKind.FARM || kind === BuildingKind.GRANARY) return false;
   if (tile.ownedBy !== player.index) return false;
   if (tile.settlement || tile.building) return false;
   if (!villageHasBuildingSlot(map, tile, player)) return false;
-  if (kind === 'mine') {
+  if (kind === BuildingKind.MINE) {
     return isMountainType(tile.terrain);
   }
-  if (kind === 'port') {
+  if (kind === BuildingKind.PORT) {
     if (tile.bridge !== undefined && tile.bridge !== null) return false;
     if (!isWaterType(tile.terrain)) return false;
     return hexNeighbors(tile).some((n) => {
@@ -253,7 +255,7 @@ export function builderBuildable(map: GameMap, tile: MapTile, kind: BuilderBuild
   const out: MapTile[] = [];
   const consider = (t: MapTile | undefined): void => {
     if (!t) return;
-    const ok = kind === 'bridge'
+    const ok = kind === BuilderExtraKind.BRIDGE
       ? t.ownedBy === player.index && canBuildBridgeHere(map, t)
       : canBuildKindIgnoringSkill(kind as BuildingKind, map, t, player);
     if (ok) out.push(t);
@@ -295,20 +297,20 @@ export function repairBuilding(map: GameMap, tile: MapTile, player: Player): boo
 }
 
 export function canUsePort(tile: MapTile, player: Player): boolean {
-  return tile.building?.kind === 'port' && tile.ownedBy === player.index;
+  return tile.building?.kind === BuildingKind.PORT && tile.ownedBy === player.index;
 }
 
 const PORT_DIRECTION_VECTORS: { d: PortDirection; o: { q: number; r: number } }[] = [
-  { d: 'e', o: { q: 1, r: 0 } },
-  { d: 'ne', o: { q: 1, r: -1 } },
-  { d: 'nw', o: { q: 0, r: -1 } },
-  { d: 'w', o: { q: -1, r: 0 } },
-  { d: 'sw', o: { q: -1, r: 1 } },
-  { d: 'se', o: { q: 0, r: 1 } },
+  { d: PortDirection.E, o: { q: 1, r: 0 } },
+  { d: PortDirection.NE, o: { q: 1, r: -1 } },
+  { d: PortDirection.NW, o: { q: 0, r: -1 } },
+  { d: PortDirection.W, o: { q: -1, r: 0 } },
+  { d: PortDirection.SW, o: { q: -1, r: 1 } },
+  { d: PortDirection.SE, o: { q: 0, r: 1 } },
 ];
 
 export function portDirection(map: GameMap, tile: MapTile): PortDirection | null {
-  if (tile.building?.kind !== 'port' || tile.ownedBy === null) return null;
+  if (tile.building?.kind !== BuildingKind.PORT || tile.ownedBy === null) return null;
   const owner = tile.ownedBy;
   const home = tile.claimedByVillage ? axialKey(tile.claimedByVillage) : null;
   const ownedShore = (n: MapTile): boolean =>
@@ -339,17 +341,17 @@ export function buildBuilding(
   player: Player,
 ): boolean {
   const allowed =
-    kind === 'sawmill'
+    kind === BuildingKind.SAWMILL
       ? canBuildSawmill(map, tile, player)
-      : kind === 'mine'
+      : kind === BuildingKind.MINE
         ? canBuildMine(map, tile, player)
-        : kind === 'port'
+        : kind === BuildingKind.PORT
           ? canBuildPort(map, tile, player)
-          : kind === 'temple'
+          : kind === BuildingKind.TEMPLE
             ? canBuildTemple(map, tile, player)
-            : kind === 'farm'
+            : kind === BuildingKind.FARM
               ? canBuildFarm(map, tile, player)
-              : kind === 'granary'
+              : kind === BuildingKind.GRANARY
                 ? canBuildGranary(map, tile, player)
                 : canBuildForestTemple(map, tile, player);
   if (!allowed) return false;
@@ -366,9 +368,9 @@ export function buildBuildingIgnoringSkill(map: GameMap, tile: MapTile, kind: Bu
 function payAndPlaceBuilding(map: GameMap, tile: MapTile, kind: BuildingKind, player: Player): boolean {
   // A port is a road/water-cluster node: it may be paid by the networks it
   // would join, just like a road or bridge.
-  const joined = kind === 'port' ? villagesJoinedBy(map, player.index, tile) : [];
+  const joined = kind === BuildingKind.PORT ? villagesJoinedBy(map, player.index, tile) : [];
   if (!payAt(map, player, tile, BUILDING_COSTS[kind], joined)) return false;
-  tile.building = kind === 'granary' ? { kind, level: 1, food: 0 } : { kind, level: 1 };
+  tile.building = kind === BuildingKind.GRANARY ? { kind, level: 1, food: 0 } : { kind, level: 1 };
   return true;
 }
 
@@ -384,12 +386,12 @@ function buildingYields(map: GameMap, player: Player): { tile: MapTile; wood: nu
       const village = neighborTile(map, c);
       if (village && villageEnemyOccupied(village)) continue;
     }
-    if (tile.building.kind === 'mine') {
-      const bonus = hasSkill(player, 'geology') ? 1 : 0;
+    if (tile.building.kind === BuildingKind.MINE) {
+      const bonus = hasSkill(player, SkillId.GEOLOGY) ? 1 : 0;
       out.push({ tile, wood: 0, stone: tile.building.level + bonus, ore: tile.building.level + bonus });
       continue;
     }
-    if (tile.building.kind === 'sawmill') {
+    if (tile.building.kind === BuildingKind.SAWMILL) {
       const forests = hexNeighbors(tile).filter((n) => {
         const t = neighborTile(map, n);
         return t !== undefined && isForestType(t.terrain);
@@ -458,15 +460,15 @@ export function buildingYield(
 ): { wood: number; stone: number; ore: number } {
   const b = tile.building;
   if (!b) return { wood: 0, stone: 0, ore: 0 };
-  if (b.kind === 'sawmill') {
+  if (b.kind === BuildingKind.SAWMILL) {
     const forests = hexNeighbors(tile).filter((n) => {
       const t = neighborTile(map, n);
       return t !== undefined && isForestType(t.terrain);
     }).length;
     return { wood: b.level * forests, stone: 0, ore: 0 };
   }
-  if (b.kind === 'mine') {
-    const bonus = owner !== null && hasSkill(owner, 'geology') ? 1 : 0;
+  if (b.kind === BuildingKind.MINE) {
+    const bonus = owner !== null && hasSkill(owner, SkillId.GEOLOGY) ? 1 : 0;
     return { wood: 0, stone: b.level + bonus, ore: b.level + bonus };
   }
   return { wood: 0, stone: 0, ore: 0 };

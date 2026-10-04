@@ -2,19 +2,20 @@ import { GameEvent } from '../game/events';
 import { GameStateSnapshot } from '../game/state';
 import { Command } from '../game/simulator';
 import { Tribe } from '../game/tribes';
+import { ClientMessageType, HostMessageType } from '@enums';
 
 export type ClientMessage =
-  | { type: 'join'; name: string }
-  | { type: 'pickTribe'; tribeId: Tribe }
-  | { type: 'ready' }
-  | { type: 'command'; cmd: Command };
+  | { type: ClientMessageType.JOIN; name: string }
+  | { type: ClientMessageType.PICK_TRIBE; tribeId: Tribe }
+  | { type: ClientMessageType.READY }
+  | { type: ClientMessageType.COMMAND; cmd: Command };
 
 export type HostMessage =
-  | { type: 'lobbyUpdate'; joined: LobbyPlayer[]; totalPlayers: number; aiCount: number }
-  | { type: 'state'; state: GameStateSnapshot; playerIndex: number }
-  | { type: 'events'; events: GameEvent[] }
-  | { type: 'playersOnline'; online: boolean[] }
-  | { type: 'error'; message: string };
+  | { type: HostMessageType.LOBBY_UPDATE; joined: LobbyPlayer[]; totalPlayers: number; aiCount: number }
+  | { type: HostMessageType.STATE; state: GameStateSnapshot; playerIndex: number }
+  | { type: HostMessageType.EVENTS; events: GameEvent[] }
+  | { type: HostMessageType.PLAYERS_ONLINE; online: boolean[] }
+  | { type: HostMessageType.ERROR; message: string };
 
 export interface LobbyPlayer {
   peerId: string;

@@ -6,6 +6,7 @@ import { type UIHost } from '../host';
 import { Button } from '../kit/button';
 import { makeLabel } from '../kit/label';
 import { Popup } from '../kit/popup';
+import { FontSize, OverlayKind } from '@enums';
 
 export class StalkerRevealDialog {
   private el: Container | null = null;
@@ -16,7 +17,7 @@ export class StalkerRevealDialog {
     this.host = host;
     const s = useGameStore.getState();
     const selection = s.selection;
-    if (!gameController.getMap() || s.overlay?.kind !== 'stalkerReveal' || !selection) return;
+    if (!gameController.getMap() || s.overlay?.kind !== OverlayKind.STALKER_REVEAL || !selection) return;
 
     const confirm = new Button({ label: t('common.confirm'), onClick: () => gameController.confirmStalkerApproach() });
     const cancel = new Button({ label: t('common.cancel'), onClick: () => gameController.cancelStalkerApproach() });
@@ -29,7 +30,7 @@ export class StalkerRevealDialog {
     });
 
     const text = makeLabel(t('stalkerReveal.hint'), {
-      fontSize: 14,
+      fontSize: FontSize.SMALL,
       fill: 0xcccccc,
       wordWrap: true,
       wordWrapWidth: popup.contentWidth,

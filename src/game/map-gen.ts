@@ -1,6 +1,5 @@
 import { allTiles, axialKey, hexDistance, hexNeighbors, ringOf, tilesInRange } from './hex';
 import { generateVillageNames } from './names';
-import type { Season } from './season';
 import { START_STOCK, type Stock } from './resources';
 import { isForestType, isLandType, isMountainType, isWaterType, TileType } from './tile-types';
 import { Biome, BIOME_FOREST, BIOME_LAND, BIOME_MOUNTAIN, generateTerrain } from './biomes';
@@ -8,16 +7,37 @@ import { SeededRandom } from '../util/random';
 import { makeUnit, type Unit } from './units';
 import { claimTileForVillage } from './claim';
 import { placeBonuses, type Bonus } from './bonus';
+import { BridgeDir, BuildingKind, MapSize, Season, TerrainFeature, UnitType, VillageBlockVariant } from '@enums';
 
 const WATER_BORDER = 2;
 const FREE_VILLAGE_MAX_DIST = 7;
 
-/** Index a map's tiles by their axial key for O(1) neighbourhood lookups. */
+interface TileIndexEntry {
+  length: number;
+  first: MapTile | undefined;
+  last: MapTile | undefined;
+  index: Map<string, MapTile>;
+}
+const tileIndexCache = new WeakMap<MapTile[], TileIndexEntry>();
+
+/** Index a map's tiles by their axial key for O(1) neighbourhood lookups.
+ *
+ *  The index is cached per tiles array: rebuilding a string-keyed Map of every
+ *  tile on each call dominated the AI turn (road, food and port network code
+ *  all ask for it, many times per planning step). The tile *set* of a map never
+ *  changes during play (tile objects are mutated in place), so the cache is
+ *  rebuilt only if the array grew or shrank or its ends were swapped. The
+ *  returned Map is shared: callers must treat it as read-only. */
 export function tileMapByKey(map: GameMap): Map<string, MapTile> {
-  return new Map(map.tiles.map((t) => [axialKey(t), t] as const));
+  const tiles = map.tiles;
+  const hit = tileIndexCache.get(tiles);
+  if (hit && hit.length === tiles.length && hit.first === tiles[0] && hit.last === tiles[tiles.length - 1]) return hit.index;
+  const index = new Map(tiles.map((t) => [axialKey(t), t] as const));
+  tileIndexCache.set(tiles, { length: tiles.length, first: tiles[0], last: tiles[tiles.length - 1], index });
+  return index;
 }
 
-export type VillageBlockVariant = 'm1' | 'm2' | 'm3' | 'm4';
+
 
 /** Below-top block variants per column, top-down, chosen when a village
  *  levels up. `l[0..2]` are left columns 1–3, `r[0..1]` right columns 1–2,
@@ -48,14 +68,14 @@ export interface Settlement {
   stock?: Stock;
 }
 
-export type BridgeDir = 'nw' | 'ne' | 'we';
+
 export interface Bridge {
   owner: number;
   dir: BridgeDir;
 }
 
 export interface Building {
-  kind: 'sawmill' | 'mine' | 'port' | 'temple' | 'forestTemple' | 'farm' | 'granary';
+  kind: BuildingKind;
   level: number;
   /** Granary only: food stored (0 at creation, +1 per adjacent farm each turn). */
   food?: number;
@@ -106,7 +126,7 @@ export interface GameMap {
   spawns: Spawn[];
 }
 
-export type MapSize = 'normal' | 'big' | 'huge';
+
 
 /** Linear map-size multiplier per option: big is ~2x the normal radius, huge
  *  ~3x. The map hex count therefore scales ~4x and ~9x. */
@@ -126,7 +146,7 @@ function baseMapRadius(playerCount: number): number {
   throw new Error(`Unsupported player count: ${playerCount}`);
 }
 
-export function mapRadiusFor(playerCount: number, size: MapSize = 'normal'): number {
+export function mapRadiusFor(playerCount: number, size: MapSize = MapSize.NORMAL): number {
   return Math.round(baseMapRadius(playerCount) * MAP_RADIUS_FACTOR[size]);
 }
 
@@ -268,12 +288,12 @@ function ensureResourceNearVillage(  tileMap: Map<string, MapTile>,
     const c = t.claimedByVillage;
     return c === null || (c.q === village.q && c.r === village.r);
   };
-  const provide = (wanted: 'mountain' | 'forest'): void => {
+  const provide = (wanted: TerrainFeature): void => {
     for (const n of tilesInRange(village, 2)) {
       if (hexDistance(n, village) < 1) continue;
       const t = tileMap.get(axialKey(n));
       if (!t || reserved.has(axialKey(n)) || t.settlement || !claimedByThis(t)) continue;
-      const found = wanted === 'mountain' ? isMountainType(t.terrain) : isForestType(t.terrain);
+      const found = wanted === TerrainFeature.MOUNTAIN ? isMountainType(t.terrain) : isForestType(t.terrain);
       if (found) {
         reserved.add(axialKey(n));
         return;
@@ -284,13 +304,13 @@ function ensureResourceNearVillage(  tileMap: Map<string, MapTile>,
       const t = tileMap.get(axialKey(n));
       if (!t || reserved.has(axialKey(n)) || t.settlement || !claimedByThis(t)) continue;
       if (!isLandType(t.terrain)) continue;
-      t.terrain = wanted === 'mountain' ? BIOME_MOUNTAIN[t.biome!] : BIOME_FOREST[t.biome!];
+      t.terrain = wanted === TerrainFeature.MOUNTAIN ? BIOME_MOUNTAIN[t.biome!] : BIOME_FOREST[t.biome!];
       reserved.add(axialKey(n));
       return;
     }
   };
-  provide('mountain');
-  provide('forest');
+  provide(TerrainFeature.MOUNTAIN);
+  provide(TerrainFeature.FOREST);
 }
 
 function angleOf(tile: { q: number; r: number }): number {
@@ -308,7 +328,7 @@ function angleDiff(a: number, b: number): number {
   return Math.min(d, 2 * Math.PI - d);
 }
 
-export function generateMap(playerCount: number, seed: number, size: MapSize = 'normal'): GameMap {
+export function generateMap(playerCount: number, seed: number, size: MapSize = MapSize.NORMAL): GameMap {
   const radius = mapRadiusFor(playerCount, size) + WATER_BORDER;
   const rng = new SeededRandom(seed);
   const villageNames = generateVillageNames(playerCount * 2, rng);
@@ -397,7 +417,7 @@ export function generateMap(playerCount: number, seed: number, size: MapSize = '
   let unitId = 0;
   for (const tile of tileMap.values()) {
     if (tile.settlement && tile.settlement.owner !== null) {
-      tile.unit = makeUnit(tile.settlement.owner, 'warrior', tile.q, tile.r, {
+      tile.unit = makeUnit(tile.settlement.owner, UnitType.WARRIOR, tile.q, tile.r, {
         id: `w${unitId}`,
         spawnVillage: { q: tile.q, r: tile.r },
       });

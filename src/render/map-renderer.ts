@@ -23,22 +23,19 @@ import { waterRouteEdges, portWaterClusterJumps } from '../game/water-roads';
 import { tileElevation } from './elevation';
 import { DamageBadgeLayer } from './damage-badge';
 import { FireEffects } from './fire';
-import {
-  captureMarkerPoints,
-  CAPTURE_EDGE_MARKER_ALPHA,
-  CAPTURE_EDGE_MARKER_SIZE,
-  CAPTURE_EDGE_MARKER_SLIDE,
-  CAPTURE_EDGE_PULSE_MS,
-  type CaptureMarkerSide,
-} from './capture-marker';
+import { captureMarkerPoints, CAPTURE_EDGE_MARKER_ALPHA, CAPTURE_EDGE_MARKER_SIZE, CAPTURE_EDGE_MARKER_SLIDE, CAPTURE_EDGE_PULSE_MS } from './capture-marker';
 import { type TextureSet, type TileTexture } from './texture-factory';
 import { villageTextureFor, villageOwnerTribe } from './village-texture';
 import { acquireVillageBuildTexture, releaseVillageBuildTexture } from './village-build-texture';
 import { tileSignature, tileInView, granaryFarmCount, type Viewport } from './tile-signature';
 import { t } from '../i18n';
 import { Tooltip } from '../ui/kit/tooltip';
-import { THEME, contrastTextColor } from '../ui/kit/theme';
+import { THEME } from '../ui/kit/theme';
+import { villageLabelTextColor } from './village-label-color';
+import { unitGlowColor } from './unit-glow-color';
+import { HP_BAR_BOX_TOP, HP_BAR_HEIGHT, HP_BAR_ICON_GAP, HP_BAR_INNER_W, HP_BAR_OUTER_H, HP_BAR_OUTER_W, HP_BAR_PADDING, HP_LABEL_GAP, HP_LABEL_PAD_X, HP_LABEL_PLATE_GAP, HP_LABEL_RADIUS } from './hp-bar-layout';
 import { icons32FrameTexture } from '../ui/kit/icons32';
+import { BuildingKind, CaptureMarkerSide, FontSize, PortDirection, Season, SelectionKind, UnitFacing, UnitType } from '@enums';
 
 /** Diameter of a pirate-deal dot (screen px; the row does not scale with zoom). */
 /** Length of one row's bounce in the season ice wave. */
@@ -49,7 +46,7 @@ const PIRATE_DEAL_GAP = 4;
 /** Screen-px gap between the pirate's hp bar anchor and the deal-dot row. */
 const PIRATE_DEAL_HPBAR_GAP = 4;
 /** Village name label text size (px). */
-const VILLAGE_LABEL_FONT_SIZE = 12;
+const VILLAGE_LABEL_FONT_SIZE = FontSize.VERY_SMALL;
 /** Overlay stacking: village labels sit below the unit standing on the village,
  *  and both sit below everything else (hp bars, fire, markers) at zIndex 0. */
 const OVERLAY_Z_VILLAGE_LABEL = -2;
@@ -59,12 +56,6 @@ const OVERLAY_Z_ATTACK_MARKER = -0.5;
 /** World offset of the hp bar anchor above/relative to the tile's unit top. */
 const HP_BAR_ANCHOR_OFFSET = 40;
 
-/** HP bar outer white box and the inner green/orange damage bars (screen px). */
-const HP_BAR_OUTER_W = 52;
-const HP_BAR_OUTER_H = 10;
-const HP_BAR_PADDING = 1;
-const HP_BAR_HEIGHT = HP_BAR_OUTER_H - 2 * HP_BAR_PADDING;
-const HP_BAR_INNER_W = HP_BAR_OUTER_W - 2 * HP_BAR_PADDING;
 const HP_BAR_GREEN = 0x49cc5d;
 const HP_BAR_GHOST = 0xfa9a09;
 const HP_BAR_GREEN_MS = 100;
@@ -155,6 +146,11 @@ interface HpBarEntry {
 
 /** A `stage:`-prefixed unit id (combat staging) refers to the same entity as
  *  the real unit; map both to the real id's hp bar key. */
+/** Black rounded plate behind hp-line text: the text box (x, y, w, h) plus side padding. */
+function drawHpPlate(g: Graphics, x: number, y: number, w: number, h: number, alpha: number): void {
+  g.roundRect(x - HP_LABEL_PAD_X, y, w + HP_LABEL_PAD_X * 2, h, HP_LABEL_RADIUS).fill({ color: 0x000000, alpha });
+}
+
 function normalizeHpBarKey(key: string): string {
   return key.startsWith('stage:') ? key.slice('stage:'.length) : key;
 }
@@ -222,7 +218,7 @@ export class MapView {
   /** Cumulative ms spent paused; subtracted from performance.now() so the
    *  decorative animations resume from exactly where they paused. */
   private pausedMs = 0;
-  private unitFacings = new Map<string, 'left' | 'right'>();
+  private unitFacings = new Map<string, UnitFacing>();
   /** Screen-space copies of the unit sprites standing on labelled villages,
    *  drawn above the village name label (which lives in the overlay, above the
    *  world tiles). Each copy follows its source sprite via `onRender`. */
@@ -246,7 +242,7 @@ export class MapView {
   /** Screen-space layer for edge capture markers. Kept out of `overlay` so a
    *  host can place it above every HUD element. */
   readonly edgeMarkers = new Container();
-  private edgeMarkerParts: { g: Graphics; side: 'l' | 'r' | 't' | 'b'; along: number; W: number; H: number }[] = [];
+  private edgeMarkerParts: { g: Graphics; side: CaptureMarkerSide; along: number; W: number; H: number }[] = [];
   private stopEdgePulseFn: (() => void) | null = null;
   private edgePulseStart: number | null = null;
 
@@ -404,7 +400,7 @@ export class MapView {
           const center = this.unitTextureTop(unit, players);
           const maxHp = UNIT_TYPES[unit.type].maxHp;
           const hp = this.hpOverrides.get(unit.id) ?? unit.hp;
-          const canAct = unit.type === 'pirate' ? false : unitCanAct(map, tile, unit, players[unit.owner]!);
+          const canAct = unit.type === UnitType.PIRATE ? false : unitCanAct(map, tile, unit, players[unit.owner]!);
           const stunned = (unit.stunTurns ?? 0) >= 1;
           const raging = berserkerRage(unit) > 0;
           hpBarSpecs.push({
@@ -418,7 +414,7 @@ export class MapView {
             starving: unit.starving === true,
           });
         }
-        if (unit.type === 'pirate' || unit.shipLevel !== undefined) {
+        if (unit.type === UnitType.PIRATE || unit.shipLevel !== undefined) {
           const sprite = tv.unitSprite;
           if (sprite) shipBobs.push({ sprite, key: axialKey(tile), baseY: y });
         }
@@ -459,7 +455,7 @@ export class MapView {
           world: { x: p.x, y: y + this.hexSize * 0.35 + 5 }
         });
       }
-      if (tile.building?.kind === 'granary' && tile.ownedBy !== null && tile.ownedBy !== undefined && explored && !detailHidden) {
+      if (tile.building?.kind === BuildingKind.GRANARY && tile.ownedBy !== null && tile.ownedBy !== undefined && explored && !detailHidden) {
         granaryLabels.push({ tile, owner: tile.ownedBy, world: { x: p.x, y: y + this.hexSize * 0.35 + 5 } });
       }
       if (tile.settlement && tile.settlement.captureReady && tile.unit && tile.unit.owner !== tile.settlement.owner && explored) {
@@ -481,7 +477,7 @@ export class MapView {
         // Sit right on top of the unit's hp bar (anchored at y - top + 40) with
         // a 4px gap; the bar's top edge is 11px above its own anchor.
         const hpBarY = y - this.unitTextureTop(tile.unit, players) + 40;
-        exclamations.push({ el, world: { x: p.x, y: hpBarY - (11 + 4 + spriteH / 2) / viewport.scale } });
+        exclamations.push({ el, world: { x: p.x, y: hpBarY - (-HP_BAR_BOX_TOP + HP_BAR_ICON_GAP + spriteH / 2) / viewport.scale } });
       }
       if (
         tile.settlement &&
@@ -704,7 +700,7 @@ export class MapView {
     if (tv.wallSprite) tv.wallSprite.visible = explored;
 
     const tileKey = axialKey(tile);
-    if (explored && tile.building?.kind === 'granary') {
+    if (explored && tile.building?.kind === BuildingKind.GRANARY) {
       const farms = granaryFarmCount(this.map!, tile);
       const prevFarms = this.granaryFarms.get(tileKey);
       this.granaryFarms.set(tileKey, farms);
@@ -713,7 +709,7 @@ export class MapView {
       this.granaryFarms.delete(tileKey);
     }
 
-    const buildingIsPort = tile.building !== null && tile.building.kind === 'port';
+    const buildingIsPort = tile.building !== null && tile.building.kind === BuildingKind.PORT;
     const buildingTileTex = tile.building !== null && !buildingIsPort ? this.buildingTexture(tile) : null;
     const portTex = buildingIsPort ? this.portTileTexture(tile) : null;
     this.syncSprite(tv, 'buildingSprite', tile.building
@@ -748,7 +744,7 @@ export class MapView {
     this.syncSprite(tv, 'trapSprite', tile.trap?.owner === localPlayerIndex ? trapTex?.texture ?? null : null, p.x, y, trapTex?.anchorY ?? 0.5);
 
     const isShipUnit = tile.unit !== null && tile.unit.shipLevel !== undefined;
-    const isPirateUnit = tile.unit !== null && tile.unit.type === 'pirate';
+    const isPirateUnit = tile.unit !== null && tile.unit.type === UnitType.PIRATE;
     const tribe = tile.unit ? players[tile.unit.owner]?.tribe : undefined;
     const unitTex = tile.unit
       ? isPirateUnit
@@ -766,7 +762,7 @@ export class MapView {
       // The owner sees their stealthed stalker slightly dimmed.
       tv.unitSprite.alpha = tile.unit && tile.unit.owner === localPlayerIndex && tile.unit.isStealthed === true ? 0.6 : 1;
       if (tile.unit) {
-        this.faceUnitSprite(tv.unitSprite, this.unitFacings.get(tile.unit.id) ?? 'right');
+        this.faceUnitSprite(tv.unitSprite, this.unitFacings.get(tile.unit.id) ?? UnitFacing.RIGHT);
       }
     }
 
@@ -779,7 +775,7 @@ export class MapView {
   private syncDealCircles(tv: TileView, tile: MapTile, players: Player[], explored: boolean, hiddenUnitIds: Set<string>): void {
     const unit = tile.unit;
     const paidBy = unit?.paidBy ?? [];
-    const shouldDraw = unit !== null && unit.type === 'pirate' && explored && !(hiddenUnitIds.has(unit.id)) && paidBy.length > 0;
+    const shouldDraw = unit !== null && unit.type === UnitType.PIRATE && explored && !(hiddenUnitIds.has(unit.id)) && paidBy.length > 0;
     if (!shouldDraw) {
       if (tv.dealCircles) {
         tv.el.removeChild(tv.dealCircles);
@@ -863,11 +859,11 @@ export class MapView {
 
   /** Sets a unit's horizontal facing so its sprite looks toward its last
    * attacked enemy: flipped (left) or default (right). */
-  private faceUnitSprite(sprite: Sprite, facing: 'left' | 'right'): void {
-    sprite.scale.set(this.spriteScale * (facing === 'left' ? -1 : 1), this.spriteScale);
+  private faceUnitSprite(sprite: Sprite, facing: UnitFacing): void {
+    sprite.scale.set(this.spriteScale * (facing === UnitFacing.LEFT ? -1 : 1), this.spriteScale);
   }
 
-  setUnitFacing(unitId: string, facing: 'left' | 'right'): void {
+  setUnitFacing(unitId: string, facing: UnitFacing): void {
     this.unitFacings.set(unitId, facing);
     if (!this.map) return;
     const tile = this.map.tiles.find((t) => t.unit?.id === unitId);
@@ -881,7 +877,7 @@ export class MapView {
 
   /** Flips the sprite currently drawn on a tile without changing the stored
    * facing (used to keep staged combat sprites oriented while they animate). */
-  faceUnitAtKey(key: string, facing: 'left' | 'right'): void {
+  faceUnitAtKey(key: string, facing: UnitFacing): void {
     const sprite = this.tileViews.get(key)?.unitSprite;
     if (sprite) {
       this.faceUnitSprite(sprite, facing);
@@ -890,7 +886,7 @@ export class MapView {
   }
 
   private drawRoad(tv: TileView, tile: MapTile, explored: boolean): void {
-    const isPort = tile.building?.kind === 'port';
+    const isPort = tile.building?.kind === BuildingKind.PORT;
     // Ports are road nodes in the game logic (roads connect up to their tile
     // edge), but the port cell itself never shows a road: no road strokes are
     // drawn from its centre.
@@ -907,7 +903,7 @@ export class MapView {
         const connected =
           (n?.settlement && n.settlement.owner === owner) ||
           n?.roadOwner === owner ||
-          (n?.building && n.building.kind === 'port' && n.ownedBy === owner);
+          (n?.building && n.building.kind === BuildingKind.PORT && n.ownedBy === owner);
         if (!connected) continue;
         const seg = hexEdge(tile, e, this.hexSize);
         orangeEdges.push({ x: (seg.ax + seg.bx) / 2, y: edgeMidY(seg) });
@@ -969,16 +965,16 @@ export class MapView {
     const b = tile.building!;
     const tx = this.textures;
     switch (b.kind) {
-      case 'sawmill':
+      case BuildingKind.SAWMILL:
         return tx.sawmillTexture;
-      case 'farm':
+      case BuildingKind.FARM:
         // A farm that yields nothing (winter) uses the pre-baked black-and-white texture.
-        return this.map?.season === 'winter' ? tx.farmIdleTexture : tx.farmTexture;
-      case 'granary':
+        return this.map?.season === Season.WINTER ? tx.farmIdleTexture : tx.farmTexture;
+      case BuildingKind.GRANARY:
         return tx.granaryTextures[granaryFarmCount(this.map!, tile)]!;
-      case 'temple':
+      case BuildingKind.TEMPLE:
         return tx.templeTextures[b.level as 1 | 2 | 3 | 4];
-      case 'forestTemple':
+      case BuildingKind.FOREST_TEMPLE:
         return tx.forestTempleTextures[b.level as 1 | 2 | 3 | 4];
       default:
         return tx.mineTexture;
@@ -988,7 +984,7 @@ export class MapView {
   private portTileTexture(tile: MapTile): TileTexture {
     if (tile.ownedBy === null) return { texture: this.textures.freePortTexture, anchorY: 0.5 };
     const dir = portDirection(this.map!, tile);
-    return this.textures.portTextures[dir ?? 'e'];
+    return this.textures.portTextures[dir ?? PortDirection.E];
   }
 
   private syncSprite(
@@ -1552,7 +1548,7 @@ export class MapView {
       tv !== undefined &&
       tile !== undefined &&
       selection !== null &&
-      selection.kind === 'unit' &&
+      selection.kind === SelectionKind.UNIT &&
       unit !== null &&
       selection.q === tile.q &&
       selection.r === tile.r &&
@@ -1576,6 +1572,7 @@ export class MapView {
       glow.anchor.set(0.5, glowTex.anchorY);
     }
     glow.visible = tv.unitSprite?.visible ?? true;
+    glow.tint = unitGlowColor(unit!, localPlayerIndex);
     this.syncGlowSprite(key);
   }
 
@@ -1605,7 +1602,7 @@ export class MapView {
   private unitTextureFor(tile: MapTile, players: Player[]): TileTexture | null {
     const unit = tile.unit;
     if (!unit) return null;
-    if (unit.type === 'pirate') return this.textures.pirateTexture;
+    if (unit.type === UnitType.PIRATE) return this.textures.pirateTexture;
     const tribe = players[unit.owner]?.tribe;
     if (unit.shipLevel !== undefined && tribe !== undefined) {
       return this.textures.shipTextures[tribe]?.[unit.shipLevel] ?? null;
@@ -1939,7 +1936,7 @@ export class MapView {
   }
 
   private unitTextureTop(unit: Unit, players: Player[]): number {
-    if (unit.type === 'pirate') {
+    if (unit.type === UnitType.PIRATE) {
       const tex = this.textures.pirateTexture;
       return tex.anchorY * tex.texture.height * this.spriteScale;
     }
@@ -2028,10 +2025,10 @@ export class MapView {
   private createHpBar(spec: HpBarSpec): HpBarEntry {
     const el = new Container();
     el.sortableChildren = true;
-    // The white box's top edge sits 11px above the anchor (its center at -5);
-    // the green/ghost bars fill the inner 60x10 area (1px padding); the label's
-    // bottom sits 13px above the anchor (2px above the box top).
-    const boxTop = -11;
+    // The white box ends just above the anchor (see hp-bar-layout); the
+    // green/ghost bars fill its inner area (1px padding); the label's bottom
+    // sits HP_LABEL_GAP above the box top.
+    const boxTop = HP_BAR_BOX_TOP;
 
     const bg = new Graphics();
     bg.zIndex = 0;
@@ -2047,21 +2044,19 @@ export class MapView {
     el.addChild(green);
 
     const label = this.takeText(spec.label, {
-      fontSize: 13,
+      fontSize: FontSize.VERY_SMALL,
       fill: 0xffffff,
       fontFamily: FONT_REGULAR,
     });
     label.anchor.set(0.5, 1);
-    label.position.set(0, boxTop - 2);
+    label.position.set(0, boxTop - HP_LABEL_GAP);
     label.zIndex = 1;
     this.hpLabelHeight = label.height;
 
     const labelBg = this.takeGraphics();
     labelBg.zIndex = 0;
     const alpha = spec.dim ? 0.3 : 1;
-    labelBg
-      .rect(label.x - label.width / 2 - 2, label.y - label.height, label.width + 4, label.height)
-      .fill({ color: 0x000000, alpha });
+    drawHpPlate(labelBg, label.x - label.width / 2, label.y - label.height, label.width, label.height, alpha);
     el.addChild(labelBg);
     el.addChild(label);
 
@@ -2072,17 +2067,17 @@ export class MapView {
       icon.anchor.set(0.5, 1);
       icon.width = 16;
       icon.height = 16;
-      icon.position.set(label.x + label.width / 2 + 12, label.y);
+      icon.position.set(label.x + label.width / 2 + HP_LABEL_PAD_X + 10, label.y);
       icon.zIndex = 1;
       el.addChild(icon);
       bonusIcon = icon;
       bonusText = this.takeText(`+${spec.bonus}`, {
-        fontSize: 13,
+        fontSize: FontSize.VERY_SMALL,
         fill: 0xffcc00,
         fontFamily: FONT_REGULAR,
       });
       bonusText.anchor.set(0, 1);
-      bonusText.position.set(label.x + label.width / 2 + 24, label.y);
+      bonusText.position.set(label.x + label.width / 2 + HP_LABEL_PAD_X + 22, label.y);
       bonusText.zIndex = 1;
       el.addChild(bonusText);
     }
@@ -2115,12 +2110,7 @@ export class MapView {
   private updateHpBarLabel(bar: HpBarEntry, spec: HpBarSpec): void {
     bar.label.text = spec.label;
     const alpha = spec.dim ? 0.3 : 1;
-    bar.labelBg.clear().rect(
-      bar.label.x - bar.label.width / 2 - 2,
-      bar.label.y - bar.label.height,
-      bar.label.width + 4,
-      bar.label.height,
-    ).fill({ color: 0x000000, alpha });
+    drawHpPlate(bar.labelBg.clear(), bar.label.x - bar.label.width / 2, bar.label.y - bar.label.height, bar.label.width, bar.label.height, alpha);
     this.hpLabelHeight = bar.label.height;
     this.updateStarveTag(bar, spec, alpha);
   }
@@ -2138,7 +2128,7 @@ export class MapView {
       return;
     }
     if (!bar.starveTag) {
-      const text = this.takeText('S', { fontSize: 13, fill: 0xff4d4d, fontFamily: FONT_REGULAR });
+      const text = this.takeText('S', { fontSize: FontSize.VERY_SMALL, fill: 0xff4d4d, fontFamily: FONT_REGULAR });
       text.anchor.set(1, 1);
       text.zIndex = 1;
       const bg = this.takeGraphics();
@@ -2148,15 +2138,14 @@ export class MapView {
       bar.starveTag = { text, bg };
     }
     const { text, bg } = bar.starveTag;
-    const right = bar.label.x - bar.label.width / 2 - 4;
+    // The tag's plate ends HP_LABEL_PLATE_GAP before the hp plate.
+    const right = bar.label.x - bar.label.width / 2 - HP_LABEL_PAD_X - HP_LABEL_PLATE_GAP - HP_LABEL_PAD_X;
     text.position.set(right, bar.label.y);
-    bg.clear()
-      .rect(right - text.width - 2, bar.label.y - bar.label.height, text.width + 4, bar.label.height)
-      .fill({ color: 0x000000, alpha });
+    drawHpPlate(bg.clear(), right - text.width, bar.label.y - bar.label.height, text.width, bar.label.height, alpha);
   }
 
   private drawHpBars(bar: HpBarEntry): void {
-    const boxTop = -11;
+    const boxTop = HP_BAR_BOX_TOP;
     bar.ghost.clear().rect(-HP_BAR_OUTER_W / 2 + HP_BAR_PADDING, boxTop + HP_BAR_PADDING, bar.ghostW, HP_BAR_HEIGHT).fill(HP_BAR_GHOST);
     bar.green.clear().rect(-HP_BAR_OUTER_W / 2 + HP_BAR_PADDING, boxTop + HP_BAR_PADDING, bar.greenW, HP_BAR_HEIGHT).fill(HP_BAR_GREEN);
   }
@@ -2250,7 +2239,7 @@ export class MapView {
     }
     const W = viewport.width;
     const H = viewport.height;
-    const parts: { g: Graphics; side: 'l' | 'r' | 't' | 'b'; along: number; W: number; H: number }[] = [];
+    const parts: { g: Graphics; side: CaptureMarkerSide; along: number; W: number; H: number }[] = [];
     for (const tile of this.map.tiles) {
       const st = tile.settlement;
       if (!st || !st.captureReady) continue;
@@ -2263,13 +2252,13 @@ export class MapView {
       if (sx >= 0 && sx <= W && sy >= 0 && sy <= H) continue;
       const dx = sx < 0 ? -sx : sx > W ? sx - W : 0;
       const dy = sy < 0 ? -sy : sy > H ? sy - H : 0;
-      const side: 'l' | 'r' | 't' | 'b' = dx >= dy ? (sx < 0 ? 'l' : 'r') : sy < 0 ? 't' : 'b';
+      const side: CaptureMarkerSide = dx >= dy ? (sx < 0 ? CaptureMarkerSide.LEFT : CaptureMarkerSide.RIGHT) : sy < 0 ? CaptureMarkerSide.TOP : CaptureMarkerSide.BOTTOM;
       // The marker sits exactly on the village's own screen coordinate along
       // the chosen edge: its x for top/bottom edges and its y for left/right
       // edges, so it points precisely at the off-screen village.
       const halfLen = CAPTURE_EDGE_MARKER_SIZE / 2;
       let along: number;
-      if (side === 'l' || side === 'r') along = Math.max(halfLen, Math.min(H - halfLen, sy));
+      if (side === CaptureMarkerSide.LEFT || side === CaptureMarkerSide.RIGHT) along = Math.max(halfLen, Math.min(H - halfLen, sy));
       else along = Math.max(halfLen, Math.min(W - halfLen, sx));
       const g = new Graphics();
       g.alpha = CAPTURE_EDGE_MARKER_ALPHA;
@@ -2402,7 +2391,7 @@ export class MapView {
     const plateColor = territoryColor(tribe, this.knownOwners.has(owner));
     const label = this.takeText(`${tile.building?.food ?? 0}/${GRANARY_CAPACITY}`, {
       fontSize: VILLAGE_LABEL_FONT_SIZE,
-      fill: contrastTextColor(plateColor),
+      fill: villageLabelTextColor(tribe, this.knownOwners.has(owner)),
       fontFamily: FONT_REGULAR,
     });
     label.anchor.set(0.5, 0.5);
@@ -2438,7 +2427,7 @@ export class MapView {
     const plateColor = territoryColor(tribe, this.knownOwners.has(owner));
     const label = this.takeText(`${tile.settlement!.name ?? ''} ${count}/${capacity}`.trim(), {
       fontSize: VILLAGE_LABEL_FONT_SIZE,
-      fill: contrastTextColor(plateColor),
+      fill: villageLabelTextColor(tribe, this.knownOwners.has(owner)),
       fontFamily: FONT_REGULAR
     });
     label.anchor.set(0, 0.5);

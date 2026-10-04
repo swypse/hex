@@ -4,12 +4,13 @@ import { perfStatsFor } from '../../render/perf-stats';
 import { type UIHost, type Widget } from '../host';
 import { makeLabel } from '../kit/label';
 import { makePanel } from '../kit/panel';
+import { FontSize } from '@enums';
 
 const PANEL_X = 6;
 const PANEL_Y = 6;
 const REFRESH_MS = 300;
 
-/** Debug stats panel (F3): FPS, frame ms, GL draw calls (WebGL only), visible
+/** Debug stats panel (F3, or `?perf` in the URL): FPS, worst frame and slow-frame counts, render CPU ms, frame ms, GL draw calls (WebGL only), visible
  *  render-object and texture counts, and JS heap (Chromium only). Top-left,
  *  hidden until toggled, rebuilt at ~3 Hz from the shared `PerfStats`. */
 export class HudPerf implements Widget {
@@ -25,7 +26,8 @@ export class HudPerf implements Widget {
     el.position.set(PANEL_X, PANEL_Y);
     root.addChild(el);
     this.el = el;
-    this.el.visible = false;
+    // `?perf` in the URL opens the panel at start: F3 does not exist on touch devices.
+    this.el.visible = new URLSearchParams(window.location?.search ?? '').has('perf');
 
     perfStatsFor(host.app).begin();
     this.onKey = (e: KeyboardEvent): void => {
@@ -33,6 +35,7 @@ export class HudPerf implements Widget {
     };
     window.addEventListener('keydown', this.onKey);
     this.timer = setInterval(() => this.refresh(), REFRESH_MS);
+    if (this.el.visible) this.refresh();
   }
 
   private toggle(): void {
@@ -46,7 +49,10 @@ export class HudPerf implements Widget {
     markDirty();
     const snap = perfStatsFor(this.host.app).getSnapshot();
     const lines = [
-      `fps ${snap.fps}   ${snap.frameMs.toFixed(1)} ms`,
+      `fps ${snap.fps}   ${snap.frameMs.toFixed(1)} ms   worst ${snap.maxMs.toFixed(1)}`,
+      `frames >33ms ${snap.slow33}   >50ms ${snap.slow50}`,
+      `render cpu ${snap.renderMsAvg.toFixed(1)} / ${snap.renderMsMax.toFixed(1)} ms`,
+      snap.longFrames ? `js long frames ${snap.longFrames.count} (max ${snap.longFrames.maxMs} ms)` : 'js long frames n/a',
       `draws ${snap.drawCalls === null ? 'n/a' : snap.drawCalls}`,
       `objs ${snap.renderObjects}`,
       `tex ${snap.textures}`,
@@ -59,7 +65,7 @@ export class HudPerf implements Widget {
     let y = padTop;
     let widest = 0;
     for (const line of lines) {
-      const label = makeLabel(line, { fontSize: 10, fill: 0xeeeeee });
+      const label = makeLabel(line, { fontSize: FontSize.VERY_SMALL, fill: 0xeeeeee });
       label.eventMode = 'none';
       label.position.set(padSide, y);
       this.el.addChild(label);

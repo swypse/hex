@@ -4,6 +4,7 @@ import { useGameStore } from '../src/store/game-store';
 import { TutorialOverlay } from '../src/ui/overlays/tutorial-overlay';
 import { type UIHost } from '../src/ui/host';
 import { buildTutorialPlayers } from '../src/game/tutorial/tutorial-map';
+import { Screen, TutorialStepId } from '@enums';
 
 function fakeCanvasContext() {
   return {
@@ -33,9 +34,9 @@ describe('TutorialOverlay', () => {
     };
     root = new Container();
     useGameStore.setState({
-      screen: 'game',
+      screen: Screen.GAME,
       tutorial: true,
-      tutorialStep: 'moveUnit',
+      tutorialStep: TutorialStepId.MOVE_UNIT,
       tutorialHighlightSkills: [],
       tutorialHighlightEndTurn: false,
       texturesLoading: false,

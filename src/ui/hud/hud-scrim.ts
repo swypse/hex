@@ -1,12 +1,13 @@
 import { Container, FillGradient, Graphics } from 'pixi.js';
 import { type UIHost, type Widget } from '../host';
+import { ScrimSide } from '@enums';
 
 /** Height of the full-width top/bottom scrim band. */
 const SCENIC_BAND_H = 70;
 
 export interface HudScrimOptions {
   /** 'top' fades opaque→transparent downward; 'bottom' is the mirror. */
-  side?: 'top' | 'bottom';
+  side?: ScrimSide;
 }
 
 /** Full-width edge scrim: black α=1 at the very edge of the screen fading to
@@ -15,14 +16,14 @@ export interface HudScrimOptions {
  *  renders above the map and every tile but below all HUD widgets (resource
  *  panel, player icons, scores, turn bar). Non-interactive. */
 export class HudScrim implements Widget {
-  private readonly side: 'top' | 'bottom';
+  private readonly side: ScrimSide;
   private el: Graphics | null = null;
   private host: UIHost | null = null;
   private onResize: (() => void) | null = null;
   private gradient: FillGradient | null = null;
 
   constructor(opts: HudScrimOptions = {}) {
-    this.side = opts.side ?? 'top';
+    this.side = opts.side ?? ScrimSide.TOP;
   }
 
   mount(host: UIHost, root: Container): void {
@@ -45,8 +46,8 @@ export class HudScrim implements Widget {
     // Fade from 0.8 alpha at the screen edge to fully transparent away from it.
     // One gradient fill (rather than stacked alpha-stepped rects) so the fade
     // is smooth with no visible banding lines.
-    const edge = this.side === 'top' ? 0.8 : 0;
-    const away = this.side === 'top' ? 0 : 0.8;
+    const edge = this.side === ScrimSide.TOP ? 0.8 : 0;
+    const away = this.side === ScrimSide.TOP ? 0 : 0.8;
     const gradient = new FillGradient({
       type: 'linear',
       start: { x: 0, y: 0 },
@@ -59,7 +60,7 @@ export class HudScrim implements Widget {
     });
     this.el.rect(0, 0, screenW, SCENIC_BAND_H).fill(gradient);
     this.gradient = gradient;
-    this.el.position.set(0, this.side === 'top' ? 0 : screenH - SCENIC_BAND_H);
+    this.el.position.set(0, this.side === ScrimSide.TOP ? 0 : screenH - SCENIC_BAND_H);
   };
 
   destroy(): void {

@@ -5,7 +5,7 @@ import { type UIHost } from '@/ui/host';
 import { Button } from '@/ui/kit/button';
 import { ButtonGroup } from '@/ui/kit/button-group';
 import { LobbyScreen } from '@/ui/screens/lobby-screen';
-import { GameMode } from '@enums';
+import { GameMode, LobbyRole, Screen } from '@enums';
 import { BitmapText, Container, Graphics, Sprite } from 'pixi.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -342,9 +342,9 @@ describe('LobbyScreen menu keyboard navigation', () => {
   });
 
   it('goes back to the start screen on Backspace', () => {
-    useGameStore.setState({ screen: 'lobby' });
+    useGameStore.setState({ screen: Screen.LOBBY });
     key('Backspace');
-    expect(useGameStore.getState().screen).toBe('start');
+    expect(useGameStore.getState().screen).toBe(Screen.START);
   });
 
   it('places the menu back button as the last button below the others', () => {
@@ -428,7 +428,7 @@ describe('LobbyScreen client room tribe selection', () => {
   const setClientRoom = (): void => {
     useGameStore.setState({
       lobby: {
-        role: 'client',
+        role: LobbyRole.CLIENT,
         code: 'ABCDEF',
         mode: GameMode.CAPTURE,
         totalPlayers: 2,
@@ -481,7 +481,7 @@ describe('LobbyScreen client room tribe selection', () => {
     setClientRoom();
     useGameStore.setState({
       lobby: {
-        role: 'client',
+        role: LobbyRole.CLIENT,
         code: 'ABCDEF',
         mode: GameMode.CAPTURE,
         totalPlayers: 2,
@@ -520,7 +520,7 @@ describe('LobbyScreen client room tribe selection', () => {
     setClientRoom();
     useGameStore.setState({
       lobby: {
-        role: 'client',
+        role: LobbyRole.CLIENT,
         code: 'ABCDEF',
         mode: GameMode.CAPTURE,
         totalPlayers: 2,

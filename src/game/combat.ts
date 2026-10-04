@@ -8,6 +8,7 @@ import { UNIT_TYPES, Unit } from './units';
 import { attackBonus, effectiveAttack, berserkerRage, isStunned } from './abilities';
 import { damageReduction } from './buffs';
 import { BUILDING_MAX_HP } from './buildings';
+import { SiegeTargetKind, SkillId, UnitType } from '@enums';
 
 interface AttackResult {
   attackerDamage: number;
@@ -27,7 +28,7 @@ const SCIENCE_MISS_CHANCE = 0.05;
 export const COMBAT_SCALE = 1.5;
 
 export function missChanceFor(player: Player): number {
-  return hasSkill(player, 'science') ? SCIENCE_MISS_CHANCE : MISS_CHANCE;
+  return hasSkill(player, SkillId.SCIENCE) ? SCIENCE_MISS_CHANCE : MISS_CHANCE;
 }
 
 /** Raw attack force: attack × current hp ratio (no defense applied). The
@@ -75,7 +76,7 @@ export function resolveCombat(map: GameMap | null, attacker: Unit, target: MapTi
   // so a ship's counter math is unchanged, while bonuses apply on top.
   const scaleAttack = attacker.attack + bonus;
   const attackerDamage = Math.round((attackForce / total) * scaleAttack * COMBAT_SCALE);
-  const counterMult = defender.type === 'shield' && !isShip(defender) ? 2 : 1;
+  const counterMult = defender.type === UnitType.SHIELD && !isShip(defender) ? 2 : 1;
   const counterDamage = Math.round((defenseForce / total) * def * COMBAT_SCALE * counterMult);
   return { attackerDamage, counterDamage };
 }
@@ -87,7 +88,7 @@ export function resolveCombat(map: GameMap | null, attacker: Unit, target: MapTi
 export function canCounterAttack(unit: Unit): boolean {
   if (isStunned(unit)) return false;
   if (berserkerRage(unit) > 0) return false;
-  return !(unit.type === 'catapult' && !isShip(unit));
+  return !(unit.type === UnitType.CATAPULT && !isShip(unit));
 }
 
 /** Counter damage an attack on `target` would draw back onto `attacker` (0
@@ -124,7 +125,7 @@ interface SiegeOutcome {
   /** The structure destroyed on a hit: a village level, its wall, a building,
    *  or a bridge. `null` when nothing was hit (or a building was merely
    *  damaged, not destroyed). */
-  destroyed: 'village' | 'wall' | 'building' | 'bridge' | 'road' | null;
+  destroyed: SiegeTargetKind | null;
   /** Remaining hp of a building hit by the volley (undefined for non-building
    *  or non-damaging hits). */
   buildingHp?: number;
@@ -144,19 +145,19 @@ export function performSiege(catapult: Unit, target: MapTile, rng: () => number 
   if (s && s.owner !== null && s.owner !== catapult.owner) {
     if (s.wall) {
       s.wall = false;
-      return { missed: false, destroyed: 'wall' };
+      return { missed: false, destroyed: SiegeTargetKind.WALL };
     }
     if (s.level > 1) {
       s.level -= 1;
     }
-    return { missed: false, destroyed: 'village' };
+    return { missed: false, destroyed: SiegeTargetKind.VILLAGE };
   }
   if (target.building && target.ownedBy !== null && target.ownedBy !== catapult.owner) {
     // A building takes 1 damage per hit and is removed once its hp reaches 0.
     const hp = (target.building.hp ?? BUILDING_MAX_HP) - 1;
     if (hp <= 0) {
       target.building = null;
-      return { missed: false, destroyed: 'building', buildingHp: 0 };
+      return { missed: false, destroyed: SiegeTargetKind.BUILDING, buildingHp: 0 };
     }
     target.building.hp = hp;
     return { missed: false, destroyed: null, buildingHp: hp };
@@ -164,12 +165,12 @@ export function performSiege(catapult: Unit, target: MapTile, rng: () => number 
   if (target.bridge !== undefined && target.bridge !== null && target.bridge.owner !== catapult.owner) {
     target.bridge = null;
     target.roadOwner = null;
-    return { missed: false, destroyed: 'bridge' };
+    return { missed: false, destroyed: SiegeTargetKind.BRIDGE };
   }
   // A road is hit last: a building on the same tile is destroyed first.
   if (target.roadOwner !== null && target.roadOwner !== undefined && target.roadOwner !== catapult.owner) {
     target.roadOwner = null;
-    return { missed: false, destroyed: 'road' };
+    return { missed: false, destroyed: SiegeTargetKind.ROAD };
   }
   // A free/unclaimed structure: the volley still resolves (marks the catapult
   // as attacked) but has no effect.
@@ -188,7 +189,7 @@ export function attackableTargets(map: GameMap, unit: Unit, playerIndex = 0): Ma
   // Land catapults are the sole siege unit: they can also target enemy
   // buildings (villages, mines, sawmills, ports, temples, bridges) within
   // their attack range, using the same range/fog logic as enemy units.
-  if (unit.type === 'catapult') {
+  if (unit.type === UnitType.CATAPULT) {
     for (const t of map.tiles) {
       if (t.unit) continue;
       if (hexDistance({ q: unit.q, r: unit.r }, t) > shipAttackDistance(unit)) continue;
@@ -204,7 +205,7 @@ export function attackableTargets(map: GameMap, unit: Unit, playerIndex = 0): Ma
  *  production buildings rather than sitting idle. Villages (and their walls)
  *  are worth more than a standalone building; a bridge is last. */
 export function chooseBestSiegeTarget(map: GameMap, unit: Unit, playerIndex = 0): MapTile | null {
-  if (unit.type !== 'catapult') return null;
+  if (unit.type !== UnitType.CATAPULT) return null;
   let best: MapTile | null = null;
   let bestScore = -Infinity;
   for (const t of map.tiles) {
@@ -246,8 +247,8 @@ export function chooseBestAttack(map: GameMap, unit: Unit, playerIndex = 0): Map
     let s = 0;
     if (dmg >= target.hp) s += 500;
     s += (UNIT_TYPES[target.type].maxHp - target.hp) * 3;
-    if (target.type === 'swordsman') s += 80;
-    if (target.type === 'archer') s += 60;
+    if (target.type === UnitType.SWORDSMAN) s += 80;
+    if (target.type === UnitType.ARCHER) s += 60;
     if (target.shipLevel !== undefined) s += 90;
     if (t.settlement && t.settlement.owner !== unit.owner) s += 150;
     const dist = hexDistance({ q: unit.q, r: unit.r }, { q: t.q, r: t.r });
@@ -286,7 +287,7 @@ export function performAttack(
 
   if (rng() < missChance) {
     attacker.hasAttacked = true;
-    if (attacker.type === 'rider') attacker.hasMoved = false;
+    if (attacker.type === UnitType.RIDER) attacker.hasMoved = false;
     return {
       attackerDamage: 0,
       targetDamage: 0,
@@ -300,7 +301,7 @@ export function performAttack(
   const targetDied = targetUnit.hp - attackerDamage <= 0;
   targetUnit.hp = Math.max(0, targetUnit.hp - attackerDamage);
   attacker.hasAttacked = true;
-  if (attacker.type === 'rider') attacker.hasMoved = false;
+  if (attacker.type === UnitType.RIDER) attacker.hasMoved = false;
 
   let targetDamage = 0;
   let attackerDied = false;
@@ -322,7 +323,7 @@ export function performAttack(
     if (target.settlement && target.settlement.owner !== attacker.owner && target.settlement.captureReady) {
       target.settlement.captureReady = false;
     }
-    if (attackerTile && attacker.type !== 'archer' && attacker.type !== 'catapult' && attacker.type !== 'pirate' && targetUnit.type !== 'pirate' && !isShip(attacker) && !isShip(targetUnit)) {
+    if (attackerTile && attacker.type !== UnitType.ARCHER && attacker.type !== UnitType.CATAPULT && attacker.type !== UnitType.PIRATE && targetUnit.type !== UnitType.PIRATE && !isShip(attacker) && !isShip(targetUnit)) {
       attackerTile.unit = null;
       attacker.q = target.q;
       attacker.r = target.r;

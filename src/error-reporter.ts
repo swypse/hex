@@ -1,5 +1,6 @@
 import { Application, Container, Graphics, Text } from 'pixi.js';
 import { t } from './i18n';
+import { FontSize } from '@enums';
 
 const TOAST_LIFETIME_MS = 3000;
 const TOAST_FADE_MS = 180;
@@ -23,7 +24,7 @@ function showToast(): void {
     text: t('error.toast'),
     style: {
       fontFamily: 'Roboto, system-ui, sans-serif',
-      fontSize: 15,
+      fontSize: FontSize.SMALL,
       fill: 0xeeeeee,
       wordWrap: true,
       wordWrapWidth: TOAST_MAX_WIDTH - TOAST_PAD * 2,

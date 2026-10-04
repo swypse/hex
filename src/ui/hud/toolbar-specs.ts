@@ -10,12 +10,12 @@ import { SHIP_UPGRADE_COST, canUpgradeShip } from '../../game/ship';
 import { unitsInVillage, villageCapacity, canBuildWall, WALL_COST } from '../../game/village';
 import { canBuildRoad, ROAD_COST } from '../../game/roads';
 import { canBuildBridge, BRIDGE_COST } from '../../game/bridges';
-import { BuildingKind } from '../../game/events';
 import { bonusEligibleFor } from '../../game/bonus';
 import { bottleCollectableFor } from '../../game/bottles';
 import { trapCells, TRAP_COST } from '../../game/traps';
 import { stormEligible } from '../../game/storm';
 import { adjacentEnemyVillages } from '../../game/stalker';
+import { BuildingKind, OverlayKind, UnitType } from '@enums';
 
 export interface ToolbarSpec {
   key: string;
@@ -50,7 +50,7 @@ export function toolbarSpecs(): ToolbarSpec[] {
       const minPrice = Math.min(...Object.values(UNIT_TYPES).filter((t) => t.price > 0).map((t) => t.price));
       const spawnDisabled = !!tile.unit || unitsInVillage(map, tile) >= villageCapacity(settlement.level) || player.resources.money < minPrice;
       if (!spawnDisabled) {
-        out.push({ key: 'spawn', label: t('ui.spawn'), disabled: false, onClick: () => useGameStore.getState().setOverlay({ kind: 'spawn' }) });
+        out.push({ key: 'spawn', label: t('ui.spawn'), disabled: false, onClick: () => useGameStore.getState().setOverlay({ kind: OverlayKind.SPAWN }) });
       }
       const cost = villageUpgradeCost(settlement.level);
       const upgradeDisabled = !canAffordAt(map, player, tile, cost);
@@ -83,32 +83,32 @@ export function toolbarSpecs(): ToolbarSpec[] {
       });
     }
     const kinds: Array<{ kind: BuildingKind; label: string }> = [
-      { kind: 'sawmill', label: t('ui.buildsawmill10') },
-      { kind: 'mine', label: t('ui.buildmine15') },
-      { kind: 'port', label: t('ui.buildport10w302ore') },
-      { kind: 'temple', label: t('ui.buildwatertemple10s30') },
-      { kind: 'forestTemple', label: t('ui.buildforesttemple10s30') },
-      { kind: 'farm', label: t('ui.buildfarm') },
-      { kind: 'granary', label: t('ui.buildgranary') },
+      { kind: BuildingKind.SAWMILL, label: t('ui.buildsawmill10') },
+      { kind: BuildingKind.MINE, label: t('ui.buildmine15') },
+      { kind: BuildingKind.PORT, label: t('ui.buildport10w302ore') },
+      { kind: BuildingKind.TEMPLE, label: t('ui.buildwatertemple10s30') },
+      { kind: BuildingKind.FOREST_TEMPLE, label: t('ui.buildforesttemple10s30') },
+      { kind: BuildingKind.FARM, label: t('ui.buildfarm') },
+      { kind: BuildingKind.GRANARY, label: t('ui.buildgranary') },
     ];
     for (const { kind, label } of kinds) {
-      const ok = kind === 'sawmill'
+      const ok = kind === BuildingKind.SAWMILL
         ? canBuildSawmill(map, tile, player)
-        : kind === 'mine'
+        : kind === BuildingKind.MINE
           ? canBuildMine(map, tile, player)
-          : kind === 'port'
+          : kind === BuildingKind.PORT
             ? canBuildPort(map, tile, player)
-            : kind === 'temple'
+            : kind === BuildingKind.TEMPLE
               ? canBuildTemple(map, tile, player)
-              : kind === 'farm'
+              : kind === BuildingKind.FARM
                 ? canBuildFarm(map, tile, player)
-                : kind === 'granary'
+                : kind === BuildingKind.GRANARY
                   ? canBuildGranary(map, tile, player)
                   : canBuildForestTemple(map, tile, player);
       if (!ok) continue;
       // A port is a road/water-cluster node: it may be paid by the networks it
       // would join, just like a road or bridge.
-      const joined = kind === 'port' ? villagesJoinedBy(map, player.index, tile) : [];
+      const joined = kind === BuildingKind.PORT ? villagesJoinedBy(map, player.index, tile) : [];
       out.push({ key: kind, label, disabled: !canAffordAt(map, player, tile, BUILDING_COSTS[kind], joined), onClick: () => gameController.buildSelectedBuilding(kind) });
     }
     if (canBuildRoad(map, tile, player)) {
@@ -139,27 +139,27 @@ export function toolbarSpecs(): ToolbarSpec[] {
       });
     }
     const idle = !unit.hasMoved && !unit.hasAttacked && !unit.hasHealed && (unit.stunTurns ?? 0) < 1;
-    if (unit.type === 'stalker' && !unit.isStealthed && unit.shipLevel === undefined && idle && adjacentEnemyVillages(map, tile, player.index).length === 0) {
+    if (unit.type === UnitType.STALKER && !unit.isStealthed && unit.shipLevel === undefined && idle && adjacentEnemyVillages(map, tile, player.index).length === 0) {
       out.push({ key: 'stealth', label: t('action.enableStealth'), disabled: false, onClick: () => gameController.enableStealthSelected() });
     }
-    if (unit.type === 'builder' && unit.shipLevel === undefined && canAffordAnyBuilderBuild(map, player, tile)) {
-      out.push({ key: 'build', label: t('action.build'), disabled: !idle, onClick: () => useGameStore.getState().setOverlay({ kind: 'builderBuild' }) });
+    if (unit.type === UnitType.BUILDER && unit.shipLevel === undefined && canAffordAnyBuilderBuild(map, player, tile)) {
+      out.push({ key: 'build', label: t('action.build'), disabled: !idle, onClick: () => useGameStore.getState().setOverlay({ kind: OverlayKind.BUILDER_BUILD }) });
     }
-    if (unit.type === 'trapper' && unit.shipLevel === undefined && trapCells(map, tile).length > 0) {
+    if (unit.type === UnitType.TRAPPER && unit.shipLevel === undefined && trapCells(map, tile).length > 0) {
       out.push({ key: 'thorn-trap', label: t('action.buildTrap'), disabled: !idle || !canAffordAt(map, player, tile, TRAP_COST), onClick: () => gameController.placeTrap() });
     }
     if (canBurnBuilding(tile, unit) && tile.building) {
-      out.push({ key: `burn-${tile.building.kind}`, label: t(tile.building.kind === 'farm' ? 'action.burnFarm' : 'action.burnGranary'), disabled: false, onClick: () => gameController.burnSelected() });
+      out.push({ key: `burn-${tile.building.kind}`, label: t(tile.building.kind === BuildingKind.FARM ? 'action.burnFarm' : 'action.burnGranary'), disabled: false, onClick: () => gameController.burnSelected() });
     }
     if (canBurnRoad(tile, unit)) {
       out.push({ key: 'burn-road', label: t('action.burnRoad'), disabled: false, onClick: () => gameController.burnRoadSelected() });
     }
-    if (unit.type === 'stormcaller' && stormEligible(map, unit)) {
+    if (unit.type === UnitType.STORMCALLER && stormEligible(map, unit)) {
       out.push({ key: 'storm', label: t('action.storm'), disabled: !idle, onClick: () => gameController.stormSelected() });
     }
   }
 
-  if (unit && unit.type === 'pirate') {
+  if (unit && unit.type === UnitType.PIRATE) {
     const dealt = hasPirateDeal(unit, player.index);
     out.push({
       key: 'deal',

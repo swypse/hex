@@ -5,6 +5,7 @@ import { useGameStore } from '../src/store/game-store';
 import { TileType } from '../src/game/tile-types';
 import type { MapTile } from '../src/game/map-gen';
 import { axialKey } from '../src/game/hex';
+import { GameEventType } from '@enums';
 
 describe('explorer visibility', () => {
   function tile(q: number, r: number): MapTile {
@@ -40,7 +41,7 @@ describe('explorer visibility', () => {
     const { host, mapView, textures } = makeHost([tile(0, 0), tile(1, 0)]);
     const presenter = new EventPresenter(host);
     await presenter.present(
-      [{ type: 'explorer', q: 0, r: 0, path: [{ q: 1, r: 0 }], playerIndex: 1 }],
+      [{ type: GameEventType.EXPLORER, q: 0, r: 0, path: [{ q: 1, r: 0 }], playerIndex: 1 }],
       new Set(),
     );
     expect(mapView).not.toHaveBeenCalled();
@@ -53,7 +54,7 @@ describe('explorer visibility', () => {
     const { host } = makeHost(tiles);
     const presenter = new EventPresenter(host);
     await presenter.present(
-      [{ type: 'explorer', q: 0, r: 0, path: [{ q: 1, r: 0 }], playerIndex: 0 }],
+      [{ type: GameEventType.EXPLORER, q: 0, r: 0, path: [{ q: 1, r: 0 }], playerIndex: 0 }],
       new Set(),
     );
     expect(tiles[0]!.exploredBy).toEqual([0]);

@@ -1,6 +1,7 @@
 import { Container } from 'pixi.js';
 import { Button, type ButtonCorners } from './button';
 import { THEME } from './theme';
+import { FontSize } from '@enums';
 
 interface ButtonGroupItem {
   label: string;
@@ -8,7 +9,7 @@ interface ButtonGroupItem {
 }
 
 /** Uniform font size for every button in the group. */
-const GROUP_FONT_SIZE = 14;
+const GROUP_FONT_SIZE = FontSize.SMALL;
 
 interface ButtonGroupOpts {
   items: ButtonGroupItem[];

@@ -1,6 +1,7 @@
 import { Application, Container, Graphics, BitmapText } from 'pixi.js';
 import { makeLabel } from './label';
 import { markDirty } from '../../render/render-gate';
+import { FontSize } from '@enums';
 
 const TRIANGLE_H = 8;
 const TRIANGLE_W = 14;
@@ -36,8 +37,8 @@ export class Tooltip {
     this.el.eventMode = 'static';
     this.el.zIndex = 1000;
     this.bg = new Graphics();
-    this.title = makeLabel('', { fontSize: 14, fill: 0xffffff, fontWeight: '700' });
-    this.text = makeLabel('', { fontSize: 13, fill: 0xeeeeee });
+    this.title = makeLabel('', { fontSize: FontSize.SMALL, fill: 0xffffff, fontWeight: '700' });
+    this.text = makeLabel('', { fontSize: FontSize.VERY_SMALL, fill: 0xeeeeee });
     this.el.addChild(this.bg, this.title, this.text);
     this.el.on('pointerover', () => this.cancelHide());
     this.el.on('pointerout', () => this.hideAfter(500));

@@ -9,7 +9,7 @@ import { GameScreen } from '../src/ui/screens/game-screen';
 import { gameController } from '../src/controller/game-controller';
 import { useGameStore } from '../src/store/game-store';
 import { type UIHost } from '../src/ui/host';
-import { GameMode } from '@enums';
+import { GameMode, NetMode, Screen } from '@enums';
 
 vi.mock('../src/render/texture-factory', async () => {
   const { Texture, ImageSource } = await import('pixi.js');
@@ -108,14 +108,14 @@ describe('WebGL context loss recovery', () => {
     };
     controller.shutdown();
     useGameStore.setState({
-      screen: 'start',
+      screen: Screen.START,
       players: [],
       turn: 1,
       currentPlayerIndex: 0,
       aiActive: false,
       selection: null,
       overlay: null,
-      netMode: 'single',
+      netMode: NetMode.SINGLE,
       pendingSnapshot: null,
       texturesLoading: false,
     });
@@ -123,7 +123,7 @@ describe('WebGL context loss recovery', () => {
 
   afterEach(() => {
     controller.shutdown();
-    useGameStore.getState().setScreen('start');
+    useGameStore.getState().setScreen(Screen.START);
   });
 
   it('rebuilds the map scene with fresh textures after the context is restored', async () => {

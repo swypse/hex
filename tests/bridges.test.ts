@@ -6,6 +6,7 @@ import { Player } from '../src/game/players';
 import { Tribe } from '../src/game/tribes';
 import { BRIDGE_COST, bridgeDirFor, buildBridge, canBuildBridge } from '../src/game/bridges';
 import { canBuildPort, canBuildTemple } from '../src/game/buildings';
+import { BridgeDir, BuildingKind, SkillId, UnitType } from '@enums';
 
 function player(skills: Player['skills'] = [], money = 100): Player {
   return {
@@ -69,15 +70,15 @@ function nwGap(): GameMap {
 
 describe('bridgeDirFor', () => {
   it('detects the horizontal we axis', () => {
-    expect(bridgeDirFor(weGap(), tileAt(weGap(), 1, 0)!)).toBe('we');
+    expect(bridgeDirFor(weGap(), tileAt(weGap(), 1, 0)!)).toBe(BridgeDir.WE);
   });
 
   it('detects the ne diagonal axis', () => {
-    expect(bridgeDirFor(neGap(), tileAt(neGap(), 1, 0)!)).toBe('ne');
+    expect(bridgeDirFor(neGap(), tileAt(neGap(), 1, 0)!)).toBe(BridgeDir.NE);
   });
 
   it('detects the nw diagonal axis', () => {
-    expect(bridgeDirFor(nwGap(), tileAt(nwGap(), 1, 0)!)).toBe('nw');
+    expect(bridgeDirFor(nwGap(), tileAt(nwGap(), 1, 0)!)).toBe(BridgeDir.NW);
   });
 
   it('returns null when every neighbour is water', () => {
@@ -93,18 +94,18 @@ describe('canBuildBridge', () => {
     const map = weGap();
     const water = tileAt(map, 1, 0)!;
     expect(canBuildBridge(map, water, player([]))).toBe(false);
-    expect(canBuildBridge(map, water, player(['bridges']))).toBe(true);
+    expect(canBuildBridge(map, water, player([SkillId.BRIDGES]))).toBe(true);
 
-    water.unit = makeUnit('u', 0, 'warrior', 1, 0);
-    expect(canBuildBridge(map, water, player(['bridges']))).toBe(false);
+    water.unit = makeUnit('u', 0, UnitType.WARRIOR, 1, 0);
+    expect(canBuildBridge(map, water, player([SkillId.BRIDGES]))).toBe(false);
     water.unit = null;
 
-    water.building = { kind: 'port', level: 1 };
-    expect(canBuildBridge(map, water, player(['bridges']))).toBe(false);
+    water.building = { kind: BuildingKind.PORT, level: 1 };
+    expect(canBuildBridge(map, water, player([SkillId.BRIDGES]))).toBe(false);
     water.building = null;
 
-    water.bridge = { owner: 0, dir: 'we' };
-    expect(canBuildBridge(map, water, player(['bridges']))).toBe(false);
+    water.bridge = { owner: 0, dir: BridgeDir.WE };
+    expect(canBuildBridge(map, water, player([SkillId.BRIDGES]))).toBe(false);
     water.bridge = null;
   });
 });
@@ -112,11 +113,11 @@ describe('canBuildBridge', () => {
 describe('buildBridge', () => {
   it('pays the cost and stamps the bridge plus road owner', () => {
     const map = weGap();
-    const p = player(['bridges']);
+    const p = player([SkillId.BRIDGES]);
     const village = giveResources(map, p, { wood: 100, stone: 100 })!;
     const before = { money: p.resources.money, ...village.settlement!.stock! };
     expect(buildBridge(map, tileAt(map, 1, 0)!, p)).toBe(true);
-    expect(tileAt(map, 1, 0)!.bridge).toEqual({ owner: 0, dir: 'we' });
+    expect(tileAt(map, 1, 0)!.bridge).toEqual({ owner: 0, dir: BridgeDir.WE });
     expect(tileAt(map, 1, 0)!.roadOwner).toBe(0);
     expect(village.settlement!.stock!.wood).toBe(before.wood - BRIDGE_COST.wood);
     expect(p.resources.money).toBe(before.money - BRIDGE_COST.money);
@@ -126,8 +127,8 @@ describe('buildBridge', () => {
   it('fails without the skill, with too little money, or on a land tile', () => {
     const map = weGap();
     expect(buildBridge(map, tileAt(map, 1, 0)!, player([]))).toBe(false);
-    expect(buildBridge(map, tileAt(map, 1, 0)!, player(['bridges'], 5))).toBe(false);
-    expect(buildBridge(map, tileAt(map, 0, 0)!, player(['bridges']))).toBe(false);
+    expect(buildBridge(map, tileAt(map, 1, 0)!, player([SkillId.BRIDGES], 5))).toBe(false);
+    expect(buildBridge(map, tileAt(map, 0, 0)!, player([SkillId.BRIDGES]))).toBe(false);
   });
 });
 
@@ -138,20 +139,20 @@ describe('port and water temple exclusion', () => {
     water.ownedBy = 0;
     // The west shore is owned land, so the (non-bridged) water tile is a legal port.
     tileAt(map, 0, 0)!.ownedBy = 0;
-    if (bridged) water.bridge = { owner: 0, dir: 'we' };
+    if (bridged) water.bridge = { owner: 0, dir: BridgeDir.WE };
     return map;
   }
 
   it('a port cannot be built on a bridged water tile', () => {
-    const open = canBuildPort(waterTileMap(false), tileAt(waterTileMap(false), 1, 0)!, player(['water', 'bridges']));
-    const blocked = canBuildPort(waterTileMap(true), tileAt(waterTileMap(true), 1, 0)!, player(['water', 'bridges']));
+    const open = canBuildPort(waterTileMap(false), tileAt(waterTileMap(false), 1, 0)!, player([SkillId.WATER, SkillId.BRIDGES]));
+    const blocked = canBuildPort(waterTileMap(true), tileAt(waterTileMap(true), 1, 0)!, player([SkillId.WATER, SkillId.BRIDGES]));
     expect(open).toBe(true);
     expect(blocked).toBe(false);
   });
 
   it('a water temple cannot be built on a bridged water tile', () => {
-    const open = canBuildTemple(waterTileMap(false), tileAt(waterTileMap(false), 1, 0)!, player(['waterTemples', 'bridges']));
-    const blocked = canBuildTemple(waterTileMap(true), tileAt(waterTileMap(true), 1, 0)!, player(['waterTemples', 'bridges']));
+    const open = canBuildTemple(waterTileMap(false), tileAt(waterTileMap(false), 1, 0)!, player([SkillId.WATER_TEMPLES, SkillId.BRIDGES]));
+    const blocked = canBuildTemple(waterTileMap(true), tileAt(waterTileMap(true), 1, 0)!, player([SkillId.WATER_TEMPLES, SkillId.BRIDGES]));
     expect(open).toBe(true);
     expect(blocked).toBe(false);
   });

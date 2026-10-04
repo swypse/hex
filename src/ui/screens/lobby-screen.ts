@@ -4,7 +4,7 @@ import { t } from '@/i18n';
 import { buildJoinLink, consumePendingJoin } from '@/net/join-link';
 import { playerName, setPlayerName } from '@/storage/settings';
 import { useGameStore } from '@/store/game-store';
-import { GameMode } from '@enums';
+import { ConnectionState, FontSize, GameMode, LobbyRole, LobbyView, Screen } from '@enums';
 import { Container } from 'pixi.js';
 import { type ScreenController, type UIHost } from '../host';
 import { Button } from '../kit/button';
@@ -17,7 +17,7 @@ import { makeTribeOption } from '../kit/tribe-option';
 import { isTouchDevice } from '../touch';
 import { ScreenScroll } from '../vertical-scroll';
 
-type View = 'menu' | 'host' | 'join';
+
 
 const HOST_NAV_ITEMS = 6;
 // Tribe option circle radius (matches makeTribeOption), used to place the
@@ -29,7 +29,7 @@ export class LobbyScreen implements ScreenController {
   private root: Container | null = null;
   private host: UIHost | null = null;
   private scroller: ScreenScroll | null = null;
-  private view: View = 'menu';
+  private view: LobbyView = LobbyView.MENU;
   private mode: GameMode = GameMode.CAPTURE;
   private humans = 2;
   private aiCount = 1;
@@ -54,7 +54,7 @@ export class LobbyScreen implements ScreenController {
     // Arriving via a share link ?join=<code> opens the join screen prefilled.
     const joinCode = consumePendingJoin();
     if (joinCode) {
-      this.view = 'join';
+      this.view = LobbyView.JOIN;
       this.code = joinCode;
     }
     this.render();
@@ -85,9 +85,9 @@ export class LobbyScreen implements ScreenController {
     }
     this.scroller = new ScreenScroll(this.host.app, this.root);
     const s = useGameStore.getState();
-    if (this.view === 'menu' && !s.lobby) this.renderMenu();
-    else if (this.view === 'host' && !s.lobby) this.renderHost();
-    else if (this.view === 'join' && !s.lobby) this.renderJoin();
+    if (this.view === LobbyView.MENU && !s.lobby) this.renderMenu();
+    else if (this.view === LobbyView.HOST && !s.lobby) this.renderHost();
+    else if (this.view === LobbyView.JOIN && !s.lobby) this.renderJoin();
     else this.renderRoom();
     this.scroller.resize();
     this.scroller.refresh();
@@ -98,7 +98,7 @@ export class LobbyScreen implements ScreenController {
   }
 
   private title(text: string): void {
-    const t = makeLabel(text, { fontSize: 24, fill: 0xffffff });
+    const t = makeLabel(text, { fontSize: FontSize.BIG, fill: 0xffffff });
     t.anchor.set(0.5, 0.5);
     t.position.set(this.host!.app.screen.width / 2, 48);
     this.viewContent.addChild(t);
@@ -109,20 +109,20 @@ export class LobbyScreen implements ScreenController {
     const cx = this.host!.app.screen.width / 2;
     const hostBtn = new Button({
       label: t('lobby.hostGame'), width: 240, onClick: () => {
-        this.view = 'host';
+        this.view = LobbyView.HOST;
         this.render();
       }
     });
     const joinBtn = new Button({
       label: t('lobby.joinGame'), width: 240, onClick: () => {
-        this.view = 'join';
+        this.view = LobbyView.JOIN;
         this.render();
       }
     });
     const back = new Button({
       label: t('common.back'),
       width: 240,
-      onClick: () => useGameStore.getState().setScreen('start')
+      onClick: () => useGameStore.getState().setScreen(Screen.START)
     });
     hostBtn.position.set(cx - 120, 160);
     joinBtn.position.set(cx - 120, 230);
@@ -132,7 +132,7 @@ export class LobbyScreen implements ScreenController {
     this.updateMenuSelection();
     this.viewContent.addChild(hostBtn, joinBtn, back);
 
-    const hint = makeLabel(t('lobby.menuHint'), { fontSize: 12, fill: 0x888888 });
+    const hint = makeLabel(t('lobby.menuHint'), { fontSize: FontSize.VERY_SMALL, fill: 0x888888 });
     hint.visible = !isTouchDevice();
     hint.anchor.set(0.5, 0.5);
     hint.position.set(cx, 360);
@@ -165,11 +165,11 @@ export class LobbyScreen implements ScreenController {
 
   private handleKey(e: KeyboardEvent): void {
     if (useGameStore.getState().lobby) return;
-    if (this.view === 'menu') {
+    if (this.view === LobbyView.MENU) {
       this.handleMenuKey(e);
       return;
     }
-    if (this.view !== 'host') return;
+    if (this.view !== LobbyView.HOST) return;
     // Ignore keys while the name field is being edited.
     if (document.activeElement instanceof HTMLInputElement) return;
     if (e.key === 'ArrowUp') {
@@ -186,14 +186,14 @@ export class LobbyScreen implements ScreenController {
     } else if (e.key === 'Enter') {
       e.preventDefault();
       if (this.focus === HOST_NAV_ITEMS - 1) {
-        this.view = 'menu';
+        this.view = LobbyView.MENU;
         this.render();
       } else {
         this.createRoom();
       }
     } else if (e.key === 'Backspace') {
       e.preventDefault();
-      this.view = 'menu';
+      this.view = LobbyView.MENU;
       this.render();
     }
   }
@@ -212,7 +212,7 @@ export class LobbyScreen implements ScreenController {
       this.menuButtons[this.menuIndex]?.trigger();
     } else if (e.key === 'Backspace') {
       e.preventDefault();
-      useGameStore.getState().setScreen('start');
+      useGameStore.getState().setScreen(Screen.START);
     }
   }
 
@@ -240,7 +240,7 @@ export class LobbyScreen implements ScreenController {
   }
 
   private groupLabel(text: string, group: number): ReturnType<typeof makeLabel> {
-    const label = makeLabel(text, { fontSize: 16, fill: this.focus === group ? 0xffffff : 0x888888 });
+    const label = makeLabel(text, { fontSize: FontSize.NORMAL, fill: this.focus === group ? 0xffffff : 0x888888 });
     label.anchor.set(0.5, 0.5);
     return label;
   }
@@ -331,7 +331,7 @@ export class LobbyScreen implements ScreenController {
 
     const total = makeLabel(
       t('lobby.total', { total: this.humans + this.aiCount, humans: this.humans, ai: this.aiCount }),
-      { fontSize: 14, fill: 0xeeeeee },
+      { fontSize: FontSize.SMALL, fill: 0xeeeeee },
     );
     total.anchor.set(0.5, 0.5);
     const totalTop = aiBottom + BLOCK_GAP;
@@ -370,10 +370,10 @@ export class LobbyScreen implements ScreenController {
     const back = new Button({
       label: t('common.back'),
       width: 96,
-      fontSize: 14,
+      fontSize: FontSize.SMALL,
       selected: this.focus === HOST_NAV_ITEMS - 1,
       onClick: () => {
-        this.view = 'menu';
+        this.view = LobbyView.MENU;
         this.render();
       }
     });
@@ -383,7 +383,7 @@ export class LobbyScreen implements ScreenController {
     this.viewContent.addChild(this.createBtn, back);
     this.updateCreate();
 
-    const hint = makeLabel(t('lobby.hostHint'), { fontSize: 12, fill: 0x888888 });
+    const hint = makeLabel(t('lobby.hostHint'), { fontSize: FontSize.VERY_SMALL, fill: 0x888888 });
     hint.visible = !isTouchDevice();
     hint.anchor.set(0.5, 0.5);
     hint.position.set(cx, startTop + this.createBtn.height + 16 + back.height + 16);
@@ -436,14 +436,14 @@ export class LobbyScreen implements ScreenController {
     this.updateJoin();
     y += 60;
 
-    if (s.connection === 'connecting') {
-      const c = makeLabel(t('lobby.connecting'), { fontSize: 16, fill: 0xeeeeee });
+    if (s.connection === ConnectionState.CONNECTING) {
+      const c = makeLabel(t('lobby.connecting'), { fontSize: FontSize.NORMAL, fill: 0xeeeeee });
       c.anchor.set(0.5, 0.5);
       c.position.set(cx, y);
       this.viewContent.addChild(c);
       y += 30;
-    } else if (s.connection === 'error') {
-      const e = makeLabel(t('lobby.connectionFailed'), { fontSize: 16, fill: 0xc0392b });
+    } else if (s.connection === ConnectionState.ERROR) {
+      const e = makeLabel(t('lobby.connectionFailed'), { fontSize: FontSize.NORMAL, fill: 0xc0392b });
       e.anchor.set(0.5, 0.5);
       e.position.set(cx, y);
       this.viewContent.addChild(e);
@@ -452,7 +452,7 @@ export class LobbyScreen implements ScreenController {
 
     const back = new Button({
       label: t('common.back'), width: 200, onClick: () => {
-        this.view = 'menu';
+        this.view = LobbyView.MENU;
         this.render();
       }
     });
@@ -464,7 +464,7 @@ export class LobbyScreen implements ScreenController {
     const s = useGameStore.getState();
     const lobby = s.lobby!;
     const cx = this.host!.app.screen.width / 2;
-    const isHost = lobby.role === 'host';
+    const isHost = lobby.role === LobbyRole.HOST;
     const joined = lobby.players;
     const humanSlots = Math.max(1, lobby.totalPlayers - lobby.aiCount);
     const canStart = joined.length === humanSlots && joined.every((p) => p.ready && p.tribeId !== null);
@@ -472,7 +472,7 @@ export class LobbyScreen implements ScreenController {
     const myPeerId = isHost ? (joined.find((p) => p.isHost)?.peerId ?? '') : s.myPeerId;
 
     this.title(isHost ? t('lobby.yourRoom') : t('lobby.room'));
-    const code = makeLabel(t('lobby.code', { code: lobby.code }), { fontSize: 18, fill: 0xffffff });
+    const code = makeLabel(t('lobby.code', { code: lobby.code }), { fontSize: FontSize.NORMAL, fill: 0xffffff });
     code.anchor.set(0.5, 0.5);
     let copyBtn: Button | null = null;
     copyBtn = new Button({
@@ -515,7 +515,7 @@ export class LobbyScreen implements ScreenController {
       const tribeName = p.tribeId !== null ? (tribeById(p.tribeId)?.name ?? '') : '';
       const row = makeLabel(
         `${p.name || '...'}${tribeName ? ` - ${tribeName}` : ''}${p.isHost ? ' ' + t('lobby.hostMarker') : ''}${p.ready ? ' ' + t('lobby.readyMarker') : ''}`,
-        { fontSize: 16, fill: 0xeeeeee },
+        { fontSize: FontSize.NORMAL, fill: 0xeeeeee },
       );
       row.anchor.set(0.5, 0.5);
       row.position.set(cx, y);
@@ -524,7 +524,7 @@ export class LobbyScreen implements ScreenController {
     }
     y += 20;
 
-    const tribeLabel = makeLabel(t('common.chooseTribe'), { fontSize: 24, fill: 0xffffff });
+    const tribeLabel = makeLabel(t('common.chooseTribe'), { fontSize: FontSize.BIG, fill: 0xffffff });
     tribeLabel.anchor.set(0.5, 0.5);
     tribeLabel.position.set(cx, y);
     this.viewContent.addChild(tribeLabel);
@@ -555,15 +555,15 @@ export class LobbyScreen implements ScreenController {
     y += 70 + (tribeRows - 1) * TRIBE_ROW_STEP;
 
     if (isHost) {
-      if (s.connection === 'error') {
-        const errMsg = makeLabel(s.connectionMessage || t('lobby.connectionError'), { fontSize: 14, fill: 0xc0392b });
+      if (s.connection === ConnectionState.ERROR) {
+        const errMsg = makeLabel(s.connectionMessage || t('lobby.connectionError'), { fontSize: FontSize.SMALL, fill: 0xc0392b });
         errMsg.anchor.set(0.5, 0.5);
         errMsg.position.set(cx, y);
         this.viewContent.addChild(errMsg);
         const back = new Button({
           label: t('common.back'), width: 150, onClick: () => {
             gameController.cancelLobby();
-            this.view = 'menu';
+            this.view = LobbyView.MENU;
             this.render();
           }
         });
@@ -571,8 +571,8 @@ export class LobbyScreen implements ScreenController {
         this.viewContent.addChild(back);
         return;
       }
-      if (s.connection === 'connecting') {
-        const setup = makeLabel(t('lobby.setupRoom'), { fontSize: 14, fill: 0xcccccc });
+      if (s.connection === ConnectionState.CONNECTING) {
+        const setup = makeLabel(t('lobby.setupRoom'), { fontSize: FontSize.SMALL, fill: 0xcccccc });
         setup.anchor.set(0.5, 0.5);
         setup.position.set(cx, y);
         this.viewContent.addChild(setup);
@@ -587,14 +587,14 @@ export class LobbyScreen implements ScreenController {
       this.viewContent.addChild(start);
       y += 60;
       if (!canStart) {
-        const wait = makeLabel(t('lobby.waitingAll'), { fontSize: 14, fill: 0x888888 });
+        const wait = makeLabel(t('lobby.waitingAll'), { fontSize: FontSize.SMALL, fill: 0x888888 });
         wait.anchor.set(0.5, 0.5);
         wait.position.set(cx, y);
         this.viewContent.addChild(wait);
       }
     } else {
-      if (s.connection === 'error') {
-        const errMsg = makeLabel(s.connectionMessage || t('lobby.errMsg'), { fontSize: 14, fill: 0xc0392b });
+      if (s.connection === ConnectionState.ERROR) {
+        const errMsg = makeLabel(s.connectionMessage || t('lobby.errMsg'), { fontSize: FontSize.SMALL, fill: 0xc0392b });
         errMsg.anchor.set(0.5, 0.5);
         errMsg.position.set(cx, y);
         this.viewContent.addChild(errMsg);
@@ -610,7 +610,7 @@ export class LobbyScreen implements ScreenController {
         const back = new Button({
           label: t('common.back'), width: 150, onClick: () => {
             gameController.cancelLobby();
-            this.view = 'join';
+            this.view = LobbyView.JOIN;
             this.render();
           }
         });
@@ -629,20 +629,20 @@ export class LobbyScreen implements ScreenController {
       this.viewContent.addChild(ready);
       y += 60;
       if (isReady) {
-        const wait = makeLabel(t('lobby.waitStart'), { fontSize: 14, fill: 0x888888 });
+        const wait = makeLabel(t('lobby.waitStart'), { fontSize: FontSize.SMALL, fill: 0x888888 });
         wait.anchor.set(0.5, 0.5);
         wait.position.set(cx, y);
         this.viewContent.addChild(wait);
         y += 24;
       } else if (me && me.tribeId === null) {
-        const hint = makeLabel(t('lobby.pickTribeHint'), { fontSize: 14, fill: 0x888888 });
+        const hint = makeLabel(t('lobby.pickTribeHint'), { fontSize: FontSize.SMALL, fill: 0x888888 });
         hint.anchor.set(0.5, 0.5);
         hint.position.set(cx, y);
         this.viewContent.addChild(hint);
         y += 24;
       }
-      if (s.connection === 'connecting') {
-        const connecting = makeLabel(t('lobby.connecting'), { fontSize: 14, fill: 0xcccccc });
+      if (s.connection === ConnectionState.CONNECTING) {
+        const connecting = makeLabel(t('lobby.connecting'), { fontSize: FontSize.SMALL, fill: 0xcccccc });
         connecting.anchor.set(0.5, 0.5);
         connecting.position.set(cx, y);
         this.viewContent.addChild(connecting);
@@ -650,7 +650,7 @@ export class LobbyScreen implements ScreenController {
         const cancel = new Button({
           label: t('common.cancel'), width: 150, onClick: () => {
             gameController.cancelLobby();
-            this.view = 'join';
+            this.view = LobbyView.JOIN;
             this.render();
           }
         });

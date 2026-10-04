@@ -2,15 +2,13 @@ import {
   Application, BlurFilter, ColorMatrixFilter, Container, FillGradient, Graphics, Rectangle, Sprite, Texture
 } from 'pixi.js';
 import { axialKey, HEX_TILT, hexNeighbors } from '../game/hex';
-import { tileMapByKey, type BridgeDir, type GameMap, type MapTile } from '../game/map-gen';
+import { tileMapByKey, type GameMap, type MapTile } from '../game/map-gen';
 import { isSolidGround, isWaterType, TileType, TILE_TYPE_COLORS } from '../game/tile-types';
 import { TRIBES, Tribe } from '../game/tribes';
-import { UnitType, UNIT_IMAGE_FILES, UNIT_TYPES } from '../game/units';
-import { PortDirection } from '../game/buildings';
+import { UNIT_IMAGE_FILES, UNIT_TYPES } from '../game/units';
 import { shadeColor } from '../util/color';
 import { tileElevation } from './elevation';
 import { ensureCanvasResource } from './image-texture';
-import type { Season } from '../game/season';
 import { countIceTiles } from '../game/ice';
 import { ensureTerrainAtlas, terrainFrameTexture, terrainTileTexture, TERRAIN_TILE_FILES, TERRAIN_FOG_FILE } from './terrain-atlas';
 import { buildingTileTexture, ensureBuildingsAtlas } from './buildings-atlas';
@@ -18,6 +16,8 @@ import { ensureTribeAtlas, tribeTileTexture } from './tribe-atlas';
 import { ensureActionButtonAtlas, actionButtonFrameTexture } from '../ui/kit/action-button-icons';
 import { ensureIcons32Atlas, icons32FrameTexture } from '../ui/kit/icons32';
 import { VillageBuildTextureService } from './village-build-texture';
+import { SLICE_BUDGET_MS, yieldToMain } from '../util/time-slice';
+import { BridgeDir, PortDirection, Season, TileAnchor, TileLayer, UnitType } from '@enums';
 
 const TEXTURE_BASE = `${import.meta.env.BASE_URL}textures/`;
 
@@ -173,7 +173,7 @@ function composeHexTexture(
   fill: number,
   opts: {
     walls: boolean;
-    anchor: 'base' | 'topface';
+    anchor: TileAnchor;
     sideColors?: { left: number; right: number };
     brightness?: number
   },
@@ -242,7 +242,7 @@ function composeHexTexture(
     : Math.max(hexSize * HEX_TILT, imageBottom);
   const textureHeight = imageTop + wallBase;
   const anchor =
-    opts.anchor === 'base' ? (imageTop + height) / textureHeight : imageTop / textureHeight;
+    opts.anchor === TileAnchor.BASE ? (imageTop + height) / textureHeight : imageTop / textureHeight;
   return { texture, anchorY: anchor };
 }
 
@@ -337,9 +337,11 @@ function makeUnitGlowTexture(app: Application, base: TileTexture): TileTexture {
   const container = new Container();
   const sprite = new Sprite(base.texture);
   sprite.anchor.set(0.5, base.anchorY);
+  // Flatten the art to white: the glow sprite is tinted at draw time, so one
+  // baked texture serves the cyan own-unit glow and the red enemy glow.
   const blurColor = new ColorMatrixFilter();
   blurColor.matrix = [
-    0, 0, 0, 0, 0,
+    0, 0, 0, 0, 1,
     0, 0, 0, 0, 1,
     0, 0, 0, 0, 1,
     0, 0, 0, 1, 0,
@@ -356,6 +358,41 @@ function makeUnitGlowTexture(app: Application, base: TileTexture): TileTexture {
   return { texture, anchorY };
 }
 
+/** Glow textures (a blurred silhouette per unit texture) baked on first use.
+ *
+ *  A glow is only drawn behind the selected unit, yet baking one for every unit
+ *  and ship of every tribe took about half of the whole texture load. `get`
+ *  bakes the glow for a registered base texture the first time it is asked for
+ *  and keeps it; after `dispose` it answers nothing, so a late request cannot
+ *  bake a texture nobody would free. */
+class LazyGlowMap extends Map<Texture, TileTexture> {
+  private readonly bases = new Map<Texture, TileTexture>();
+  private disposed = false;
+
+  constructor(private readonly bake: (base: TileTexture) => TileTexture) {
+    super();
+  }
+
+  register(base: TileTexture): void {
+    this.bases.set(base.texture, base);
+  }
+
+  override get(texture: Texture): TileTexture | undefined {
+    const baked = super.get(texture);
+    if (baked || this.disposed) return baked;
+    const base = this.bases.get(texture);
+    if (!base) return undefined;
+    const glow = this.bake(base);
+    super.set(texture, glow);
+    return glow;
+  }
+
+  dispose(): void {
+    this.disposed = true;
+    this.bases.clear();
+  }
+}
+
 export async function createTextures(
   app: Application,
   map: GameMap,
@@ -363,7 +400,7 @@ export async function createTextures(
   /** Tribes present in this game. Only their atlases are loaded. */
   activeTribes: ReadonlySet<Tribe> = new Set(TRIBES.map((t) => t.id)),
   /** Season whose terrain tile variants are baked. */
-  season: Season = 'spring',
+  season: Season = Season.SPRING,
 ): Promise<TextureSet> {
   // Every texture baked with generateTexture lives on the GPU until destroyed;
   // collect them so destroyTextureSet can free them when the set is replaced.
@@ -377,6 +414,18 @@ export async function createTextures(
       },
     },
   } as unknown as Application;
+  // The map can change while the bake yields to the browser (an AI turn plays in
+  // slices): read everything the terrain textures depend on up front, so the
+  // set always matches one moment of the map.
+  const iceTiles = countIceTiles(map);
+  let sliceEnd = performance.now() + SLICE_BUDGET_MS;
+  /** Hands the thread back to the browser once the current slice is used up, so
+   *  the bake runs as many short tasks instead of one long one. */
+  const maybeYield = async (): Promise<void> => {
+    if (performance.now() < sliceEnd) return;
+    await yieldToMain();
+    sliceEnd = performance.now() + SLICE_BUDGET_MS;
+  };
   const images = await loadTileImages(season);
   await ensureBuildingsAtlas();
   const tileTextures = new Map<string, TileTexture>();
@@ -384,23 +433,24 @@ export async function createTextures(
   const fogImage = images.get('fog') ?? null;
   const textureCache = new Map<string, TileTexture>();
   const getTileTexture = (
-    layer: 'tile' | 'fog',
+    layer: TileLayer,
     terrain: TileType,
     heightPx: number,
     img: Texture | null,
     fill: number,
-    anchor: 'base' | 'topface',
+    anchor: TileAnchor,
     opts?: {
       sideColors?: { left: number; right: number };
       brightness?: number;
     },
   ): TileTexture => {
     const brightness = opts?.brightness ?? 1;
-    const cacheKey = `${layer}|${terrain}|${heightPx}|${anchor}|${brightness}`;
+    // A fog texture does not depend on the terrain under it: one per height.
+    const cacheKey = layer === TileLayer.FOG ? `fog|${heightPx}|${anchor}|${brightness}` : `${layer}|${terrain}|${heightPx}|${anchor}|${brightness}`;
     const cached = textureCache.get(cacheKey);
     if (cached) return cached;
     const tex = composeHexTexture(bakeApp, hexSize, heightPx, img, fill, {
-      walls: anchor === 'base',
+      walls: anchor === TileAnchor.BASE,
       anchor,
       sideColors: opts?.sideColors,
       brightness,
@@ -414,45 +464,50 @@ export async function createTextures(
   }
   const tileByKey = tileMapByKey(map);
   const findNeighbor = (q: number, r: number): MapTile | undefined => tileByKey.get(axialKey({ q, r }));
-  for (const tile of map.tiles) {
-    const fill = TILE_TYPE_COLORS[tile.terrain];
-    const bottom = isWaterType(tile.terrain) ? shadeColor(fill, 0.7) : fill;
-    const heightPx = tileElevation(tile, hexSize);
-    const key = axialKey(tile);
-    const img = images.get(String(tile.terrain)) ?? null;
-    const brightness = coastWaterBrightness(tile, findNeighbor);
+  const tileSpecs = map.tiles.map((tile) => ({
+    key: axialKey(tile),
+    terrain: tile.terrain,
+    heightPx: tileElevation(tile, hexSize),
+    brightness: coastWaterBrightness(tile, findNeighbor),
+  }));
+  for (const spec of tileSpecs) {
+    const fill = TILE_TYPE_COLORS[spec.terrain];
+    const bottom = isWaterType(spec.terrain) ? shadeColor(fill, 0.7) : fill;
+    const img = images.get(String(spec.terrain)) ?? null;
     tileTextures.set(
-      key,
-      getTileTexture('tile', tile.terrain, heightPx, img, bottom, 'base', {
-        sideColors: TERRAIN_SIDE_COLORS[tile.terrain],
-        brightness,
+      spec.key,
+      getTileTexture(TileLayer.TILE, spec.terrain, spec.heightPx, img, bottom, TileAnchor.BASE, {
+        sideColors: TERRAIN_SIDE_COLORS[spec.terrain],
+        brightness: spec.brightness,
       }),
     );
     fogTextures.set(
-      key,
+      spec.key,
       getTileTexture(
-        'fog',
-        tile.terrain,
+        TileLayer.FOG,
+        spec.terrain,
         maxHeightPx,
         fogImage,
         0x7a7a7a,
-        'base',
+        TileAnchor.BASE,
         { sideColors: { left: FOG_LEFT_WALL, right: FOG_RIGHT_WALL } },
       ),
     );
+    await maybeYield();
   }
   const unitTextures = {} as Record<Tribe, Record<UnitType, TileTexture>>;
-  const glowFor = new Map<Texture, TileTexture>();
+  const glowFor = new LazyGlowMap((base) => makeUnitGlowTexture(bakeApp, base));
   for (const tribe of TRIBES) {
     if (!activeTribes.has(tribe.id)) continue;
     await ensureTribeAtlas(tribe.code);
     const perTribe = {} as Record<UnitType, TileTexture>;
     for (const type of Object.keys(UNIT_TYPES) as UnitType[]) {
-      if (type === 'pirate') continue;
+      if (type === UnitType.PIRATE) continue;
       const frameKey = UNIT_IMAGE_FILES[tribe.id][type].replace(/\.png$/, '');
       const img = tribeTileTexture(tribe.code, frameKey);
       perTribe[type] = makeUnitImageTexture(bakeApp, img, hexSize) ?? blankTile(1);
-      glowFor.set(perTribe[type].texture, makeUnitGlowTexture(bakeApp, perTribe[type]));
+      glowFor.register(perTribe[type]);
+      await maybeYield();
     }
     unitTextures[tribe.id] = perTribe;
   }
@@ -465,7 +520,8 @@ export async function createTextures(
       const suffix = level === 1 ? 'ship' : `ship-${level}`;
       const img = tribeTileTexture(tribe.code, `${tribe.code}-${suffix}`);
       shipTextures[tribe.id][level] = makeUnitImageTexture(bakeApp, img, hexSize) ?? blankTile(0.5);
-      glowFor.set(shipTextures[tribe.id][level].texture, makeUnitGlowTexture(bakeApp, shipTextures[tribe.id][level]));
+      glowFor.register(shipTextures[tribe.id][level]);
+      await maybeYield();
     }
   }
   const sawmillTexture =
@@ -522,7 +578,10 @@ export async function createTextures(
   const trapTexture = trapImg ? makeUnitImageTexture(bakeApp, trapImg, hexSize) : null;
   const pirateTexture =
     makeUnitImageTexture(bakeApp, terrainFrameTexture('pirates-ship'), hexSize) ?? blankTile(0.5);
-  glowFor.set(pirateTexture.texture, makeUnitGlowTexture(bakeApp, pirateTexture));
+  glowFor.register(pirateTexture);
+  // Bake one glow now so the blur pipelines compile behind the loading screen
+  // instead of hitching the first time a unit is selected.
+  glowFor.get(pirateTexture.texture);
   const villageBuilds: Partial<Record<Tribe, VillageBuildTextureService>> = {};
   for (const [tribe, prefix] of [[Tribe.Cats, 'cats'], [Tribe.Villagers, 'villagers'], [Tribe.Warriors, 'warriors'], [Tribe.Aqua, 'aqua'], [Tribe.Forest, 'forest'], [Tribe.Sand, 'sand'], [Tribe.Barbarians, 'barbarians']] as const) {
     if (!activeTribes.has(tribe)) continue;
@@ -532,11 +591,11 @@ export async function createTextures(
   }
   return {
     season,
-    iceTiles: countIceTiles(map),
+    iceTiles,
     ownedTextures: owned,
     tileTextures,
     fogTextures,
-    fogTopTexture: getTileTexture('fog', TileType.Water, 0, fogImage, 0x7a7a7a, 'topface'),
+    fogTopTexture: getTileTexture(TileLayer.FOG, TileType.Water, 0, fogImage, 0x7a7a7a, TileAnchor.TOPFACE),
     villageBuilds,
     freeVillageTexture:
       makeUnitImageTexture(bakeApp, buildingTileTexture('village-empty'), hexSize) ?? blankTile(1),
@@ -605,6 +664,7 @@ export function destroyTextureSet(textures: TextureSet, opts: { contextLost?: bo
     }, 'was destroyed while still bound to a shader');
   }
   textures.ownedTextures = [];
+  if (textures.glowFor instanceof LazyGlowMap) textures.glowFor.dispose();
   const builds = textures.villageBuilds;
   if (!builds) return;
   for (const service of Object.values(builds)) service?.destroy();

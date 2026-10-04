@@ -4,6 +4,7 @@ import { attackDamage, attackableTargets, chooseBestAttack, resolveCombat, defen
 import type { Player } from '../src/game/players';
 import { TileType } from '../src/game/tile-types';
 import { Unit, UNIT_TYPES, MAX_HP } from '../src/game/units';
+import { BridgeDir, BuildingKind, SiegeTargetKind, UnitType } from '@enums';
 
 function makeTile(
   q: number,
@@ -15,15 +16,15 @@ function makeTile(
 }
 
 function makeWarrior(id: string, owner: number, q: number, r: number, hp: number): Unit {
-  return { id, owner, type: 'warrior', q, r, hasMoved: false, hasAttacked: false, hasHealed: false, hp, attack: 20, attackDistance: 1, defense: 10, spawnVillage: null };
+  return { id, owner, type: UnitType.WARRIOR, q, r, hasMoved: false, hasAttacked: false, hasHealed: false, hp, attack: 20, attackDistance: 1, defense: 10, spawnVillage: null };
 }
 
 function makeShield(id: string, owner: number, q: number, r: number, hp: number): Unit {
-  return { id, owner, type: 'shield', q, r, hasMoved: false, hasAttacked: false, hasHealed: false, hp, attack: 7, attackDistance: 1, defense: 20, spawnVillage: null };
+  return { id, owner, type: UnitType.SHIELD, q, r, hasMoved: false, hasAttacked: false, hasHealed: false, hp, attack: 7, attackDistance: 1, defense: 20, spawnVillage: null };
 }
 
 function makeCatapult(id: string, owner: number, q: number, r: number, hp: number): Unit {
-  return { id, owner, type: 'catapult', q, r, hasMoved: false, hasAttacked: false, hasHealed: false, hp, attack: 50, attackDistance: 4, defense: 0, spawnVillage: null };
+  return { id, owner, type: UnitType.CATAPULT, q, r, hasMoved: false, hasAttacked: false, hasHealed: false, hp, attack: 50, attackDistance: 4, defense: 0, spawnVillage: null };
 }
 
 function makeMap(): GameMap {
@@ -41,10 +42,10 @@ function catapultMap(): GameMap {
   enemyVillage.settlement = { owner: 1, level: 2, captureReady: false };
   enemyVillage.ownedBy = 1;
   const enemyMine = makeTile(3, 0, TileType.GrasslandMountain);
-  enemyMine.building = { kind: 'mine', level: 1 };
+  enemyMine.building = { kind: BuildingKind.MINE, level: 1 };
   enemyMine.ownedBy = 1;
   const enemyBridge = makeTile(1, -1, TileType.Water);
-  enemyBridge.bridge = { owner: 1, dir: 'we' };
+  enemyBridge.bridge = { owner: 1, dir: BridgeDir.WE };
   enemyBridge.ownedBy = 1;
   const friendlyVillage = makeTile(-1, 0, TileType.GrasslandLand);
   friendlyVillage.settlement = { owner: 0, level: 1, captureReady: false };
@@ -165,7 +166,7 @@ describe('catapult siege targets', () => {
   it('a non-catapult does not list structure tiles', () => {
     const map = catapultMap();
     const warrior = map.tiles[0]!.unit! as Unit;
-    (warrior as Unit & { type: string }).type = 'warrior';
+    (warrior as Unit & { type: string }).type = UnitType.WARRIOR;
     const keys = attackableTargets(map, warrior, 0).map((t) => `${t.q},${t.r}`);
     expect(keys).not.toContain('2,0');
     expect(keys).not.toContain('3,0');
@@ -204,25 +205,25 @@ describe('performSiege', () => {
     village.settlement = { owner: 1, level: 3, captureReady: false, wall: true };
     village.ownedBy = 1;
     const first = performSiege(c, village, noMiss);
-    expect(first.destroyed).toBe('wall');
+    expect(first.destroyed).toBe(SiegeTargetKind.WALL);
     expect(village.settlement!.wall).toBe(false);
     expect(village.settlement!.level).toBe(3);
 
     const second = performSiege(c, village, noMiss);
-    expect(second.destroyed).toBe('village');
+    expect(second.destroyed).toBe(SiegeTargetKind.VILLAGE);
     expect(village.settlement!.level).toBe(2);
 
     const third = performSiege(c, village, noMiss);
     expect(village.settlement!.level).toBe(1);
     const fourth = performSiege(c, village, noMiss);
     expect(village.settlement!.level).toBe(1); // clamped at min 1
-    expect(fourth.destroyed).toBe('village');
+    expect(fourth.destroyed).toBe(SiegeTargetKind.VILLAGE);
   });
 
   it('damages a building by 1 per hit and removes it at 0 hp', () => {
     const c = makeCatapult('c', 0, 0, 0, 30);
     const mine = makeTile(3, 0, TileType.GrasslandMountain);
-    mine.building = { kind: 'mine', level: 1 };
+    mine.building = { kind: BuildingKind.MINE, level: 1 };
     mine.ownedBy = 1;
 
     const first = performSiege(c, mine, noMiss);
@@ -231,7 +232,7 @@ describe('performSiege', () => {
     expect(mine.building!.hp).toBe(1);
 
     const second = performSiege(c, mine, noMiss);
-    expect(second.destroyed).toBe('building');
+    expect(second.destroyed).toBe(SiegeTargetKind.BUILDING);
     expect(second.buildingHp).toBe(0);
     expect(mine.building).toBeNull();
   });
@@ -239,11 +240,11 @@ describe('performSiege', () => {
   it('removes a bridge outright on a hit and clears the road owner', () => {
     const c = makeCatapult('c', 0, 0, 0, 30);
     const bridge = makeTile(1, -1, TileType.Water);
-    bridge.bridge = { owner: 1, dir: 'we' };
+    bridge.bridge = { owner: 1, dir: BridgeDir.WE };
     bridge.roadOwner = 1;
     bridge.ownedBy = 1;
     const out = performSiege(c, bridge, noMiss);
-    expect(out.destroyed).toBe('bridge');
+    expect(out.destroyed).toBe(SiegeTargetKind.BRIDGE);
     expect(bridge.bridge).toBeNull();
     expect(bridge.roadOwner).toBeNull();
   });
@@ -274,7 +275,7 @@ describe('chooseBestAttack', () => {
 
   it('prefers a target that cannot retaliate', () => {
     const map: GameMap = { radius: 4, tiles: [], spawns: [] };
-    const archer: Unit = { id: 'a', owner: 0, type: 'archer', q: 0, r: 0, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 40, attack: 20, attackDistance: 2, defense: 7, spawnVillage: null };
+    const archer: Unit = { id: 'a', owner: 0, type: UnitType.ARCHER, q: 0, r: 0, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 40, attack: 20, attackDistance: 2, defense: 7, spawnVillage: null };
     const melee = makeTile(1, 0, TileType.GrasslandLand, makeWarrior('m', 1, 1, 0, 1));
     const farMelee = makeTile(2, 0, TileType.GrasslandLand, makeWarrior('f', 1, 2, 0, 1));
     map.tiles.push(makeTile(0, 0, TileType.GrasslandLand, archer), melee, farMelee);
@@ -315,7 +316,7 @@ describe('chooseBestAttack', () => {
   it('a non-catapult with no unit targets returns null (no siege)', () => {
     const map = catapultMap();
     const warrior = map.tiles[0]!.unit! as Unit;
-    (warrior as Unit & { type: string }).type = 'archer';
+    (warrior as Unit & { type: string }).type = UnitType.ARCHER;
     expect(chooseBestAttack(map, warrior, 0)).toBeNull();
   });
 });
@@ -360,7 +361,7 @@ describe('performAttack', () => {
 
   it('does not move an archer onto the killed tile', () => {
     const map = makeMap();
-    const archer: Unit = { id: 'arc', owner: 0, type: 'archer', q: 0, r: 0, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 40, attack: 20, attackDistance: 3, defense: 7, spawnVillage: null };
+    const archer: Unit = { id: 'arc', owner: 0, type: UnitType.ARCHER, q: 0, r: 0, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 40, attack: 20, attackDistance: 3, defense: 7, spawnVillage: null };
     map.tiles[0]!.unit = archer;
     const dying = makeTile(1, 0, TileType.GrasslandLand, makeWarrior('b', 1, 1, 0, 1));
     map.tiles[1]! = dying;
@@ -411,7 +412,7 @@ describe('performAttack', () => {
 
   it('does not move a ship onto the killed tile', () => {
     const map = makeMap();
-    const ship: Unit = { id: 'ship', owner: 0, type: 'warrior', q: 0, r: 0, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 50, attack: 20, attackDistance: 1, defense: 10, spawnVillage: null, shipLevel: 1 };
+    const ship: Unit = { id: 'ship', owner: 0, type: UnitType.WARRIOR, q: 0, r: 0, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 50, attack: 20, attackDistance: 1, defense: 10, spawnVillage: null, shipLevel: 1 };
     map.tiles[0]!.unit = ship;
     const dying = makeTile(1, 0, TileType.GrasslandLand, makeWarrior('b', 1, 1, 0, 1));
     map.tiles[1]! = dying;
@@ -423,7 +424,7 @@ describe('performAttack', () => {
   it('does not move a land attacker onto a killed ship tile', () => {
     const map = makeMap();
     const attacker = map.tiles[0]!.unit!;
-    const dyingShip: Unit = { id: 'ship', owner: 1, type: 'warrior', q: 0, r: -1, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 1, attack: 20, attackDistance: 1, defense: 10, spawnVillage: null, shipLevel: 1 };
+    const dyingShip: Unit = { id: 'ship', owner: 1, type: UnitType.WARRIOR, q: 0, r: -1, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 1, attack: 20, attackDistance: 1, defense: 10, spawnVillage: null, shipLevel: 1 };
     const shipTile = makeTile(0, -1, TileType.Water, dyingShip);
     map.tiles[2]! = shipTile;
     performAttack(map, attacker, shipTile, noMiss);
@@ -435,9 +436,9 @@ describe('performAttack', () => {
 
   it('does not move a ship attacker onto a killed ship tile', () => {
     const map = makeMap();
-    const ship: Unit = { id: 'shipA', owner: 0, type: 'warrior', q: 0, r: 0, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 50, attack: 20, attackDistance: 1, defense: 10, spawnVillage: null, shipLevel: 1 };
+    const ship: Unit = { id: 'shipA', owner: 0, type: UnitType.WARRIOR, q: 0, r: 0, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 50, attack: 20, attackDistance: 1, defense: 10, spawnVillage: null, shipLevel: 1 };
     map.tiles[0]!.unit = ship;
-    const dyingShip: Unit = { id: 'shipB', owner: 1, type: 'warrior', q: 0, r: -1, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 1, attack: 20, attackDistance: 1, defense: 10, spawnVillage: null, shipLevel: 1 };
+    const dyingShip: Unit = { id: 'shipB', owner: 1, type: UnitType.WARRIOR, q: 0, r: -1, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 1, attack: 20, attackDistance: 1, defense: 10, spawnVillage: null, shipLevel: 1 };
     const shipTile = makeTile(0, -1, TileType.Water, dyingShip);
     map.tiles[2]! = shipTile;
     performAttack(map, ship, shipTile, noMiss);
@@ -448,7 +449,7 @@ describe('performAttack', () => {
   it('does not move a land attacker onto a killed pirate tile', () => {
     const map = makeMap();
     const attacker = map.tiles[0]!.unit!;
-    const pirate: Unit = { id: 'pir', owner: -1, type: 'pirate', q: 0, r: -1, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 1, attack: 30, attackDistance: 3, defense: 5, spawnVillage: null };
+    const pirate: Unit = { id: 'pir', owner: -1, type: UnitType.PIRATE, q: 0, r: -1, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 1, attack: 30, attackDistance: 3, defense: 5, spawnVillage: null };
     const pirateTile = makeTile(0, -1, TileType.Water, pirate);
     map.tiles[2]! = pirateTile;
     performAttack(map, attacker, pirateTile, noMiss);
@@ -518,7 +519,7 @@ describe('performAttack', () => {
 
   it('does not apply counter-damage when the attacker is beyond the target reach', () => {
     const map: GameMap = { radius: 4, tiles: [], spawns: [] };
-    const archer: Unit = { id: 'arc', owner: 0, type: 'archer', q: 0, r: 0, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 40, attack: 20, attackDistance: 2, defense: 7, spawnVillage: null };
+    const archer: Unit = { id: 'arc', owner: 0, type: UnitType.ARCHER, q: 0, r: 0, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 40, attack: 20, attackDistance: 2, defense: 7, spawnVillage: null };
     const far = makeTile(2, 0, TileType.GrasslandLand, makeWarrior('w', 1, 2, 0, 30));
     map.tiles.push(makeTile(0, 0, TileType.GrasslandLand, archer), far);
     const result = performAttack(map, archer, far, noMiss);
@@ -531,7 +532,7 @@ describe('performAttack', () => {
 
 describe('ship attacks', () => {  it('a level-3 ship attacks at distance 3 with damage 30 and can target water units', () => {
     const ship: Unit = {
-      id: 's', owner: 0, type: 'archer', q: 0, r: 0,
+      id: 's', owner: 0, type: UnitType.ARCHER, q: 0, r: 0,
       hasMoved: false, hasAttacked: false, hasHealed: false,
       hp: 40, attack: 20, attackDistance: 2, defense: 7, spawnVillage: null,
       shipLevel: 3,
@@ -659,7 +660,7 @@ describe('temple protection', () => {
     for (const q of [2, 3, 4]) {
       const t = makeTile(q, 0, TileType.Water);
       t.ownedBy = 1;
-      t.building = { kind: 'temple', level: 1 };
+      t.building = { kind: BuildingKind.TEMPLE, level: 1 };
       map.tiles.push(t);
     }
     return map;
@@ -696,34 +697,34 @@ describe('tradeIsFavorable', () => {
   }
 
   it('returns true for a kill', () => {
-    const knight = unitOf('k', 'knight', 0, 0, 0); // attack 40
-    const weak = unitOf('w', 'warrior', 1, 1, 0);
+    const knight = unitOf('k', UnitType.KNIGHT, 0, 0, 0); // attack 40
+    const weak = unitOf('w', UnitType.WARRIOR, 1, 1, 0);
     weak.hp = 10;
     expect(tradeIsFavorable(knight, tileWith(1, 0, weak))).toBe(true);
   });
 
   it('returns true when the target cannot counter', () => {
-    const archer = unitOf('a', 'archer', 0, 0, 0); // range 2, damage 20
-    const warrior = unitOf('w', 'warrior', 1, 2, 0); // range 1 -> cannot counter at distance 2
+    const archer = unitOf('a', UnitType.ARCHER, 0, 0, 0); // range 2, damage 20
+    const warrior = unitOf('w', UnitType.WARRIOR, 1, 2, 0); // range 1 -> cannot counter at distance 2
     expect(tradeIsFavorable(archer, tileWith(2, 0, warrior))).toBe(true);
   });
 
   it('returns true when the target is a land catapult, even in range', () => {
-    const warrior = unitOf('w', 'warrior', 0, 0, 0);
-    const catapult = unitOf('c', 'catapult', 1, 1, 0); // range 4, adjacent, but cannot counter
+    const warrior = unitOf('w', UnitType.WARRIOR, 0, 0, 0);
+    const catapult = unitOf('c', UnitType.CATAPULT, 1, 1, 0); // range 4, adjacent, but cannot counter
     expect(tradeIsFavorable(warrior, tileWith(1, 0, catapult))).toBe(true);
   });
 
   it('returns false for a losing melee trade', () => {
-    const warrior = unitOf('w', 'warrior', 0, 0, 0);
+    const warrior = unitOf('w', UnitType.WARRIOR, 0, 0, 0);
     warrior.hp = 10; // this warrior is wounded: low attack force
-    const swordsman = unitOf('s', 'swordsman', 1, 1, 0);
+    const swordsman = unitOf('s', UnitType.SWORDSMAN, 1, 1, 0);
     expect(tradeIsFavorable(warrior, tileWith(1, 0, swordsman))).toBe(false);
   });
 
   it('returns true for an equal melee trade', () => {
-    const a = unitOf('a', 'warrior', 0, 0, 0);
-    const b = unitOf('b', 'warrior', 1, 1, 0);
+    const a = unitOf('a', UnitType.WARRIOR, 0, 0, 0);
+    const b = unitOf('b', UnitType.WARRIOR, 1, 1, 0);
     expect(tradeIsFavorable(a, tileWith(1, 0, b))).toBe(true);
   });
 });
@@ -738,18 +739,18 @@ describe('special-unit combat hooks', () => {
 
   it('a stealthed stalker ignores the target defense entirely', () => {
     const map = makeMap();
-    const stalker = unitOf('s', 'stalker', 0, 0, 0);
+    const stalker = unitOf('s', UnitType.STALKER, 0, 0, 0);
     stalker.isStealthed = true;
     map.tiles[0]!.unit = stalker;
     const target = map.tiles[1]!;
-    target.unit = unitOf('t', 'swordsman', 1, 1, 0); // defense 16, full hp
+    target.unit = unitOf('t', UnitType.SWORDSMAN, 1, 1, 0); // defense 16, full hp
     const { attackerDamage, counterDamage } = resolveCombat(map, stalker, target);
     expect(attackerDamage).toBe(Math.round(10 * COMBAT_SCALE));
     expect(counterDamage).toBe(0);
   });
 
   it('a raging berserker never counter-attacks', () => {
-    const berserker = unitOf('b', 'berserker', 0, 0, 0);
+    const berserker = unitOf('b', UnitType.BERSERKER, 0, 0, 0);
     berserker.hp = 10; // <= 35% of 50
     expect(canCounterAttack(berserker)).toBe(false);
     berserker.hp = 50;
@@ -758,12 +759,12 @@ describe('special-unit combat hooks', () => {
 
   it('a banner aura raises the attacker damage', () => {
     const map = makeMap();
-    const bannerTile = tileWith(1, 0, unitOf('bn', 'banner', 0, 1, 0));
+    const bannerTile = tileWith(1, 0, unitOf('bn', UnitType.BANNER, 0, 1, 0));
     map.tiles.push(bannerTile);
-    const fighter = unitOf('f', 'warrior', 0, 0, 0);
+    const fighter = unitOf('f', UnitType.WARRIOR, 0, 0, 0);
     map.tiles[0]!.unit = fighter;
     const target = map.tiles[1]!;
-    target.unit = unitOf('t', 'warrior', 1, 1, 0);
+    target.unit = unitOf('t', UnitType.WARRIOR, 1, 1, 0);
     const withAura = resolveCombat(map, fighter, target);
     bannerTile.unit = null; // drop the banner: aura gone
     const withoutAura = resolveCombat(map, map.tiles[0]!.unit!, target);
@@ -772,7 +773,7 @@ describe('special-unit combat hooks', () => {
 
   it('attackableTargets excludes an invisible stealthed enemy', () => {
     const map = makeMap();
-    const stalker = unitOf('s', 'stalker', 1, 1, 0);
+    const stalker = unitOf('s', UnitType.STALKER, 1, 1, 0);
     stalker.isStealthed = true;
     map.tiles[1]!.unit = stalker;
     const targets = attackableTargets(map, map.tiles[0]!.unit!, 0);

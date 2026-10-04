@@ -8,6 +8,7 @@ import { type UIHost } from '../host';
 import { Button } from '../kit/button';
 import { makeLabel } from '../kit/label';
 import { Popup } from '../kit/popup';
+import { FontSize, OverlayKind } from '@enums';
 
 export class ShipLandingDialog {
   private el: Container | null = null;
@@ -19,7 +20,7 @@ export class ShipLandingDialog {
     const s = useGameStore.getState();
     const map = gameController.getMap();
     const selection = s.selection;
-    if (!map || s.overlay?.kind !== 'shipLanding' || !selection) return;
+    if (!map || s.overlay?.kind !== OverlayKind.SHIP_LANDING || !selection) return;
     const tile = tileAt(map, selection.q, selection.r);
     if (!tile || !tile.unit) return;
 
@@ -34,7 +35,7 @@ export class ShipLandingDialog {
     });
 
     const text = makeLabel(t('shipLanding.hint'), {
-      fontSize: 14,
+      fontSize: FontSize.SMALL,
       fill: 0xcccccc,
       wordWrap: true,
       wordWrapWidth: popup.contentWidth,

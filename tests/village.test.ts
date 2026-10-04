@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { GameMap, MapTile, Settlement, SettlementBuild } from '../src/game/map-gen';
 import { TileType } from '../src/game/tile-types';
 import { claimRadius, ownedTilesFor, upgradeVillage } from '../src/game/village';
+import { VillageBlockVariant } from '@enums';
 
 function makeTile(
   q: number,
@@ -100,10 +101,10 @@ describe('upgradeVillage build rolling', () => {
     const m2 = upgraded(3, alwaysM2);
     const m3 = upgraded(3, alwaysM3);
     const m4 = upgraded(3, alwaysM4);
-    for (const col of [...m1.l, ...m1.r, ...m1.lBack!, ...m1.rBack!]) expect(col).toEqual(['m1']);
-    for (const col of [...m2.l, ...m2.r, ...m2.lBack!, ...m2.rBack!]) expect(col).toEqual(['m2']);
-    for (const col of [...m3.l, ...m3.r, ...m3.lBack!, ...m3.rBack!]) expect(col).toEqual(['m3']);
-    for (const col of [...m4.l, ...m4.r, ...m4.lBack!, ...m4.rBack!]) expect(col).toEqual(['m4']);
+    for (const col of [...m1.l, ...m1.r, ...m1.lBack!, ...m1.rBack!]) expect(col).toEqual([VillageBlockVariant.M1]);
+    for (const col of [...m2.l, ...m2.r, ...m2.lBack!, ...m2.rBack!]) expect(col).toEqual([VillageBlockVariant.M2]);
+    for (const col of [...m3.l, ...m3.r, ...m3.lBack!, ...m3.rBack!]) expect(col).toEqual([VillageBlockVariant.M3]);
+    for (const col of [...m4.l, ...m4.r, ...m4.lBack!, ...m4.rBack!]) expect(col).toEqual([VillageBlockVariant.M4]);
   });
 
   it('top-ups a legacy settlement that already has a level but no build', () => {
@@ -118,14 +119,14 @@ describe('upgradeVillage build rolling', () => {
     expect(b.lBack!.map((c) => c.length)).toEqual([1, 1]);
     expect(b.rBack!.map((c) => c.length)).toEqual([1]);
     for (const col of [...b.l, ...b.r, ...b.lBack!, ...b.rBack!]) {
-      expect(col.every((v) => v === 'm1')).toBe(true);
+      expect(col.every((v) => v === VillageBlockVariant.M1)).toBe(true);
     }
   });
 
   it('top-ups back columns of an existing record created before back columns existed', () => {
     const map = makeMap();
     const a = map.tiles[0]!;
-    a.settlement!.build = { l: [['m1']], r: [['m1'], ['m1']] };
+    a.settlement!.build = { l: [[VillageBlockVariant.M1]], r: [[VillageBlockVariant.M1], [VillageBlockVariant.M1]] };
     a.settlement!.level = 2;
     upgradeVillage(map, a, alwaysM1);
     expect(a.settlement!.level).toBe(3);
@@ -133,7 +134,7 @@ describe('upgradeVillage build rolling', () => {
     expect(b.l[0]).toEqual(['m1']);
     expect(b.r.map((c) => c.length)).toEqual([1, 1]);
     for (const col of [...b.lBack!, ...b.rBack!]) {
-      expect(col).toEqual(['m1']);
+      expect(col).toEqual([VillageBlockVariant.M1]);
     }
   });
 

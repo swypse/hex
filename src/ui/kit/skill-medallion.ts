@@ -1,10 +1,10 @@
 import { Container, Graphics } from 'pixi.js';
-import type { SkillId } from '../../game/skills';
 import { makeLabel } from './label';
 import { makeSkillIcon, SKILL_ICON_FILES } from './skill-icons';
 import { THEME } from './theme';
+import { FontSize, SkillId } from '@enums';
 
-const PRICE_FONT_SIZE = 14;
+const PRICE_FONT_SIZE = FontSize.SMALL;
 
 interface SkillMedallionOpts {
   skill: SkillId;

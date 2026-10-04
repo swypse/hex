@@ -13,7 +13,7 @@ import { SeededRandom } from '../src/util/random';
 import { Simulator } from '../src/game/simulator';
 import { TileType } from '../src/game/tile-types';
 import { SCORE_PAD, SCORE_TOP_OFFSET, SCORE_CHIP_RADIUS } from '../src/ui/layout';
-import { GameMode } from '@enums';
+import { BuildingKind, GameMode, Screen } from '@enums';
 import { t } from '../src/i18n';
 
 function makeHost(): UIHost {
@@ -37,12 +37,12 @@ describe('HudScore buff icons', () => {
       const tile = tileAt(map, q, 0)!;
       tile.terrain = TileType.Water;
       tile.ownedBy = 0;
-      if (q <= waterTemples) tile.building = { kind: 'temple', level: 1 };
+      if (q <= waterTemples) tile.building = { kind: BuildingKind.TEMPLE, level: 1 };
     }
     const sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5 });
     (gameController as unknown as { sim: unknown }).sim = sim;
 
-    useGameStore.setState({ screen: 'game', players, localPlayerIndex: 0 });
+    useGameStore.setState({ screen: Screen.GAME, players, localPlayerIndex: 0 });
     root = new Container();
     host = makeHost();
     hud = new HudScore();
@@ -131,17 +131,17 @@ describe('HudScore buff icons', () => {
       const tile = tileAt(map, q, 0)!;
       tile.terrain = TileType.Water;
       tile.ownedBy = 0;
-      if (q <= 3) tile.building = { kind: 'temple', level: 1 };
+      if (q <= 3) tile.building = { kind: BuildingKind.TEMPLE, level: 1 };
     }
     for (const r of [1, 2, 3]) {
       const tile = tileAt(map, 0, r)!;
       tile.terrain = TileType.GrasslandForest;
       tile.ownedBy = 0;
-      tile.building = { kind: 'forestTemple', level: 1 };
+      tile.building = { kind: BuildingKind.FOREST_TEMPLE, level: 1 };
     }
     const sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5 });
     (gameController as unknown as { sim: unknown }).sim = sim;
-    useGameStore.setState({ screen: 'game', players, localPlayerIndex: 0 });
+    useGameStore.setState({ screen: Screen.GAME, players, localPlayerIndex: 0 });
     root = new Container();
     hud = new HudScore();
     hud.mount(makeHost(), root);
@@ -179,7 +179,7 @@ describe('HudScore buff icons', () => {
     const map = makeTestMap(3);
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(42));
 
-    useGameStore.setState({ screen: 'game', players, localPlayerIndex: 0 });
+    useGameStore.setState({ screen: Screen.GAME, players, localPlayerIndex: 0 });
 
     const registered: Array<() => void> = [];
     const host = makeHost();
@@ -199,7 +199,7 @@ describe('HudScore buff icons', () => {
   it('fires onTap when the score chip is tapped', () => {
     const map = makeTestMap(3);
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(42));
-    useGameStore.setState({ screen: 'game', players, localPlayerIndex: 0 });
+    useGameStore.setState({ screen: Screen.GAME, players, localPlayerIndex: 0 });
     root = new Container();
     host = makeHost();
     let tapped = 0;

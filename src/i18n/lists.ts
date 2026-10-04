@@ -1,7 +1,7 @@
-import { currentLanguage, type Language } from '../storage/settings';
+import { currentLanguage } from '../storage/settings';
+import { Language, NounKind, WordKind } from '@enums';
 
-/** Grammatical class of a village-noun: masculine, feminine, or plural-only. */
-type NounKind = 'm' | 'f' | 'pl';
+
 
 interface WordList {
   adjectives: string[];
@@ -34,7 +34,7 @@ const LISTS: Record<Language, WordList> = {
       'Солнечные', 'Туманные', 'Тихие', 'Высокие', 'Глубокие',
     ],
     nouns: ['Дуб', 'Холм', 'Мост', 'Колодец', 'Луг', 'Ручей', 'Мох', 'Сосны', 'Скала', 'Ворота'],
-    nounKinds: ['m', 'm', 'm', 'm', 'm', 'm', 'm', 'pl', 'f', 'pl'],
+    nounKinds: [NounKind.M, NounKind.M, NounKind.M, NounKind.M, NounKind.M, NounKind.M, NounKind.M, NounKind.PL, NounKind.F, NounKind.PL],
   },
 };
 
@@ -55,7 +55,7 @@ function agreeingAdjective(list: WordList, adjIdx: number, nounIdx: number): str
   const base = list.adjectives[adjIdx] ?? '';
   if (!base) return '';
   const kind = list.nounKinds?.[nounIdx];
-  const formList = kind === 'f' ? list.adjectiveFeminine : kind === 'pl' ? list.adjectivePlural : undefined;
+  const formList = kind === NounKind.F ? list.adjectiveFeminine : kind === NounKind.PL ? list.adjectivePlural : undefined;
   if (!formList) return base;
   return formList[adjIdx] ?? base;
 }
@@ -72,7 +72,7 @@ export function villageNameAt(adjIdx: number, nounIdx: number): string {
   return composeName(listFor(currentLanguage()), adjIdx, nounIdx);
 }
 
-type FoundWord = { idx: number; kind: 'adj' | 'noun' };
+type FoundWord = { idx: number; kind: WordKind };
 
 /** Adjectives and animals used to generate AI player names per language. */
 const PLAYER_ADJECTIVES: Record<Language, string[]> = {
@@ -91,7 +91,7 @@ export function playerNameWords(): { adjectives: string[]; animals: string[] } {
 
 /** Ordinal-rank label ("3rd", "2-е место") following each language's grammar. */
 export function placeWord(rank: number): string {
-  if (currentLanguage() === 'ru') return `${rank}-е место`;
+  if (currentLanguage() === Language.RU) return `${rank}-е место`;
   const mod10 = rank % 10;
   const mod100 = rank % 100;
   const suffix =
@@ -106,15 +106,15 @@ export function placeWord(rank: number): string {
  *  (feminine/plural) adjective forms as well as base forms. */
 function findToken(token: string): FoundWord | null {
   const lower = token.toLowerCase();
-  for (const lang of ['en', 'ru'] as Language[]) {
+  for (const lang of [Language.EN, Language.RU] as Language[]) {
     const list = LISTS[lang];
     for (const forms of [list.adjectives, list.adjectiveFeminine, list.adjectivePlural]) {
       if (!forms) continue;
       const idx = forms.findIndex((w) => w.toLowerCase() === lower);
-      if (idx >= 0) return { idx, kind: 'adj' };
+      if (idx >= 0) return { idx, kind: WordKind.ADJ };
     }
     const nounIdx = list.nouns.findIndex((w) => w.toLowerCase() === lower);
-    if (nounIdx >= 0) return { idx: nounIdx, kind: 'noun' };
+    if (nounIdx >= 0) return { idx: nounIdx, kind: WordKind.NOUN };
   }
   return null;
 }
@@ -130,7 +130,7 @@ export function localizeVillageName(name: string): string {
 
   // Pair form: re-render the whole name so the adjective agrees with the noun.
   const [first, second] = found;
-  if (first?.word?.kind === 'adj' && second?.word?.kind === 'noun') {
+  if (first?.word?.kind === WordKind.ADJ && second?.word?.kind === WordKind.NOUN) {
     const adjIdx = first.word.idx;
     const nounIdx = second.word.idx;
     if (target.adjectives[adjIdx] !== undefined && target.nouns[nounIdx] !== undefined) {
@@ -143,7 +143,7 @@ export function localizeVillageName(name: string): string {
     .map(({ token, word }) => {
       if (!word) return token;
       const wordInTarget =
-        word.kind === 'adj' ? target.adjectives[word.idx] : target.nouns[word.idx];
+        word.kind === WordKind.ADJ ? target.adjectives[word.idx] : target.nouns[word.idx];
       return wordInTarget !== undefined ? cap(wordInTarget) : token;
     })
     .join(' ');

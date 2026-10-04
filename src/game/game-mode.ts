@@ -1,4 +1,4 @@
-import { GameMode } from '@enums';
+import { GameMode, NetMode, OverlayKind } from '@enums';
 export { GameMode };
 import { GameMap } from './map-gen';
 import { Player } from './players';
@@ -86,21 +86,21 @@ export function rankPlayers(players: Player[], map: GameMap): Player[] {
 }
 
 interface WatchPromptCheck {
-  netMode: string;
+  netMode: NetMode;
   mode: GameMode;
   gameOver: boolean;
   watching: boolean;
   localActive: boolean;
-  overlayKind: string | null;
+  overlayKind: OverlayKind | null;
 }
 
 export function shouldPromptWatch(c: WatchPromptCheck): boolean {
   return (
-    c.netMode === 'single' &&
-    c.mode === 'capture' &&
+    c.netMode === NetMode.SINGLE &&
+    c.mode === GameMode.CAPTURE &&
     !c.gameOver &&
     !c.watching &&
     !c.localActive &&
-    c.overlayKind !== 'watchingPrompt'
+    c.overlayKind !== OverlayKind.WATCHING_PROMPT
   );
 }

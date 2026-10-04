@@ -20,10 +20,11 @@ import {
   shipMovePoints,
   upgradeShip,
 } from '../src/game/ship';
+import { UnitType } from '@enums';
 
 function unit(overrides: Partial<Unit> = {}): Unit {
   return {
-    id: 'u', owner: 0, type: 'warrior', q: 0, r: 0,
+    id: 'u', owner: 0, type: UnitType.WARRIOR, q: 0, r: 0,
     hasMoved: false, hasAttacked: false, hasHealed: false,
     hp: 50, attack: 20, attackDistance: 1, spawnVillage: null,
     ...overrides,
@@ -140,13 +141,13 @@ describe('ship', () => {
   });
 
   it('keeps the crew defense when a unit becomes a ship', () => {
-    const u = makeUnit(0, 'swordsman', 0, 0);
+    const u = makeUnit(0, UnitType.SWORDSMAN, 0, 0);
     expect(u.defense).toBe(16);
     gainShipAbility(u);
     expect(u.shipLevel).toBe(1);
     expect(u.defense).toBe(16);
 
-    const shield = makeUnit(0, 'shield', 0, 0);
+    const shield = makeUnit(0, UnitType.SHIELD, 0, 0);
     gainShipAbility(shield);
     expect(shield.defense).toBe(20);
   });

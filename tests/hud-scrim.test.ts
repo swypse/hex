@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { Container } from 'pixi.js';
 import { HudScrim } from '../src/ui/hud/hud-scrim';
 import { type UIHost } from '../src/ui/host';
+import { ScrimSide } from '@enums';
 
 function makeHost(width = 1280, height = 800): UIHost {
   return {
@@ -35,7 +36,7 @@ describe('HudScrim', () => {
   });
 
   it('top scrim: full-width 70px band at y 0, non-interactive', () => {
-    const scrim = new HudScrim({ side: 'top' });
+    const scrim = new HudScrim({ side: ScrimSide.TOP });
     scrim.mount(host, root);
     const el = (scrim as unknown as { el: Container }).el!;
     expect(el.eventMode).toBe('none');
@@ -49,7 +50,7 @@ describe('HudScrim', () => {
   });
 
   it('bottom scrim: full-width 70px band flush with the screen bottom', () => {
-    const scrim = new HudScrim({ side: 'bottom' });
+    const scrim = new HudScrim({ side: ScrimSide.BOTTOM });
     scrim.mount(host, root);
     const el = (scrim as unknown as { el: Container }).el!;
     expect(el.position.y).toBe(800 - 70);

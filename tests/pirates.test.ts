@@ -1,4 +1,4 @@
-import { GameMode } from '@enums';
+import { CommandType, GameEventType, GameMode, UnitType } from '@enums';
 import { describe, expect, it } from 'vitest';
 import { hexDistance, hexNeighbors } from '@/game/hex';
 import { buildPlayers } from '@/game/players';
@@ -21,7 +21,7 @@ function makePirate(id: string, q: number, r: number): Unit {
   return {
     id,
     owner: PIRATE_OWNER,
-    type: 'pirate',
+    type: UnitType.PIRATE,
     q,
     r,
     hasMoved: false,
@@ -36,7 +36,7 @@ function makePirate(id: string, q: number, r: number): Unit {
 }
 
 function makeShip(id: string, owner: number, q: number, r: number): Unit {
-  const ship = makeUnit(id, owner, 'warrior', q, r);
+  const ship = makeUnit(id, owner, UnitType.WARRIOR, q, r);
   ship.shipLevel = 1;
   return ship;
 }
@@ -50,19 +50,19 @@ describe('Pirates', () => {
     sim.drainEvents();
 
     for (let i = 0; i < 6; i++) {
-      sim.applyCommand({ type: 'endTurn' });
+      sim.applyCommand({ type: CommandType.END_TURN });
       sim.drainEvents();
     }
     expect(sim.turn).toBe(7);
-    expect(map.tiles.filter((t) => t.unit?.type === 'pirate')).toHaveLength(0);
+    expect(map.tiles.filter((t) => t.unit?.type === UnitType.PIRATE)).toHaveLength(0);
 
-    sim.applyCommand({ type: 'endTurn' });
+    sim.applyCommand({ type: CommandType.END_TURN });
     const events = sim.drainEvents();
-    const pirates = map.tiles.filter((t) => t.unit?.type === 'pirate');
+    const pirates = map.tiles.filter((t) => t.unit?.type === UnitType.PIRATE);
     expect(pirates).toHaveLength(1);
     expect(pirates[0]!.unit!.owner).toBe(PIRATE_OWNER);
     expect(hexDistance({ q: 0, r: 0 }, pirates[0]!)).toBe(map.radius);
-    expect(events.some((e) => e.type === 'pirateSpawned')).toBe(true);
+    expect(events.some((e) => e.type === GameEventType.PIRATE_SPAWNED)).toBe(true);
   });
 
   it('a failed capture attempt damages both the pirate and the ship without stealing money', () => {
@@ -81,12 +81,12 @@ describe('Pirates', () => {
     sim.startGame();
     sim.drainEvents();
 
-    sim.applyCommand({ type: 'endTurn' });
+    sim.applyCommand({ type: CommandType.END_TURN });
     const events = sim.drainEvents();
     expect(players[0]!.resources.money).toBe(before);
     expect(pirate.hp).toBe(PIRATE_HP - 20);
     expect(ship.hp).toBe(50 - 10);
-    expect(events.some((e) => e.type === 'pirateCapture' && (e as { success: boolean }).success === false)).toBe(true);
+    expect(events.some((e) => e.type === GameEventType.PIRATE_CAPTURE && (e as { success: boolean }).success === false)).toBe(true);
   });
 
   it('removes a pirate that drops to 0 hp on a failed capture', () => {
@@ -104,7 +104,7 @@ describe('Pirates', () => {
     sim.startGame();
     sim.drainEvents();
 
-    sim.applyCommand({ type: 'endTurn' });
+    sim.applyCommand({ type: CommandType.END_TURN });
     sim.drainEvents();
     expect(pirate.hp).toBe(0);
     expect(tileAt(map, 0, 0)!.unit).toBeNull();
@@ -127,7 +127,7 @@ describe('Pirates', () => {
     sim.startGame();
     sim.drainEvents();
 
-    sim.applyCommand({ type: 'endTurn' });
+    sim.applyCommand({ type: CommandType.END_TURN });
     sim.drainEvents();
     expect(ship.hp).toBe(0);
     expect(tileAt(map, 0, 1)!.unit).toBeNull();
@@ -148,9 +148,9 @@ describe('Pirates', () => {
     sim.startGame();
     sim.drainEvents();
 
-    sim.applyCommand({ type: 'endTurn' });
+    sim.applyCommand({ type: CommandType.END_TURN });
     sim.drainEvents();
-    expect(ship.type).toBe('pirate');
+    expect(ship.type).toBe(UnitType.PIRATE);
     expect(ship.owner).toBe(PIRATE_OWNER);
     expect(ship.hp).toBe(50);
     expect(ship.shipLevel).toBe(1);
@@ -170,10 +170,10 @@ describe('Pirates', () => {
     sim.startGame();
     sim.drainEvents();
 
-    sim.applyCommand({ type: 'endTurn' });
+    sim.applyCommand({ type: CommandType.END_TURN });
     const events = sim.drainEvents();
-    const captureIdx = events.findIndex((e) => e.type === 'pirateCapture');
-    const turnIdx = events.findIndex((e) => e.type === 'turnStarted');
+    const captureIdx = events.findIndex((e) => e.type === GameEventType.PIRATE_CAPTURE);
+    const turnIdx = events.findIndex((e) => e.type === GameEventType.TURN_STARTED);
     expect(captureIdx).toBeGreaterThan(-1);
     expect(turnIdx).toBeGreaterThan(captureIdx);
   });
@@ -182,7 +182,7 @@ describe('Pirates', () => {
     const map = makeTestMap();
     tileAt(map, 0, 0)!.terrain = TileType.Water;
     tileAt(map, 0, 0)!.unit = makePirate('pirate-1', 0, 0);
-    const defender = makeUnit('guard', 0, 'warrior', 0, 1);
+    const defender = makeUnit('guard', 0, UnitType.WARRIOR, 0, 1);
     tileAt(map, 0, 1)!.unit = defender;
 
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
@@ -190,7 +190,7 @@ describe('Pirates', () => {
     sim.startGame();
     sim.drainEvents();
 
-    sim.applyCommand({ type: 'endTurn' });
+    sim.applyCommand({ type: CommandType.END_TURN });
     sim.drainEvents();
     // pirate force 30, warrior defenseForce 10, total 40:
     // round((30/40)*30*1.5) = 34; counter round((10/40)*10*1.5) = 4
@@ -203,7 +203,7 @@ describe('Pirates', () => {
     tileAt(map, 0, 0)!.terrain = TileType.Water;
     const pirate = makePirate('pirate-1', 0, 0);
     tileAt(map, 0, 0)!.unit = pirate;
-    const defender = makeUnit('guard', 0, 'warrior', 0, 1);
+    const defender = makeUnit('guard', 0, UnitType.WARRIOR, 0, 1);
     defender.hp = 1;
     tileAt(map, 0, 1)!.unit = defender;
 
@@ -212,7 +212,7 @@ describe('Pirates', () => {
     sim.startGame();
     sim.drainEvents();
 
-    sim.applyCommand({ type: 'endTurn' });
+    sim.applyCommand({ type: CommandType.END_TURN });
     sim.drainEvents();
     expect(tileAt(map, 0, 1)!.unit).toBeNull();
     expect(tileAt(map, 0, 0)!.unit).toBe(pirate);
@@ -222,7 +222,7 @@ describe('Pirates', () => {
     const map = makeTestMap();
     tileAt(map, 0, 0)!.terrain = TileType.Water;
     tileAt(map, 0, 0)!.unit = makePirate('pirate-1', 0, 0);
-    const attacker = makeUnit('att', 0, 'warrior', 0, 1);
+    const attacker = makeUnit('att', 0, UnitType.WARRIOR, 0, 1);
     tileAt(map, 0, 1)!.unit = attacker;
 
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
@@ -230,7 +230,7 @@ describe('Pirates', () => {
     sim.startGame();
     sim.drainEvents();
 
-    const ok = sim.applyCommand({ type: 'attack', unitId: 'att', q: 0, r: 0 });
+    const ok = sim.applyCommand({ type: CommandType.ATTACK, unitId: 'att', q: 0, r: 0 });
     expect(ok).toBe(true);
     sim.drainEvents();
     // warrior force 20, pirate defenseForce 5, total 25:
@@ -256,12 +256,12 @@ describe('Pirates', () => {
     sim.startGame();
     sim.drainEvents();
 
-    sim.applyCommand({ type: 'endTurn' });
+    sim.applyCommand({ type: CommandType.END_TURN });
     const events = sim.drainEvents();
     // The pirate closes to within its attack range (3) of the ship.
     expect(pirate.q).toBe(0);
     expect(pirate.r).toBe(1);
-    expect(events.some((e) => e.type === 'unitMoved' && (e as { unitId: string }).unitId === 'pirate-1')).toBe(true);
+    expect(events.some((e) => e.type === GameEventType.UNIT_MOVED && (e as { unitId: string }).unitId === 'pirate-1')).toBe(true);
   });
 
   it('moves in a random direction at max distance when no player unit exists', () => {
@@ -279,11 +279,11 @@ describe('Pirates', () => {
     sim.startGame();
     sim.drainEvents();
 
-    sim.applyCommand({ type: 'endTurn' });
+    sim.applyCommand({ type: CommandType.END_TURN });
     const events = sim.drainEvents();
     expect(pirate.q !== 0 || pirate.r !== 0).toBe(true);
     expect(isWaterType(tileAt(map, pirate.q, pirate.r)!.terrain)).toBe(true);
-    expect(events.some((e) => e.type === 'unitMoved' && (e as { unitId: string }).unitId === 'pirate-1')).toBe(true);
+    expect(events.some((e) => e.type === GameEventType.UNIT_MOVED && (e as { unitId: string }).unitId === 'pirate-1')).toBe(true);
   });
 
   it('award 30 points to the player who kills a pirate', () => {
@@ -300,12 +300,12 @@ describe('Pirates', () => {
     sim.startGame();
     sim.drainEvents();
 
-    const ok = sim.applyCommand({ type: 'attack', unitId: 'ship-1', q: 0, r: 0 });
+    const ok = sim.applyCommand({ type: CommandType.ATTACK, unitId: 'ship-1', q: 0, r: 0 });
     expect(ok).toBe(true);
     const events = sim.drainEvents();
     expect(tileAt(map, 0, 0)!.unit).toBeNull();
     expect(players[0]!.score).toBe(30);
-    expect(events.some((e) => e.type === 'scoreFly' && e.amount === 30)).toBe(true);
+    expect(events.some((e) => e.type === GameEventType.SCORE_FLY && e.amount === 30)).toBe(true);
   });
 
   it('accepts a deal for 50 money and the pirate stops attacking the player', () => {
@@ -322,14 +322,14 @@ describe('Pirates', () => {
     sim.startGame();
     sim.drainEvents();
 
-    expect(sim.applyCommand({ type: 'deal', unitId: 'pirate-1' })).toBe(true);
+    expect(sim.applyCommand({ type: CommandType.DEAL, unitId: 'pirate-1' })).toBe(true);
     const events = sim.drainEvents();
     expect(players[0]!.resources.money).toBe(50);
     expect(pirate.paidBy).toContain(0);
-    expect(events.some((e) => e.type === 'pirateDeal' && e.playerIndex === 0)).toBe(true);
+    expect(events.some((e) => e.type === GameEventType.PIRATE_DEAL && e.playerIndex === 0)).toBe(true);
 
     const shipHp = ship.hp;
-    sim.applyCommand({ type: 'endTurn' });
+    sim.applyCommand({ type: CommandType.END_TURN });
     sim.drainEvents();
     expect(ship.hp).toBe(shipHp);
     expect(tileAt(map, 0, 1)!.unit).toBe(ship);
@@ -348,9 +348,9 @@ describe('Pirates', () => {
     sim.startGame();
     sim.drainEvents();
 
-    expect(sim.applyCommand({ type: 'deal', unitId: 'pirate-1' })).toBe(true);
+    expect(sim.applyCommand({ type: CommandType.DEAL, unitId: 'pirate-1' })).toBe(true);
     sim.drainEvents();
-    expect(sim.applyCommand({ type: 'deal', unitId: 'pirate-1' })).toBe(false);
+    expect(sim.applyCommand({ type: CommandType.DEAL, unitId: 'pirate-1' })).toBe(false);
     expect(players[0]!.resources.money).toBe(50);
   });
 
@@ -366,7 +366,7 @@ describe('Pirates', () => {
     sim.startGame();
     sim.drainEvents();
 
-    expect(sim.applyCommand({ type: 'deal', unitId: 'pirate-1' })).toBe(false);
+    expect(sim.applyCommand({ type: CommandType.DEAL, unitId: 'pirate-1' })).toBe(false);
     expect(players[0]!.resources.money).toBe(moneyBefore);
     expect(pirate.paidBy).toBeUndefined();
   });
@@ -382,7 +382,7 @@ describe('Pirates', () => {
     sim.startGame();
     sim.drainEvents();
 
-    expect(sim.applyCommand({ type: 'deal', unitId: 'ship-1' })).toBe(false);
+    expect(sim.applyCommand({ type: CommandType.DEAL, unitId: 'ship-1' })).toBe(false);
     expect(players[0]!.resources.money).toBe(100);
   });
 
@@ -400,19 +400,19 @@ describe('Pirates', () => {
     sim.startGame();
     sim.drainEvents();
 
-    sim.applyCommand({ type: 'deal', unitId: 'pirate-1' });
+    sim.applyCommand({ type: CommandType.DEAL, unitId: 'pirate-1' });
     sim.drainEvents();
 
-    expect(sim.applyCommand({ type: 'attack', unitId: 'ship-1', q: 0, r: 0 })).toBe(true);
+    expect(sim.applyCommand({ type: CommandType.ATTACK, unitId: 'ship-1', q: 0, r: 0 })).toBe(true);
     const attackEvents = sim.drainEvents();
     expect(pirate.paidBy).toBeUndefined();
-    expect(attackEvents.some((e) => e.type === 'pirateDealCanceled' && e.playerIndex === 0)).toBe(true);
+    expect(attackEvents.some((e) => e.type === GameEventType.PIRATE_DEAL_CANCELED && e.playerIndex === 0)).toBe(true);
 
     const shipHpAfterFight = ship.hp;
-    sim.applyCommand({ type: 'endTurn' });
+    sim.applyCommand({ type: CommandType.END_TURN });
     const turnEvents = sim.drainEvents();
     expect(ship.hp).toBeLessThan(shipHpAfterFight);
-    expect(turnEvents.some((e) => e.type === 'pirateCapture')).toBe(true);
+    expect(turnEvents.some((e) => e.type === GameEventType.PIRATE_CAPTURE)).toBe(true);
   });
 });
 
@@ -426,7 +426,7 @@ describe('Pirate target tribes', () => {
     const spots: [number, number][] = [[0, 0], [1, 0], [2, 0], [3, 0]];
     players.forEach((p, i) => {
       const [q, r] = spots[i]!;
-      tileAt(map, q, r)!.unit = makeUnit(`u${i}`, p.index, 'warrior', q, r);
+      tileAt(map, q, r)!.unit = makeUnit(`u${i}`, p.index, UnitType.WARRIOR, q, r);
     });
     const pirate = makePirate('pirate-1', 5, 0);
     tileAt(map, 5, 0)!.unit = pirate;

@@ -10,7 +10,7 @@ import {
   settlementHelpLines,
   settlementHelpTitle,
 } from '../src/game/help-texts';
-import { BuildingKind } from '../src/game/events';
+import { BuildingKind } from '@enums';
 
 describe('help texts', () => {
   it('describes a settlement with level, capacity, income and upgrades', () => {
@@ -34,7 +34,7 @@ describe('help texts', () => {
 
   it('provides a description for every building kind', () => {
     const map = makeTestMap(2);
-    const kinds: BuildingKind[] = ['sawmill', 'mine', 'port', 'temple', 'forestTemple'];
+    const kinds: BuildingKind[] = [BuildingKind.SAWMILL, BuildingKind.MINE, BuildingKind.PORT, BuildingKind.TEMPLE, BuildingKind.FOREST_TEMPLE];
     for (const kind of kinds) {
       const tile = tileAt(map, 0, 0)!;
       tile.settlement = null;

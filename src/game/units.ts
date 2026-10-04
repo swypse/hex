@@ -2,8 +2,9 @@ import { t } from '../i18n';
 import { shipMovePoints } from './ship';
 import type { Resources } from './resources';
 import { Tribe } from './tribes';
+import { UnitType } from '@enums';
 
-export type UnitType = 'warrior' | 'rider' | 'archer' | 'swordsman' | 'shield' | 'catapult' | 'knight' | 'pirate' | 'stalker' | 'builder' | 'banner' | 'berserker' | 'trapper' | 'stormcaller' | 'stunner';
+
 type PlayableUnitType = Exclude<UnitType, 'pirate'>;
 
 export const PIRATE_OWNER = -1;
@@ -24,25 +25,24 @@ interface UnitTypeInfo {
   price: number;
   priceWood: number;
   priceOre: number;
-  shape: 'circle' | 'square' | 'triangle' | 'swordsman';
 }
 
 export const UNIT_TYPES: Record<UnitType, UnitTypeInfo> = {
-  warrior: { movePoints: 10, attack: 20, attackDistance: 1, maxHp: 50, defense: 10, price: 4, priceWood: 0, priceOre: 0, shape: 'circle' },
-  rider: { movePoints: 40, attack: 22, attackDistance: 1, maxHp: 45, defense: 8, price: 6, priceWood: 0, priceOre: 0, shape: 'square' },
-  archer: { movePoints: 10, attack: 26, attackDistance: 2, maxHp: 40, defense: 7, price: 6, priceWood: 0, priceOre: 0, shape: 'triangle' },
-  swordsman: { movePoints: 10, attack: 40, attackDistance: 1, maxHp: 80, defense: 16, price: 10, priceWood: 0, priceOre: 2, shape: 'swordsman' },
-  shield: { movePoints: 10, attack: 7, attackDistance: 1, maxHp: 80, defense: 20, price: 8, priceWood: 0, priceOre: 2, shape: 'square' },
-  catapult: { movePoints: 10, attack: 50, attackDistance: 4, maxHp: 30, defense: 0, price: 15, priceWood: 10, priceOre: 3, shape: 'square' },
-  knight: { movePoints: 30, attack: 40, attackDistance: 1, maxHp: 70, defense: 12, price: 14, priceWood: 0, priceOre: 5, shape: 'swordsman' },
-  pirate: { movePoints: 50, attack: 15, attackDistance: 3, maxHp: PIRATE_HP, defense: 5, price: 0, priceWood: 0, priceOre: 0, shape: 'square' },
-  stalker: { movePoints: 20, attack: 10, attackDistance: 1, maxHp: 20, defense: 0, price: 9, priceWood: 0, priceOre: 2, shape: 'circle' },
-  builder: { movePoints: 8, attack: 10, attackDistance: 1, maxHp: 40, defense: 0, price: 15, priceWood: 0, priceOre: 0, shape: 'circle' },
-  banner: { movePoints: 8, attack: 10, attackDistance: 1, maxHp: 30, defense: 0, price: 7, priceWood: 0, priceOre: 2, shape: 'circle' },
-  berserker: { movePoints: 10, attack: 26, attackDistance: 1, maxHp: 50, defense: 8, price: 10, priceWood: 0, priceOre: 2, shape: 'circle' },
-  trapper: { movePoints: 10, attack: 20, attackDistance: 1, maxHp: 44, defense: 8, price: 6, priceWood: 0, priceOre: 2, shape: 'circle' },
-  stormcaller: { movePoints: 20, attack: 20, attackDistance: 1, maxHp: 44, defense: 8, price: 6, priceWood: 0, priceOre: 2, shape: 'circle' },
-  stunner: { movePoints: 8, attack: 20, attackDistance: 2, maxHp: 40, defense: 10, price: 7, priceWood: 0, priceOre: 2, shape: 'circle' },
+  warrior: { movePoints: 10, attack: 20, attackDistance: 1, maxHp: 50, defense: 10, price: 4, priceWood: 0, priceOre: 0 },
+  rider: { movePoints: 40, attack: 22, attackDistance: 1, maxHp: 45, defense: 8, price: 6, priceWood: 0, priceOre: 0 },
+  archer: { movePoints: 10, attack: 26, attackDistance: 2, maxHp: 40, defense: 7, price: 6, priceWood: 0, priceOre: 0 },
+  swordsman: { movePoints: 10, attack: 40, attackDistance: 1, maxHp: 80, defense: 16, price: 10, priceWood: 0, priceOre: 2 },
+  shield: { movePoints: 10, attack: 7, attackDistance: 1, maxHp: 80, defense: 20, price: 8, priceWood: 0, priceOre: 2 },
+  catapult: { movePoints: 10, attack: 50, attackDistance: 4, maxHp: 30, defense: 0, price: 15, priceWood: 10, priceOre: 3 },
+  knight: { movePoints: 30, attack: 40, attackDistance: 1, maxHp: 70, defense: 12, price: 14, priceWood: 0, priceOre: 5 },
+  pirate: { movePoints: 50, attack: 15, attackDistance: 3, maxHp: PIRATE_HP, defense: 5, price: 0, priceWood: 0, priceOre: 0 },
+  stalker: { movePoints: 20, attack: 10, attackDistance: 1, maxHp: 20, defense: 0, price: 9, priceWood: 0, priceOre: 2 },
+  builder: { movePoints: 8, attack: 10, attackDistance: 1, maxHp: 40, defense: 0, price: 15, priceWood: 0, priceOre: 0 },
+  banner: { movePoints: 8, attack: 10, attackDistance: 1, maxHp: 30, defense: 0, price: 7, priceWood: 0, priceOre: 2 },
+  berserker: { movePoints: 10, attack: 26, attackDistance: 1, maxHp: 50, defense: 8, price: 10, priceWood: 0, priceOre: 2 },
+  trapper: { movePoints: 10, attack: 20, attackDistance: 1, maxHp: 44, defense: 8, price: 6, priceWood: 0, priceOre: 2 },
+  stormcaller: { movePoints: 20, attack: 20, attackDistance: 1, maxHp: 44, defense: 8, price: 6, priceWood: 0, priceOre: 2 },
+  stunner: { movePoints: 8, attack: 20, attackDistance: 2, maxHp: 40, defense: 10, price: 7, priceWood: 0, priceOre: 2 },
 };
 
 /** Resources needed to spawn a unit of this type. */
@@ -301,7 +301,7 @@ export function canMove(unit: Unit): boolean {
   if (unit.hasMoved || unit.hasHealed) return false;
   // A ship can never move again in the turn it has attacked.
   if (unit.shipLevel !== undefined) return !unit.hasAttacked;
-  return unit.type === 'rider' || !unit.hasAttacked;
+  return unit.type === UnitType.RIDER || !unit.hasAttacked;
 }
 
 /** Move points a unit may spend this turn (road bonuses are handled per tile
@@ -313,11 +313,11 @@ export function movePoints(unit: Unit): number {
 export function canAttack(unit: Unit): boolean {
   if (isStunnedLocal(unit)) return false;
   if (unit.hasHealed || unit.hasLanded) return false;
-  if (unit.hasAttacked) return unit.shipLevel === undefined && unit.type === 'knight' && unit.canExtraAttack === true;
+  if (unit.hasAttacked) return unit.shipLevel === undefined && unit.type === UnitType.KNIGHT && unit.canExtraAttack === true;
   // A ship may always attack after moving this turn; the shield/catapult
   // "cannot attack after moving" limit applies only to land units.
   if (unit.shipLevel !== undefined) return true;
-  return !(unit.type === 'shield' && unit.hasMoved) && !(unit.type === 'catapult' && unit.hasMoved);
+  return !(unit.type === UnitType.SHIELD && unit.hasMoved) && !(unit.type === UnitType.CATAPULT && unit.hasMoved);
 }
 
 export function canHeal(unit: Unit): boolean {

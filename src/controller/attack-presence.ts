@@ -1,5 +1,6 @@
 import type { AttackUnitPre, GameEvent } from '../game/events';
 import type { Axial } from '../game/hex';
+import { GameEventType, UnitType } from '@enums';
 
 export interface AttackPresenceParticipant {
   unitId: string;
@@ -14,7 +15,7 @@ export function attackPresenceParticipants(events: GameEvent[]): Map<string, Att
     if (!out.has(p.unitId)) out.set(p.unitId, p);
   };
   for (const e of events) {
-    if (e.type !== 'attack') continue;
+    if (e.type !== GameEventType.ATTACK) continue;
     const a = e.attackerPre;
     const t = e.targetPre;
     if (e.targetDied && t) add(e.targetId, e.targetTile, t);
@@ -26,10 +27,10 @@ export function attackPresenceParticipants(events: GameEvent[]): Map<string, Att
       t &&
       a.shipLevel === undefined &&
       t.shipLevel === undefined &&
-      a.type !== 'archer' &&
-      a.type !== 'catapult' &&
-      a.type !== 'pirate' &&
-      t.type !== 'pirate'
+      a.type !== UnitType.ARCHER &&
+      a.type !== UnitType.CATAPULT &&
+      a.type !== UnitType.PIRATE &&
+      t.type !== UnitType.PIRATE
     ) {
       add(e.attackerId, e.attackerTile, a);
     }

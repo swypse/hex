@@ -8,6 +8,7 @@ import { SHIP_UPGRADE_COST } from './ship';
 import { BRIDGE_COST } from './bridges';
 import { BRIDGE_SCORE } from './score';
 import { t } from '../i18n';
+import { BuildingKind } from '@enums';
 
 export function settlementHelpTitle(tile: MapTile): string {
   const name = tile.settlement?.name;
@@ -82,7 +83,7 @@ export function buildingHelpLines(map: GameMap, tile: MapTile): string[] {
   const b = tile.building;
   if (!b) return [];
   switch (b.kind) {
-    case 'sawmill': {
+    case BuildingKind.SAWMILL: {
       const y = buildingYield(map, tile, null);
       return [
         t('help.building.sawmill.produce', { level: b.level, wood: y.wood }),
@@ -90,7 +91,7 @@ export function buildingHelpLines(map: GameMap, tile: MapTile): string[] {
         t('help.building.sawmill.place'),
       ];
     }
-    case 'mine': {
+    case BuildingKind.MINE: {
       const y = buildingYield(map, tile, null);
       const note = y.ore > b.level ? t('help.building.mine.note') : '';
       return [
@@ -99,7 +100,7 @@ export function buildingHelpLines(map: GameMap, tile: MapTile): string[] {
         t('help.building.mine.place'),
       ];
     }
-    case 'port': {
+    case BuildingKind.PORT: {
       return [
         t('help.building.port.board'),
         t('help.building.port.upgrade', {
@@ -112,7 +113,7 @@ export function buildingHelpLines(map: GameMap, tile: MapTile): string[] {
         t('help.building.port.place'),
       ];
     }
-    case 'temple': {
+    case BuildingKind.TEMPLE: {
       return [
         t('help.building.temple.grow'),
         t('help.building.temple.score'),
@@ -120,7 +121,7 @@ export function buildingHelpLines(map: GameMap, tile: MapTile): string[] {
         t('help.building.temple.place'),
       ];
     }
-    case 'forestTemple': {
+    case BuildingKind.FOREST_TEMPLE: {
       return [
         t('help.building.temple.grow'),
         t('help.building.temple.score'),
@@ -128,14 +129,14 @@ export function buildingHelpLines(map: GameMap, tile: MapTile): string[] {
         t('help.building.forestTemple.place'),
       ];
     }
-    case 'farm': {
+    case BuildingKind.FARM: {
       return [
         t('help.building.farm.produce', { food: FARM_FOOD, science: FARM_FOOD_SCIENCE }),
         t('help.building.farm.skill', { money: BUILDING_COSTS.farm.money, wood: BUILDING_COSTS.farm.wood }),
         t('help.building.farm.place'),
       ];
     }
-    case 'granary': {
+    case BuildingKind.GRANARY: {
       return [
         t('help.building.granary.store', { food: b.food ?? 0 }),
         t('help.building.granary.skill', { money: BUILDING_COSTS.granary.money, wood: BUILDING_COSTS.granary.wood, stone: BUILDING_COSTS.granary.stone }),

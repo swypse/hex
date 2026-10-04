@@ -3,7 +3,6 @@ import { gameController } from '../../controller/game-controller';
 import { useGameStore } from '../../store/game-store';
 import { t } from '../../i18n';
 import { advanceCheatBuffer, triggeredCheat, SKILLS_CHEAT_WORD, RESOURCE_CHEAT_WORD, FOG_CHEAT_WORD, PIRATES_CHEAT_WORD, AI_LOGS_CHEAT_WORD, WIN_CHEAT_WORD, SEASON_CHEAT_WORDS } from '../../game/cheats';
-import type { Season } from '../../game/season';
 import { type ScreenController, type UIHost, type Widget } from '../host';
 import { HudScore } from '../hud/hud-score';
 import { HudPlayers } from '../hud/hud-players';
@@ -17,11 +16,12 @@ import { HudToolbar } from '../hud/hud-toolbar';
 import { HudWatchExit } from '../hud/hud-watch-exit';
 import { HudPerf } from '../hud/hud-perf';
 import { HudScrim } from '../hud/hud-scrim';
+import { OverlayKind, ScrimSide, Season } from '@enums';
 
 /** The score HUD: tapping the player's chip opens the stats popup. */
 function scoreHud(): HudScore {
   const hud = new HudScore();
-  hud.onTap = () => useGameStore.getState().setOverlay({ kind: 'stats' });
+  hud.onTap = () => useGameStore.getState().setOverlay({ kind: OverlayKind.STATS });
   return hud;
 }
 
@@ -83,8 +83,8 @@ export class GameScreen implements ScreenController {
     gameController.init(host.app, this.mapLayer!, host.overlayLayer);
 
     const gameWidgets: Widget[] = [
-      new HudScrim({ side: 'top' }),
-      new HudScrim({ side: 'bottom' }),
+      new HudScrim({ side: ScrimSide.TOP }),
+      new HudScrim({ side: ScrimSide.BOTTOM }),
       scoreHud(),
       new HudPlayers(),
       new HudTurn(),

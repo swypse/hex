@@ -13,6 +13,9 @@ import { Unit, UNIT_TYPES } from '../src/game/units';
 import { axialKey, hexToPixel } from '../src/game/hex';
 import { tileElevation } from '../src/render/elevation';
 import { type TextureSet, type TileTexture } from '../src/render/texture-factory';
+import { ENEMY_GLOW_COLOR, OWN_GLOW_COLOR } from '../src/render/unit-glow-color';
+import { HP_BAR_BOX_TOP, HP_BAR_HEIGHT, HP_BAR_ICON_GAP, HP_BAR_INNER_W, HP_BAR_OUTER_H, HP_BAR_OUTER_W, HP_LABEL_PAD_X, HP_LABEL_RADIUS, HP_LABEL_UP } from '../src/render/hp-bar-layout';
+import { BonusKind, BridgeDir, BuildingKind, CaptureMarkerSide, SelectionKind, UnitFacing, UnitType } from '@enums';
 
 const HEX = 40;
 const SPRITE_SCALE = 0.25;
@@ -101,7 +104,7 @@ describe('MapView hp bar anchoring', () => {
       unit: {
         id: 'u1',
         owner: 0,
-        type: 'warrior',
+        type: UnitType.WARRIOR,
         q: 0,
         r: 0,
         hasMoved: false,
@@ -238,7 +241,7 @@ describe('MapView hp bar anchoring', () => {
     // something else changes (the classic stale full-bar at partial hp bug).
     const partial = map.tiles.find((t) => t.q === 1 && t.r === 0)!;
     partial.unit = {
-      id: 'half', owner: 0, type: 'warrior', q: 1, r: 0,
+      id: 'half', owner: 0, type: UnitType.WARRIOR, q: 1, r: 0,
       hasMoved: true, hasAttacked: true, hasHealed: true,
       hp: 25, attack: 20, attackDistance: 1, spawnVillage: { q: 0, r: 0 },
     };
@@ -276,7 +279,7 @@ describe('MapView hp bar anchoring', () => {
     tile.settlement = { owner: 0, level: 1, captureReady: false };
     tile.ownedBy = 0;
     tile.unit = {
-      id: 'me', owner: 0, type: 'warrior', q: 0, r: 0,
+      id: 'me', owner: 0, type: UnitType.WARRIOR, q: 0, r: 0,
       hasMoved: false, hasAttacked: false, hasHealed: false,
       hp: 50, attack: 20, attackDistance: 1, defense: 10, spawnVillage: null,
     };
@@ -304,10 +307,10 @@ describe('MapView hp bar anchoring', () => {
     expect(ex).toBeDefined();
     const p = hexToPixel(tile, HEX);
     const hpBarY = p.y - tileElevation(tile, HEX) - ANCHOR_Y * TEX_H * SPRITE_SCALE + 40;
-    // The bar's top edge sits 11px above its anchor; the icon bottom must be 4px higher.
+    // The bar's top edge sits above its anchor; the icon bottom must be HP_BAR_ICON_GAP higher.
     const spriteH = HEX * 1.05;
-    const gap = (hpBarY - ex.world.y) * 1 - 11 - spriteH / 2;
-    expect(gap).toBeCloseTo(4, 5);
+    const gap = (hpBarY - ex.world.y) * 1 + HP_BAR_BOX_TOP - spriteH / 2;
+    expect(gap).toBeCloseTo(HP_BAR_ICON_GAP, 5);
   });
 
   it('renders the capture icon above the unit hp bar and its hp text', () => {
@@ -340,7 +343,7 @@ describe('MapView hp bar anchoring', () => {
       building: null, roadOwner: null, unit: null, ownedBy: 0, claimedByVillage: null, exploredBy: [0],
     };
     tile.unit = {
-      id: 'st', owner: 0, type: 'warrior', q: 0, r: 0,
+      id: 'st', owner: 0, type: UnitType.WARRIOR, q: 0, r: 0,
       hasMoved: false, hasAttacked: false, hasHealed: false,
       hp: UNIT_TYPES.warrior.maxHp, attack: 20, attackDistance: 1, spawnVillage: null,
     };
@@ -377,7 +380,7 @@ describe('MapView hp bar anchoring', () => {
     (performance as { now: () => number }).now = () => now;
     try {
       shipTile.unit = {
-        id: 'sh', owner: 0, type: 'warrior', q: 0, r: 0,
+        id: 'sh', owner: 0, type: UnitType.WARRIOR, q: 0, r: 0,
         hasMoved: false, hasAttacked: false, hasHealed: false,
         hp: 4, attack: 2, attackDistance: 1, spawnVillage: null, shipLevel: 1,
       };
@@ -419,7 +422,7 @@ describe('MapView hp bar anchoring', () => {
     (performance as { now: () => number }).now = () => now;
     try {
       shipTile.unit = {
-        id: 'sh', owner: 0, type: 'warrior', q: 0, r: 0,
+        id: 'sh', owner: 0, type: UnitType.WARRIOR, q: 0, r: 0,
         hasMoved: false, hasAttacked: false, hasHealed: false,
         hp: 4, attack: 2, attackDistance: 1, spawnVillage: null, shipLevel: 1,
       };
@@ -576,7 +579,7 @@ describe('MapView hp bar anchoring', () => {
       settlement: { owner: 1, level: 1, captureReady: true },
       building: null, roadOwner: null,
       unit: {
-        id: 'cap', owner: 0, type: 'warrior', q: 10, r: 0,
+        id: 'cap', owner: 0, type: UnitType.WARRIOR, q: 10, r: 0,
         hasMoved: true, hasAttacked: false, hasHealed: false,
         hp: 50, attack: 2, attackDistance: 1, spawnVillage: null,
       },
@@ -610,7 +613,7 @@ describe('MapView hp bar anchoring', () => {
       settlement: { owner: 1, level: 1, captureReady: true },
       building: null, roadOwner: null,
       unit: {
-        id: 'cap', owner: 0, type: 'warrior', q: 10, r: 0,
+        id: 'cap', owner: 0, type: UnitType.WARRIOR, q: 10, r: 0,
         hasMoved: true, hasAttacked: false, hasHealed: false,
         hp: 50, attack: 2, attackDistance: 1, spawnVillage: null,
       },
@@ -650,7 +653,7 @@ describe('MapView hp bar anchoring', () => {
       settlement: { owner: 1, level: 1, captureReady: true },
       building: null, roadOwner: null,
       unit: {
-        id: 'cap', owner: 0, type: 'warrior', q: 5, r: -2,
+        id: 'cap', owner: 0, type: UnitType.WARRIOR, q: 5, r: -2,
         hasMoved: false, hasAttacked: false, hasHealed: false,
         hp: 50, attack: 2, attackDistance: 1, spawnVillage: null,
       },
@@ -677,9 +680,9 @@ describe('MapView hp bar anchoring', () => {
     expect(p.x).toBeGreaterThanOrEqual(0);
     expect(p.x).toBeLessThanOrEqual(W);
     view.repositionEdgeMarkers({ x: 0, y: 0, scale: 1, width: W, height: H });
-    const parts = (view as unknown as { edgeMarkerParts: { side: 'l' | 'r' | 't' | 'b'; along: number; W: number; H: number }[] }).edgeMarkerParts;
+    const parts = (view as unknown as { edgeMarkerParts: { side: CaptureMarkerSide; along: number; W: number; H: number }[] }).edgeMarkerParts;
     expect(parts.length).toBe(1);
-    expect(parts[0]!.side).toBe('t');
+    expect(parts[0]!.side).toBe(CaptureMarkerSide.TOP);
     expect(parts[0]!.along).toBe(p.x);
     view.destroy();
   });
@@ -690,7 +693,7 @@ describe('MapView hp bar anchoring', () => {
       settlement: { owner: 1, level: 1, captureReady: true },
       building: null, roadOwner: null,
       unit: {
-        id: 'cap', owner: 0, type: 'warrior', q: -8, r: 3,
+        id: 'cap', owner: 0, type: UnitType.WARRIOR, q: -8, r: 3,
         hasMoved: false, hasAttacked: false, hasHealed: false,
         hp: 50, attack: 2, attackDistance: 1, spawnVillage: null,
       },
@@ -717,9 +720,9 @@ describe('MapView hp bar anchoring', () => {
     expect(p.y).toBeGreaterThanOrEqual(0);
     expect(p.y).toBeLessThanOrEqual(H);
     view.repositionEdgeMarkers({ x: 0, y: 0, scale: 1, width: W, height: H });
-    const parts = (view as unknown as { edgeMarkerParts: { side: 'l' | 'r' | 't' | 'b'; along: number; W: number; H: number }[] }).edgeMarkerParts;
+    const parts = (view as unknown as { edgeMarkerParts: { side: CaptureMarkerSide; along: number; W: number; H: number }[] }).edgeMarkerParts;
     expect(parts.length).toBe(1);
-    expect(parts[0]!.side).toBe('l');
+    expect(parts[0]!.side).toBe(CaptureMarkerSide.LEFT);
     expect(parts[0]!.along).toBe(p.y);
     view.destroy();
   });
@@ -779,24 +782,40 @@ describe('MapView hp bar anchoring', () => {
     expect(graphicsCount).toBe(4); // white box, orange ghost, green bar, label bg
   });
 
-  it('draws a white 52x10 box with a full green bar and an orange ghost behind it', () => {
+  it('puts the hp text on a black plate with HP_LABEL_PAD_X side padding and rounded corners', () => {
+    const el = hpBarItem().el;
+    const plate = el.children.find((c) => c instanceof Graphics && c !== el.children[0] && c !== el.children[1] && c !== el.children[2]) as Graphics;
+    const label = el.children.find((c) => c instanceof BitmapText) as BitmapText;
+    expect(plate.getBounds().width).toBeCloseTo(label.width + HP_LABEL_PAD_X * 2, 5);
+    const shapes = plate.context.instructions.flatMap((i) => {
+      const path = (i.data as { path?: { instructions: Array<{ action: string; data: number[] }> } })?.path;
+      return path ? path.instructions : [];
+    });
+    const round = shapes.find((i) => i.action === 'roundRect');
+    expect(round).toBeDefined();
+    expect(round!.data[4]).toBe(HP_LABEL_RADIUS); // roundRect(x, y, w, h, radius)
+    const fill = plate.context.instructions.find((i) => i.action === 'fill')!.data as { style: { color: number } };
+    expect(fill.style.color).toBe(0x000000);
+  });
+
+  it('draws a white box (HP_BAR_OUTER_W x HP_BAR_OUTER_H) with a full green bar and an orange ghost behind it', () => {
     const el = hpBarItem().el;
     const bg = el.children[0] as Graphics;
     const ghost = el.children[1] as Graphics;
     const green = el.children[2] as Graphics;
     const bounds = bg.getBounds();
-    expect(bounds.width).toBeCloseTo(52, 5);
-    expect(bounds.height).toBeCloseTo(10, 5);
+    expect(bounds.width).toBeCloseTo(HP_BAR_OUTER_W, 5);
+    expect(bounds.height).toBeCloseTo(HP_BAR_OUTER_H, 5);
     const fillOf = (g: Graphics): number =>
       (g.context.instructions.find((i) => i.action === 'fill')!.data as { style: { color: number } }).style.color;
     expect(fillOf(bg)).toBe(0xffffff);
     expect(fillOf(ghost)).toBe(0xfa9a09);
     expect(fillOf(green)).toBe(0x49cc5d);
-    // At full hp the green bar covers the orange ghost: both span the inner 50x8.
-    expect(ghost.getBounds().width).toBeCloseTo(50, 5);
-    expect(ghost.getBounds().height).toBeCloseTo(8, 5);
-    expect(green.getBounds().width).toBeCloseTo(50, 5);
-    expect(green.getBounds().height).toBeCloseTo(8, 5);
+    // At full hp the green bar covers the orange ghost: both span the inner area.
+    expect(ghost.getBounds().width).toBeCloseTo(HP_BAR_INNER_W, 5);
+    expect(ghost.getBounds().height).toBeCloseTo(HP_BAR_HEIGHT, 5);
+    expect(green.getBounds().width).toBeCloseTo(HP_BAR_INNER_W, 5);
+    expect(green.getBounds().height).toBeCloseTo(HP_BAR_HEIGHT, 5);
     // The green bar renders above the ghost.
     expect(green.zIndex).toBeGreaterThan(ghost.zIndex);
   });
@@ -808,7 +827,7 @@ describe('MapView hp bar anchoring', () => {
       ticker: { add: (fn: () => void) => callbacks.push(fn), remove: (): void => {} },
     } as unknown as Application;
     const unit: Unit = {
-      id: 'u1', owner: 0, type: 'warrior', q: 0, r: 0,
+      id: 'u1', owner: 0, type: UnitType.WARRIOR, q: 0, r: 0,
       hasMoved: false, hasAttacked: false, hasHealed: false,
       hp: 50, attack: 20, attackDistance: 1, spawnVillage: null,
     };
@@ -833,8 +852,9 @@ describe('MapView hp bar anchoring', () => {
       const green = bar.el.children[2] as Graphics;
       const greenW = (): number => green.getBounds().width;
       const ghostW = (): number => ghost.getBounds().width;
-      expect(greenW()).toBeCloseTo(50, 5);
-      expect(ghostW()).toBeCloseTo(50, 5);
+      const W = HP_BAR_INNER_W; // full bar
+      expect(greenW()).toBeCloseTo(W, 5);
+      expect(ghostW()).toBeCloseTo(W, 5);
 
       // Damage to 25/50: green drops to 25 in 100ms, ghost trails in 300ms.
       const addedBefore = callbacks.length;
@@ -844,22 +864,22 @@ describe('MapView hp bar anchoring', () => {
       expect(ticks.length).toBeGreaterThan(0);
       now = 50; // halfway through the green animation, 1/6 of the ghost's
       for (const tick of ticks) tick();
-      expect(greenW()).toBeCloseTo(37.5, 5);
-      expect(ghostW()).toBeCloseTo(275 / 6, 5); // 50 - 25/6
+      expect(greenW()).toBeCloseTo(0.75 * W, 5);
+      expect(ghostW()).toBeCloseTo((11 / 12) * W, 5); // W - (W/2)/6
       now = 100; // green is done, ghost is 1/3 of the way
       for (const tick of ticks) tick();
-      expect(greenW()).toBeCloseTo(25, 5);
-      expect(ghostW()).toBeCloseTo(125 / 3, 5); // 50 - 25/3
+      expect(greenW()).toBeCloseTo(0.5 * W, 5);
+      expect(ghostW()).toBeCloseTo((5 / 6) * W, 5); // W - (W/2)/3
       now = 300; // both settled
       for (const tick of ticks) tick();
-      expect(greenW()).toBeCloseTo(25, 5);
-      expect(ghostW()).toBeCloseTo(25, 5);
+      expect(greenW()).toBeCloseTo(0.5 * W, 5);
+      expect(ghostW()).toBeCloseTo(0.5 * W, 5);
 
       // A heal snaps both bars back instantly: the widths already read the target.
       unit.hp = 40;
       v.update(m, players, null, new Set(), new Set(), 0, new Set(), vp);
-      expect(greenW()).toBeCloseTo(40, 5); // 40/50 * 50
-      expect(ghostW()).toBeCloseTo(40, 5);
+      expect(greenW()).toBeCloseTo(0.8 * W, 5); // 40/50 of the bar
+      expect(ghostW()).toBeCloseTo(0.8 * W, 5);
     } finally {
       (performance as { now: () => number }).now = origNow;
       v.destroy();
@@ -882,7 +902,7 @@ describe('MapView hp bar anchoring', () => {
     };
     const tile = (q: number, r: number) => map.tiles.find((x) => x.q === q && x.r === r)!;
     const war = (id: string, owner: number, q: number, r: number, hp: number): Unit => ({
-      id, owner, type: 'warrior', q, r, hasMoved: true, hasAttacked: true, hasHealed: true,
+      id, owner, type: UnitType.WARRIOR, q, r, hasMoved: true, hasAttacked: true, hasHealed: true,
       hp, attack: 20, attackDistance: 1, defense: 10, spawnVillage: null,
     });
     tile(0, 0).unit = war('a', 0, 0, 0, 50);
@@ -921,7 +941,7 @@ describe('MapView hp bar anchoring', () => {
       widths.push(greenOf()); // green done, ghost mid
       now = 320;
       for (const cb of callbacks) cb();
-      widths.push(greenOf()); // settled at 30/50 * 50 = 30
+      widths.push(greenOf()); // settled at 30/50 of the bar
       sync(50); // revert with the stale pre-attack override
       sync(30); // real post-attack hp
 
@@ -929,13 +949,13 @@ describe('MapView hp bar anchoring', () => {
       for (let i = 1; i < widths.length; i++) {
         expect(widths[i]!).toBeLessThanOrEqual(widths[i - 1]! + 1e-6);
       }
-      expect(greenOf()).toBeCloseTo(30, 5); // 30/50 * 50
+      expect(greenOf()).toBeCloseTo(0.6 * HP_BAR_INNER_W, 5); // 30/50 of the bar
 
       // A genuine heal after the restage window does snap back up.
       now += 1000 + 10; // HP_RESTAGE_WINDOW_MS + margin
       for (const cb of callbacks) cb();
       sync(50);
-      expect(greenOf()).toBeCloseTo(50, 5);
+      expect(greenOf()).toBeCloseTo(HP_BAR_INNER_W, 5);
     } finally {
       (performance as { now: () => number }).now = origNow;
       v.destroy();
@@ -945,7 +965,7 @@ describe('MapView hp bar anchoring', () => {
   it('shows the same white-box hp bar for a damaged building', () => {
     const tile = map.tiles.find((t) => t.q === 0 && t.r === 0)!;
     tile.unit = null;
-    tile.building = { kind: 'mine', level: 1, hp: 1 };
+    tile.building = { kind: BuildingKind.MINE, level: 1, hp: 1 };
     view.update(map, players, null, new Set(), new Set(), 0, new Set(), {
       x: 400, y: 300, scale: 1, width: 800, height: 600,
     });
@@ -993,7 +1013,7 @@ describe('MapView hp bar anchoring', () => {
       ticker: { add: (): void => {}, remove: (): void => {} },
     } as unknown as Application;
     const v = new MapView(app, textures, HEX, SPRITE_SCALE, 2);
-    const selection = { kind: 'unit', q: 0, r: 0 } as const;
+    const selection = { kind: SelectionKind.UNIT, q: 0, r: 0 };
     v.update(m, players, selection, new Set(['1,0']), new Set(['0,1']), 0, new Set(), {
       x: 400, y: 300, scale: 1, width: 800, height: 600,
     });
@@ -1025,7 +1045,7 @@ describe('MapView hp bar anchoring', () => {
       ticker: { add: (): void => {}, remove: (): void => {} },
     } as unknown as Application;
     const v = new MapView(app, textures, HEX, SPRITE_SCALE, 2);
-    const selection = { kind: 'unit', q: 0, r: 0 } as const;
+    const selection = { kind: SelectionKind.UNIT, q: 0, r: 0 };
     v.update(m, players, selection, new Set(['1,0']), new Set(), 0, new Set(), {
       x: 400, y: 300, scale: 1, width: 800, height: 600,
     });
@@ -1068,7 +1088,7 @@ describe('MapView hp bar anchoring', () => {
     });
     const m: GameMap = { radius: 2, spawns: [], tiles: [tile(0, 0), tile(1, 0), tile(2, 0)] };
     const v = new MapView(app, buildTextures(m), HEX, SPRITE_SCALE, 2);
-    const selection = { kind: 'unit', q: 0, r: 0 } as const;
+    const selection = { kind: SelectionKind.UNIT, q: 0, r: 0 };
     const origNow = performance.now;
     let now = 0;
     (performance as { now: () => number }).now = () => now;
@@ -1091,7 +1111,7 @@ describe('MapView hp bar anchoring', () => {
   });
 
   it('shows a steady glow behind a selected unit and hides it when deselected', () => {
-    const selection = { kind: 'unit', q: 0, r: 0 } as const;
+    const selection = { kind: SelectionKind.UNIT, q: 0, r: 0 };
     view.update(map, players, selection, new Set(), new Set(), 0, new Set(), {
       x: 400,
       y: 300,
@@ -1116,6 +1136,21 @@ describe('MapView hp bar anchoring', () => {
     expect(tv.glowSprite).toBeNull();
   });
 
+  it('tints the selection glow red for an enemy unit and keeps the normal colour for an own unit', () => {
+    const vp = { x: 400, y: 300, scale: 1, width: 800, height: 600 };
+    const selection = { kind: SelectionKind.UNIT, q: 0, r: 0 };
+    const tvOf = (): { glowSprite: Sprite | null } =>
+      (view as unknown as { tileViews: Map<string, { glowSprite: Sprite | null }> }).tileViews.get('0,0')!;
+
+    view.update(map, players, selection, new Set(), new Set(), 0, new Set(), vp);
+    expect(tvOf().glowSprite!.tint).toBe(OWN_GLOW_COLOR);
+
+    // The same unit seen by another player is an enemy.
+    map.tiles.find((t) => t.q === 0 && t.r === 0)!.exploredBy = [0, 1];
+    view.update(map, players, selection, new Set(), new Set(), 1, new Set(), vp);
+    expect(tvOf().glowSprite!.tint).toBe(ENEMY_GLOW_COLOR);
+  });
+
   it('keeps the selected tile el above same-row neighbors so the top border stays visible', () => {
     const t00: MapTile = {
       q: 0, r: 0, terrain: TileType.GrasslandLand, height: 0.1, settlement: null, building: null,
@@ -1131,7 +1166,7 @@ describe('MapView hp bar anchoring', () => {
       ticker: { add: (): void => {}, remove: (): void => {} },
     } as unknown as Application;
     const v = new MapView(app, textures, HEX, SPRITE_SCALE, 2);
-    const selection: import('../src/game/selection').Selection = { kind: 'tile', q: 0, r: 0 };
+    const selection: import('../src/game/selection').Selection = { kind: SelectionKind.TILE, q: 0, r: 0 };
     v.update(m, players, selection, new Set(), new Set(), 0, new Set(), {
       x: 400,
       y: 300,
@@ -1147,7 +1182,7 @@ describe('MapView hp bar anchoring', () => {
   });
 
   it('splits the selected border: top part layered in the tile, bottom part above everything', () => {
-    const selection: import('../src/game/selection').Selection = { kind: 'tile', q: 0, r: 0 };
+    const selection: import('../src/game/selection').Selection = { kind: SelectionKind.TILE, q: 0, r: 0 };
     view.update(map, players, selection, new Set(), new Set(), 0, new Set(), {
       x: 400,
       y: 300,
@@ -1170,7 +1205,7 @@ describe('MapView hp bar anchoring', () => {
   });
 
   it('draws the split selected border as open polylines without a closing segment', () => {
-    const selection: import('../src/game/selection').Selection = { kind: 'tile', q: 0, r: 0 };
+    const selection: import('../src/game/selection').Selection = { kind: SelectionKind.TILE, q: 0, r: 0 };
     view.update(map, players, selection, new Set(), new Set(), 0, new Set(), {
       x: 400,
       y: 300,
@@ -1195,7 +1230,7 @@ describe('MapView hp bar anchoring', () => {
   it('renders a directional port texture pointing at the adjacent owned land', () => {
     const portTile: MapTile = {
       q: 0, r: 0, terrain: TileType.Water, height: 0.1, settlement: null,
-      building: { kind: 'port', level: 1 }, roadOwner: null, unit: null,
+      building: { kind: BuildingKind.PORT, level: 1 }, roadOwner: null, unit: null,
       ownedBy: 0, claimedByVillage: null, exploredBy: [0],
     };
     const villageTile: MapTile = {
@@ -1220,7 +1255,7 @@ describe('MapView hp bar anchoring', () => {
   it('renders the free port texture for a port with no owner', () => {
     const freePort: MapTile = {
       q: 0, r: 0, terrain: TileType.Water, height: 0.1, settlement: null,
-      building: { kind: 'port', level: 1 }, roadOwner: null, unit: null,
+      building: { kind: BuildingKind.PORT, level: 1 }, roadOwner: null, unit: null,
       ownedBy: null, claimedByVillage: null, exploredBy: [0],
     };
     const portMap: GameMap = { radius: 1, spawns: [], tiles: [freePort] };
@@ -1240,7 +1275,7 @@ describe('MapView hp bar anchoring', () => {
   it('renders the bridge texture matching its orientation', () => {
     const t: MapTile = {
       q: 0, r: 0, terrain: TileType.Water, height: 0.1, settlement: null,
-      building: null, roadOwner: 0, bridge: { owner: 0, dir: 'we' }, unit: null,
+      building: null, roadOwner: 0, bridge: { owner: 0, dir: BridgeDir.WE }, unit: null,
       ownedBy: 0, claimedByVillage: null, exploredBy: [0],
     };
     const m: GameMap = { radius: 1, spawns: [], tiles: [t] };
@@ -1260,7 +1295,7 @@ describe('MapView hp bar anchoring', () => {
   it('does not draw a road above a bridge even when it is roadOwner-connected', () => {
     const bridgeTile: MapTile = {
       q: 0, r: 0, terrain: TileType.Water, height: 0.1, settlement: null,
-      building: null, roadOwner: 0, bridge: { owner: 0, dir: 'we' }, unit: null,
+      building: null, roadOwner: 0, bridge: { owner: 0, dir: BridgeDir.WE }, unit: null,
       ownedBy: 0, claimedByVillage: null, exploredBy: [0],
     };
     const shoreTile: MapTile = {
@@ -1286,7 +1321,7 @@ describe('MapView hp bar anchoring', () => {
   it('raises the bridge to the lower of its two coast elevations', () => {
     const bridgeTile: MapTile = {
       q: 0, r: 0, terrain: TileType.Water, height: 0.1, settlement: null,
-      building: null, roadOwner: 0, bridge: { owner: 0, dir: 'we' }, unit: null,
+      building: null, roadOwner: 0, bridge: { owner: 0, dir: BridgeDir.WE }, unit: null,
       ownedBy: 0, claimedByVillage: null, exploredBy: [0],
     };
     const lowCoast: MapTile = {
@@ -1318,7 +1353,7 @@ describe('MapView hp bar anchoring', () => {
   it('renders the temple texture matching the temple level', () => {
     const t: MapTile = {
       q: 0, r: 0, terrain: TileType.Water, height: 0.1, settlement: null,
-      building: { kind: 'temple', level: 3 }, roadOwner: null, unit: null,
+      building: { kind: BuildingKind.TEMPLE, level: 3 }, roadOwner: null, unit: null,
       ownedBy: 0, claimedByVillage: null, exploredBy: [0],
     };
     const m: GameMap = { radius: 1, spawns: [], tiles: [t] };
@@ -1338,7 +1373,7 @@ describe('MapView hp bar anchoring', () => {
   it('renders the forest temple texture matching the temple level', () => {
     const t: MapTile = {
       q: 0, r: 0, terrain: TileType.GrasslandForest, height: 0.1, settlement: null,
-      building: { kind: 'forestTemple', level: 3 }, roadOwner: null, unit: null,
+      building: { kind: BuildingKind.FOREST_TEMPLE, level: 3 }, roadOwner: null, unit: null,
       ownedBy: 0, claimedByVillage: null, exploredBy: [0],
     };
     const m: GameMap = { radius: 1, spawns: [], tiles: [t] };
@@ -1369,7 +1404,7 @@ describe('MapView hp bar anchoring', () => {
     const tile = map.tiles.find((t) => t.q === 0 && t.r === 0)!;
     tile.settlement = { owner: 0, level: 1, captureReady: false };
     tile.unit = {
-      id: 'e1', owner: 1, type: 'warrior', q: 0, r: 0,
+      id: 'e1', owner: 1, type: UnitType.WARRIOR, q: 0, r: 0,
       hasMoved: false, hasAttacked: false, hasHealed: false,
       hp: 5, attack: 2, attackDistance: 1, spawnVillage: null,
     };
@@ -1384,7 +1419,7 @@ describe('MapView hp bar anchoring', () => {
     const tile = map.tiles.find((t) => t.q === 0 && t.r === 0)!;
     tile.settlement = { owner: 0, level: 1, captureReady: false };
     tile.unit = {
-      id: 'e1', owner: 1, type: 'warrior', q: 0, r: 0,
+      id: 'e1', owner: 1, type: UnitType.WARRIOR, q: 0, r: 0,
       hasMoved: false, hasAttacked: false, hasHealed: false,
       hp: 5, attack: 2, attackDistance: 1, spawnVillage: null,
     };
@@ -1408,7 +1443,7 @@ describe('MapView hp bar anchoring', () => {
     const tile = map.tiles.find((t) => t.q === 0 && t.r === 0)!;
     tile.settlement = { owner: 0, level: 1, captureReady: false };
     tile.unit = {
-      id: 'e1', owner: 1, type: 'warrior', q: 0, r: 0,
+      id: 'e1', owner: 1, type: UnitType.WARRIOR, q: 0, r: 0,
       hasMoved: false, hasAttacked: false, hasHealed: false,
       hp: 5, attack: 2, attackDistance: 1, spawnVillage: null,
     };
@@ -1478,7 +1513,7 @@ describe('MapView hp bar anchoring', () => {
       building: null, roadOwner: null, unit: null, ownedBy: null, claimedByVillage: null, exploredBy: [0],
     };
     const u1: Unit = {
-      id: 'u1', owner: 0, type: 'warrior', q: 0, r: 0,
+      id: 'u1', owner: 0, type: UnitType.WARRIOR, q: 0, r: 0,
       hasMoved: false, hasAttacked: false, hasHealed: false,
       hp: 5, attack: 2, attackDistance: 1, spawnVillage: null,
     };
@@ -1494,7 +1529,7 @@ describe('MapView hp bar anchoring', () => {
     const tvs = (v as unknown as { tileViews: Map<string, { unitSprite: Sprite | null }> }).tileViews;
     const s0 = tvs.get('0,0')!.unitSprite!;
     expect(s0.scale.x).toBeGreaterThan(0);
-    v.setUnitFacing('u1', 'left');
+    v.setUnitFacing('u1', UnitFacing.LEFT);
     expect(s0.scale.x).toBeLessThan(0);
     // Unit moves to another tile: the stored facing survives the re-render.
     t00.unit = null;
@@ -1512,7 +1547,7 @@ describe('MapView hp bar anchoring', () => {
       building: null, roadOwner: null, unit: null, ownedBy: 0, claimedByVillage: null, exploredBy: [0],
     };
     const u1: Unit = {
-      id: 'u1', owner: 0, type: 'warrior', q: 0, r: 0,
+      id: 'u1', owner: 0, type: UnitType.WARRIOR, q: 0, r: 0,
       hasMoved: false, hasAttacked: false, hasHealed: false,
       hp: 5, attack: 2, attackDistance: 1, spawnVillage: null,
     };
@@ -1527,9 +1562,9 @@ describe('MapView hp bar anchoring', () => {
     v.update(m, players, null, new Set(), new Set(), 0, new Set(), viewport);
     const tvs = (v as unknown as { tileViews: Map<string, { unitSprite: Sprite | null }> }).tileViews;
     const s0 = tvs.get('0,0')!.unitSprite!;
-    v.setUnitFacing('u1', 'left');
+    v.setUnitFacing('u1', UnitFacing.LEFT);
     expect(s0.scale.x).toBeLessThan(0);
-    v.setUnitFacing('u1', 'right');
+    v.setUnitFacing('u1', UnitFacing.RIGHT);
     expect(s0.scale.x).toBeGreaterThan(0);
     v.destroy();
   });
@@ -1546,7 +1581,7 @@ describe('MapView hp bar anchoring', () => {
       building: null, roadOwner: null, unit: null, ownedBy: null, claimedByVillage: null, exploredBy: [0],
     };
     tile.unit = {
-      id: 'pir', owner: -1, type: 'pirate', q: 0, r: 0,
+      id: 'pir', owner: -1, type: UnitType.PIRATE, q: 0, r: 0,
       hasMoved: false, hasAttacked: false, hasHealed: false,
       hp: 15, attack: 3, attackDistance: 1, spawnVillage: null,
     };
@@ -1611,7 +1646,7 @@ describe('MapView hp bar anchoring', () => {
 
   it('renders a bonus sprite above the hex, building and unit on the tile', () => {
     const bonusTile = map.tiles.find((t) => t.q === 0 && t.r === 0)!;
-    bonusTile.bonus = { kind: 'money', claimer: null, arrivalTurn: 0 };
+    bonusTile.bonus = { kind: BonusKind.MONEY, claimer: null, arrivalTurn: 0 };
     view.update(map, players, null, new Set(), new Set(), 0, new Set(), {
       x: 400,
       y: 300,
@@ -1721,7 +1756,7 @@ describe('MapView storm water pulse', () => {
 
       // A ship on the tile lifts together with its water: terrain + unit, same delay.
       m.tiles[1]!.unit = {
-        id: 'ship', owner: 0, type: 'warrior', q: 1, r: 0,
+        id: 'ship', owner: 0, type: UnitType.WARRIOR, q: 1, r: 0,
         hasMoved: false, hasAttacked: false, hasHealed: false,
         hp: 40, attack: 20, attackDistance: 1, spawnVillage: null,
       };
@@ -1875,7 +1910,7 @@ describe('MapView water roads', () => {
   function waterTile(q: number, r: number, opts: { port?: boolean; ownedBy?: number | null } = {}): MapTile {
     return {
       q, r, terrain: TileType.Water, height: 0.1, settlement: null,
-      building: opts.port ? { kind: 'port', level: 1 } : null, roadOwner: null, unit: null,
+      building: opts.port ? { kind: BuildingKind.PORT, level: 1 } : null, roadOwner: null, unit: null,
       ownedBy: opts.ownedBy !== undefined ? opts.ownedBy : null,
       claimedByVillage: null, exploredBy: [0],
     };
@@ -2062,45 +2097,45 @@ describe('captureMarkerPoints', () => {
   it('keeps the top-edge triangle visible, vertex on the edge pointing up at the village', () => {
     // Resting: vertex on the top edge (y=0) pointing UP at the village above,
     // base 20px below on-screen so the triangle body is visible.
-    const rest = captureMarkerPoints('t', 100, 0, 800, 600);
+    const rest = captureMarkerPoints(CaptureMarkerSide.TOP, 100, 0, 800, 600);
     expect(rest[3]).toBe(0); // vertex on the top edge
     expect(rest[1]).toBe(20); // base inside the screen
     expect(Math.min(rest[1], rest[3], rest[5])).toBe(0); // vertex is the top-most point
     expect(rest[2]).toBe(100); // vertex sits at the village screen x
     // Slid: vertex moved 10px out past the edge; base still on-screen (10px).
-    const slid = captureMarkerPoints('t', 100, 10, 800, 600);
+    const slid = captureMarkerPoints(CaptureMarkerSide.TOP, 100, 10, 800, 600);
     expect(slid[3]).toBe(-10);
     expect(slid[1]).toBe(10);
     expect(slid[2]).toBe(100);
   });
 
   it('keeps the bottom-edge triangle visible, vertex pointing down at the village', () => {
-    const rest = captureMarkerPoints('b', 100, 0, 800, 600);
+    const rest = captureMarkerPoints(CaptureMarkerSide.BOTTOM, 100, 0, 800, 600);
     expect(rest[3]).toBe(600); // vertex on the bottom edge
     expect(rest[1]).toBe(580); // base inside the screen
     expect(Math.max(rest[1], rest[3], rest[5])).toBe(600); // vertex is the bottom-most point
     expect(rest[2]).toBe(100);
-    const slid = captureMarkerPoints('b', 100, 10, 800, 600);
+    const slid = captureMarkerPoints(CaptureMarkerSide.BOTTOM, 100, 10, 800, 600);
     expect(slid[3]).toBe(610);
     expect(slid[1]).toBe(590);
   });
 
   it('keeps left/right triangles visible, vertex pointing toward the village', () => {
-    const l = captureMarkerPoints('l', 50, 0, 800, 600);
+    const l = captureMarkerPoints(CaptureMarkerSide.LEFT, 50, 0, 800, 600);
     expect(l[2]).toBe(0); // vertex on the left edge
     expect(l[0]).toBe(20); // base inside the screen
     expect(Math.min(l[0], l[2], l[4])).toBe(0); // vertex is the left-most point
     expect(l[3]).toBe(50); // vertex sits at the village screen y
-    const lSlid = captureMarkerPoints('l', 50, 10, 800, 600);
+    const lSlid = captureMarkerPoints(CaptureMarkerSide.LEFT, 50, 10, 800, 600);
     expect(lSlid[2]).toBe(-10);
     expect(lSlid[0]).toBe(10);
 
-    const r = captureMarkerPoints('r', 50, 0, 800, 600);
+    const r = captureMarkerPoints(CaptureMarkerSide.RIGHT, 50, 0, 800, 600);
     expect(r[2]).toBe(800); // vertex on the right edge
     expect(r[0]).toBe(780); // base inside the screen
     expect(Math.max(r[0], r[2], r[4])).toBe(800); // vertex is the right-most point
     expect(r[3]).toBe(50);
-    const rSlid = captureMarkerPoints('r', 50, 10, 800, 600);
+    const rSlid = captureMarkerPoints(CaptureMarkerSide.RIGHT, 50, 10, 800, 600);
     expect(rSlid[2]).toBe(810);
     expect(rSlid[0]).toBe(790);
   });
@@ -2117,7 +2152,7 @@ describe('pirate deal circles', () => {
 
   function makePirate(id: string, paidBy: number[] | undefined): Unit {
     return {
-      id, owner: -1, type: 'pirate', q: 0, r: 0,
+      id, owner: -1, type: UnitType.PIRATE, q: 0, r: 0,
       hasMoved: false, hasAttacked: false, hasHealed: false,
       hp: 80, attack: 30, attackDistance: 3, defense: 5, spawnVillage: null,
       ...(paidBy ? { paidBy } : {}),
@@ -2265,7 +2300,7 @@ describe('MapView road-port connection', () => {
     return {
       q, r, terrain, height: 0.1,
       settlement: opts.port ? null : opts.roadOwner === undefined ? { owner: 0, level: 1, captureReady: false } : null,
-      building: opts.port ? { kind: 'port', level: 1 } : null,
+      building: opts.port ? { kind: BuildingKind.PORT, level: 1 } : null,
       roadOwner: opts.roadOwner === undefined ? null : opts.roadOwner,
       unit: null,
       ownedBy: opts.port ? (opts.ownedBy ?? null) : null,
@@ -2329,7 +2364,7 @@ describe('MapView road-port connection', () => {
 describe('damage preview badges', () => {
   const viewport = { x: 400, y: 300, scale: 1, width: 800, height: 600 };
 
-  function unit(id: string, owner: number, q: number, r: number, type: 'warrior' | 'archer' = 'warrior'): Unit {
+  function unit(id: string, owner: number, q: number, r: number, type: UnitType.WARRIOR | UnitType.ARCHER = UnitType.WARRIOR): Unit {
     const t = UNIT_TYPES[type];
     return {
       id, owner, type, q, r,
@@ -2403,9 +2438,9 @@ describe('damage preview badges', () => {
     } as unknown as Application;
     const v = new MapView(app, buildTextures(m), HEX, SPRITE_SCALE, 2);
     const players = playersOf();
-    v.update(m, players, { kind: 'unit', q: 0, r: 0 }, new Set(['1,0']), new Set(), 0, new Set(), viewport);
+    v.update(m, players, { kind: SelectionKind.UNIT, q: 0, r: 0 }, new Set(['1,0']), new Set(), 0, new Set(), viewport);
     v.showDamagePreview(t00.unit!, t10);
-    v.update(m, players, { kind: 'unit', q: 0, r: 0 }, new Set(['1,0']), new Set(), 0, new Set(), viewport);
+    v.update(m, players, { kind: SelectionKind.UNIT, q: 0, r: 0 }, new Set(['1,0']), new Set(), 0, new Set(), viewport);
     // Badges live in the unscaled overlay (zoom-independent, like HP bars).
     expect(v.markerLayer.children.length).toBeGreaterThan(0);
     const hasText = (c: Container): boolean =>
@@ -2424,14 +2459,14 @@ describe('damage preview badges', () => {
     } as unknown as Application;
     const v = new MapView(app, buildTextures(m), HEX, SPRITE_SCALE, 2);
     const players = playersOf();
-    v.update(m, players, { kind: 'unit', q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
+    v.update(m, players, { kind: SelectionKind.UNIT, q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
     const before = badgesOf(v);
     expect(before).toHaveLength(0);
 
     vi.useFakeTimers();
     v.showDamagePreview(t00.unit!, t10);
     vi.advanceTimersByTime(100);
-    v.update(m, players, { kind: 'unit', q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
+    v.update(m, players, { kind: SelectionKind.UNIT, q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
     vi.useRealTimers();
     const badges = badgesOf(v);
     // warrior vs warrior: attackForce 20, defenseForce 10, total 30:
@@ -2455,11 +2490,11 @@ describe('damage preview badges', () => {
     let now = 0;
     (performance as { now: () => number }).now = () => now;
     try {
-      v.update(m, players, { kind: 'unit', q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
+      v.update(m, players, { kind: SelectionKind.UNIT, q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
       vi.useFakeTimers();
       (performance as { now: () => number }).now = () => now;
       v.showDamagePreview(t00.unit!, t10);
-      v.update(m, players, { kind: 'unit', q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
+      v.update(m, players, { kind: SelectionKind.UNIT, q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
       const targetEl = badgeEl(v, '-20');
       now = 120; // past the badge fade-in
       for (const fn of callbacks) fn();
@@ -2468,7 +2503,7 @@ describe('damage preview badges', () => {
       // The 100ms hold-delay fires, the counter badge becomes visible, and the
       // preview re-renders (showDamagePreview's onRender does this in the app).
       vi.advanceTimersByTime(100);
-      v.update(m, players, { kind: 'unit', q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
+      v.update(m, players, { kind: SelectionKind.UNIT, q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
       vi.useRealTimers();
       (performance as { now: () => number }).now = () => now;
 
@@ -2498,11 +2533,11 @@ describe('damage preview badges', () => {
     } as unknown as Application;
     const v = new MapView(app, buildTextures(m), HEX, SPRITE_SCALE, 2);
     const players = playersOf();
-    v.update(m, players, { kind: 'unit', q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
+    v.update(m, players, { kind: SelectionKind.UNIT, q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
     vi.useFakeTimers();
     v.showDamagePreview(t00.unit!, t30);
     vi.advanceTimersByTime(100);
-    v.update(m, players, { kind: 'unit', q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
+    v.update(m, players, { kind: SelectionKind.UNIT, q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
     vi.useRealTimers();
     const badges = badgesOf(v);
     // Only the target badge: the attacker takes no counter in a real attack.
@@ -2524,11 +2559,11 @@ describe('damage preview badges', () => {
     } as unknown as Application;
     const v = new MapView(app, buildTextures(m), HEX, SPRITE_SCALE, 2);
     const players = playersOf();
-    v.update(m, players, { kind: 'unit', q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
+    v.update(m, players, { kind: SelectionKind.UNIT, q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
     vi.useFakeTimers();
     v.showDamagePreview(t00.unit!, t10);
     vi.advanceTimersByTime(100);
-    v.update(m, players, { kind: 'unit', q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
+    v.update(m, players, { kind: SelectionKind.UNIT, q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
     vi.useRealTimers();
     const badges = badgesOf(v);
     // Only the target badge: a dead target never counter-attacks.
@@ -2546,9 +2581,9 @@ describe('damage preview badges', () => {
     } as unknown as Application;
     const v = new MapView(app, buildTextures(m), HEX, SPRITE_SCALE, 2);
     const players = playersOf();
-    v.update(m, players, { kind: 'unit', q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
+    v.update(m, players, { kind: SelectionKind.UNIT, q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
     v.showDamagePreview(t00.unit!, t30);
-    v.update(m, players, { kind: 'unit', q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
+    v.update(m, players, { kind: SelectionKind.UNIT, q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
     expect(badgesOf(v).some((b) => b.text === '-20')).toBe(true);
     v.destroy();
   });
@@ -2563,9 +2598,9 @@ describe('damage preview badges', () => {
     } as unknown as Application;
     const v = new MapView(app, buildTextures(m), HEX, SPRITE_SCALE, 2);
     const players = playersOf();
-    v.update(m, players, { kind: 'unit', q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
+    v.update(m, players, { kind: SelectionKind.UNIT, q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
     v.showDamagePreview(t00.unit!, t10);
-    v.update(m, players, { kind: 'unit', q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
+    v.update(m, players, { kind: SelectionKind.UNIT, q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
     const el = badgeEl(v, '-20');
     // #111 fill, no stroke, rounded rect.
     const g = el.children.find((c) => c instanceof Graphics) as Graphics | undefined;
@@ -2600,11 +2635,11 @@ describe('damage preview badges', () => {
     } as unknown as Application;
     const v = new MapView(app, buildTextures(m), HEX, SPRITE_SCALE, 2);
     const players = playersOf();
-    v.update(m, players, { kind: 'unit', q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
+    v.update(m, players, { kind: SelectionKind.UNIT, q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
     vi.useFakeTimers();
     v.showDamagePreview(t00.unit!, t10);
     vi.advanceTimersByTime(100);
-    v.update(m, players, { kind: 'unit', q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
+    v.update(m, players, { kind: SelectionKind.UNIT, q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
     vi.useRealTimers();
     const badges = badgesOf(v);
     // The 0-damage target badge is skipped; only the 15 counter badge remains.
@@ -2625,9 +2660,9 @@ describe('damage preview badges', () => {
     } as unknown as Application;
     const v = new MapView(app, buildTextures(m), HEX, SPRITE_SCALE, 2);
     const players = playersOf();
-    v.update(m, players, { kind: 'unit', q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
+    v.update(m, players, { kind: SelectionKind.UNIT, q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
     v.showDamagePreview(t00.unit!, t10);
-    v.update(m, players, { kind: 'unit', q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
+    v.update(m, players, { kind: SelectionKind.UNIT, q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
     const el = badgeEl(v, '-27');
     const icon = el.children.find((c) => c instanceof Sprite) as Sprite | undefined;
     expect(icon).toBeDefined();
@@ -2645,9 +2680,9 @@ describe('damage preview badges', () => {
     } as unknown as Application;
     const v = new MapView(app, buildTextures(m), HEX, SPRITE_SCALE, 2);
     const players = playersOf();
-    v.update(m, players, { kind: 'unit', q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
+    v.update(m, players, { kind: SelectionKind.UNIT, q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
     v.showDamagePreview(t00.unit!, t10);
-    v.update(m, players, { kind: 'unit', q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
+    v.update(m, players, { kind: SelectionKind.UNIT, q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
     const el = badgeEl(v, '-20');
     const g = el.children.find((c) => c instanceof Graphics) as Graphics;
     const nested = g.context.instructions.flatMap((i) => {
@@ -2683,9 +2718,9 @@ describe('damage preview badges', () => {
     } as unknown as Application;
     const v = new MapView(app, buildTextures(m), HEX, SPRITE_SCALE, 2);
     const players = playersOf();
-    v.update(m, players, { kind: 'unit', q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
+    v.update(m, players, { kind: SelectionKind.UNIT, q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
     v.showDamagePreview(t00.unit!, t10);
-    v.update(m, players, { kind: 'unit', q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
+    v.update(m, players, { kind: SelectionKind.UNIT, q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
     const el = badgeEl(v, '-20');
     // The badge's local caret tip is the bottom of the caret triangle; the
     // badge's world anchor is its outer wrapper's position.
@@ -2707,11 +2742,11 @@ describe('damage preview badges', () => {
     const hpLabel = hpBar.el.children.find((c) => c instanceof BitmapText) as BitmapText;
     const p = hexToPixel(t10, HEX);
     const anchorY = p.y - tileElevation(t10, HEX) - 5 + 40;
-    // hp label bottom sits 13px above the anchor; the text top rises hpLabel.height
-    // above that; the caret tip must be 4px above the text top.
+    // hp label bottom sits HP_LABEL_UP above the anchor; the text top rises
+    // hpLabel.height above that; the caret tip must be 4px above the text top.
     // In screen-space (viewport.y = 300, scale = 1) the caret tip y =
-    // viewport.y + anchorY - 13 - hpLabel.height - 4.
-    expect(caretTipWorld).toBeCloseTo(300 + anchorY - 13 - hpLabel.height - 4, 5);
+    // viewport.y + anchorY - HP_LABEL_UP - hpLabel.height - 4.
+    expect(caretTipWorld).toBeCloseTo(300 + anchorY - HP_LABEL_UP - hpLabel.height - 4, 5);
     v.destroy();
   });
 
@@ -2730,9 +2765,9 @@ describe('damage preview badges', () => {
     let now = 0;
     (performance as { now: () => number }).now = () => now;
     try {
-      v.update(m, players, { kind: 'unit', q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
+      v.update(m, players, { kind: SelectionKind.UNIT, q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
       v.showDamagePreview(t00.unit!, t10);
-      v.update(m, players, { kind: 'unit', q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
+      v.update(m, players, { kind: SelectionKind.UNIT, q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
       const el = badgeEl(v, '-20');
       expect(el.alpha).toBe(0);
       now = 0;
@@ -2782,10 +2817,10 @@ describe('damage preview badges', () => {
     } as unknown as Application;
     const v = new MapView(app, buildTextures(m), HEX, SPRITE_SCALE, 2);
     const players = playersOf();
-    v.update(m, players, { kind: 'unit', q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
+    v.update(m, players, { kind: SelectionKind.UNIT, q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
     v.showDamagePreview(t00.unit!, t10);
     v.hideDamagePreview();
-    v.update(m, players, { kind: 'unit', q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
+    v.update(m, players, { kind: SelectionKind.UNIT, q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
     expect(badgesOf(v)).toHaveLength(0);
     v.destroy();
   });
@@ -2805,9 +2840,9 @@ describe('damage preview badges', () => {
     } as unknown as Application;
     const v = new MapView(app, buildTextures(m), HEX, SPRITE_SCALE, 2);
     const players = playersOf();
-    v.update(m, players, { kind: 'unit', q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
+    v.update(m, players, { kind: SelectionKind.UNIT, q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
     v.showDamagePreview(t00.unit!, t10);
-    v.update(m, players, { kind: 'unit', q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
+    v.update(m, players, { kind: SelectionKind.UNIT, q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
 
     expect(v.overlay.sortableChildren).toBe(true);
     // The badge's outer wrapper sorts above the village label container so the
@@ -2850,7 +2885,7 @@ describe('MapView marker reveal deferral', () => {
       claimedByVillage: null, exploredBy: [0, 1],
     };
     own.unit = {
-      id: 'u', owner: 0, type: 'warrior', q: 0, r: 0,
+      id: 'u', owner: 0, type: UnitType.WARRIOR, q: 0, r: 0,
       hasMoved: false, hasAttacked: false, hasHealed: false,
       hp: 50, attack: 2, attackDistance: 1, spawnVillage: null,
     };
@@ -2860,14 +2895,14 @@ describe('MapView marker reveal deferral', () => {
       claimedByVillage: null, exploredBy: [0, 1],
     };
     enemy.unit = {
-      id: 'e', owner: 1, type: 'warrior', q: 1, r: 0,
+      id: 'e', owner: 1, type: UnitType.WARRIOR, q: 1, r: 0,
       hasMoved: false, hasAttacked: false, hasHealed: false,
       hp: 50, attack: 2, attackDistance: 1, spawnVillage: null,
     };
     const map: GameMap = { radius: 1, spawns: [], tiles: [own, enemy] };
     const v = new MapView(app, buildTextures(map), HEX, SPRITE_SCALE, 2);
     const players = playersOf();
-    const selected: Selection = { kind: 'unit', q: 0, r: 0 };
+    const selected: Selection = { kind: SelectionKind.UNIT, q: 0, r: 0 };
     const attackKey = axialKey({ q: 1, r: 0 });
     const attackable = new Set([attackKey]);
 

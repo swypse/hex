@@ -9,6 +9,7 @@ import type { GameMap } from '../../game/map-gen';
 import type { Player } from '../../game/players';
 import { makeIconChip } from '../kit/tribe-chip';
 import { makeLabel } from '../kit/label';
+import { FontSize } from '@enums';
 
 export function placeColor(place: number): number {
   if (place === 1) return 0xffd700;
@@ -62,24 +63,24 @@ export function drawPlayerStatsBlock(content: Container, cw: number, y: number, 
     const unknown = new Container();
     const bg = new Graphics();
     bg.circle(0, 0, CHIP_SIZE / 2).fill(UNKNOWN_TRIBE_COLOR);
-    const q = makeLabel('?', { fontSize: 20, fill: 0xffffff, fontWeight: '800' });
+    const q = makeLabel('?', { fontSize: FontSize.BIG, fill: 0xffffff, fontWeight: '800' });
     q.anchor.set(0.5, 0.5);
     unknown.addChild(bg, q);
     unknown.position.set(CHIP_SIZE / 2, headerCentre);
     content.addChild(unknown);
   }
 
-  const name = makeLabel(tribeName, { fontSize: 15, fill: o.dimmed ? 0x777777 : tribeColor, fontWeight: '700' });
+  const name = makeLabel(tribeName, { fontSize: FontSize.SMALL, fill: o.dimmed ? 0x777777 : tribeColor, fontWeight: '700' });
   name.anchor.set(0, 0.5);
   name.position.set(CHIP_SIZE + 8, headerCentre);
   content.addChild(name);
 
   const score = totalScore(map, p);
-  const scoreLabel = makeLabel(t('stats.pts', { score }), { fontSize: 20, fill: 0xff8c00, fontWeight: '900' });
+  const scoreLabel = makeLabel(t('stats.pts', { score }), { fontSize: FontSize.BIG, fill: 0xff8c00, fontWeight: '900' });
   scoreLabel.anchor.set(1, 0.5);
   scoreLabel.position.set(cw, headerCentre);
   content.addChild(scoreLabel);
-  const placeLabel = makeLabel(placeWord(place), { fontSize: 13, fill: placeColor(place), fontWeight: '600' });
+  const placeLabel = makeLabel(placeWord(place), { fontSize: FontSize.VERY_SMALL, fill: placeColor(place), fontWeight: '600' });
   placeLabel.anchor.set(1, 0.5);
   placeLabel.position.set(cw - scoreLabel.width - 8, headerCentre);
   content.addChild(placeLabel);
@@ -89,13 +90,13 @@ export function drawPlayerStatsBlock(content: Container, cw: number, y: number, 
   const rows = gameOverRows(map, p, o.fastBonus ?? 0).filter((row) => row.count !== 0 || row.score !== 0);
   for (const row of rows) {
     const centre = y + ROW_LINE / 2;
-    const title = makeLabel(row.label, { fontSize: 13, fill: 0xaaaaaa });
+    const title = makeLabel(row.label, { fontSize: FontSize.VERY_SMALL, fill: 0xaaaaaa });
     title.anchor.set(0, 0.5);
     title.position.set(0, centre);
     content.addChild(title);
     const valueText =
       row.count === 0 ? `+${row.score}` : row.score > 0 ? `${row.count} · +${row.score}` : String(row.count);
-    const value = makeLabel(valueText, { fontSize: 13, fill: 0xff8c00, fontWeight: '600' });
+    const value = makeLabel(valueText, { fontSize: FontSize.VERY_SMALL, fill: 0xff8c00, fontWeight: '600' });
     value.anchor.set(1, 0.5);
     value.position.set(cw, centre);
     content.addChild(value);
@@ -104,17 +105,17 @@ export function drawPlayerStatsBlock(content: Container, cw: number, y: number, 
 
   const achievementIds = unlockedAchievements(p);
   if (achievementIds.length > 0) {
-    const achTitle = makeLabel(t('stats.detailAchievements'), { fontSize: 13, fill: 0xaaaaaa });
+    const achTitle = makeLabel(t('stats.detailAchievements'), { fontSize: FontSize.VERY_SMALL, fill: 0xaaaaaa });
     achTitle.anchor.set(0, 0);
     achTitle.position.set(0, y);
     content.addChild(achTitle);
-    const achPts = makeLabel(`+${achievementTotalScore(p)}`, { fontSize: 13, fill: 0xff8c00, fontWeight: '600' });
+    const achPts = makeLabel(`+${achievementTotalScore(p)}`, { fontSize: FontSize.VERY_SMALL, fill: 0xff8c00, fontWeight: '600' });
     achPts.anchor.set(1, 0);
     achPts.position.set(cw, y);
     content.addChild(achPts);
     y += ROW_LINE + ROW_GAP;
     for (const id of achievementIds) {
-      const line = makeLabel(t(achievementNameKey(id)), { fontSize: 13, fill: 0xeeeeee });
+      const line = makeLabel(t(achievementNameKey(id)), { fontSize: FontSize.VERY_SMALL, fill: 0xeeeeee });
       line.anchor.set(1, 0);
       line.position.set(cw, y);
       content.addChild(line);

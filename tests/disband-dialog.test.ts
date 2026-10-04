@@ -1,4 +1,4 @@
-import { GameMode } from '@enums';
+import { GameMode, OverlayKind, UnitType } from '@enums';
 import { describe, expect, it, beforeEach, afterEach } from 'vitest';
 import { Container, BitmapText } from 'pixi.js';
 import { Simulator } from '../src/game/simulator';
@@ -45,7 +45,7 @@ describe('DisbandDialog', () => {
     };
     const map = generateMap(2, 42);
     unitTile = map.tiles.find((t) => t.terrain !== TileType.Water && t.settlement === null && t.unit === null)!;
-    unitTile.unit = makeUnit('u1', 0, 'warrior', unitTile.q, unitTile.r);
+    unitTile.unit = makeUnit('u1', 0, UnitType.WARRIOR, unitTile.q, unitTile.r);
     const players = buildPlayers(0, 1, new SeededRandom(1));
     players[0]!.resources.money = 50;
     const sim = new Simulator(map, players, GameMode.CAPTURE);
@@ -54,7 +54,7 @@ describe('DisbandDialog', () => {
     (gameController as unknown as { sim: unknown }).sim = sim;
     useGameStore.getState().setLocalPlayerIndex(0);
     useGameStore.getState().setPlayers(players);
-    useGameStore.getState().setOverlay({ kind: 'disband', unitId: 'u1' });
+    useGameStore.getState().setOverlay({ kind: OverlayKind.DISBAND, unitId: 'u1' });
     root = new Container();
   });
 

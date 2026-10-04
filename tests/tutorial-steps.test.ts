@@ -2,33 +2,34 @@ import { describe, expect, it } from 'vitest';
 import { SKILLS } from '../src/game/skills';
 import { buildTutorialMap, TUTORIAL_RADIUS } from '../src/game/tutorial/tutorial-map';
 import { STEP_ORDER, STEP_CONFIG, skillPulseStep, stepCounter, type TutorialStepDef } from '../src/game/tutorial/tutorial-steps';
+import { SkillId, TutorialStepId } from '@enums';
 
 const markerExists = (map: ReturnType<typeof buildTutorialMap>, m: { q: number; r: number }): boolean =>
   map.tiles.some((t) => t.q === m.q && t.r === m.r);
 
 describe('tutorial steps', () => {
   it('orders all steps from welcome to end without duplication', () => {
-    expect(STEP_ORDER[0]).toBe('welcome');
-    expect(STEP_ORDER[STEP_ORDER.length - 1]).toBe('end');
+    expect(STEP_ORDER[0]).toBe(TutorialStepId.WELCOME);
+    expect(STEP_ORDER[STEP_ORDER.length - 1]).toBe(TutorialStepId.END);
     expect(new Set(STEP_ORDER).size).toBe(STEP_ORDER.length);
   });
 
   it('orders all steps from welcome to end and includes the naval segment', () => {
-    expect(STEP_ORDER[0]).toBe('welcome');
-    expect(STEP_ORDER[STEP_ORDER.length - 1]).toBe('end');
+    expect(STEP_ORDER[0]).toBe(TutorialStepId.WELCOME);
+    expect(STEP_ORDER[STEP_ORDER.length - 1]).toBe(TutorialStepId.END);
     expect(new Set(STEP_ORDER).size).toBe(STEP_ORDER.length);
     const naval = ['upgradeVillage3', 'openWaterNavigation', 'buildPort', 'boardShip', 'upgradeShip', 'attackEnemyShip'];
     for (const id of naval) expect(STEP_ORDER).toContain(id);
     // Naval steps sit between the archer attack and the end.
-    expect(STEP_ORDER.indexOf('attackEnemy')).toBeLessThan(STEP_ORDER.indexOf('upgradeVillage3'));
-    expect(STEP_ORDER.indexOf('attackEnemyShip')).toBeLessThan(STEP_ORDER.indexOf('end'));
+    expect(STEP_ORDER.indexOf(TutorialStepId.ATTACK_ENEMY)).toBeLessThan(STEP_ORDER.indexOf(TutorialStepId.UPGRADE_VILLAGE3));
+    expect(STEP_ORDER.indexOf(TutorialStepId.ATTACK_ENEMY_SHIP)).toBeLessThan(STEP_ORDER.indexOf(TutorialStepId.END));
   });
 
   it('configures the naval steps with toolbar keys and skill highlights', () => {
     expect(STEP_CONFIG.upgradeVillage3.toolbarKey).toBe('upgrade');
     expect(STEP_CONFIG.buildPort.toolbarKey).toBe('port');
     expect(STEP_CONFIG.upgradeShip.toolbarKey).toBe('upgrade-ship');
-    expect(STEP_CONFIG.openWaterNavigation.highlightSkills).toEqual(['water', 'navigation']);
+    expect(STEP_CONFIG.openWaterNavigation.highlightSkills).toEqual([SkillId.WATER, SkillId.NAVIGATION]);
     expect(STEP_CONFIG.boardShip.markers).toEqual([{ q: 1, r: 0 }]);
   });
 
@@ -58,16 +59,16 @@ describe('tutorial steps', () => {
   });
 
   it('highlights forestry during openForestry and climbing+smithery during openClimbingSmithery', () => {
-    expect(STEP_CONFIG.openForestry.highlightSkills).toEqual(['forestry']);
-    expect(STEP_CONFIG.openClimbingSmithery.highlightSkills).toEqual(['climbing', 'smithery']);
+    expect(STEP_CONFIG.openForestry.highlightSkills).toEqual([SkillId.FORESTRY]);
+    expect(STEP_CONFIG.openClimbingSmithery.highlightSkills).toEqual([SkillId.CLIMBING, SkillId.SMITHERY]);
   });
 
   it('drives the skills-button pulse from the skill steps only', () => {
-    expect(skillPulseStep('openForestry')).toBe(true);
-    expect(skillPulseStep('openClimbingSmithery')).toBe(true);
-    expect(skillPulseStep('openWaterNavigation')).toBe(true);
+    expect(skillPulseStep(TutorialStepId.OPEN_FORESTRY)).toBe(true);
+    expect(skillPulseStep(TutorialStepId.OPEN_CLIMBING_SMITHERY)).toBe(true);
+    expect(skillPulseStep(TutorialStepId.OPEN_WATER_NAVIGATION)).toBe(true);
     for (const id of STEP_ORDER) {
-      if (id !== 'openForestry' && id !== 'openClimbingSmithery' && id !== 'openWaterNavigation') {
+      if (id !== TutorialStepId.OPEN_FORESTRY && id !== TutorialStepId.OPEN_CLIMBING_SMITHERY && id !== TutorialStepId.OPEN_WATER_NAVIGATION) {
         expect(skillPulseStep(id)).toBe(false);
       }
     }
@@ -82,9 +83,9 @@ describe('tutorial steps', () => {
   });
 
   it('numbers every message heading with a [N/M] counter', () => {
-    expect(stepCounter('welcome')).toBe(`[1/${STEP_ORDER.length}]`);
-    expect(stepCounter('end')).toBe(`[${STEP_ORDER.length}/${STEP_ORDER.length}]`);
-    expect(stepCounter('buildSawmill')).toBe(`[7/${STEP_ORDER.length}]`);
+    expect(stepCounter(TutorialStepId.WELCOME)).toBe(`[1/${STEP_ORDER.length}]`);
+    expect(stepCounter(TutorialStepId.END)).toBe(`[${STEP_ORDER.length}/${STEP_ORDER.length}]`);
+    expect(stepCounter(TutorialStepId.BUILD_SAWMILL)).toBe(`[7/${STEP_ORDER.length}]`);
     const counted = STEP_ORDER.map((id) => stepCounter(id));
     expect(new Set(counted).size).toBe(STEP_ORDER.length);
   });

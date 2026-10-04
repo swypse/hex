@@ -5,6 +5,7 @@ import { type UIHost } from '../host';
 import { Button } from '../kit/button';
 import { makeLabel } from '../kit/label';
 import { Popup } from '../kit/popup';
+import { FontSize } from '@enums';
 
 export class LeaveGameDialog {
   private el: Container | null = null;
@@ -23,7 +24,7 @@ export class LeaveGameDialog {
     });
 
     const hint = makeLabel(t('leave.hint'), {
-      fontSize: 14,
+      fontSize: FontSize.SMALL,
       fill: 0xcccccc,
       wordWrap: true,
       wordWrapWidth: popup.contentWidth,

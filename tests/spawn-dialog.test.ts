@@ -1,4 +1,4 @@
-import { GameMode } from '@enums';
+import { GameMode, OverlayKind, SelectionKind, UnitType } from '@enums';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Container, Sprite, Text } from 'pixi.js';
 import { SpawnDialog, spawnableTypesFor } from '../src/ui/overlays/spawn-dialog';
@@ -11,7 +11,7 @@ import { buildPlayers } from '../src/game/players';
 import { Tribe } from '../src/game/tribes';
 import { SeededRandom } from '../src/util/random';
 import { axialKey } from '../src/game/hex';
-import { UNIT_TYPES, type UnitType } from '../src/game/units';
+import { UNIT_TYPES } from '../src/game/units';
 
 type KeyboardEventLike = { key: string; preventDefault: () => void };
 
@@ -58,10 +58,10 @@ describe('SpawnDialog', () => {
     const players = buildPlayers(Tribe.Cats, 1, new SeededRandom(1));
     (gameController as unknown as { sim: Simulator | null }).sim = new Simulator(map, players, GameMode.CAPTURE);
     useGameStore.setState({
-      selection: { kind: 'tile', q: 0, r: 0 },
+      selection: { kind: SelectionKind.TILE, q: 0, r: 0 },
       players,
       localPlayerIndex: 0,
-      overlay: { kind: 'spawn' },
+      overlay: { kind: OverlayKind.SPAWN },
     });
 
     host = makeHost();
@@ -77,7 +77,7 @@ describe('SpawnDialog', () => {
   it('closes the dialog when Escape is pressed', () => {
     const dialog = new SpawnDialog();
     dialog.mount(host, root);
-    expect(useGameStore.getState().overlay).toEqual({ kind: 'spawn' });
+    expect(useGameStore.getState().overlay).toEqual({ kind: OverlayKind.SPAWN });
     keyHandler!({ key: 'Escape', preventDefault: () => {} });
     expect(useGameStore.getState().overlay).toBeNull();
     dialog.destroy();
@@ -162,17 +162,17 @@ describe('spawnableTypesFor', () => {
   }
 
   it('lists the base units plus the player\'s own tribe special', () => {
-    expect(spawnableTypesFor(playerOf(Tribe.Cats))).toContain('stalker');
+    expect(spawnableTypesFor(playerOf(Tribe.Cats))).toContain(UnitType.STALKER);
     expect(spawnableTypesFor(playerOf(Tribe.Cats))).toHaveLength(8);
   });
 
   it('does not list other tribes special units', () => {
     const cats = spawnableTypesFor(playerOf(Tribe.Cats));
-    expect(cats).not.toContain('banner');
-    expect(cats).not.toContain('berserker');
-    expect(cats).not.toContain('builder');
-    expect(spawnableTypesFor(playerOf(Tribe.Warriors))).not.toContain('stalker');
+    expect(cats).not.toContain(UnitType.BANNER);
+    expect(cats).not.toContain(UnitType.BERSERKER);
+    expect(cats).not.toContain(UnitType.BUILDER);
+    expect(spawnableTypesFor(playerOf(Tribe.Warriors))).not.toContain(UnitType.STALKER);
     const warriors = spawnableTypesFor(playerOf(Tribe.Villagers));
-    expect(warriors).toContain('builder');
+    expect(warriors).toContain(UnitType.BUILDER);
   });
 });

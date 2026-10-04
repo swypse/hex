@@ -14,7 +14,7 @@ import {
 import { TileType } from '@/game/tile-types';
 import { Tribe } from '@/game/tribes';
 import { SeededRandom } from '@/util';
-import { GameMode } from '@enums';
+import { BuildingKind, CommandType, GameMode, SkillId, UnitType } from '@enums';
 import { describe, expect, it } from 'vitest';
 import { makeTestMap, makeUnit, tileAt } from './helpers/test-map';
 
@@ -138,8 +138,8 @@ describe('canAffordAt / payAt', () => {
     const site = tileAt(map, 3, 1)!;
     site.ownedBy = 0;
     site.claimedByVillage = { q: 4, r: 0 };
-    p.skills = ['agriculture'];
-    expect(buildBuilding(map, site, 'farm', p)).toBe(true);
+    p.skills = [SkillId.AGRICULTURE];
+    expect(buildBuilding(map, site, BuildingKind.FARM, p)).toBe(true);
     expect(readStock(b).wood).toBe(100 - BUILDING_COSTS.farm.wood);
     expect(readStock(a).wood).toBe(100);
   });
@@ -149,7 +149,7 @@ describe('building income goes to villages', () => {
   function sawmillScene(): { map: GameMap; a: MapTile; b: MapTile; p: Player } {
     const s = scene(false);
     const saw = tileAt(s.map, 4, 1)!;
-    saw.building = { kind: 'sawmill', level: 1 };
+    saw.building = { kind: BuildingKind.SAWMILL, level: 1 };
     saw.ownedBy = 0;
     saw.claimedByVillage = { q: 4, r: 0 };
     tileAt(s.map, 5, 1)!.terrain = TileType.GrasslandForest;
@@ -181,7 +181,7 @@ describe('building income goes to villages', () => {
     const sim = new Simulator(map, players, GameMode.TURNS30, { rng: () => 0.5, disablePirates: true });
     sim.startGame();
     sim.drainEvents();
-    sim.applyCommand({ type: 'endTurn' });
+    sim.applyCommand({ type: CommandType.END_TURN });
     expect(readStock(b).wood).toBe(1);
     expect(readStock(a).wood).toBe(0);
     expect(Object.keys(p.resources)).toEqual(['money']);
@@ -196,10 +196,10 @@ describe('capturing a village', () => {
     village.ownedBy = 1;
     village.claimedByVillage = { q: 0, r: 0 };
     const granary = tileAt(map, 1, 0)!;
-    granary.building = { kind: 'granary', level: 1, food: 30 };
+    granary.building = { kind: BuildingKind.GRANARY, level: 1, food: 30 };
     granary.ownedBy = 1;
     granary.claimedByVillage = { q: 0, r: 0 };
-    const capturer = makeUnit('c', 0, 'warrior', 0, 0);
+    const capturer = makeUnit('c', 0, UnitType.WARRIOR, 0, 0);
     village.unit = capturer;
     captureVillage(map, village, capturer);
     expect(village.settlement!.owner).toBe(0);
@@ -213,7 +213,7 @@ describe('capturing a village', () => {
     const village = tileAt(map, 0, 0)!;
     village.settlement = { owner: null, level: 1, captureReady: true };
     village.claimedByVillage = { q: 0, r: 0 };
-    const capturer = makeUnit('c', 0, 'warrior', 0, 0);
+    const capturer = makeUnit('c', 0, UnitType.WARRIOR, 0, 0);
     village.unit = capturer;
     captureVillage(map, village, capturer);
     expect(readStock(village)).toEqual(START_STOCK);
@@ -224,7 +224,7 @@ describe('capturing a village', () => {
     const village = tileAt(map, 0, 0)!;
     village.settlement = { owner: 1, level: 1, captureReady: true, stock: { wood: 0, stone: 0, ore: 0, food: 0 } };
     village.claimedByVillage = { q: 0, r: 0 };
-    const capturer = makeUnit('c', 0, 'warrior', 0, 0);
+    const capturer = makeUnit('c', 0, UnitType.WARRIOR, 0, 0);
     village.unit = capturer;
     captureVillage(map, village, capturer);
     expect(readStock(village)).toEqual(START_STOCK);
@@ -235,7 +235,7 @@ describe('capturing a village', () => {
     const village = tileAt(map, 0, 0)!;
     village.settlement = { owner: null, level: 1, captureReady: true };
     village.claimedByVillage = { q: 0, r: 0 };
-    const capturer = makeUnit('c', 0, 'warrior', 0, 0);
+    const capturer = makeUnit('c', 0, UnitType.WARRIOR, 0, 0);
     village.unit = capturer;
     captureVillage(map, village, capturer);
     addStock(village, { wood: -3 });
@@ -256,7 +256,7 @@ describe('road paid by the networks it joins', () => {
     const target = tileAt(s.map, 3, 0)!;
     target.ownedBy = 0;
     target.claimedByVillage = { q: 4, r: 0 };
-    s.p.skills = ['forestry', 'roads'];
+    s.p.skills = [SkillId.FORESTRY, SkillId.ROADS];
     return { ...s, target };
   }
 
@@ -300,7 +300,7 @@ describe('food reserve per network', () => {
   it('units eat the food held by their own network only', () => {
     const { map, a, b, p } = scene(false);
     for (const v of [a, b]) {
-      const u = makeUnit(`w${v.q}`, 0, 'warrior', v.q, v.r + 1);
+      const u = makeUnit(`w${v.q}`, 0, UnitType.WARRIOR, v.q, v.r + 1);
       u.spawnVillage = { q: v.q, r: v.r };
       tileAt(map, v.q, v.r + 1)!.unit = u;
     }
@@ -315,7 +315,7 @@ describe('food reserve per network', () => {
 
   it('connected villages share the food', () => {
     const { map, a, b, p } = scene(true);
-    const u = makeUnit('w', 0, 'warrior', 0, 1);
+    const u = makeUnit('w', 0, UnitType.WARRIOR, 0, 1);
     u.spawnVillage = { q: 0, r: 0 };
     tileAt(map, 0, 1)!.unit = u;
     addStock(b, { food: 10 });

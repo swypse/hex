@@ -2,6 +2,7 @@ import { Application, Container, Graphics, BitmapText, type FederatedPointerEven
 import { Button } from './button';
 import { makeLabel } from './label';
 import { THEME } from './theme';
+import { FontSize, PopupPosition } from '@enums';
 
 const PAD_H = 20;
 const PAD_TOP = 16;
@@ -21,7 +22,7 @@ const DEFAULT_WIDTH = 420;
 const MIN_CARD_HEIGHT = 80;
 
 /** Standard body text size used across popups. */
-export const POPUP_BODY_SIZE = 14;
+export const POPUP_BODY_SIZE = FontSize.SMALL;
 
 interface PopupOpts {
   app: Application;
@@ -46,7 +47,7 @@ interface PopupOpts {
   /** Message mode: no chrome; the card shrinks to fit the content width. */
   fitContent?: boolean;
   /** Where to place the card: centered (default) or anchored to the top. */
-  position?: 'center' | 'top';
+  position?: PopupPosition;
   /** For position 'top': distance from the top of the screen to the card. */
   topY?: number;
   onClose?: () => void;
@@ -124,7 +125,7 @@ export class Popup {
     this.modal = opts.modal ?? true;
     this.scrollable = opts.scrollable ?? true;
     this.fitContent = opts.fitContent ?? false;
-    this.positionTop = (opts.position ?? 'center') === 'top';
+    this.positionTop = (opts.position ?? PopupPosition.CENTER) === PopupPosition.TOP;
     this.topY = opts.topY ?? 64;
 
     const screenW = this.app.screen.width;
@@ -160,7 +161,7 @@ export class Popup {
     if (interactive) this.card.on('pointertap', () => opts.onTap?.());
     this.bg = new Graphics();
     this.titleText = opts.title
-      ? makeLabel(opts.title, { fontSize: 18, fill: 0xffffff, fontWeight: '700', wordWrap: true, wordWrapWidth: Math.max(120, this.contentWidth) })
+      ? makeLabel(opts.title, { fontSize: FontSize.NORMAL, fill: 0xffffff, fontWeight: '700', wordWrap: true, wordWrapWidth: Math.max(120, this.contentWidth) })
       : null;
 
     this.viewport = new Container();
@@ -302,7 +303,10 @@ export class Popup {
       const screenH = this.app.screen.height;
       const maxH = Math.floor(screenH * 0.6);
       const natural = overhead + this.contentNaturalHeight;
-      this.cardHeight = Math.max(MIN_CARD_HEIGHT, Math.min(natural, maxH));
+      // A message card hugs its text (equal padding top and bottom); other
+      // popups keep a minimum height so short dialogs do not look squashed.
+      const minH = this.fitContent ? 0 : MIN_CARD_HEIGHT;
+      this.cardHeight = Math.max(minH, Math.min(natural, maxH));
       this.contentHeight = Math.max(0, this.cardHeight - overhead);
     }
 

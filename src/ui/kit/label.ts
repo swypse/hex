@@ -1,11 +1,13 @@
 import { BitmapText, type TextStyleFontWeight, type TextStyleOptions } from 'pixi.js';
 import { THEME } from './theme';
 import { fontFamilyForWeight, sizedFontFamily } from './bitmap-fonts';
+import { FontSize } from '@enums';
 
 export function makeLabel(
   text: string,
   opts: {
-    fontSize?: number;
+    /** One of the shared text sizes; see `FontSize`. */
+    fontSize?: FontSize;
     fill?: number;
     fontWeight?: TextStyleFontWeight;
     anchor?: [number, number];
@@ -21,7 +23,7 @@ export function makeLabel(
   } = {},
 ): BitmapText {
   const bake = Math.max(1, opts.bake ?? 1);
-  const fontSize = (opts.fontSize ?? 16) * bake;
+  const fontSize = (opts.fontSize ?? FontSize.NORMAL) * bake;
   const style: TextStyleOptions = {
     fontFamily: sizedFontFamily(fontFamilyForWeight(opts.fontWeight), fontSize),
     fontSize,

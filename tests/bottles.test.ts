@@ -1,4 +1,4 @@
-import { GameMode } from '@enums';
+import { BottleEffect, BridgeDir, BuildingKind, CommandType, GameEventType, GameMode, UnitType } from '@enums';
 import { describe, it, expect } from 'vitest';
 import { GameMap, MapTile } from '../src/game/map-gen';
 import { TileType } from '../src/game/tile-types';
@@ -28,7 +28,7 @@ function tile(q: number, r: number, terrain: TileType, ownedBy: number | null = 
     roadOwner: null,
     exploredBy: [0],
   };
-  if (opts.bridge) t.bridge = { owner: 0, dir: 'we' };
+  if (opts.bridge) t.bridge = { owner: 0, dir: BridgeDir.WE };
   return t;
 }
 
@@ -41,7 +41,7 @@ function mapWith(tiles: MapTile[]): GameMap {
 }
 
 function ship(owner: number, q: number, r: number, opts: { hasMoved?: boolean; hasAttacked?: boolean; hasHealed?: boolean } = {}): MapTile['unit'] {
-  return makeUnit(owner, 'warrior', q, r, { shipLevel: 2, hasMoved: opts.hasMoved ?? false, hasAttacked: opts.hasAttacked ?? false, hasHealed: opts.hasHealed ?? false });
+  return makeUnit(owner, UnitType.WARRIOR, q, r, { shipLevel: 2, hasMoved: opts.hasMoved ?? false, hasAttacked: opts.hasAttacked ?? false, hasHealed: opts.hasHealed ?? false });
 }
 
 describe('bottle spawning', () => {
@@ -76,7 +76,7 @@ describe('bottle spawning', () => {
     const map = mapWith([
       water(0, 0, 1),
       tile(1, 0, TileType.GrasslandLand),
-      water(2, 0, null, { building: { kind: 'port', level: 1 } }),
+      water(2, 0, null, { building: { kind: BuildingKind.PORT, level: 1 } }),
       water(3, 0, null, { bridge: true }),
       water(4, 0, null, { unit: ship(0, 4, 0) }),
     ]);
@@ -140,7 +140,7 @@ describe('bottle collection', () => {
 
   it('is not collectable by a land unit or another player', () => {
     const land = tile(1, 0, TileType.GrasslandLand, null, {
-      unit: makeUnit(0, 'warrior', 1, 0),
+      unit: makeUnit(0, UnitType.WARRIOR, 1, 0),
     });
     land.bottle = { bornTurn: 3, arrivalTurn: 7 };
     const other = mapWith([
@@ -178,12 +178,12 @@ it('floats a bottle in each spawn interval turn when the roll wins', () => {
     sim.startGame();
     sim.drainEvents();
     // advancing 2 rounds lands on the first spawn-interval turn.
-    for (let i = 0; i < BOTTLE_SPAWN_TURNS; i++) sim.applyCommand({ type: 'endTurn' });
+    for (let i = 0; i < BOTTLE_SPAWN_TURNS; i++) sim.applyCommand({ type: CommandType.END_TURN });
     const afterFirst = map.tiles.filter((t) => t.bottle);
     expect(afterFirst.length).toBe(1);
     expect(afterFirst[0]!.bottle!.bornTurn).toBe(BOTTLE_SPAWN_TURNS);
     // one more full interval passes.
-    for (let i = 0; i < BOTTLE_SPAWN_TURNS; i++) sim.applyCommand({ type: 'endTurn' });
+    for (let i = 0; i < BOTTLE_SPAWN_TURNS; i++) sim.applyCommand({ type: CommandType.END_TURN });
     const afterSecond = map.tiles.filter((t) => t.bottle);
     expect(afterSecond.length).toBe(Math.floor((BOTTLE_SPAWN_TURNS * 2) / BOTTLE_SPAWN_TURNS));
   });
@@ -193,8 +193,8 @@ it('floats a bottle in each spawn interval turn when the roll wins', () => {
     const sim = simWith(map, 1, () => 0.5);
     sim.startGame();
     sim.drainEvents();
-    sim.applyCommand({ type: 'endTurn' });
-    sim.applyCommand({ type: 'endTurn' });
+    sim.applyCommand({ type: CommandType.END_TURN });
+    sim.applyCommand({ type: CommandType.END_TURN });
     expect(map.tiles.filter((t) => t.bottle).length).toBe(0);
   });
 
@@ -206,7 +206,7 @@ it('floats a bottle in each spawn interval turn when the roll wins', () => {
     sim.startGame();
     sim.drainEvents();
     // Advance so the bornTurn 3 bottle is now >5 turns old (turn 9).
-    for (let i = 0; i < 8; i++) sim.applyCommand({ type: 'endTurn' });
+    for (let i = 0; i < 8; i++) sim.applyCommand({ type: CommandType.END_TURN });
     expect(tiles[0]!.bottle).toBeUndefined();
   });
 
@@ -220,7 +220,7 @@ it('floats a bottle in each spawn interval turn when the roll wins', () => {
     sim.turn = 8;
     sim.startGame();
     sim.drainEvents();
-    const ok = sim.applyCommand({ type: 'getBottle' });
+    const ok = sim.applyCommand({ type: CommandType.GET_BOTTLE });
     expect(ok).toBe(true);
     expect(map.tiles[0]!.bottle).toBeUndefined();
     const unit = map.tiles[0]!.unit!;
@@ -228,7 +228,7 @@ it('floats a bottle in each spawn interval turn when the roll wins', () => {
     expect(unit.hasAttacked).toBe(true);
     expect(unit.hasHealed).toBe(true);
     const events = sim.drainEvents();
-    expect(events.some((e) => e.type === 'bottleCollected' && e.kind === 'money')).toBe(true);
+    expect(events.some((e) => e.type === GameEventType.BOTTLE_COLLECTED && e.kind === BottleEffect.MONEY)).toBe(true);
   });
 
   it('grants 50 money for a money bottle', () => {
@@ -239,7 +239,7 @@ it('floats a bottle in each spawn interval turn when the roll wins', () => {
     sim.startGame();
     sim.drainEvents();
     const before = sim.players[0]!.resources.money;
-    sim.applyCommand({ type: 'getBottle' });
+    sim.applyCommand({ type: CommandType.GET_BOTTLE });
     expect(sim.players[0]!.resources.money).toBe(before + 50);
   });
 
@@ -251,7 +251,7 @@ it('floats a bottle in each spawn interval turn when the roll wins', () => {
     sim.turn = 8;
     sim.startGame();
     sim.drainEvents();
-    sim.applyCommand({ type: 'getBottle' });
+    sim.applyCommand({ type: CommandType.GET_BOTTLE });
     expect(map.tiles[0]!.unit!.hp).toBe(50);
   });
 
@@ -265,10 +265,10 @@ it('floats a bottle in each spawn interval turn when the roll wins', () => {
     sim.turn = 8;
     sim.startGame();
     sim.drainEvents();
-    sim.applyCommand({ type: 'getBottle' });
+    sim.applyCommand({ type: CommandType.GET_BOTTLE });
     expect(sim.players[0]!.skills.length).toBe(1);
     const events = sim.drainEvents();
-    expect(events.some((e) => e.type === 'bottleCollected' && e.kind === 'skill')).toBe(true);
+    expect(events.some((e) => e.type === GameEventType.BOTTLE_COLLECTED && e.kind === BottleEffect.SKILL)).toBe(true);
   });
 
   it('does not collect a bottle the ship already exhausted', () => {
@@ -281,7 +281,7 @@ it('floats a bottle in each spawn interval turn when the roll wins', () => {
     sim.startGame();
     sim.drainEvents();
     const before = sim.players[0]!.resources.money;
-    expect(sim.applyCommand({ type: 'getBottle' })).toBe(false);
+    expect(sim.applyCommand({ type: CommandType.GET_BOTTLE })).toBe(false);
     expect(sim.players[0]!.resources.money).toBe(before);
     expect(map.tiles[0]!.bottle).toBeDefined();
   });
@@ -297,9 +297,9 @@ it('floats a bottle in each spawn interval turn when the roll wins', () => {
     sim.turn = 8;
     sim.startGame();
     sim.drainEvents();
-    sim.applyCommand({ type: 'endTurn' }); // player 0 -> AI player 1 acts
+    sim.applyCommand({ type: CommandType.END_TURN }); // player 0 -> AI player 1 acts
     expect(map.tiles[2]!.bottle).toBeUndefined();
     const events = sim.drainEvents();
-    expect(events.some((e) => e.type === 'bottleCollected' && e.playerIndex === 1 && e.kind === 'money')).toBe(true);
+    expect(events.some((e) => e.type === GameEventType.BOTTLE_COLLECTED && e.playerIndex === 1 && e.kind === BottleEffect.MONEY)).toBe(true);
   });
 });

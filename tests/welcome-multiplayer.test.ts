@@ -7,7 +7,7 @@ import { Tribe } from '@/game/tribes';
 import type { HostMessage } from '@/net/peer-session';
 import { useGameStore } from '@/store/game-store';
 import { SeededRandom } from '@/util';
-import { GameMode } from '@enums';
+import { GameMode, HostMessageType, OverlayKind, Screen } from '@enums';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 function buildSim(): Simulator {
@@ -29,7 +29,7 @@ const controller = gameController as unknown as { onHostMessage(msg: HostMessage
 describe('client welcome dialog', () => {
   beforeEach(() => {
     useGameStore.setState({
-      screen: 'lobby',
+      screen: Screen.LOBBY,
       overlay: null,
       pendingSnapshot: null,
       localPlayerIndex: -1,
@@ -40,18 +40,18 @@ describe('client welcome dialog', () => {
     const sim = buildSim();
     sim.startGame();
     sim.drainEvents();
-    controller.onHostMessage({ type: 'state', state: sim.snapshot(), playerIndex: 1 });
-    expect(useGameStore.getState().screen).toBe('game');
-    expect(useGameStore.getState().overlay).toEqual({ kind: 'welcome' });
+    controller.onHostMessage({ type: HostMessageType.STATE, state: sim.snapshot(), playerIndex: 1 });
+    expect(useGameStore.getState().screen).toBe(Screen.GAME);
+    expect(useGameStore.getState().overlay).toEqual({ kind: OverlayKind.WELCOME });
   });
 
   it('does not reopen the welcome dialog on later state syncs after it was dismissed', () => {
     const sim = buildSim();
     sim.startGame();
     sim.drainEvents();
-    controller.onHostMessage({ type: 'state', state: sim.snapshot(), playerIndex: 1 });
+    controller.onHostMessage({ type: HostMessageType.STATE, state: sim.snapshot(), playerIndex: 1 });
     useGameStore.getState().setOverlay(null);
-    controller.onHostMessage({ type: 'state', state: sim.snapshot(), playerIndex: 1 });
+    controller.onHostMessage({ type: HostMessageType.STATE, state: sim.snapshot(), playerIndex: 1 });
     expect(useGameStore.getState().overlay).toBeNull();
   });
 });

@@ -5,9 +5,10 @@ import { Tribe } from '../src/game/tribes';
 import { SeededRandom } from '../src/util/random';
 import { makeTestMap, tileAt, makeUnit } from './helpers/test-map';
 import { TileType } from '../src/game/tile-types';
+import { AiActionType, AiDifficulty, BuildingKind, SkillId, UnitType } from '@enums';
 
 function makeAI(): ReturnType<typeof buildPlayers>[number] {
-  const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(11), 'normal');
+  const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(11), AiDifficulty.NORMAL);
   return players[1]!;
 }
 
@@ -20,11 +21,11 @@ describe('AI keeps villages defended', () => {
     home.settlement = { owner: 1, level: 1, captureReady: false };
     home.ownedBy = 1;
     home.exploredBy = [1];
-    const guard = makeUnit('guard', 1, 'warrior', 0, 0);
+    const guard = makeUnit('guard', 1, UnitType.WARRIOR, 0, 0);
     home.unit = guard;
     // A fast enemy rider three hexes east: can reach the village next turn.
     const riderTile = tileAt(map, 3, 0)!;
-    riderTile.unit = makeUnit('rider', 0, 'rider', 3, 0);
+    riderTile.unit = makeUnit('rider', 0, UnitType.RIDER, 3, 0);
     riderTile.exploredBy = [1];
     // An enemy village adjacent to our guard that it could 'push' into.
     const enemyVillage = tileAt(map, 0, -1)!;
@@ -33,7 +34,7 @@ describe('AI keeps villages defended', () => {
     enemyVillage.exploredBy = [1];
 
     const actions = planAiActions(map, ai, new SeededRandom(5));
-    expect(actions.some((a) => a.type === 'move' && a.unitId === 'guard')).toBe(false);
+    expect(actions.some((a) => a.type === AiActionType.MOVE && a.unitId === 'guard')).toBe(false);
   });
 });
 
@@ -41,7 +42,7 @@ describe('AI builds a mine instead of wasting its last slot on a sawmill', () =>
   it('opens the economy chain and puts a mine before any sawmill', () => {
     const map = makeTestMap(6);
     const ai = makeAI();
-    ai.skills = ['forestry', 'smithery'];
+    ai.skills = [SkillId.FORESTRY, SkillId.SMITHERY];
     ai.resources = { wood: 3, stone: 2, money: 40, ore: 0, food: 20 };
     // Level-1 village (one building slot) claiming both a forest and a mountain.
     const village = tileAt(map, 0, 0)!;
@@ -57,8 +58,8 @@ describe('AI builds a mine instead of wasting its last slot on a sawmill', () =>
     forest.claimedByVillage = { q: 0, r: 0 };
 
     const actions = planAiActions(map, ai, new SeededRandom(9));
-    const mineIdx = actions.findIndex((a) => a.type === 'build' && a.kind === 'mine');
-    const sawmillIdx = actions.findIndex((a) => a.type === 'build' && a.kind === 'sawmill');
+    const mineIdx = actions.findIndex((a) => a.type === AiActionType.BUILD && a.kind === BuildingKind.MINE);
+    const sawmillIdx = actions.findIndex((a) => a.type === AiActionType.BUILD && a.kind === BuildingKind.SAWMILL);
     expect(mineIdx).toBeGreaterThanOrEqual(0);
     // The mountain must be mined before the village spends its slots on sawmills.
     if (sawmillIdx >= 0) expect(mineIdx).toBeLessThan(sawmillIdx);

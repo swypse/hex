@@ -2,9 +2,10 @@ import { GameMap, MapTile } from './map-gen';
 import { Player } from './players';
 import { payAt } from './stock';
 import { hasSkill } from './skills';
-import { makeUnit, unitSpawnCost, UNIT_TYPES, UnitType } from './units';
+import { makeUnit, unitSpawnCost, UNIT_TYPES } from './units';
 import { unitsInVillage, villageCapacity } from './village';
 import { TRIBE_SPECIAL_UNIT } from './tribes';
+import { SkillId, UnitType } from '@enums';
 
 let spawnSeq = 0;
 
@@ -18,11 +19,11 @@ export function spawnUnit(
   if (!settlement || settlement.owner !== player.index) return false;
   if (villageTile.unit) return false;
   if (unitsInVillage(map, villageTile) >= villageCapacity(settlement.level)) return false;
-  if (type === 'rider' && !hasSkill(player, 'riding')) return false;
-  if (type === 'knight' && !hasSkill(player, 'knights')) return false;
-  if (type === 'swordsman' && !hasSkill(player, 'swordsman')) return false;
-  if (type === 'shield' && !hasSkill(player, 'shields')) return false;
-  if (type === 'catapult' && !hasSkill(player, 'catapult')) return false;
+  if (type === UnitType.RIDER && !hasSkill(player, SkillId.RIDING)) return false;
+  if (type === UnitType.KNIGHT && !hasSkill(player, SkillId.KNIGHTS)) return false;
+  if (type === UnitType.SWORDSMAN && !hasSkill(player, SkillId.SWORDSMAN)) return false;
+  if (type === UnitType.SHIELD && !hasSkill(player, SkillId.SHIELDS)) return false;
+  if (type === UnitType.CATAPULT && !hasSkill(player, SkillId.CATAPULT)) return false;
   // Special units: a tribe's own special is allowed with no skill; another
   // tribe's special is never allowed.
   if (TRIBE_SPECIAL_UNIT[player.tribe] === type) {

@@ -1,38 +1,22 @@
 import { describe, it, expect } from 'vitest';
 import { Tribe } from '../src/game/tribes';
-import {
-  UNIT_TYPES,
-  UNIT_IMAGE_FILES,
-  UNIT_MOVE_POINTS,
-  UNIT_ATTACK,
-  UNIT_ATTACK_DISTANCE,
-  UNIT_TYPE_NAMES,
-  UnitType,
-  canAttack,
-  canHeal,
-  PIRATE_HP,
-  canMove,
-  healUnit,
-  movePoints,
-  makeUnit,
-  HEAL_AMOUNT,
-  unitMaintenance,
-} from '../src/game/units';
+import { UNIT_TYPES, UNIT_IMAGE_FILES, UNIT_MOVE_POINTS, UNIT_ATTACK, UNIT_ATTACK_DISTANCE, UNIT_TYPE_NAMES, canAttack, canHeal, PIRATE_HP, canMove, healUnit, movePoints, makeUnit, HEAL_AMOUNT, unitMaintenance } from '../src/game/units';
+import { UnitType } from '@enums';
 
 describe('UNIT_TYPES', () => {
   it('defines warrior, rider, archer, swordsman', () => {
-    expect(UNIT_TYPES.warrior).toEqual({ movePoints: 10, attack: 20, attackDistance: 1, maxHp: 50, defense: 10, price: 4, priceWood: 0, priceOre: 0, shape: 'circle' });
-    expect(UNIT_TYPES.rider).toEqual({ movePoints: 40, attack: 22, attackDistance: 1, maxHp: 45, defense: 8, price: 6, priceWood: 0, priceOre: 0, shape: 'square' });
-    expect(UNIT_TYPES.archer).toEqual({ movePoints: 10, attack: 26, attackDistance: 2, maxHp: 40, defense: 7, price: 6, priceWood: 0, priceOre: 0, shape: 'triangle' });
-    expect(UNIT_TYPES.swordsman).toEqual({ movePoints: 10, attack: 40, attackDistance: 1, maxHp: 80, defense: 16, price: 10, priceWood: 0, priceOre: 2, shape: 'swordsman' });
+    expect(UNIT_TYPES.warrior).toEqual({ movePoints: 10, attack: 20, attackDistance: 1, maxHp: 50, defense: 10, price: 4, priceWood: 0, priceOre: 0 });
+    expect(UNIT_TYPES.rider).toEqual({ movePoints: 40, attack: 22, attackDistance: 1, maxHp: 45, defense: 8, price: 6, priceWood: 0, priceOre: 0 });
+    expect(UNIT_TYPES.archer).toEqual({ movePoints: 10, attack: 26, attackDistance: 2, maxHp: 40, defense: 7, price: 6, priceWood: 0, priceOre: 0 });
+    expect(UNIT_TYPES.swordsman).toEqual({ movePoints: 10, attack: 40, attackDistance: 1, maxHp: 80, defense: 16, price: 10, priceWood: 0, priceOre: 2 });
   });
 
   it('defines the shield unit with 80 hp, 10 move points and a 8 money + 2 ore price', () => {
-    expect(UNIT_TYPES.shield).toEqual({ movePoints: 10, attack: 7, attackDistance: 1, maxHp: 80, defense: 20, price: 8, priceWood: 0, priceOre: 2, shape: 'square' });
+    expect(UNIT_TYPES.shield).toEqual({ movePoints: 10, attack: 7, attackDistance: 1, maxHp: 80, defense: 20, price: 8, priceWood: 0, priceOre: 2 });
   });
 
   it('defines the catapult unit with siege stats and a wood cost', () => {
-    expect(UNIT_TYPES.catapult).toEqual({ movePoints: 10, attack: 50, attackDistance: 4, maxHp: 30, defense: 0, price: 15, priceWood: 10, priceOre: 3, shape: 'square' });
+    expect(UNIT_TYPES.catapult).toEqual({ movePoints: 10, attack: 50, attackDistance: 4, maxHp: 30, defense: 0, price: 15, priceWood: 10, priceOre: 3 });
     expect(UNIT_MOVE_POINTS.catapult).toBe(10);
     expect(UNIT_ATTACK.catapult).toBe(50);
     expect(UNIT_ATTACK_DISTANCE.catapult).toBe(4);
@@ -40,7 +24,7 @@ describe('UNIT_TYPES', () => {
   });
 
   it('defines the knight unit with 30 move points, 40 attack and an ore cost', () => {
-    expect(UNIT_TYPES.knight).toEqual({ movePoints: 30, attack: 40, attackDistance: 1, maxHp: 70, defense: 12, price: 14, priceWood: 0, priceOre: 5, shape: 'swordsman' });
+    expect(UNIT_TYPES.knight).toEqual({ movePoints: 30, attack: 40, attackDistance: 1, maxHp: 70, defense: 12, price: 14, priceWood: 0, priceOre: 5 });
     expect(UNIT_MOVE_POINTS.knight).toBe(30);
     expect(UNIT_ATTACK.knight).toBe(40);
     expect(UNIT_ATTACK_DISTANCE.knight).toBe(1);
@@ -49,8 +33,8 @@ describe('UNIT_TYPES', () => {
 
   it('gives pirates 80 hp and 5 defense', () => {
     expect(PIRATE_HP).toBe(80);
-    expect(UNIT_TYPES.pirate).toEqual({ movePoints: 50, attack: 15, attackDistance: 3, maxHp: 80, defense: 5, price: 0, priceWood: 0, priceOre: 0, shape: 'square' });
-    const pirate = makeUnit(-1, 'pirate', 0, 0);
+    expect(UNIT_TYPES.pirate).toEqual({ movePoints: 50, attack: 15, attackDistance: 3, maxHp: 80, defense: 5, price: 0, priceWood: 0, priceOre: 0 });
+    const pirate = makeUnit(-1, UnitType.PIRATE, 0, 0);
     expect(pirate.hp).toBe(80);
     expect(pirate.defense).toBe(5);
   });
@@ -76,7 +60,7 @@ function mkUnit(overrides: Partial<import('../src/game/units').Unit> = {}): impo
   return {
     id: 'u',
     owner: 0,
-    type: 'warrior',
+    type: UnitType.WARRIOR,
     q: 0,
     r: 0,
     hasMoved: false,
@@ -95,7 +79,7 @@ function makeShield(overrides: Partial<import('../src/game/units').Unit> = {}): 
   return {
     id: 's',
     owner: 0,
-    type: 'shield',
+    type: UnitType.SHIELD,
     q: 0,
     r: 0,
     hasMoved: false,
@@ -114,7 +98,7 @@ function makeCatapult(overrides: Partial<import('../src/game/units').Unit> = {})
   return {
     id: 'c',
     owner: 0,
-    type: 'catapult',
+    type: UnitType.CATAPULT,
     q: 0,
     r: 0,
     hasMoved: false,
@@ -135,12 +119,12 @@ describe('action availability', () => {
     expect(canMove(mkUnit({ hasMoved: true }))).toBe(false);
     expect(canMove(mkUnit({ hasHealed: true }))).toBe(false);
     expect(canMove(mkUnit({ hasAttacked: true }))).toBe(false);
-    expect(canMove(mkUnit({ type: 'rider', hasAttacked: true }))).toBe(true);
-    expect(movePoints(mkUnit({ type: 'rider', hasAttacked: true }))).toBe(40);
+    expect(canMove(mkUnit({ type: UnitType.RIDER, hasAttacked: true }))).toBe(true);
+    expect(movePoints(mkUnit({ type: UnitType.RIDER, hasAttacked: true }))).toBe(40);
     expect(movePoints(mkUnit())).toBe(10);
-    expect(movePoints(mkUnit({ type: 'rider' }))).toBe(40);
-    expect(movePoints(mkUnit({ type: 'knight' }))).toBe(30);
-    expect(movePoints(mkUnit({ type: 'pirate' }))).toBe(50);
+    expect(movePoints(mkUnit({ type: UnitType.RIDER }))).toBe(40);
+    expect(movePoints(mkUnit({ type: UnitType.KNIGHT }))).toBe(30);
+    expect(movePoints(mkUnit({ type: UnitType.PIRATE }))).toBe(50);
     expect(movePoints(mkUnit({ shipLevel: 1 }))).toBe(20);
     expect(movePoints(mkUnit({ shipLevel: 2 }))).toBe(30);
     expect(movePoints(mkUnit({ shipLevel: 3 }))).toBe(40);
@@ -177,9 +161,9 @@ describe('action availability', () => {
   it('canMove: a ship never moves after attacking, even a rider ship', () => {
     expect(canMove(mkUnit({ shipLevel: 1 }))).toBe(true);
     expect(canMove(mkUnit({ shipLevel: 1, hasAttacked: true }))).toBe(false);
-    expect(canMove(mkUnit({ type: 'rider', shipLevel: 1, hasAttacked: true }))).toBe(false);
+    expect(canMove(mkUnit({ type: UnitType.RIDER, shipLevel: 1, hasAttacked: true }))).toBe(false);
     expect(canMove(mkUnit({ shipLevel: 1, hasMoved: true }))).toBe(false);
-    expect(canMove(mkUnit({ type: 'rider', hasAttacked: true }))).toBe(true);
+    expect(canMove(mkUnit({ type: UnitType.RIDER, hasAttacked: true }))).toBe(true);
   });
 
   it('canHeal: only as a first action and when damaged', () => {
@@ -205,7 +189,7 @@ describe('action availability', () => {
     expect(canMove(u)).toBe(false);
     expect(canAttack(u)).toBe(false);
     expect(canHeal(u)).toBe(false);
-    const rider = mkUnit({ type: 'rider', hasAttacked: true, stunTurns: 1 });
+    const rider = mkUnit({ type: UnitType.RIDER, hasAttacked: true, stunTurns: 1 });
     expect(canMove(rider)).toBe(false);
     const shieldShip = makeShield({ shipLevel: 1, hasMoved: true, stunTurns: 1 });
     expect(canAttack(shieldShip)).toBe(false);
@@ -214,10 +198,10 @@ describe('action availability', () => {
 
 describe('makeUnit', () => {
   it('creates a fresh unit with stats derived from UNIT_TYPES', () => {
-    const u = makeUnit(2, 'archer', 3, 4, { id: 'a1' });
+    const u = makeUnit(2, UnitType.ARCHER, 3, 4, { id: 'a1' });
     expect(u.id).toBe('a1');
     expect(u.owner).toBe(2);
-    expect(u.type).toBe('archer');
+    expect(u.type).toBe(UnitType.ARCHER);
     expect(u.q).toBe(3);
     expect(u.r).toBe(4);
     expect(u.hasMoved).toBe(false);
@@ -230,7 +214,7 @@ describe('makeUnit', () => {
   });
 
   it('applies opt overrides', () => {
-    const u = makeUnit(0, 'warrior', 0, 0, {
+    const u = makeUnit(0, UnitType.WARRIOR, 0, 0, {
       id: 'w1',
       hasMoved: true,
       hasAttacked: true,
@@ -246,7 +230,7 @@ describe('makeUnit', () => {
   });
 
   it('defaults id from type and position when omitted', () => {
-    const u = makeUnit(0, 'rider', 5, -2);
+    const u = makeUnit(0, UnitType.RIDER, 5, -2);
     expect(u.id).toBe('rider-5,-2');
   });
 });
@@ -254,14 +238,14 @@ describe('makeUnit', () => {
 describe('unitMaintenance', () => {
   it('maps every land unit type to its upkeep', () => {
     const costs: [UnitType, number][] = [
-      ['warrior', 1],
-      ['archer', 2],
-      ['swordsman', 3],
-      ['rider', 2],
-      ['knight', 4],
-      ['catapult', 5],
-      ['shield', 2],
-      ['pirate', 0],
+      [UnitType.WARRIOR, 1],
+      [UnitType.ARCHER, 2],
+      [UnitType.SWORDSMAN, 3],
+      [UnitType.RIDER, 2],
+      [UnitType.KNIGHT, 4],
+      [UnitType.CATAPULT, 5],
+      [UnitType.SHIELD, 2],
+      [UnitType.PIRATE, 0],
     ];
     for (const [type, cost] of costs) {
       expect(unitMaintenance(makeUnit(0, type, 0, 0, {}))).toBe(cost);
@@ -269,25 +253,25 @@ describe('unitMaintenance', () => {
   });
 
   it('charges ships by their level regardless of the land type', () => {
-    expect(unitMaintenance(makeUnit(0, 'warrior', 0, 0, { shipLevel: 1 }))).toBe(2);
-    expect(unitMaintenance(makeUnit(0, 'catapult', 0, 0, { shipLevel: 2 }))).toBe(3);
-    expect(unitMaintenance(makeUnit(0, 'warrior', 0, 0, { shipLevel: 3 }))).toBe(4);
+    expect(unitMaintenance(makeUnit(0, UnitType.WARRIOR, 0, 0, { shipLevel: 1 }))).toBe(2);
+    expect(unitMaintenance(makeUnit(0, UnitType.CATAPULT, 0, 0, { shipLevel: 2 }))).toBe(3);
+    expect(unitMaintenance(makeUnit(0, UnitType.WARRIOR, 0, 0, { shipLevel: 3 }))).toBe(4);
   });
 });
 
 describe('special units', () => {
   const cases: Array<[UnitType, number, number, number, number, number, number, number, number]> = [
-    ['stalker', 20, 10, 1, 20, 0, 9, 0, 2],
-    ['builder', 8, 10, 1, 40, 0, 15, 0, 0],
-    ['banner', 8, 10, 1, 30, 0, 7, 0, 2],
-    ['berserker', 10, 26, 1, 50, 8, 10, 0, 2],
-    ['trapper', 10, 20, 1, 44, 8, 6, 0, 2],
-    ['stormcaller', 20, 20, 1, 44, 8, 6, 0, 2],
-    ['stunner', 8, 20, 2, 40, 10, 7, 0, 2],
+    [UnitType.STALKER, 20, 10, 1, 20, 0, 9, 0, 2],
+    [UnitType.BUILDER, 8, 10, 1, 40, 0, 15, 0, 0],
+    [UnitType.BANNER, 8, 10, 1, 30, 0, 7, 0, 2],
+    [UnitType.BERSERKER, 10, 26, 1, 50, 8, 10, 0, 2],
+    [UnitType.TRAPPER, 10, 20, 1, 44, 8, 6, 0, 2],
+    [UnitType.STORMCALLER, 20, 20, 1, 44, 8, 6, 0, 2],
+    [UnitType.STUNNER, 8, 20, 2, 40, 10, 7, 0, 2],
   ];
   for (const [type, move, atk, range, hp, def, price, wood, ore] of cases) {
     it(`defines the ${type} unit`, () => {
-      expect(UNIT_TYPES[type]).toEqual({ movePoints: move, attack: atk, attackDistance: range, maxHp: hp, defense: def, price, priceWood: wood, priceOre: ore, shape: 'circle' });
+      expect(UNIT_TYPES[type]).toEqual({ movePoints: move, attack: atk, attackDistance: range, maxHp: hp, defense: def, price, priceWood: wood, priceOre: ore });
       expect(UNIT_TYPE_NAMES[type]).toBeTruthy();
       expect(unitMaintenance(makeUnit(0, type, 0, 0))).toBeGreaterThanOrEqual(2);
     });

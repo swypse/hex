@@ -4,7 +4,6 @@ import { useGameStore } from '../../store/game-store';
 import { saveRepository } from '../../storage/save-game';
 import { activeMatchStore } from '../../storage/active-match';
 import { loadSettings, setAiDifficulty, setSoundEnabled, welcomeDismissed, setWelcomeDismissed } from '../../storage/settings';
-import { AiDifficulty } from '../../game/ai-difficulty';
 import { isTouchDevice } from '../touch';
 import { markDirty } from '../../render/render-gate';
 import { type ScreenController, type UIHost } from '../host';
@@ -21,8 +20,9 @@ import { makeLabel } from '../kit/label';
 import { makeCheckbox } from '../kit/checkbox';
 import { Modal } from '../kit/modal';
 import { Popup } from '../kit/popup';
-import { setLanguage, type Language } from '../../storage/settings';
+import { setLanguage } from '../../storage/settings';
 import { ensureCanvasResource } from '../../render/image-texture';
+import { AiDifficulty, FontSize, Language, Screen, StartModal } from '@enums';
 
 const IMAGE_BASE = `${import.meta.env.BASE_URL}images/`;
 
@@ -56,12 +56,12 @@ class SettingsPanel {
     const blockGap = 10;
     let y = 0;
 
-    const difficultyLabel = makeLabel(t('settings.difficulty'), { fontSize: 14, fill: 0xeeeeee });
+    const difficultyLabel = makeLabel(t('settings.difficulty'), { fontSize: FontSize.SMALL, fill: 0xeeeeee });
     difficultyLabel.position.set(0, y);
     content.addChild(difficultyLabel);
     y += difficultyLabel.height + 8;
 
-    const difficultyOptions: AiDifficulty[] = ['easy', 'normal', 'hard'];
+    const difficultyOptions: AiDifficulty[] = [AiDifficulty.EASY, AiDifficulty.NORMAL, AiDifficulty.HARD];
     const difficultyKeys: Record<AiDifficulty, string> = {
       easy: 'difficulty.easy',
       normal: 'difficulty.normal',
@@ -86,7 +86,7 @@ class SettingsPanel {
     content.addChild(difficultyGroup);
     y += difficultyGroup.buttonHeight + blockGap;
 
-    const soundLabel = makeLabel(t('settings.sound'), { fontSize: 14, fill: 0xeeeeee });
+    const soundLabel = makeLabel(t('settings.sound'), { fontSize: FontSize.SMALL, fill: 0xeeeeee });
     soundLabel.position.set(0, y);
     content.addChild(soundLabel);
     y += soundLabel.height + 8;
@@ -121,14 +121,14 @@ class SettingsPanel {
     content.addChild(soundGroup);
     y += soundGroup.buttonHeight + blockGap;
 
-    const langLabel = makeLabel(t('settings.language'), { fontSize: 14, fill: 0xeeeeee });
+    const langLabel = makeLabel(t('settings.language'), { fontSize: FontSize.SMALL, fill: 0xeeeeee });
     langLabel.position.set(0, y);
     content.addChild(langLabel);
     y += langLabel.height + 8;
 
     const langOptions: { code: Language; key: string }[] = [
-      { code: 'en', key: 'lang.en' },
-      { code: 'ru', key: 'lang.ru' },
+      { code: Language.EN, key: 'lang.en' },
+      { code: Language.RU, key: 'lang.ru' },
     ];
     const currentLang = loadSettings().lang;
     const langGroup = new ButtonGroup({
@@ -148,7 +148,7 @@ class SettingsPanel {
     content.addChild(langGroup);
     y += langGroup.buttonHeight + blockGap;
 
-    const welcomeLabel = makeLabel(t('settings.dontShowWelcome'), { fontSize: 14, fill: 0xeeeeee });
+    const welcomeLabel = makeLabel(t('settings.dontShowWelcome'), { fontSize: FontSize.SMALL, fill: 0xeeeeee });
     welcomeLabel.position.set(0, y);
     content.addChild(welcomeLabel);
     y += welcomeLabel.height + 8;
@@ -219,12 +219,12 @@ export class StartScreen implements ScreenController {
     const single = new Button({
       label: t('start.single'),
       width: 240,
-      onClick: () => useGameStore.getState().setScreen('setup'),
+      onClick: () => useGameStore.getState().setScreen(Screen.SETUP),
     });
     const multi = new Button({
       label: t('start.multi'),
       width: 240,
-      onClick: () => useGameStore.getState().setScreen('lobby'),
+      onClick: () => useGameStore.getState().setScreen(Screen.LOBBY),
     });
     const tutorial = new Button({
       label: t('start.tutorial'),
@@ -244,26 +244,26 @@ export class StartScreen implements ScreenController {
     this.buttons = buttons;
     this.buttons[0]!.selected = true;
 
-    this.hint = makeLabel(t('start.hint'), { fontSize: 14, fill: 0xeeeeee });
+    this.hint = makeLabel(t('start.hint'), { fontSize: FontSize.SMALL, fill: 0xeeeeee });
     this.hint.visible = !isTouchDevice();
     this.hint.alpha = 0.7;
     this.hint.anchor.set(0.5, 0.5);
 
-    this.version = makeLabel('alpha-version', { fontSize: 14, fill: 0xffffff });
+    this.version = makeLabel('alpha-version', { fontSize: FontSize.SMALL, fill: 0xffffff });
     this.version.anchor.set(0.5, 0.5);
     this.version.alpha = 0.9;
 
     this.aboutBtn = new Button({
       label: t('start.about'),
       width: 96,
-      fontSize: 14,
-      onClick: () => this.openModal('about')
+      fontSize: FontSize.SMALL,
+      onClick: () => this.openModal(StartModal.ABOUT)
     });
     this.settingsBtn = new Button({
       label: t('start.settings'),
       width: 110,
-      fontSize: 14,
-      onClick: () => this.openModal('settings')
+      fontSize: FontSize.SMALL,
+      onClick: () => this.openModal(StartModal.SETTINGS)
     });
     this.root.addChild(this.aboutBtn, this.settingsBtn);
     if (this.scroll) {
@@ -389,15 +389,15 @@ export class StartScreen implements ScreenController {
     });
   }
 
-  private openModal(kind: 'about' | 'settings'): void {
+  private openModal(kind: StartModal): void {
     if (this.modal || !this.host) return;
-    if (kind === 'settings') {
+    if (kind === StartModal.SETTINGS) {
       const panel = new SettingsPanel(this.host.app, () => this.closeModal());
       panel.mount(this.root!);
       this.modal = panel;
       return;
     }
-    const opts = kind === 'about'
+    const opts = kind === StartModal.ABOUT
       ? { title: t('start.aboutTitle'), lines: [t('start.aboutText'), t('start.author', { name: 'swypse' })] }
       : { title: t('settings.title'), lines: [] };
     const modal = new Modal({ app: this.host.app, ...opts, onClose: () => this.closeModal() });

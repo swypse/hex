@@ -1,15 +1,15 @@
 import { SeededRandom } from '@/util';
-import { GameMode } from '@enums';
+import { AiGoalId, AiPace, AiPersonalityId, BuildingKind, GameMode, SkillId, SpawnPreference } from '@enums';
 import { AiDifficultyProfile } from './ai-difficulty';
 import { flagsFor } from './ai-flags';
 import { AI_PERSONALITIES, personalityFor } from './ai-personality';
 import { AiSituation } from './ai-situation';
-import { AiDirectives, AiGoalId, AiGoalState, AiStrategyState } from './ai-types';
+import { AiDirectives, AiGoalState, AiStrategyState } from './ai-types';
 import { isExploredFor } from './explore';
 import { hexDistance } from './hex';
 import { GameMap } from './map-gen';
 import { Player } from './players';
-import { hasSkill, SkillId } from './skills';
+import { hasSkill } from './skills';
 
 export function goalTargetKey(g: AiGoalState): string {
   return g.target ? `${g.target.q},${g.target.r}` : '';
@@ -19,7 +19,7 @@ export function productionBuildings(map: GameMap, player: Player): number {
   let n = 0;
   for (const t of map.tiles) {
     if (t.ownedBy !== player.index || !t.building) continue;
-    if (t.building.kind === 'mine' || t.building.kind === 'sawmill') n += 1;
+    if (t.building.kind === BuildingKind.MINE || t.building.kind === BuildingKind.SAWMILL) n += 1;
   }
   return n;
 }
@@ -71,11 +71,11 @@ function chooseArmyTarget(map: GameMap, player: Player): { q: number; r: number 
 
 function goalExpired(map: GameMap, player: Player, situation: AiSituation, g: AiGoalState): boolean {
   switch (g.id) {
-    case 'defense':
+    case AiGoalId.DEFENSE:
       return !situation.endangered;
-    case 'naval':
+    case AiGoalId.NAVAL:
       return !situation.navalThreat;
-    case 'army':
+    case AiGoalId.ARMY:
       if (!g.target) return false;
       const tile = map.tiles.find((t) => t.q === g.target!.q && t.r === g.target!.r && t.settlement);
       if (!tile || !tile.settlement) return true;
@@ -105,8 +105,8 @@ function weightedPrimaryScore(
     armyScore += 20 * weights.score;
   }
   if (production >= difficulty.strategy.economyCap) economyScore -= 40;
-  if (economyScore >= armyScore) return 'economy';
-  return 'army';
+  if (economyScore >= armyScore) return AiGoalId.ECONOMY;
+  return AiGoalId.ARMY;
 }
 
 export function updateStrategy(
@@ -124,31 +124,31 @@ export function updateStrategy(
   if (turn < state.nextPlanTurn && !expired) return state;
 
   const kept = state.goals.filter((g) => !goalExpired(map, player, situation, g));
-  let next = kept.filter((g) => g.id !== 'defense' && g.id !== 'naval');
+  let next = kept.filter((g) => g.id !== AiGoalId.DEFENSE && g.id !== AiGoalId.NAVAL);
 
-  if (situation.endangered && !hasGoalTyped(next, 'defense')) {
+  if (situation.endangered && !hasGoalTyped(next, AiGoalId.DEFENSE)) {
     const danger = situation.dangers[0];
-    next.push(makeGoal('defense', 'muster', danger ? { q: danger.village.q, r: danger.village.r } : null));
+    next.push(makeGoal(AiGoalId.DEFENSE, 'muster', danger ? { q: danger.village.q, r: danger.village.r } : null));
   }
-  if (situation.navalThreat && !hasGoalTyped(next, 'naval')) {
-    next.push(makeGoal('naval', 'research', null));
+  if (situation.navalThreat && !hasGoalTyped(next, AiGoalId.NAVAL)) {
+    next.push(makeGoal(AiGoalId.NAVAL, 'research', null));
   }
-  if (mode === GameMode.TURNS30 && !hasGoalTyped(next, 'score')) {
-    next.push(makeGoal('score', 'race', null));
+  if (mode === GameMode.TURNS30 && !hasGoalTyped(next, AiGoalId.SCORE)) {
+    next.push(makeGoal(AiGoalId.SCORE, 'race', null));
   }
 
-  const current = next.find((g) => g.id === 'economy' || g.id === 'army');
+  const current = next.find((g) => g.id === AiGoalId.ECONOMY || g.id === AiGoalId.ARMY);
   const picked = weightedPrimaryScore(map, player, situation, mode, difficulty, rng, {
     economy: personality.goalWeights.economy,
     army: personality.goalWeights.army,
     score: personality.goalWeights.score,
   });
   if (mode === GameMode.TURNS30 && situation.ownPower < situation.enemyPower * 0.8) {
-    next = next.filter((g) => g.id !== 'economy' && g.id !== 'army');
-    if (!hasGoalTyped(next, 'army')) next.push(makeGoal('army', 'choose', null));
+    next = next.filter((g) => g.id !== AiGoalId.ECONOMY && g.id !== AiGoalId.ARMY);
+    if (!hasGoalTyped(next, AiGoalId.ARMY)) next.push(makeGoal(AiGoalId.ARMY, 'choose', null));
   } else if (!current || current.id !== picked) {
-    next = next.filter((g) => g.id !== 'economy' && g.id !== 'army');
-    next.push(makeGoal(picked, picked === 'army' ? 'choose' : 'build', picked === 'army' ? chooseArmyTarget(map, player) : null));
+    next = next.filter((g) => g.id !== AiGoalId.ECONOMY && g.id !== AiGoalId.ARMY);
+    next.push(makeGoal(picked, picked === AiGoalId.ARMY ? 'choose' : 'build', picked === AiGoalId.ARMY ? chooseArmyTarget(map, player) : null));
   }
 
   state.goals = next;
@@ -158,14 +158,14 @@ export function updateStrategy(
 
 function economySkillChain(player: Player): SkillId[] | null {
   const chain: SkillId[] = flagsFor(player).militarySkills
-    ? ['forestry', 'agriculture', 'climbing', 'smithery', 'swordsman', 'science', 'geology', 'riding', 'knights']
-    : ['forestry', 'agriculture', 'climbing', 'smithery', 'geology', 'science'];
+    ? [SkillId.FORESTRY, SkillId.AGRICULTURE, SkillId.CLIMBING, SkillId.SMITHERY, SkillId.SWORDSMAN, SkillId.SCIENCE, SkillId.GEOLOGY, SkillId.RIDING, SkillId.KNIGHTS]
+    : [SkillId.FORESTRY, SkillId.AGRICULTURE, SkillId.CLIMBING, SkillId.SMITHERY, SkillId.GEOLOGY, SkillId.SCIENCE];
   for (const s of chain) if (!hasSkill(player, s)) return chain.slice(chain.indexOf(s));
   return null;
 }
 
 function navalSkillChain(player: Player): SkillId[] | null {
-  const chain: SkillId[] = ['water', 'navigation', 'science', 'catapult'];
+  const chain: SkillId[] = [SkillId.WATER, SkillId.NAVIGATION, SkillId.SCIENCE, SkillId.CATAPULT];
   for (const s of chain) if (!hasSkill(player, s)) return chain.slice(chain.indexOf(s));
   return null;
 }
@@ -207,27 +207,27 @@ export function deriveDirectives(
   difficulty: AiDifficultyProfile,
   strategy: AiStrategyState,
 ): AiDirectives {
-  const personality = AI_PERSONALITIES[strategy.personalityId as 'aggressive' | 'balanced' | 'builder'] ?? AI_PERSONALITIES.balanced;
+  const personality = AI_PERSONALITIES[strategy.personalityId as AiPersonalityId] ?? AI_PERSONALITIES.balanced;
   const d: AiDirectives = {
     frontTarget: null,
     muster: null,
     spawnPlan: [],
     moneyReserve: 8,
     skillChain: null,
-    pace: 'normal'
+    pace: AiPace.NORMAL
   };
 
   for (const g of [...strategy.goals].sort((a, b) => GOAL_PRIORITY[a.id] - GOAL_PRIORITY[b.id])) {
-    if (g.id === 'economy') {
-      d.pace = 'slow';
+    if (g.id === AiGoalId.ECONOMY) {
+      d.pace = AiPace.SLOW;
       d.moneyReserve = Math.max(d.moneyReserve, 12);
       d.skillChain = economySkillChain(player);
     }
-    if (g.id === 'army') {
+    if (g.id === AiGoalId.ARMY) {
       const target = g.target;
       if (!target) continue;
       d.frontTarget = target;
-      d.pace = 'rushed';
+      d.pace = AiPace.RUSHED;
       if (d.moneyReserve > 4) d.moneyReserve = 4;
       const mustered = countOwnUnitsNear(map, player, target, 5);
       const minUnits = Math.round(personality.musterMinUnits * difficulty.strategy.musterFactor);
@@ -238,31 +238,31 @@ export function deriveDirectives(
       const village = nearestOwnVillageTo(map, player, target);
       if (village) {
         const freeTarget = situation.freeVillages.some((fv) => fv.village.q === target.q && fv.village.r === target.r);
-        d.spawnPlan.push({ villageKey: `${village.q},${village.r}`, prefer: freeTarget ? 'scout' : 'offense' });
+        d.spawnPlan.push({ villageKey: `${village.q},${village.r}`, prefer: freeTarget ? SpawnPreference.SCOUT : SpawnPreference.OFFENSE });
       }
     }
-    if (g.id === 'defense') {
+    if (g.id === AiGoalId.DEFENSE) {
       if (!g.target) continue;
       d.frontTarget = g.target;
       d.moneyReserve = 0;
-      d.pace = 'rushed';
+      d.pace = AiPace.RUSHED;
       d.muster = { tile: g.target, minUnits: 1, target: g.target };
       const village = map.tiles.find((t) => t.settlement && t.settlement.owner === player.index && !t.unit);
-      if (village) d.spawnPlan.push({ villageKey: `${village.q},${village.r}`, prefer: 'defense' });
+      if (village) d.spawnPlan.push({ villageKey: `${village.q},${village.r}`, prefer: SpawnPreference.DEFENSE });
     }
-    if (g.id === 'naval') {
+    if (g.id === AiGoalId.NAVAL) {
       d.skillChain = navalSkillChain(player);
-      d.pace = 'rushed';
+      d.pace = AiPace.RUSHED;
       if (d.moneyReserve <= 8) d.moneyReserve = 10;
     }
-    if (g.id === 'score') {
-      d.pace = 'rushed';
+    if (g.id === AiGoalId.SCORE) {
+      d.pace = AiPace.RUSHED;
       d.moneyReserve = 0;
       if (situation.freeVillages.length > 0) {
         const fv = { q: situation.freeVillages[0]!.village.q, r: situation.freeVillages[0]!.village.r };
         d.frontTarget = fv;
         const village = nearestOwnVillageTo(map, player, fv);
-        if (village) d.spawnPlan.push({ villageKey: `${village.q},${village.r}`, prefer: 'scout' });
+        if (village) d.spawnPlan.push({ villageKey: `${village.q},${village.r}`, prefer: SpawnPreference.SCOUT });
       }
     }
   }

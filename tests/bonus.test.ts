@@ -1,17 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import { bonusEligibleFor, explorerPath, findClosestVillage, randomBonusKind, } from '../src/game/bonus';
 import { isExploredFor } from '../src/game/explore';
-import { GameMode } from '../src/game/game-mode';
 import { hexDistance, hexNeighbors } from '../src/game/hex';
 import { type GameMap, generateMap } from '../src/game/map-gen';
 import { buildPlayers } from '../src/game/players';
 import { Simulator } from '../src/game/simulator';
-import { type SkillId, SKILLS } from '../src/game/skills';
+import { SKILLS } from '../src/game/skills';
 import { readStock } from '../src/game/stock';
 import { isWaterType, TileType } from '../src/game/tile-types';
 import { Tribe } from '../src/game/tribes';
 import { SeededRandom } from '../src/util/random';
 import { makeTestMap, makeUnit, tileAt } from './helpers/test-map';
+import { BonusKind, CommandType, GameEventType, GameMode, SkillId, UnitType } from '@enums';
 
 describe('bonus placement', () => {
   it('places players+1 bonuses on land with spacing constraints', () => {
@@ -46,9 +46,9 @@ describe('bonus helpers', () => {
   it('bonusEligibleFor requires a same-player unit and a previous arrival turn', () => {
     const map = makeTestMap(3);
     const t = tileAt(map, 1, 0)!;
-    t.bonus = { kind: 'money', claimer: 0, arrivalTurn: 1 };
+    t.bonus = { kind: BonusKind.MONEY, claimer: 0, arrivalTurn: 1 };
     expect(bonusEligibleFor(map, 0, 1)).toEqual([]);
-    t.unit = makeUnit('u1', 0, 'warrior', 1, 0);
+    t.unit = makeUnit('u1', 0, UnitType.WARRIOR, 1, 0);
     expect(bonusEligibleFor(map, 0, 1)).toEqual([]);
     expect(bonusEligibleFor(map, 0, 2).length).toBe(1);
     // A different player's unit is not eligible.
@@ -142,11 +142,11 @@ function corridorMap(cells: [number, number][]): GameMap {
   };
 }
 
-function bonusMap(kind: 'money' | 'resources' | 'villageUpgrade' | 'explorer' | 'skill' = 'money') {
+function bonusMap(kind: BonusKind = BonusKind.MONEY) {
   const map = makeTestMap(3);
   for (const t of map.tiles) t.exploredBy = [];
   tileAt(map, 0, 0)!.settlement = { owner: 0, level: 1, captureReady: false };
-  tileAt(map, 0, 0)!.unit = makeUnit('u1', 0, 'warrior', 0, 0);
+  tileAt(map, 0, 0)!.unit = makeUnit('u1', 0, UnitType.WARRIOR, 0, 0);
   tileAt(map, 0, 0)!.exploredBy = [0];
   const target = tileAt(map, 0, 1)!;
   target.exploredBy = [0];
@@ -155,28 +155,28 @@ function bonusMap(kind: 'money' | 'resources' | 'villageUpgrade' | 'explorer' | 
 }
 
 describe('bonus claiming (simulator)', () => {
-  function makeSim(kind: 'money' | 'resources' | 'villageUpgrade' | 'explorer' | 'skill' = 'money', rng = 0.5) {
+  function makeSim(kind: BonusKind = BonusKind.MONEY, rng = 0.5) {
     const { map, target } = bonusMap(kind);
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
     const sim = new Simulator(map, players, GameMode.TURNS30, { rng: () => rng });
     sim.startGame();
     sim.drainEvents();
-    sim.applyCommand({ type: 'move', unitId: 'u1', q: 0, r: 1 });
+    sim.applyCommand({ type: CommandType.MOVE, unitId: 'u1', q: 0, r: 1 });
     return { map, target, players, sim };
   }
 
   it('requires waiting until the next turn, then awards and exhausts the unit', () => {
-    const { map, target, players, sim } = makeSim('money');
+    const { map, target, players, sim } = makeSim(BonusKind.MONEY);
     expect(target.bonus!.arrivalTurn).toBe(1);
     expect(bonusEligibleFor(map, 0, 1).length).toBe(0);
-    expect(sim.applyCommand({ type: 'claimBonus' })).toBe(false);
+    expect(sim.applyCommand({ type: CommandType.CLAIM_BONUS })).toBe(false);
 
-    sim.applyCommand({ type: 'endTurn' });
+    sim.applyCommand({ type: CommandType.END_TURN });
     expect(sim.turn).toBe(2);
     expect(sim.currentPlayerIndex).toBe(0);
     expect(bonusEligibleFor(map, 0, 2).length).toBe(1);
     const before = players[0]!.resources.money;
-    expect(sim.applyCommand({ type: 'claimBonus' })).toBe(true);
+    expect(sim.applyCommand({ type: CommandType.CLAIM_BONUS })).toBe(true);
     expect(target.bonus).toBeNull();
     expect(players[0]!.resources.money).toBe(before + 15);
     expect(target.unit!.hasMoved).toBe(true);
@@ -185,80 +185,80 @@ describe('bonus claiming (simulator)', () => {
   });
 
   it('resources bonus adds wood, stone, ore', () => {
-    const { map, target, players, sim } = makeSim('resources');
-    sim.applyCommand({ type: 'endTurn' });
+    const { map, target, players, sim } = makeSim(BonusKind.RESOURCES);
+    sim.applyCommand({ type: CommandType.END_TURN });
     // The materials go to the village nearest to the bonus.
     const village = tileAt(map, 0, 0)!;
     const before = { ...readStock(village) };
-    expect(sim.applyCommand({ type: 'claimBonus' })).toBe(true);
+    expect(sim.applyCommand({ type: CommandType.CLAIM_BONUS })).toBe(true);
     expect(readStock(village).wood).toBe(before.wood + 10);
     expect(readStock(village).stone).toBe(before.stone + 5);
     expect(readStock(village).ore).toBe(before.ore + 5);
   });
 
   it('villageUpgrade bonus upgrades the closest village for free', () => {
-    const { map, target, sim } = makeSim('villageUpgrade');
+    const { map, target, sim } = makeSim(BonusKind.VILLAGE_UPGRADE);
     const village = tileAt(map, 0, 0)!;
     expect(village.settlement!.level).toBe(1);
-    sim.applyCommand({ type: 'endTurn' });
-    expect(sim.applyCommand({ type: 'claimBonus' })).toBe(true);
+    sim.applyCommand({ type: CommandType.END_TURN });
+    expect(sim.applyCommand({ type: CommandType.CLAIM_BONUS })).toBe(true);
     expect(village.settlement!.level).toBe(2);
     expect(target.bonus).toBeNull();
   });
 
   it('explorer bonus reveals tiles and emits an explorer event', () => {
-    const { map, target, sim } = makeSim('explorer', 0.3);
-    sim.applyCommand({ type: 'endTurn' });
-    expect(sim.applyCommand({ type: 'claimBonus' })).toBe(true);
+    const { map, target, sim } = makeSim(BonusKind.EXPLORER, 0.3);
+    sim.applyCommand({ type: CommandType.END_TURN });
+    expect(sim.applyCommand({ type: CommandType.CLAIM_BONUS })).toBe(true);
     const events = sim.drainEvents();
-    expect(events.some((e) => e.type === 'explorer')).toBe(true);
+    expect(events.some((e) => e.type === GameEventType.EXPLORER)).toBe(true);
     const explored = map.tiles.filter((t) => isExploredFor(t, 0)).length;
     expect(explored).toBeGreaterThan(2);
     expect(target.bonus).toBeNull();
   });
 
   it('skill bonus opens a random unopened skill for the claimer', () => {
-    const { map, target, players, sim } = makeSim('skill', 0); // rng 0 -> first unopened = climbing
-    sim.applyCommand({ type: 'endTurn' });
-    expect(players[0]!.skills).not.toContain('climbing');
-    expect(sim.applyCommand({ type: 'claimBonus' })).toBe(true);
-    expect(players[0]!.skills).toContain('climbing');
+    const { map, target, players, sim } = makeSim(BonusKind.SKILL, 0); // rng 0 -> first unopened = climbing
+    sim.applyCommand({ type: CommandType.END_TURN });
+    expect(players[0]!.skills).not.toContain(SkillId.CLIMBING);
+    expect(sim.applyCommand({ type: CommandType.CLAIM_BONUS })).toBe(true);
+    expect(players[0]!.skills).toContain(SkillId.CLIMBING);
     expect(target.bonus).toBeNull();
     const events = sim.drainEvents();
-    const claim = events.find((e) => e.type === 'bonusClaimed');
-    expect(claim).toMatchObject({ type: 'bonusClaimed', kind: 'skill', skill: 'climbing', playerIndex: 0 });
+    const claim = events.find((e) => e.type === GameEventType.BONUS_CLAIMED);
+    expect(claim).toMatchObject({ type: GameEventType.BONUS_CLAIMED, kind: BonusKind.SKILL, skill: SkillId.CLIMBING, playerIndex: 0 });
   });
 
   it('skill bonus falls back to +15 money when all skills are open', () => {
     const map = makeTestMap(3);
     for (const t of map.tiles) t.exploredBy = [];
     tileAt(map, 0, 0)!.settlement = { owner: 0, level: 1, captureReady: false };
-    tileAt(map, 0, 0)!.unit = makeUnit('u1', 0, 'warrior', 0, 0);
+    tileAt(map, 0, 0)!.unit = makeUnit('u1', 0, UnitType.WARRIOR, 0, 0);
     tileAt(map, 0, 0)!.exploredBy = [0];
     const target = tileAt(map, 0, 1)!;
     target.exploredBy = [0];
-    target.bonus = { kind: 'skill', claimer: null, arrivalTurn: 0 };
+    target.bonus = { kind: BonusKind.SKILL, claimer: null, arrivalTurn: 0 };
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
     players[0]!.skills = Object.keys(SKILLS) as SkillId[];
     const sim = new Simulator(map, players, GameMode.TURNS30, { rng: () => 0.5 });
     sim.startGame();
     sim.drainEvents();
-    sim.applyCommand({ type: 'move', unitId: 'u1', q: 0, r: 1 });
-    sim.applyCommand({ type: 'endTurn' });
+    sim.applyCommand({ type: CommandType.MOVE, unitId: 'u1', q: 0, r: 1 });
+    sim.applyCommand({ type: CommandType.END_TURN });
     const moneyBefore = players[0]!.resources.money;
-    expect(sim.applyCommand({ type: 'claimBonus' })).toBe(true);
+    expect(sim.applyCommand({ type: CommandType.CLAIM_BONUS })).toBe(true);
     expect(players[0]!.resources.money).toBe(moneyBefore + 15);
     const events = sim.drainEvents();
-    expect(events.find((e) => e.type === 'bonusClaimed')).toMatchObject({ kind: 'money', playerIndex: 0 });
+    expect(events.find((e) => e.type === GameEventType.BONUS_CLAIMED)).toMatchObject({ kind: BonusKind.MONEY, playerIndex: 0 });
   });
 
   it('AI players claim eligible bonuses on their turn', () => {
     const map = makeTestMap(3);
     tileAt(map, 0, 0)!.settlement = { owner: 0, level: 1, captureReady: false };
-    tileAt(map, 0, 0)!.unit = makeUnit('u0', 0, 'warrior', 0, 0);
+    tileAt(map, 0, 0)!.unit = makeUnit('u0', 0, UnitType.WARRIOR, 0, 0);
     const aiTile = tileAt(map, 3, 0)!;
-    aiTile.unit = makeUnit('ai1', 1, 'warrior', 3, 0);
-    aiTile.bonus = { kind: 'money', claimer: 1, arrivalTurn: 1 };
+    aiTile.unit = makeUnit('ai1', 1, UnitType.WARRIOR, 3, 0);
+    aiTile.bonus = { kind: BonusKind.MONEY, claimer: 1, arrivalTurn: 1 };
     // Surround the AI unit with water so its planner cannot move it away.
     for (const n of hexNeighbors(aiTile)) {
       const t = tileAt(map, n.q, n.r);
@@ -269,15 +269,15 @@ describe('bonus claiming (simulator)', () => {
     sim.startGame();
     sim.drainEvents();
     // Human ends turn 1 -> AI turn 1 plays -> wrap -> human turn 2.
-    sim.applyCommand({ type: 'endTurn' });
+    sim.applyCommand({ type: CommandType.END_TURN });
     expect(sim.turn).toBe(2);
     expect(sim.currentPlayerIndex).toBe(0);
     // Human ends turn 2 -> AI turn 2 plays (claims bonus) -> wrap -> human turn 3.
-    sim.applyCommand({ type: 'endTurn' });
+    sim.applyCommand({ type: CommandType.END_TURN });
     expect(sim.turn).toBe(3);
     expect(sim.currentPlayerIndex).toBe(0);
     expect(aiTile.bonus).toBeNull();
     const events = sim.drainEvents();
-    expect(events.some((e) => e.type === 'bonusClaimed' && e.playerIndex === 1)).toBe(true);
+    expect(events.some((e) => e.type === GameEventType.BONUS_CLAIMED && e.playerIndex === 1)).toBe(true);
   });
 });

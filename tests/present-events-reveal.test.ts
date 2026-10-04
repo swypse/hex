@@ -1,4 +1,4 @@
-import { GameMode } from '@enums';
+import { GameEventType, GameMode, NetMode, UnitType } from '@enums';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { Application, Container, Graphics, ImageSource, Text, Texture } from 'pixi.js';
 import { gameController } from '../src/controller/game-controller';
@@ -71,7 +71,7 @@ function tile(q: number, r: number): MapTile {
 }
 function makeUnit(id: string, owner: number, q: number, r: number): Unit {
   return {
-    id, owner, type: 'warrior', q, r, hasMoved: false, hasAttacked: false, hasHealed: false,
+    id, owner, type: UnitType.WARRIOR, q, r, hasMoved: false, hasAttacked: false, hasHealed: false,
     hp: UNIT_TYPES.warrior.maxHp, attack: UNIT_TYPES.warrior.attack, attackDistance: UNIT_TYPES.warrior.attackDistance, spawnVillage: { q, r },
   };
 }
@@ -101,7 +101,7 @@ describe('presentEvents reveals units even when a step throws', () => {
 
     Object.defineProperty(Text.prototype, 'width', { configurable: true, get: () => 40 });
     Object.defineProperty(Text.prototype, 'height', { configurable: true, get: () => 14 });
-    useGameStore.setState({ localPlayerIndex: 1, netMode: 'client', players });
+    useGameStore.setState({ localPlayerIndex: 1, netMode: NetMode.CLIENT, players });
 
     gc = gameController as unknown as Record<string, unknown>;
     (gc as { app: unknown }).app = app;
@@ -133,7 +133,7 @@ describe('presentEvents reveals units even when a step throws', () => {
       throw new Error('animation boom');
     };
     const events: GameEvent[] = [
-      { type: 'unitMoved', unitId: 'my', from: { q: 0, r: 0 }, path: [{ q: 1, r: 0 }], to: { q: 1, r: 0 } },
+      { type: GameEventType.UNIT_MOVED, unitId: 'my', from: { q: 0, r: 0 }, path: [{ q: 1, r: 0 }], to: { q: 1, r: 0 } },
     ];
     await expect(gcAny.presentEvents(events, new Set())).rejects.toThrow('animation boom');
     // Even though the presentation threw, the unit must not be left hidden.

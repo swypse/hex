@@ -1,0 +1,17 @@
+export enum UnitType {
+  WARRIOR = 'warrior',
+  RIDER = 'rider',
+  ARCHER = 'archer',
+  SWORDSMAN = 'swordsman',
+  SHIELD = 'shield',
+  CATAPULT = 'catapult',
+  KNIGHT = 'knight',
+  PIRATE = 'pirate',
+  STALKER = 'stalker',
+  BUILDER = 'builder',
+  BANNER = 'banner',
+  BERSERKER = 'berserker',
+  TRAPPER = 'trapper',
+  STORMCALLER = 'stormcaller',
+  STUNNER = 'stunner',
+}

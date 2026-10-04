@@ -8,7 +8,7 @@ import { Tribe } from '@/game/tribes';
 import type { HostMessage } from '@/net/peer-session';
 import { useGameStore } from '@/store/game-store';
 import { SeededRandom } from '@/util';
-import { GameMode } from '@enums';
+import { CommandType, ConnectionState, GameMode, HostMessageType, NetMode, Screen } from '@enums';
 import type { Application } from 'pixi.js';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -29,31 +29,31 @@ function buildSim(): Simulator {
 describe('predictable command types', () => {
   it('covers deterministic commands and excludes random/AI ones', () => {
     expect([...PREDICTABLE_COMMAND_TYPES].sort()).toEqual([
-      'build',
-      'buildBridge',
-      'buildRoad',
-      'buildWall',
-      'burn',
-      'burnRoad',
-      'capture',
-      'deal',
-      'destroyBuilding',
-      'disband',
-      'enableStealth',
-      'heal',
-      'move',
-      'openSkill',
-      'repair',
-      'shipLanding',
-      'spawn',
-      'storm',
-      'trap',
-      'upgradeShip',
-      'upgradeVillage',
+      CommandType.BUILD,
+      CommandType.BUILD_BRIDGE,
+      CommandType.BUILD_ROAD,
+      CommandType.BUILD_WALL,
+      CommandType.BURN,
+      CommandType.BURN_ROAD,
+      CommandType.CAPTURE,
+      CommandType.DEAL,
+      CommandType.DESTROY_BUILDING,
+      CommandType.DISBAND,
+      CommandType.ENABLE_STEALTH,
+      CommandType.HEAL,
+      CommandType.MOVE,
+      CommandType.OPEN_SKILL,
+      CommandType.REPAIR,
+      CommandType.SHIP_LANDING,
+      CommandType.SPAWN,
+      CommandType.STORM,
+      CommandType.TRAP,
+      CommandType.UPGRADE_SHIP,
+      CommandType.UPGRADE_VILLAGE,
     ]);
-    expect(PREDICTABLE_COMMAND_TYPES.has('attack')).toBe(false);
-    expect(PREDICTABLE_COMMAND_TYPES.has('claimBonus')).toBe(false);
-    expect(PREDICTABLE_COMMAND_TYPES.has('endTurn')).toBe(false);
+    expect(PREDICTABLE_COMMAND_TYPES.has(CommandType.ATTACK)).toBe(false);
+    expect(PREDICTABLE_COMMAND_TYPES.has(CommandType.CLAIM_BONUS)).toBe(false);
+    expect(PREDICTABLE_COMMAND_TYPES.has(CommandType.END_TURN)).toBe(false);
   });
 
   it('reproduces identical events and state when a deterministic command is applied on host and on a mirror', () => {
@@ -68,8 +68,8 @@ describe('predictable command types', () => {
     const h = start(host);
     const m = start(mirror);
 
-    const okHost = host.applyCommand({ type: 'move', unitId: h.unit.id, q: h.target.q, r: h.target.r });
-    const okMirror = mirror.applyCommand({ type: 'move', unitId: m.unit.id, q: m.target.q, r: m.target.r });
+    const okHost = host.applyCommand({ type: CommandType.MOVE, unitId: h.unit.id, q: h.target.q, r: h.target.r });
+    const okMirror = mirror.applyCommand({ type: CommandType.MOVE, unitId: m.unit.id, q: m.target.q, r: m.target.r });
     expect(okHost).toBe(true);
     expect(okMirror).toBe(true);
     expect(mirror.drainEvents()).toEqual(host.drainEvents());
@@ -120,10 +120,10 @@ describe('client optimistic reconciliation', () => {
   beforeEach(() => {
     snap = buildSim().snapshot();
     useGameStore.setState({
-      screen: 'game',
-      netMode: 'client',
+      screen: Screen.GAME,
+      netMode: NetMode.CLIENT,
       localPlayerIndex: 1,
-      connection: 'connected',
+      connection: ConnectionState.CONNECTED,
       lobby: null,
       aiActive: false,
       players: snap.players,
@@ -136,8 +136,8 @@ describe('client optimistic reconciliation', () => {
     });
   });
 
-  const stateMsg = (): HostMessage => ({ type: 'state', state: snap, playerIndex: 1 });
-  const eventsMsg = (): HostMessage => ({ type: 'events', events: [] });
+  const stateMsg = (): HostMessage => ({ type: HostMessageType.STATE, state: snap, playerIndex: 1 });
+  const eventsMsg = (): HostMessage => ({ type: HostMessageType.EVENTS, events: [] });
 
   it('skips presenting events for an optimistically predicted command', async () => {
     const { host, adopt, present } = makeFakeHost();

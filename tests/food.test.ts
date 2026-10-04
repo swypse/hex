@@ -1,4 +1,4 @@
-import { GameMode } from '@enums';
+import { BuildingKind, CommandType, FoodPressure, GameEventType, GameMode, Season, SiegeTargetKind, SkillId, UnitType } from '@enums';
 import { describe, it, expect } from 'vitest';
 import { makeTestMap, tileAt, makeUnit } from './helpers/test-map';
 import type { GameMap, MapTile } from '../src/game/map-gen';
@@ -12,7 +12,7 @@ import { planFoodFixes } from '../src/game/ai-food';
 import { Simulator } from '../src/game/simulator';
 import { START_RESOURCES, START_STOCK } from '../src/game/resources';
 import { generateMap } from '../src/game/map-gen';
-import { unitFoodUpkeep, type UnitType } from '../src/game/units';
+import { unitFoodUpkeep } from '../src/game/units';
 import { buildingsInVillage } from '../src/game/village';
 import { SKILLS } from '../src/game/skills';
 import {
@@ -84,8 +84,8 @@ describe('food resource', () => {
   });
 
   it('defines the unit food upkeep table', () => {
-    for (const t of ['warrior', 'archer', 'rider'] as const) expect(unitFoodUpkeep(t)).toBe(1);
-    for (const t of ['swordsman', 'knight', 'catapult', 'stalker', 'builder', 'banner', 'berserker', 'trapper', 'stormcaller', 'stunner'] as const) {
+    for (const t of [UnitType.WARRIOR, UnitType.ARCHER, UnitType.RIDER] as const) expect(unitFoodUpkeep(t)).toBe(1);
+    for (const t of [UnitType.SWORDSMAN, UnitType.KNIGHT, UnitType.CATAPULT, UnitType.STALKER, UnitType.BUILDER, UnitType.BANNER, UnitType.BERSERKER, UnitType.TRAPPER, UnitType.STORMCALLER, UnitType.STUNNER] as const) {
       expect(unitFoodUpkeep(t)).toBe(3);
     }
   });
@@ -94,7 +94,7 @@ describe('food resource', () => {
 describe('skills', () => {
   it('Agriculture is a root skill and Granary its child', () => {
     expect(SKILLS.agriculture.parent).toBeNull();
-    expect(SKILLS.granary.parent).toBe('agriculture');
+    expect(SKILLS.granary.parent).toBe(SkillId.AGRICULTURE);
     expect(SKILLS.granary.level).toBe(2);
   });
 });
@@ -104,13 +104,13 @@ describe('farms', () => {
     const { map, p } = setup();
     const t = tileAt(map, 1, 0)!;
     expect(canBuildFarm(map, t, p)).toBe(false);
-    p.skills.push('agriculture');
+    p.skills.push(SkillId.AGRICULTURE);
     expect(canBuildFarm(map, t, p)).toBe(true);
   });
 
   it('reject forest, mountain, water, buildings, villages and foreign land; allow roads', () => {
     const { map, p } = setup();
-    p.skills.push('agriculture');
+    p.skills.push(SkillId.AGRICULTURE);
     const t = tileAt(map, 1, 0)!;
     for (const terrain of [TileType.GrasslandForest, TileType.GrasslandMountain, TileType.Water]) {
       t.terrain = terrain;
@@ -120,7 +120,7 @@ describe('farms', () => {
     t.roadOwner = 0;
     expect(canBuildFarm(map, t, p)).toBe(true);
     t.roadOwner = null;
-    t.building = { kind: 'mine', level: 1 };
+    t.building = { kind: BuildingKind.MINE, level: 1 };
     expect(canBuildFarm(map, t, p)).toBe(false);
     t.building = null;
     expect(canBuildFarm(map, village(map), p)).toBe(false);
@@ -130,52 +130,52 @@ describe('farms', () => {
 
   it('cannot be built while an enemy unit stands on the tile, but can with an own unit', () => {
     const { map, p } = setup();
-    p.skills.push('agriculture');
+    p.skills.push(SkillId.AGRICULTURE);
     const t = tileAt(map, 1, 0)!;
-    addUnit(map, 'warrior', 1, 0, 1);
+    addUnit(map, UnitType.WARRIOR, 1, 0, 1);
     expect(canBuildFarm(map, t, p)).toBe(false);
     t.unit = null;
-    addUnit(map, 'warrior', 1, 0, 0);
+    addUnit(map, UnitType.WARRIOR, 1, 0, 0);
     expect(canBuildFarm(map, t, p)).toBe(true);
   });
 
   it('cost 15 money and 5 wood (no stone) and do not use a village building slot', () => {
     const { map, p, village: v } = setup();
-    p.skills.push('agriculture');
+    p.skills.push(SkillId.AGRICULTURE);
     expect(BUILDING_COSTS.farm).toEqual({ money: 15, wood: 5, stone: 0, ore: 0, food: 0 });
     const before = { money: p.resources.money, ...v.settlement!.stock! };
-    expect(buildBuilding(map, tileAt(map, 1, 0)!, 'farm', p)).toBe(true);
+    expect(buildBuilding(map, tileAt(map, 1, 0)!, BuildingKind.FARM, p)).toBe(true);
     expect(p.resources.money).toBe(before.money - 15);
     expect(v.settlement!.stock!.wood).toBe(before.wood - 5);
     expect(v.settlement!.stock!.stone).toBe(before.stone);
-    expect(tileAt(map, 1, 0)!.building).toEqual({ kind: 'farm', level: 1 });
+    expect(tileAt(map, 1, 0)!.building).toEqual({ kind: BuildingKind.FARM, level: 1 });
     expect(buildingsInVillage(map, v)).toBe(0);
   });
 
   it('yield 2 food, 3 with Science', () => {
     const { p } = setup();
     expect(farmYield(p)).toBe(FARM_FOOD);
-    p.skills.push('science');
+    p.skills.push(SkillId.SCIENCE);
     expect(farmYield(p)).toBe(FARM_FOOD_SCIENCE);
     expect([FARM_FOOD, FARM_FOOD_SCIENCE]).toEqual([2, 3]);
   });
 
   it('yield 0 food in winter, even with Science', () => {
     const { map, p } = setup();
-    map.season = 'winter';
+    map.season = Season.WINTER;
     expect(farmYield(p, map)).toBe(0);
-    p.skills.push('science');
+    p.skills.push(SkillId.SCIENCE);
     expect(farmYield(p, map)).toBe(0);
-    map.season = 'summer';
+    map.season = Season.SUMMER;
     expect(farmYield(p, map)).toBe(FARM_FOOD_SCIENCE);
   });
 
   it('give nothing to granaries in winter', () => {
     const { map, p } = setup();
-    map.season = 'winter';
+    map.season = Season.WINTER;
     const g = tileAt(map, 1, 0)!;
-    g.building = { kind: 'granary', level: 1, food: 5 };
-    tileAt(map, 1, -1)!.building = { kind: 'farm', level: 1 };
+    g.building = { kind: BuildingKind.GRANARY, level: 1, food: 5 };
+    tileAt(map, 1, -1)!.building = { kind: BuildingKind.FARM, level: 1 };
     applyFood(map, p);
     expect(g.building!.food).toBe(5);
   });
@@ -188,12 +188,12 @@ function village(map: GameMap): MapTile {
 describe('granaries', () => {
   it('need the Granary skill and an adjacent own farm', () => {
     const { map, p } = setup();
-    p.skills.push('agriculture');
+    p.skills.push(SkillId.AGRICULTURE);
     const g = tileAt(map, 1, 0)!;
     expect(canBuildGranary(map, g, p)).toBe(false);
-    tileAt(map, 1, -1)!.building = { kind: 'farm', level: 1 };
+    tileAt(map, 1, -1)!.building = { kind: BuildingKind.FARM, level: 1 };
     expect(canBuildGranary(map, g, p)).toBe(false); // skill missing
-    p.skills.push('granary');
+    p.skills.push(SkillId.GRANARY);
     expect(canBuildGranary(map, g, p)).toBe(true);
     tileAt(map, 1, -1)!.building = null;
     expect(canBuildGranary(map, g, p)).toBe(false); // farm gone
@@ -201,19 +201,19 @@ describe('granaries', () => {
 
   it('cost 20 money, 10 wood, 10 stone and start with 0 food', () => {
     const { map, p } = setup();
-    p.skills.push('agriculture', 'granary');
-    tileAt(map, 1, -1)!.building = { kind: 'farm', level: 1 };
+    p.skills.push(SkillId.AGRICULTURE, SkillId.GRANARY);
+    tileAt(map, 1, -1)!.building = { kind: BuildingKind.FARM, level: 1 };
     expect(BUILDING_COSTS.granary).toEqual({ money: 20, wood: 10, stone: 10, ore: 0, food: 0 });
-    expect(buildBuilding(map, tileAt(map, 1, 0)!, 'granary', p)).toBe(true);
-    expect(tileAt(map, 1, 0)!.building).toEqual({ kind: 'granary', level: 1, food: 0 });
+    expect(buildBuilding(map, tileAt(map, 1, 0)!, BuildingKind.GRANARY, p)).toBe(true);
+    expect(tileAt(map, 1, 0)!.building).toEqual({ kind: BuildingKind.GRANARY, level: 1, food: 0 });
   });
 
   it('store the unused food of adjacent farms at round end, capped at 50', () => {
     const { map, p } = setup();
     const g = tileAt(map, 1, 0)!;
-    g.building = { kind: 'granary', level: 1, food: 0 };
-    tileAt(map, 1, -1)!.building = { kind: 'farm', level: 1 };
-    tileAt(map, 0, 1)!.building = { kind: 'farm', level: 1 };
+    g.building = { kind: BuildingKind.GRANARY, level: 1, food: 0 };
+    tileAt(map, 1, -1)!.building = { kind: BuildingKind.FARM, level: 1 };
+    tileAt(map, 0, 1)!.building = { kind: BuildingKind.FARM, level: 1 };
     applyFood(map, p);
     expect(g.building!.food).toBe(4);
     g.building!.food = 47;
@@ -224,13 +224,13 @@ describe('granaries', () => {
   it('only receive what the village units did not eat; farms away from granaries are eaten first', () => {
     const { map, p } = setup();
     const g = tileAt(map, 1, 0)!;
-    g.building = { kind: 'granary', level: 1, food: 0 };
-    tileAt(map, 1, -1)!.building = { kind: 'farm', level: 1 }; // next to the granary
-    tileAt(map, -2, 0)!.building = { kind: 'farm', level: 1 }; // far away
-    addUnit(map, 'swordsman', 0, 1); // 3
+    g.building = { kind: BuildingKind.GRANARY, level: 1, food: 0 };
+    tileAt(map, 1, -1)!.building = { kind: BuildingKind.FARM, level: 1 }; // next to the granary
+    tileAt(map, -2, 0)!.building = { kind: BuildingKind.FARM, level: 1 }; // far away
+    addUnit(map, UnitType.SWORDSMAN, 0, 1); // 3
     applyFood(map, p);
     expect(g.building!.food).toBe(1); // the far farm (2) and 1 of the near farm fed the unit
-    addUnit(map, 'swordsman', -1, 1); // upkeep 6 > 4 from the farms: nothing is stored, the granary is drawn
+    addUnit(map, UnitType.SWORDSMAN, -1, 1); // upkeep 6 > 4 from the farms: nothing is stored, the granary is drawn
     applyFood(map, p);
     expect(g.building!.food).toBe(0);
   });
@@ -238,8 +238,8 @@ describe('granaries', () => {
   it('farm food without a granary is lost and the starting reserve is untouched', () => {
     const { map, p } = setup();
     setFood(map, 10);
-    tileAt(map, 1, 0)!.building = { kind: 'farm', level: 1 };
-    addUnit(map, 'warrior', 0, 1);
+    tileAt(map, 1, 0)!.building = { kind: BuildingKind.FARM, level: 1 };
+    addUnit(map, UnitType.WARRIOR, 0, 1);
     applyFood(map, p);
     expect(foodOf(map)).toBe(10);
   });
@@ -248,8 +248,8 @@ describe('granaries', () => {
     const { map, p } = setup();
     setFood(map, 10);
     const g = tileAt(map, 1, 0)!;
-    g.building = { kind: 'granary', level: 1, food: 2 };
-    addUnit(map, 'swordsman', 0, 1); // 3
+    g.building = { kind: BuildingKind.GRANARY, level: 1, food: 2 };
+    addUnit(map, UnitType.SWORDSMAN, 0, 1); // 3
     applyFood(map, p);
     expect(g.building!.food).toBe(0);
     expect(foodOf(map)).toBe(9);
@@ -259,10 +259,10 @@ describe('granaries', () => {
 describe('village food balance and starvation', () => {
   it('balance is farm production minus the food upkeep of the units it raised', () => {
     const { map, p, village: v } = setup();
-    tileAt(map, 1, 0)!.building = { kind: 'farm', level: 1 };
-    addUnit(map, 'warrior', 0, 1); // 1
-    addUnit(map, 'swordsman', -1, 1); // 3
-    addUnit(map, 'warrior', 1, -1, 0, null); // not raised by the village: free
+    tileAt(map, 1, 0)!.building = { kind: BuildingKind.FARM, level: 1 };
+    addUnit(map, UnitType.WARRIOR, 0, 1); // 1
+    addUnit(map, UnitType.SWORDSMAN, -1, 1); // 3
+    addUnit(map, UnitType.WARRIOR, 1, -1, 0, null); // not raised by the village: free
     const f = villageFood(map, v, p);
     expect(f).toMatchObject({ production: 2, upkeep: 4, balance: -2, starving: false });
     expect(foodNetIncome(map, p)).toBe(-2);
@@ -270,15 +270,15 @@ describe('village food balance and starvation', () => {
 
   it('an enemy standing on a village does not disable its farms', () => {
     const { map, p, village: v } = setup();
-    tileAt(map, 1, 0)!.building = { kind: 'farm', level: 1 };
-    v.unit = makeUnit('e', 1, 'warrior', 0, 0);
+    tileAt(map, 1, 0)!.building = { kind: BuildingKind.FARM, level: 1 };
+    v.unit = makeUnit('e', 1, UnitType.WARRIOR, 0, 0);
     expect(villageFood(map, v, p).production).toBe(2);
   });
 
   it('deficits are paid from the starting reserve', () => {
     const { map, p } = setup();
     setFood(map, 10);
-    addUnit(map, 'warrior', 0, 1);
+    addUnit(map, UnitType.WARRIOR, 0, 1);
     expect(applyFood(map, p)).toEqual([]);
     expect(foodOf(map)).toBe(9);
   });
@@ -286,9 +286,9 @@ describe('village food balance and starvation', () => {
   it('a village that cannot feed its units starves: each unit loses 10 hp', () => {
     const { map, p, village: v } = setup();
     setFood(map, 0);
-    addUnit(map, 'warrior', 0, 1);
-    addUnit(map, 'swordsman', -1, 1);
-    addUnit(map, 'archer', 1, -1, 0, null); // not raised here: untouched
+    addUnit(map, UnitType.WARRIOR, 0, 1);
+    addUnit(map, UnitType.SWORDSMAN, -1, 1);
+    addUnit(map, UnitType.ARCHER, 1, -1, 0, null); // not raised here: untouched
     const reports = applyFood(map, p);
     expect(reports).toHaveLength(1);
     expect(v.settlement!.starving).toBe(true);
@@ -302,8 +302,8 @@ describe('village food balance and starvation', () => {
   it('marks units that get too little food as starving and clears it once fed', () => {
     const { map, p } = setup();
     setFood(map, 1);
-    addUnit(map, 'warrior', 0, 1); // fed from the reserve (swordsman-first order: same cost)
-    addUnit(map, 'archer', -1, 1);
+    addUnit(map, UnitType.WARRIOR, 0, 1); // fed from the reserve (swordsman-first order: same cost)
+    addUnit(map, UnitType.ARCHER, -1, 1);
     applyFood(map, p);
     const flags = [tileAt(map, 0, 1)!.unit!.starving, tileAt(map, -1, 1)!.unit!.starving];
     expect(flags.filter(Boolean)).toHaveLength(1);
@@ -316,7 +316,7 @@ describe('village food balance and starvation', () => {
   it('starvation never drops a unit below 1 hp and clears once the village is fed again', () => {
     const { map, p, village: v } = setup();
     setFood(map, 0);
-    addUnit(map, 'warrior', 0, 1);
+    addUnit(map, UnitType.WARRIOR, 0, 1);
     tileAt(map, 0, 1)!.unit!.hp = 3;
     applyFood(map, p);
     expect(tileAt(map, 0, 1)!.unit!.hp).toBe(1);
@@ -330,8 +330,8 @@ describe('village food balance and starvation', () => {
   it('a starving village eats from its granaries before it starves', () => {
     const { map, p, village: v } = setup();
     setFood(map, 0);
-    tileAt(map, 1, 0)!.building = { kind: 'granary', level: 1, food: 5 };
-    addUnit(map, 'swordsman', 0, 1); // 3 per round
+    tileAt(map, 1, 0)!.building = { kind: BuildingKind.GRANARY, level: 1, food: 5 };
+    addUnit(map, UnitType.SWORDSMAN, 0, 1); // 3 per round
     expect(applyFood(map, p)).toEqual([]);
     expect(tileAt(map, 1, 0)!.building!.food).toBe(2);
     expect(v.settlement!.starving).toBe(false);
@@ -342,31 +342,31 @@ describe('village food balance and starvation', () => {
 
   it('pressure and sustainability helpers reflect the stock and the balance', () => {
     const { map, p } = setup();
-    expect(foodPressure(map, p)).toBe('none');
+    expect(foodPressure(map, p)).toBe(FoodPressure.NONE);
     setFood(map, 2);
-    addUnit(map, 'swordsman', 0, 1);
-    expect(foodPressure(map, p)).toBe('urgent');
+    addUnit(map, UnitType.SWORDSMAN, 0, 1);
+    expect(foodPressure(map, p)).toBe(FoodPressure.URGENT);
     setFood(map, 50);
-    expect(canSustainUnit(map, p, 'swordsman')).toBe(true);
+    expect(canSustainUnit(map, p, UnitType.SWORDSMAN)).toBe(true);
     setFood(map, 4);
-    expect(canSustainUnit(map, p, 'swordsman')).toBe(false);
+    expect(canSustainUnit(map, p, UnitType.SWORDSMAN)).toBe(false);
   });
 });
 
 describe('starving state refresh', () => {
   it('building or destroying a farm updates the village starving flag at once', () => {
     const { map, p, village: v } = setup();
-    p.skills.push('agriculture');
+    p.skills.push(SkillId.AGRICULTURE);
     setFood(map, 0);
-    addUnit(map, 'warrior', 0, 1);
+    addUnit(map, UnitType.WARRIOR, 0, 1);
     const sim = new Simulator(map, [p], GameMode.CAPTURE, { rng: () => 0.5 });
     sim.startGame();
     sim.drainEvents();
     v.settlement!.starving = true;
-    expect(sim.applyCommand({ type: 'build', q: 1, r: 0, kind: 'farm' })).toBe(true);
+    expect(sim.applyCommand({ type: CommandType.BUILD, q: 1, r: 0, kind: BuildingKind.FARM })).toBe(true);
     expect(v.settlement!.starving).toBe(false);
     expect(tileAt(map, 0, 1)!.unit!.hp).toBe(50); // nobody was hurt by the check
-    expect(sim.applyCommand({ type: 'destroyBuilding', q: 1, r: 0 })).toBe(true);
+    expect(sim.applyCommand({ type: CommandType.DESTROY_BUILDING, q: 1, r: 0 })).toBe(true);
     expect(v.settlement!.starving).toBe(true);
   });
 });
@@ -379,7 +379,7 @@ describe('starving state on spawn', () => {
     sim.startGame();
     sim.drainEvents();
     expect(v.settlement!.starving).toBeFalsy();
-    expect(sim.applyCommand({ type: 'spawn', q: 0, r: 0, unitType: 'warrior' })).toBe(true);
+    expect(sim.applyCommand({ type: CommandType.SPAWN, q: 0, r: 0, unitType: UnitType.WARRIOR })).toBe(true);
     expect(v.settlement!.starving).toBe(true);
   });
 });
@@ -388,17 +388,17 @@ describe('starving state on unit death', () => {
   it('killing a unit clears starvation once the village can feed the rest', () => {
     const { map, p, village: v } = setup();
     setFood(map, 1); // feeds one warrior, not two
-    addUnit(map, 'warrior', 0, 1);
-    addUnit(map, 'warrior', -1, 1);
+    addUnit(map, UnitType.WARRIOR, 0, 1);
+    addUnit(map, UnitType.WARRIOR, -1, 1);
     const enemy = buildPlayers(Tribe.Villagers, 2, new SeededRandom(1))[1]!;
-    addUnit(map, 'swordsman', 1, 1, 1, null);
+    addUnit(map, UnitType.SWORDSMAN, 1, 1, 1, null);
     tileAt(map, 0, 1)!.unit!.hp = 1;
     const sim = new Simulator(map, [p, enemy], GameMode.CAPTURE, { rng: () => 0.99 });
     sim.startGame();
     sim.currentPlayerIndex = 1;
     sim.drainEvents();
     v.settlement!.starving = true;
-    expect(sim.applyCommand({ type: 'attack', unitId: 'swordsman-1,1', q: 0, r: 1 })).toBe(true);
+    expect(sim.applyCommand({ type: CommandType.ATTACK, unitId: 'swordsman-1,1', q: 0, r: 1 })).toBe(true);
     expect(tileAt(map, 0, 1)!.unit?.owner).not.toBe(0); // dead (the attacker may advance onto the tile)
     expect(v.settlement!.starving).toBe(false);
   });
@@ -412,14 +412,14 @@ describe('starving state on capture', () => {
     target.settlement = { owner: 1, level: 1, captureReady: true, stock: { wood: 1, stone: 0, ore: 0, food: 0 } };
     target.ownedBy = 1;
     target.claimedByVillage = { q: 0, r: 3 };
-    const cap = makeUnit('cap', 0, 'warrior', 0, 3); // becomes the village's unit: 1 food a round
+    const cap = makeUnit('cap', 0, UnitType.WARRIOR, 0, 3); // becomes the village's unit: 1 food a round
     target.unit = cap;
     setFood(map, 0);
     const sim = new Simulator(map, [p], GameMode.CAPTURE, { rng: () => 0.5 });
     sim.startGame();
     sim.drainEvents();
     expect(target.settlement.starving).toBeFalsy();
-    expect(sim.applyCommand({ type: 'capture', q: 0, r: 3, unitId: 'cap' })).toBe(true);
+    expect(sim.applyCommand({ type: CommandType.CAPTURE, q: 0, r: 3, unitId: 'cap' })).toBe(true);
     expect(target.settlement.owner).toBe(0);
     expect(target.settlement.starving).toBe(true);
   });
@@ -436,7 +436,7 @@ function setupNetwork(connect: boolean): { map: GameMap; p: Player; a: MapTile; 
     t.ownedBy = 0;
     t.claimedByVillage = { q: 3, r: 0 };
   }
-  tileAt(map, 3, -1)!.building = { kind: 'farm', level: 1 };
+  tileAt(map, 3, -1)!.building = { kind: BuildingKind.FARM, level: 1 };
   if (connect) for (const [q, r] of [[1, 0], [2, 0]] as const) tileAt(map, q, r)!.roadOwner = 0;
   setFood(map, 0);
   return { map, p, a, b };
@@ -445,7 +445,7 @@ function setupNetwork(connect: boolean): { map: GameMap; p: Player; a: MapTile; 
 describe('food networks', () => {
   it('connected villages share farm food', () => {
     const { map, p, a } = setupNetwork(true);
-    addUnit(map, 'warrior', 0, 1);
+    addUnit(map, UnitType.WARRIOR, 0, 1);
     expect(villageFood(map, a, p)).toMatchObject({ production: 2, upkeep: 1, networkSize: 2 });
     expect(applyFood(map, p)).toEqual([]);
     expect(a.settlement!.starving).toBe(false);
@@ -453,7 +453,7 @@ describe('food networks', () => {
 
   it('unconnected villages do not', () => {
     const { map, p, a } = setupNetwork(false);
-    addUnit(map, 'warrior', 0, 1);
+    addUnit(map, UnitType.WARRIOR, 0, 1);
     expect(villageFood(map, a, p)).toMatchObject({ production: 0, networkSize: 1 });
     expect(applyFood(map, p)).toHaveLength(1);
     expect(a.settlement!.starving).toBe(true);
@@ -463,7 +463,7 @@ describe('food networks', () => {
     const { map, p } = setupNetwork(true);
     tileAt(map, 3, -1)!.building = null;
     setFood(map, 2);
-    addUnit(map, 'swordsman', 0, 1); // needs 3, gets 2: 1/3 of 10 hp, rounded
+    addUnit(map, UnitType.SWORDSMAN, 0, 1); // needs 3, gets 2: 1/3 of 10 hp, rounded
     applyFood(map, p);
     expect(tileAt(map, 0, 1)!.unit!.hp).toBe(80 - 3);
   });
@@ -473,9 +473,9 @@ describe('food networks', () => {
     tileAt(map, 3, -1)!.building = null;
     b.settlement!.level = 2;
     setFood(map, 3);
-    addUnit(map, 'warrior', 0, 1); // village A (level 1)
-    addUnit(map, 'warrior', 2, 1, 0, { q: 3, r: 0 }); // village B (level 2), fed first
-    addUnit(map, 'swordsman', 3, -2, 0, { q: 3, r: 0 }); // B's hungriest unit, fed before B's warrior
+    addUnit(map, UnitType.WARRIOR, 0, 1); // village A (level 1)
+    addUnit(map, UnitType.WARRIOR, 2, 1, 0, { q: 3, r: 0 }); // village B (level 2), fed first
+    addUnit(map, UnitType.SWORDSMAN, 3, -2, 0, { q: 3, r: 0 }); // B's hungriest unit, fed before B's warrior
     const reports = applyFood(map, p);
     expect(b.settlement!.starving).toBe(true);
     expect(a.settlement!.starving).toBe(true);
@@ -488,15 +488,15 @@ describe('food networks', () => {
 
   it('building a road re-evaluates starvation at once', () => {
     const { map, p, a } = setupNetwork(false);
-    p.skills.push('roads');
-    addUnit(map, 'warrior', 0, 1);
+    p.skills.push(SkillId.ROADS);
+    addUnit(map, UnitType.WARRIOR, 0, 1);
     const sim = new Simulator(map, [p], GameMode.CAPTURE, { rng: () => 0.5 });
     sim.startGame();
     sim.drainEvents();
     p.resources = { money: 100 };
     tileAt(map, 0, 0)!.settlement!.stock = { wood: 100, stone: 100, ore: 0, food: 0 };
     tileAt(map, 1, 0)!.roadOwner = 0;
-    expect(sim.applyCommand({ type: 'buildRoad', q: 2, r: 0 })).toBe(true);
+    expect(sim.applyCommand({ type: CommandType.BUILD_ROAD, q: 2, r: 0 })).toBe(true);
     expect(a.settlement!.starving).toBe(false);
   });
 });
@@ -504,15 +504,15 @@ describe('food networks', () => {
 describe('AI food planning', () => {
   it('computes the food state of each network separately', () => {
     const { map, p, a } = setupNetwork(false);
-    addUnit(map, 'swordsman', 0, 1); // A: upkeep 3, no farms
+    addUnit(map, UnitType.SWORDSMAN, 0, 1); // A: upkeep 3, no farms
     const states = foodNetworkStates(map, p);
     expect(states).toHaveLength(2);
     const stateA = states.find((n) => n.villages.includes(a))!;
-    expect(stateA).toMatchObject({ production: 0, upkeep: 3, balance: -3, pressure: 'urgent' });
+    expect(stateA).toMatchObject({ production: 0, upkeep: 3, balance: -3, pressure: FoodPressure.URGENT });
     expect(states.find((n) => n !== stateA)).toMatchObject({ balance: 2 });
-    expect(foodPressure(map, p, a)).toBe('urgent');
-    expect(canSustainUnit(map, p, 'warrior', 6, tileAt(map, 3, 0)!)).toBe(true);
-    expect(canSustainUnit(map, p, 'warrior', 6, a)).toBe(false);
+    expect(foodPressure(map, p, a)).toBe(FoodPressure.URGENT);
+    expect(canSustainUnit(map, p, UnitType.WARRIOR, 6, tileAt(map, 3, 0)!)).toBe(true);
+    expect(canSustainUnit(map, p, UnitType.WARRIOR, 6, a)).toBe(false);
   });
 
   it('prefers roads to a surplus village over a farm when the gap is a single tile', () => {
@@ -520,10 +520,10 @@ describe('AI food planning', () => {
     const extra = tileAt(map, 3, -2)!; // a second farm: the surplus village has more than a farm's worth
     extra.ownedBy = 0;
     extra.claimedByVillage = { q: 3, r: 0 };
-    extra.building = { kind: 'farm', level: 1 };
-    p.skills.push('agriculture', 'roads');
+    extra.building = { kind: BuildingKind.FARM, level: 1 };
+    p.skills.push(SkillId.AGRICULTURE, SkillId.ROADS);
     tileAt(map, 1, 0)!.roadOwner = 0; // only (2,0) is missing
-    addUnit(map, 'swordsman', 0, 1);
+    addUnit(map, UnitType.SWORDSMAN, 0, 1);
     const plan = planFoodFixes(map, p, foodNetworkStates(map, p));
     expect(plan.linkFirst.size).toBe(1);
     expect(plan.roads.map((r) => `${r.tile.q},${r.tile.r}`)).toContain('2,0');
@@ -531,21 +531,21 @@ describe('AI food planning', () => {
 
   it('prefers a farm when the surplus village is far away', () => {
     const { map, p } = setupNetwork(false);
-    p.skills.push('agriculture', 'roads');
-    addUnit(map, 'swordsman', 0, 1);
+    p.skills.push(SkillId.AGRICULTURE, SkillId.ROADS);
+    addUnit(map, UnitType.SWORDSMAN, 0, 1);
     const plan = planFoodFixes(map, p, foodNetworkStates(map, p));
     expect(plan.linkFirst.size).toBe(0);
   });
 
   it('plans ports on a shared lake when no farm or road is possible', () => {
     const { map, p } = setupNetwork(false);
-    p.skills.push('water'); // no Agriculture, no Roads
+    p.skills.push(SkillId.WATER); // no Agriculture, no Roads
     for (const [q, r] of [[1, 0], [2, 0]] as const) {
       const t = tileAt(map, q, r)!;
       t.terrain = TileType.Water;
       t.ownedBy = 0;
     }
-    addUnit(map, 'swordsman', 0, 1);
+    addUnit(map, UnitType.SWORDSMAN, 0, 1);
     const plan = planFoodFixes(map, p, foodNetworkStates(map, p));
     expect(plan.linkFirst.size).toBe(1);
     expect(plan.ports.map((x) => `${x.tile.q},${x.tile.r}`).sort()).toEqual(['1,0', '2,0']);
@@ -554,39 +554,39 @@ describe('AI food planning', () => {
 
   it('building the second port joins the networks and ends the starvation', () => {
     const { map, p, a } = setupNetwork(false);
-    p.skills.push('water');
+    p.skills.push(SkillId.WATER);
     for (const [q, r] of [[1, 0], [2, 0]] as const) {
       const t = tileAt(map, q, r)!;
       t.terrain = TileType.Water;
       t.ownedBy = 0;
     }
-    addUnit(map, 'swordsman', 0, 1);
-    tileAt(map, 1, 0)!.building = { kind: 'port', level: 1 };
-    tileAt(map, 2, 0)!.building = { kind: 'port', level: 1 };
+    addUnit(map, UnitType.SWORDSMAN, 0, 1);
+    tileAt(map, 1, 0)!.building = { kind: BuildingKind.PORT, level: 1 };
+    tileAt(map, 2, 0)!.building = { kind: BuildingKind.PORT, level: 1 };
     expect(villageFood(map, a, p)).toMatchObject({ networkSize: 2, production: 2 });
   });
 
   it('falls back to roads when no farm can be built', () => {
     const { map, p } = setupNetwork(false);
-    p.skills.push('roads'); // no Agriculture: farms are impossible
-    addUnit(map, 'swordsman', 0, 1);
+    p.skills.push(SkillId.ROADS); // no Agriculture: farms are impossible
+    addUnit(map, UnitType.SWORDSMAN, 0, 1);
     const plan = planFoodFixes(map, p, foodNetworkStates(map, p));
     expect(plan.linkFirst.size).toBe(1);
   });
 });
 
 describe('burning farms and granaries', () => {
-  function burnSetup(kind: 'farm' | 'granary' = 'farm'): { map: GameMap; tile: MapTile; unit: ReturnType<typeof makeUnit> } {
+  function burnSetup(kind: BuildingKind.FARM | BuildingKind.GRANARY = BuildingKind.FARM): { map: GameMap; tile: MapTile; unit: ReturnType<typeof makeUnit> } {
     const { map } = setup();
     const tile = tileAt(map, 1, 0)!;
-    tile.building = kind === 'farm' ? { kind, level: 1 } : { kind, level: 1, food: 3 };
-    const unit = makeUnit('raider', 1, 'warrior', 1, 0);
+    tile.building = kind === BuildingKind.FARM ? { kind, level: 1 } : { kind, level: 1, food: 3 };
+    const unit = makeUnit('raider', 1, UnitType.WARRIOR, 1, 0);
     tile.unit = unit;
     return { map, tile, unit };
   }
 
   it('an enemy unit standing on a farm or granary may burn it', () => {
-    for (const kind of ['farm', 'granary'] as const) {
+    for (const kind of [BuildingKind.FARM, BuildingKind.GRANARY] as const) {
       const { tile, unit } = burnSetup(kind);
       expect(canBurnBuilding(tile, unit)).toBe(true);
       expect(burnBuilding(tile, unit)).toBe(true);
@@ -608,7 +608,7 @@ describe('burning farms and granaries', () => {
     tile.ownedBy = 1;
     expect(canBurnBuilding(tile, unit)).toBe(false);
     tile.ownedBy = 0;
-    tile.building = { kind: 'mine', level: 1 };
+    tile.building = { kind: BuildingKind.MINE, level: 1 };
     expect(canBurnBuilding(tile, unit)).toBe(false);
   });
 
@@ -619,10 +619,10 @@ describe('burning farms and granaries', () => {
     sim.startGame();
     sim.currentPlayerIndex = 1;
     sim.drainEvents();
-    expect(sim.applyCommand({ type: 'burn', unitId: 'raider' })).toBe(true);
+    expect(sim.applyCommand({ type: CommandType.BURN, unitId: 'raider' })).toBe(true);
     expect(tile.building).toBeNull();
     expect(sim.drainEvents()).toContainEqual({ type: 'burned', unitId: 'raider', kind: 'farm', q: 1, r: 0, playerIndex: 1 });
-    expect(sim.applyCommand({ type: 'burn', unitId: 'raider' })).toBe(false);
+    expect(sim.applyCommand({ type: CommandType.BURN, unitId: 'raider' })).toBe(false);
   });
 });
 
@@ -631,7 +631,7 @@ describe('destroying roads', () => {
     const { map } = setup();
     const tile = tileAt(map, 1, 0)!;
     tile.roadOwner = 0;
-    const unit = makeUnit('raider', 1, 'warrior', 1, 0);
+    const unit = makeUnit('raider', 1, UnitType.WARRIOR, 1, 0);
     tile.unit = unit;
     return { map, tile, unit };
   }
@@ -662,7 +662,7 @@ describe('destroying roads', () => {
 
   it('an enemy farm on the tile has to be burned before its road', () => {
     const { tile, unit } = roadSetup();
-    tile.building = { kind: 'farm', level: 1 };
+    tile.building = { kind: BuildingKind.FARM, level: 1 };
     expect(canBurnRoad(tile, unit)).toBe(false);
     expect(burnBuilding(tile, unit)).toBe(true);
     expect(tile.roadOwner).toBe(0);
@@ -677,28 +677,28 @@ describe('destroying roads', () => {
     sim.startGame();
     sim.currentPlayerIndex = 1;
     sim.drainEvents();
-    expect(sim.applyCommand({ type: 'burnRoad', unitId: 'raider' })).toBe(true);
+    expect(sim.applyCommand({ type: CommandType.BURN_ROAD, unitId: 'raider' })).toBe(true);
     expect(tile.roadOwner).toBeNull();
     expect(sim.drainEvents()).toContainEqual({ type: 'roadBurned', unitId: 'raider', q: 1, r: 0, playerIndex: 1, owner: 0 });
-    expect(sim.applyCommand({ type: 'burnRoad', unitId: 'raider' })).toBe(false);
+    expect(sim.applyCommand({ type: CommandType.BURN_ROAD, unitId: 'raider' })).toBe(false);
   });
 
   it('a catapult may target an enemy road, but hits its building first', () => {
     const { map, tile } = roadSetup();
     tile.unit = null;
-    const cat = makeUnit('cat', 1, 'catapult', 3, 0);
+    const cat = makeUnit('cat', 1, UnitType.CATAPULT, 3, 0);
     tileAt(map, 3, 0)!.unit = cat;
     expect(isEnemySiegeTarget(tile, 1)).toBe(true);
     expect(isEnemySiegeTarget(tile, 0)).toBe(false);
-    tile.building = { kind: 'farm', level: 1 };
+    tile.building = { kind: BuildingKind.FARM, level: 1 };
     expect(performSiege(cat, tile, () => 0.99).destroyed).toBeNull(); // 2 hp: the first hit only damages
     expect(tile.roadOwner).toBe(0);
     cat.hasAttacked = false;
-    expect(performSiege(cat, tile, () => 0.99).destroyed).toBe('building');
+    expect(performSiege(cat, tile, () => 0.99).destroyed).toBe(SiegeTargetKind.BUILDING);
     expect(tile.building).toBeNull();
     expect(tile.roadOwner).toBe(0);
     cat.hasAttacked = false;
-    expect(performSiege(cat, tile, () => 0.99).destroyed).toBe('road');
+    expect(performSiege(cat, tile, () => 0.99).destroyed).toBe(SiegeTargetKind.ROAD);
     expect(tile.roadOwner).toBeNull();
   });
 });
@@ -707,15 +707,15 @@ describe('round end', () => {
   it('the simulator runs the food step and reports starvation', () => {
     const { map, p } = setup();
     setFood(map, 0);
-    addUnit(map, 'warrior', 0, 1);
+    addUnit(map, UnitType.WARRIOR, 0, 1);
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
     players[0] = p;
     const sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5 });
     sim.startGame();
     sim.drainEvents();
-    for (let i = 0; i < players.length; i++) sim.applyCommand({ type: 'endTurn' });
+    for (let i = 0; i < players.length; i++) sim.applyCommand({ type: CommandType.END_TURN });
     const events = sim.drainEvents();
-    expect(events.find((e) => e.type === 'starvation')).toMatchObject({ type: 'starvation', q: 0, r: 0, playerIndex: 0 });
+    expect(events.find((e) => e.type === GameEventType.STARVATION)).toMatchObject({ type: GameEventType.STARVATION, q: 0, r: 0, playerIndex: 0 });
     expect(tileAt(map, 0, 1)!.unit!.hp).toBeLessThan(50);
   });
 

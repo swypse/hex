@@ -23,6 +23,7 @@ import { canBuildRoad, ROAD_COST, villageConnectedNodes } from './roads';
 import { canBuildBridge, BRIDGE_COST } from './bridges';
 import { bonusEligibleFor } from './bonus';
 import { bottleCollectableFor } from './bottles';
+import { SkillId } from '@enums';
 
 const CHEAPEST_UNIT_PRICE = Math.min(
   ...Object.values(UNIT_TYPES)
@@ -32,8 +33,8 @@ const CHEAPEST_UNIT_PRICE = Math.min(
 
 /** True when the player can take at least one action anywhere this turn. */
 export function hasAnyAvailableAction(map: GameMap, player: Player, turn: number): boolean {
-  const canClimb = hasSkill(player, 'climbing');
-  const canDock = hasSkill(player, 'navigation');
+  const canClimb = hasSkill(player, SkillId.CLIMBING);
+  const canDock = hasSkill(player, SkillId.NAVIGATION);
 
   for (const tile of map.tiles) {
     const unit = tile.unit;

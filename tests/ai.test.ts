@@ -7,9 +7,9 @@ import { TileType } from '../src/game/tile-types';
 import { Tribe } from '../src/game/tribes';
 import { Unit } from '../src/game/units';
 import { SeededRandom } from '../src/util/random';
-import { SKILLS, type SkillId } from '../src/game/skills';
+import { SKILLS } from '../src/game/skills';
 import { migrateLegacyResources } from '../src/game/stock';
-import { GameMode } from '@enums';
+import { AiActionType, AiDifficulty, GameMode, SkillId, UnitType } from '@enums';
 
 /** Moves the legacy-literal materials of a test player into its capital before planning. */
 function fund<T extends import('../src/game/players').Player>(map: import('../src/game/map-gen').GameMap, player: T): T {
@@ -29,23 +29,23 @@ function makeTile(
 }
 
 function makeWarrior(id: string, owner: number, q: number, r: number): Unit {
-  return { id, owner, type: 'warrior', q, r, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 50, attack: 20, attackDistance: 1, defense: 10, spawnVillage: null };
+  return { id, owner, type: UnitType.WARRIOR, q, r, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 50, attack: 20, attackDistance: 1, defense: 10, spawnVillage: null };
 }
 
 function makeRider(id: string, owner: number, q: number, r: number): Unit {
-  return { id, owner, type: 'rider', q, r, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 40, attack: 20, attackDistance: 1, defense: 7, spawnVillage: null };
+  return { id, owner, type: UnitType.RIDER, q, r, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 40, attack: 20, attackDistance: 1, defense: 7, spawnVillage: null };
 }
 
 function makeArcher(id: string, owner: number, q: number, r: number, hp = 40): Unit {
-  return { id, owner, type: 'archer', q, r, hasMoved: false, hasAttacked: false, hasHealed: false, hp, attack: 20, attackDistance: 2, defense: 7, spawnVillage: { q, r } };
+  return { id, owner, type: UnitType.ARCHER, q, r, hasMoved: false, hasAttacked: false, hasHealed: false, hp, attack: 20, attackDistance: 2, defense: 7, spawnVillage: { q, r } };
 }
 
 function makeSwordsman(id: string, owner: number, q: number, r: number): Unit {
-  return { id, owner, type: 'swordsman', q, r, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 80, attack: 40, attackDistance: 1, defense: 20, spawnVillage: null };
+  return { id, owner, type: UnitType.SWORDSMAN, q, r, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 80, attack: 40, attackDistance: 1, defense: 20, spawnVillage: null };
 }
 
 function makeKnight(id: string, owner: number, q: number, r: number): Unit {
-  return { id, owner, type: 'knight', q, r, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 60, attack: 40, attackDistance: 1, defense: 7, spawnVillage: null };
+  return { id, owner, type: UnitType.KNIGHT, q, r, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 60, attack: 40, attackDistance: 1, defense: 7, spawnVillage: null };
 }
 
 function aiPlayer(): import('../src/game/players').Player {
@@ -92,13 +92,13 @@ describe('planAiActions', () => {
     const unit = map.tiles.find((t) => t.unit)!.unit!;
     const reachable = new Set(reachableTargets(map, unit).map((t) => `${t.q},${t.r}`));
     for (const a of planSeeds(map, aiPlayer(), 10)) {
-      if (a.type === 'move') expect(reachable.has(`${a.q},${a.r}`)).toBe(true);
+      if (a.type === AiActionType.MOVE) expect(reachable.has(`${a.q},${a.r}`)).toBe(true);
     }
   });
 
   it('does not plan moves for other players units', () => {
     for (const a of planSeeds(makeAiMap(), aiPlayer(), 10)) {
-      if (a.type === 'move') expect(a.unitId).toBe('w1');
+      if (a.type === AiActionType.MOVE) expect(a.unitId).toBe('w1');
     }
   });
 
@@ -106,8 +106,8 @@ describe('planAiActions', () => {
     const rich = aiPlayer();
     rich.resources.wood = 10; // an upgrade must leave the wood of a first farm
     const all = planSeeds(makeAiMap(), rich, 40);
-    expect(all.some((a) => a.type === 'spawn')).toBe(true);
-    expect(all.some((a) => a.type === 'upgrade')).toBe(true);
+    expect(all.some((a) => a.type === AiActionType.SPAWN)).toBe(true);
+    expect(all.some((a) => a.type === AiActionType.UPGRADE)).toBe(true);
   });
 
   it('plans a capture when parked on a capture-ready foreign village', () => {
@@ -115,23 +115,23 @@ describe('planAiActions', () => {
     map.tiles[0]!.settlement!.owner = 0;
     map.tiles[0]!.settlement!.captureReady = true;
     map.tiles[0]!.unit = makeWarrior('ai1', 1, 0, 0);
-    expect(planSeeds(map, aiPlayer(), 40).some((a) => a.type === 'capture')).toBe(true);
+    expect(planSeeds(map, aiPlayer(), 40).some((a) => a.type === AiActionType.CAPTURE)).toBe(true);
   });
 
   it('plans an attack when an enemy is adjacent', () => {
     const map = makeAiMap();
     map.tiles.push(makeTile(0, 1, 0, null, makeWarrior('enemy', 0, 0, 1)));
-    expect(planSeeds(map, aiPlayer(), 40).some((a) => a.type === 'attack')).toBe(true);
+    expect(planSeeds(map, aiPlayer(), 40).some((a) => a.type === AiActionType.ATTACK)).toBe(true);
   });
 
   it('sieges an enemy village when a catapult has no unit targets', () => {
     const map: GameMap = { radius: 4, tiles: [], spawns: [] };
-    const catapult: Unit = { id: 'cat1', owner: 1, type: 'catapult', q: 0, r: 0, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 30, attack: 50, attackDistance: 4, defense: 0, spawnVillage: null };
+    const catapult: Unit = { id: 'cat1', owner: 1, type: UnitType.CATAPULT, q: 0, r: 0, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 30, attack: 50, attackDistance: 4, defense: 0, spawnVillage: null };
     const enemyVillage = makeTile(2, 0, 0, { owner: 0, level: 2, captureReady: false });
     map.tiles.push(makeTile(0, 0, null, null, catapult), enemyVillage);
-    const attacks = planSeeds(map, aiPlayer(), 40).filter((a) => a.type === 'attack');
+    const attacks = planSeeds(map, aiPlayer(), 40).filter((a) => a.type === AiActionType.ATTACK);
     expect(attacks.length).toBeGreaterThan(0);
-    if (attacks[0]!.type === 'attack') {
+    if (attacks[0]!.type === AiActionType.ATTACK) {
       expect(attacks[0]!.q).toBe(2);
       expect(attacks[0]!.r).toBe(0);
     }
@@ -139,13 +139,13 @@ describe('planAiActions', () => {
 
   it('prefers attacking an enemy unit over sieging a village', () => {
     const map: GameMap = { radius: 4, tiles: [], spawns: [] };
-    const catapult: Unit = { id: 'cat2', owner: 1, type: 'catapult', q: 0, r: 0, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 30, attack: 50, attackDistance: 4, defense: 0, spawnVillage: null };
+    const catapult: Unit = { id: 'cat2', owner: 1, type: UnitType.CATAPULT, q: 0, r: 0, hasMoved: false, hasAttacked: false, hasHealed: false, hp: 30, attack: 50, attackDistance: 4, defense: 0, spawnVillage: null };
     const enemyVillage = makeTile(2, 0, 0, { owner: 0, level: 2, captureReady: false });
     const enemyUnit = makeTile(2, 0, 0, { owner: 0, level: 2, captureReady: false }, makeWarrior('enemy', 0, 2, 0));
     map.tiles.push(makeTile(0, 0, null, null, catapult), enemyVillage, enemyUnit);
-    const attacks = planSeeds(map, aiPlayer(), 40).filter((a) => a.type === 'attack');
+    const attacks = planSeeds(map, aiPlayer(), 40).filter((a) => a.type === AiActionType.ATTACK);
     expect(attacks.length).toBeGreaterThan(0);
-    if (attacks[0]!.type === 'attack') {
+    if (attacks[0]!.type === AiActionType.ATTACK) {
       expect(attacks[0]!.q).toBe(2);
       expect(attacks[0]!.r).toBe(0);
     }
@@ -159,8 +159,8 @@ describe('planAiActions', () => {
       makeTile(2, 0, 0, null, makeWarrior('enemy', 0, 2, 0)),
     );
     const actions = planAiActions(map, fund(map, aiPlayer()), new SeededRandom(1));
-    const move = actions.find((a) => a.type === 'move');
-    const attack = actions.find((a) => a.type === 'attack');
+    const move = actions.find((a) => a.type === AiActionType.MOVE);
+    const attack = actions.find((a) => a.type === AiActionType.ATTACK);
     expect(move).toBeDefined();
     expect(attack).toBeDefined();
     expect(actions.indexOf(move!) < actions.indexOf(attack!)).toBe(true);
@@ -175,7 +175,7 @@ describe('planAiActions', () => {
       makeTile(3, 0, 0, null, makeRider('enemy', 0, 3, 0)),
     );
     const actions = planAiActions(map, fund(map, aiPlayer()), new SeededRandom(1));
-    expect(actions.some((a) => a.type === 'move')).toBe(false);
+    expect(actions.some((a) => a.type === AiActionType.MOVE)).toBe(false);
   });
 
   it('keeps the last defender in an endangered village when ganging up would move it out', () => {
@@ -190,7 +190,7 @@ describe('planAiActions', () => {
       makeTile(2, 0, 0, null, makeRider('enemy', 0, 2, 0)),
     );
     const all = planSeeds(map, aiPlayer(), 20);
-    expect(all.some((a) => a.type === 'move' && a.unitId === 'w1')).toBe(false);
+    expect(all.some((a) => a.type === AiActionType.MOVE && a.unitId === 'w1')).toBe(false);
   });
 
   it('keeps the last defender in an endangered village when an enemy sits adjacent', () => {
@@ -205,7 +205,7 @@ describe('planAiActions', () => {
       makeTile(0, -1, null, null, makeWarrior('w2', 1, 0, -1)),
     );
     const all = planSeeds(map, aiPlayer(), 20);
-    expect(all.some((a) => a.type === 'move' && a.unitId === 'w1')).toBe(false);
+    expect(all.some((a) => a.type === AiActionType.MOVE && a.unitId === 'w1')).toBe(false);
   });
 
   it('sends a unit to capture a reachable free village', () => {
@@ -216,9 +216,9 @@ describe('planAiActions', () => {
       makeTile(2, 0),
     );
     const actions = planAiActions(map, fund(map, aiPlayer()), new SeededRandom(1));
-    const move = actions.find((a) => a.type === 'move');
+    const move = actions.find((a) => a.type === AiActionType.MOVE);
     expect(move).toBeDefined();
-    if (move && move.type === 'move') {
+    if (move && move.type === AiActionType.MOVE) {
       expect(move.q).toBe(1);
       expect(move.r).toBe(0);
     }
@@ -226,11 +226,11 @@ describe('planAiActions', () => {
 
   it('spawns the best affordable unit type', () => {
     const map = makeAiMap();
-    const player = { ...aiPlayer(), skills: ['swordsman'] as import('../src/game/players').Player['skills'] };
-    const spawns = planSeeds(map, player, 40).filter((a) => a.type === 'spawn');
+    const player = { ...aiPlayer(), skills: [SkillId.SWORDSMAN] as import('../src/game/players').Player['skills'] };
+    const spawns = planSeeds(map, player, 40).filter((a) => a.type === AiActionType.SPAWN);
     expect(spawns.length).toBeGreaterThan(0);
     for (const s of spawns) {
-      if (s.type === 'spawn') expect(s.unitType).toBe('swordsman');
+      if (s.type === AiActionType.SPAWN) expect(s.unitType).toBe(UnitType.SWORDSMAN);
     }
   });
 
@@ -241,11 +241,11 @@ describe('planAiActions', () => {
       makeTile(1, 0),
       makeTile(2, 0, 0, null, makeRider('enemy', 0, 2, 0)),
     );
-    const player = { ...aiPlayer(), skills: ['shields' as SkillId], resources: { wood: 5, stone: 5, money: 10, ore: 3, food: 20 } };
-    const spawns = planSeeds(map, player, 40).filter((a) => a.type === 'spawn');
+    const player = { ...aiPlayer(), skills: [SkillId.SHIELDS as SkillId], resources: { wood: 5, stone: 5, money: 10, ore: 3, food: 20 } };
+    const spawns = planSeeds(map, player, 40).filter((a) => a.type === AiActionType.SPAWN);
     expect(spawns.length).toBeGreaterThan(0);
     for (const s of spawns) {
-      if (s.type === 'spawn') expect(s.unitType).toBe('shield');
+      if (s.type === AiActionType.SPAWN) expect(s.unitType).toBe(UnitType.SHIELD);
     }
   });
 
@@ -256,11 +256,11 @@ describe('planAiActions', () => {
       makeTile(1, 0),
       makeTile(5, 0, null, { owner: null, level: 1, captureReady: false }),
     );
-    const player = { ...aiPlayer(), resources: { wood: 5, stone: 5, money: 10, ore: 0, food: 20 }, skills: ['riding'] as import('../src/game/players').Player['skills'] };
-    const spawns = planSeeds(map, player, 40).filter((a) => a.type === 'spawn');
+    const player = { ...aiPlayer(), resources: { wood: 5, stone: 5, money: 10, ore: 0, food: 20 }, skills: [SkillId.RIDING] as import('../src/game/players').Player['skills'] };
+    const spawns = planSeeds(map, player, 40).filter((a) => a.type === AiActionType.SPAWN);
     expect(spawns.length).toBeGreaterThan(0);
     for (const s of spawns) {
-      if (s.type === 'spawn') expect(s.unitType).toBe('rider');
+      if (s.type === AiActionType.SPAWN) expect(s.unitType).toBe(UnitType.RIDER);
     }
   });
 
@@ -277,9 +277,9 @@ describe('planAiActions', () => {
       makeTile(5, 0, 0, { owner: 0, level: 1, captureReady: false }),
     );
     const all = planSeeds(map, aiPlayer(), 20);
-    const moves = all.filter((a) => a.type === 'move');
+    const moves = all.filter((a) => a.type === AiActionType.MOVE);
     expect(moves.length).toBeGreaterThan(0);
-    expect(moves.some((m) => m.type === 'move' && m.q > 0)).toBe(true);
+    expect(moves.some((m) => m.type === AiActionType.MOVE && m.q > 0)).toBe(true);
   });
 
   it('keeps the last defender on its village instead of trading its life for a kill', () => {
@@ -292,9 +292,9 @@ describe('planAiActions', () => {
       makeTile(0, 0, 1, { owner: 1, level: 1, captureReady: false }, makeArcher('g', 1, 0, 0, 5)),
       makeTile(1, 0, 0, null, makeKnight('enemy', 0, 1, 0)),
     );
-    const player = { ...aiPlayer(), difficulty: 'easy' as const, resources: { wood: 5, stone: 5, money: 0, ore: 0, food: 20 } };
+    const player = { ...aiPlayer(), difficulty: AiDifficulty.EASY, resources: { wood: 5, stone: 5, money: 0, ore: 0, food: 20 } };
     const all = planSeeds(map, player, 20);
-    expect(all.some((a) => a.type === 'attack' && a.unitId === 'g')).toBe(false);
+    expect(all.some((a) => a.type === AiActionType.ATTACK && a.unitId === 'g')).toBe(false);
   });
 
   it('spawns a fresh defender on the village when the last defender attacks to its death', () => {
@@ -306,12 +306,12 @@ describe('planAiActions', () => {
       makeTile(0, 0, 1, { owner: 1, level: 1, captureReady: false }, makeArcher('g', 1, 0, 0, 5)),
       makeTile(1, 0, 0, null, makeKnight('enemy', 0, 1, 0)),
     );
-    const player = { ...aiPlayer(), difficulty: 'easy' as const, resources: { wood: 5, stone: 5, money: 100, ore: 0, food: 20 } };
+    const player = { ...aiPlayer(), difficulty: AiDifficulty.EASY, resources: { wood: 5, stone: 5, money: 100, ore: 0, food: 20 } };
     const plans: AiAction[][] = [];
     for (let seed = 1; seed <= 20; seed++) plans.push(planAiActions(map, fund(map, player), new SeededRandom(seed)));
     for (const plan of plans) {
-      if (plan.some((a) => a.type === 'attack' && a.unitId === 'g')) {
-        expect(plan.some((a) => a.type === 'spawn' && a.q === 0 && a.r === 0)).toBe(true);
+      if (plan.some((a) => a.type === AiActionType.ATTACK && a.unitId === 'g')) {
+        expect(plan.some((a) => a.type === AiActionType.SPAWN && a.q === 0 && a.r === 0)).toBe(true);
       }
     }
   });
@@ -328,6 +328,6 @@ describe('AI bridge building', () => {
     p.skills = Object.keys(SKILLS) as SkillId[];
     p.resources = { wood: 100, stone: 100, money: 100, ore: 0, food: 20 };
     const actions = planAiActions(map, fund(map, p), new SeededRandom(1));
-    expect(actions.some((a) => a.type === 'buildBridge')).toBe(true);
+    expect(actions.some((a) => a.type === AiActionType.BUILD_BRIDGE)).toBe(true);
   });
 });

@@ -2,7 +2,7 @@ import { Container, Graphics, BitmapText } from 'pixi.js';
 import { t } from '../../i18n';
 import { gameController } from '../../controller/game-controller';
 import { totalScore } from '../../game/score';
-import { activeBuffs, BUFF_INFO, type BuffId } from '../../game/buffs';
+import { activeBuffs, BUFF_INFO } from '../../game/buffs';
 import { tribeById } from '../../game/tribes';
 import { useGameStore } from '../../store/game-store';
 import { type UIHost, type Widget } from '../host';
@@ -16,8 +16,9 @@ import {
   SCORE_TEXT_Y,
   buffRowPosition,
 } from '../layout';
+import { BuffId, FontSize } from '@enums';
 
-const SCORE_FONT_SIZE = 20;
+const SCORE_FONT_SIZE = FontSize.BIG;
 const SCORE_COLOR = 0xffffff;
 const CHIP_RADIUS = SCORE_CHIP_RADIUS;
 const PAD = SCORE_PAD;

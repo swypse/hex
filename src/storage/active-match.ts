@@ -1,4 +1,5 @@
 import { storageService, type StorageService } from './storage-service';
+import { LobbyRole } from '@enums';
 
 const ACTIVE_MATCH_KEY = 'hex-active-match-v1';
 
@@ -7,7 +8,7 @@ const ACTIVE_MATCH_KEY = 'hex-active-match-v1';
 export const ACTIVE_MATCH_TTL_MS = 45 * 60 * 1000;
 
 export interface ActiveClientMatch {
-  role: 'client';
+  role: LobbyRole.CLIENT;
   code: string;
   name: string;
   /** Relay the room was on, so rejoin uses the same transport (e.g. a
@@ -26,7 +27,7 @@ export interface ActiveMatchStore {
 
 export function createActiveMatchStore(storage: StorageService, ttlMs: number = ACTIVE_MATCH_TTL_MS): ActiveMatchStore {
   const save = (code: string, name: string, relayUrl: string): void => {
-    const record: ActiveClientMatch = { role: 'client', code, name, relayUrl, savedAt: Date.now() };
+    const record: ActiveClientMatch = { role: LobbyRole.CLIENT, code, name, relayUrl, savedAt: Date.now() };
     try {
       storage.setItem(ACTIVE_MATCH_KEY, JSON.stringify(record));
     } catch {
@@ -53,7 +54,7 @@ export function createActiveMatchStore(storage: StorageService, ttlMs: number = 
       }
       const rec = parsed as Partial<ActiveClientMatch>;
       if (
-        rec.role !== 'client' ||
+        rec.role !== LobbyRole.CLIENT ||
         typeof rec.code !== 'string' ||
         typeof rec.name !== 'string' ||
         typeof rec.savedAt !== 'number'
@@ -66,7 +67,7 @@ export function createActiveMatchStore(storage: StorageService, ttlMs: number = 
         return null;
       }
       return {
-        role: 'client',
+        role: LobbyRole.CLIENT,
         code: rec.code,
         name: rec.name,
         relayUrl: typeof rec.relayUrl === 'string' ? rec.relayUrl : '',

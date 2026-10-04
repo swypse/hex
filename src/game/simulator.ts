@@ -1,9 +1,9 @@
 import { SeededRandom } from '@/util';
-import { GameMode } from '@enums';
-import { type AchievementId, awardAchievementScores, currentlyMetIds, evaluateAchievements } from './achievements';
-import { type AiActionMarker, aiLoggingEnabled, formatAiAction, logAiTurnStart, planAiActions } from './ai';
+import { AchievementId, AiActionType, AiEngine, BonusKind, BottleEffect, BuilderExtraKind, BuildingKind, CommandType, GameEventType, GameMode, Season, SkillId, UnitType } from '@enums';
+import { awardAchievementScores, currentlyMetIds, evaluateAchievements } from './achievements';
+import { type AiActionMarker, aiLoggingEnabled, formatAiAction, logAiTurnStart, planAiActions, planAiActionsSteps } from './ai';
 import type { AiAction } from './ai-types';
-import { bonusEligibleFor, type BonusKind, explorerPath, findClosestVillage, revealExplorerPath } from './bonus';
+import { bonusEligibleFor, explorerPath, findClosestVillage, revealExplorerPath } from './bonus';
 import {
   BOTTLE_HEAL, BOTTLE_MONEY, bottleCollectableFor, collectExpiredBottles, randomBottleEffectKind, touchBottle,
   trySpawnBottle
@@ -16,7 +16,7 @@ import {
 import { captureVillage, villageIncomeTotal } from './capture';
 import { attackableTargets, missChanceFor, performAttack, performSiege } from './combat';
 import { knownTribesFor } from './discovery';
-import { BuildingKind, GameEvent } from './events';
+import { GameEvent } from './events';
 import { exploreUnitPath } from './explore';
 import { applyFood, refreshStarving } from './food';
 import { captureWinnerIndex, computeWinner, quickCaptureScore, quickCaptureTurnsCount } from './game-mode';
@@ -30,10 +30,10 @@ import {
   awardScore, awardTempleScores, CAPTURE_SCORE, COMBO_SCORE, EMPTY_STATS, KILL_SCORE, PIRATE_KILL_SCORE, PlayerStats,
   SKILL_SCORE, UPGRADE_SCORE
 } from './score';
-import { Season, SEASON_LENGTH, seasonForTurn, SEASONS } from './season';
+import { SEASON_LENGTH, seasonForTurn, SEASONS } from './season';
 import { moveUnit, pathBetween, reachableTargets, tileAt } from './selection';
 import { gainShipAbility, revertShip, upgradeShip } from './ship';
-import { hasSkill, openSkill as applySkill, randomUnopenedSkill, SkillId } from './skills';
+import { hasSkill, openSkill as applySkill, randomUnopenedSkill } from './skills';
 import { spawnUnit } from './spawn';
 import { adjacentEnemyVillages } from './stalker';
 import type { GameStateSnapshot } from './state';
@@ -41,66 +41,63 @@ import { addStock, migrateLegacyResources, payAt } from './stock';
 import { stormDamage, stormEligible, stormTargetShips } from './storm';
 import { isWaterType, TileType } from './tile-types';
 import { canPlaceTrapOn, TRAP_COST, trapAlive, trapDamage } from './traps';
-import {
-  canAttack, canDisband, canHeal, canMove, disbandCost, hasPirateDeal, healUnit, makeUnit, movePoints, PIRATE_DEAL_COST,
-  PIRATE_OWNER, Unit, UNIT_MOVE_POINTS, UNIT_TYPES, UnitType
-} from './units';
+import { canAttack, canDisband, canHeal, canMove, disbandCost, hasPirateDeal, healUnit, makeUnit, movePoints, PIRATE_DEAL_COST, PIRATE_OWNER, Unit, UNIT_MOVE_POINTS, UNIT_TYPES } from './units';
 import { buildWall as applyWall, canBuildWall, upgradeVillage } from './village';
 
 export type Command =
-  | { type: 'move'; unitId: string; q: number; r: number }
-  | { type: 'attack'; unitId: string; q: number; r: number }
-  | { type: 'capture'; q: number; r: number; unitId: string }
-  | { type: 'spawn'; q: number; r: number; unitType: UnitType }
-  | { type: 'build'; q: number; r: number; kind: BuildingKind | 'bridge'; unitId?: string }
-  | { type: 'repair'; q: number; r: number }
-  | { type: 'destroyBuilding'; q: number; r: number }
-  | { type: 'burn'; unitId: string }
-  | { type: 'burnRoad'; unitId: string }
-  | { type: 'buildWall'; q: number; r: number }
-  | { type: 'buildRoad'; q: number; r: number }
-  | { type: 'buildBridge'; q: number; r: number }
-  | { type: 'upgradeVillage'; q: number; r: number }
-  | { type: 'upgradeShip'; unitId: string }
-  | { type: 'openSkill'; skill: SkillId }
-  | { type: 'heal'; unitId: string }
-  | { type: 'disband'; unitId: string }
-  | { type: 'deal'; unitId: string }
-  | { type: 'shipLanding'; unitId: string; q: number; r: number }
-  | { type: 'claimBonus' }
-  | { type: 'getBottle' }
-  | { type: 'enableStealth'; unitId: string }
-  | { type: 'trap'; unitId: string; q: number; r: number }
-  | { type: 'storm'; unitId: string }
-  | { type: 'stun'; unitId: string; q: number; r: number }
-  | { type: 'endTurn' }
-  | { type: 'giveToAI'; playerIndex: number }
-  | { type: 'forfeit'; playerIndex: number };
+  | { type: CommandType.MOVE; unitId: string; q: number; r: number }
+  | { type: CommandType.ATTACK; unitId: string; q: number; r: number }
+  | { type: CommandType.CAPTURE; q: number; r: number; unitId: string }
+  | { type: CommandType.SPAWN; q: number; r: number; unitType: UnitType }
+  | { type: CommandType.BUILD; q: number; r: number; kind: BuilderBuildKind; unitId?: string }
+  | { type: CommandType.REPAIR; q: number; r: number }
+  | { type: CommandType.DESTROY_BUILDING; q: number; r: number }
+  | { type: CommandType.BURN; unitId: string }
+  | { type: CommandType.BURN_ROAD; unitId: string }
+  | { type: CommandType.BUILD_WALL; q: number; r: number }
+  | { type: CommandType.BUILD_ROAD; q: number; r: number }
+  | { type: CommandType.BUILD_BRIDGE; q: number; r: number }
+  | { type: CommandType.UPGRADE_VILLAGE; q: number; r: number }
+  | { type: CommandType.UPGRADE_SHIP; unitId: string }
+  | { type: CommandType.OPEN_SKILL; skill: SkillId }
+  | { type: CommandType.HEAL; unitId: string }
+  | { type: CommandType.DISBAND; unitId: string }
+  | { type: CommandType.DEAL; unitId: string }
+  | { type: CommandType.SHIP_LANDING; unitId: string; q: number; r: number }
+  | { type: CommandType.CLAIM_BONUS }
+  | { type: CommandType.GET_BOTTLE }
+  | { type: CommandType.ENABLE_STEALTH; unitId: string }
+  | { type: CommandType.TRAP; unitId: string; q: number; r: number }
+  | { type: CommandType.STORM; unitId: string }
+  | { type: CommandType.STUN; unitId: string; q: number; r: number }
+  | { type: CommandType.END_TURN }
+  | { type: CommandType.GIVE_TO_AI; playerIndex: number }
+  | { type: CommandType.FORFEIT; playerIndex: number };
 
 /** Commands whose outcome on the authoritative sim is fully deterministic and
  *  therefore safe for a client to predict locally and replay later. */
-export const PREDICTABLE_COMMAND_TYPES: ReadonlySet<Command['type']> = new Set([
-  'move',
-  'capture',
-  'spawn',
-  'build',
-  'repair',
-  'destroyBuilding',
-  'burn',
-  'burnRoad',
-  'buildWall',
-  'buildRoad',
-  'buildBridge',
-  'upgradeVillage',
-  'upgradeShip',
-  'openSkill',
-  'heal',
-  'disband',
-  'deal',
-  'shipLanding',
-  'enableStealth',
-  'trap',
-  'storm',
+export const PREDICTABLE_COMMAND_TYPES: ReadonlySet<Command['type']> = new Set<Command['type']>([
+  CommandType.MOVE,
+  CommandType.CAPTURE,
+  CommandType.SPAWN,
+  CommandType.BUILD,
+  CommandType.REPAIR,
+  CommandType.DESTROY_BUILDING,
+  CommandType.BURN,
+  CommandType.BURN_ROAD,
+  CommandType.BUILD_WALL,
+  CommandType.BUILD_ROAD,
+  CommandType.BUILD_BRIDGE,
+  CommandType.UPGRADE_VILLAGE,
+  CommandType.UPGRADE_SHIP,
+  CommandType.OPEN_SKILL,
+  CommandType.HEAL,
+  CommandType.DISBAND,
+  CommandType.DEAL,
+  CommandType.SHIP_LANDING,
+  CommandType.ENABLE_STEALTH,
+  CommandType.TRAP,
+  CommandType.STORM,
 ]);
 
 /** Attacks a pirate makes on one tribe before it turns to another. */
@@ -192,7 +189,7 @@ export class Simulator {
 
   startGame(): void {
     this.markCaptureReadyFor(0);
-    this.emit({ type: 'turnStarted', playerIndex: 0, turn: this.turn });
+    this.emit({ type: GameEventType.TURN_STARTED, playerIndex: 0, turn: this.turn });
   }
 
   /** Farms + granaries and units on the map: changes whenever food supply or
@@ -207,8 +204,8 @@ export class Simulator {
     for (const t of this.map.tiles) {
       if (t.settlement) owners += `${t.settlement.owner ?? '-'}`;
       if (t.roadOwner !== null && t.roadOwner !== undefined) roads++;
-      if (t.building?.kind === 'port') roads++;
-      if (t.building?.kind === 'farm' || t.building?.kind === 'granary') buildings++;
+      if (t.building?.kind === BuildingKind.PORT) roads++;
+      if (t.building?.kind === BuildingKind.FARM || t.building?.kind === BuildingKind.GRANARY) buildings++;
       if (t.unit) units++;
     }
     return `${buildings},${units},${owners},${roads}`;
@@ -218,98 +215,98 @@ export class Simulator {
     let ok = false;
     const foodBefore = this.foodSignature();
     switch (cmd.type) {
-      case 'move':
+      case CommandType.MOVE:
         ok = this.doMove(cmd.unitId, cmd.q, cmd.r);
         break;
-      case 'attack':
+      case CommandType.ATTACK:
         ok = this.doAttack(cmd.unitId, cmd.q, cmd.r);
         break;
-      case 'capture':
+      case CommandType.CAPTURE:
         ok = this.doCapture(cmd.q, cmd.r, cmd.unitId);
         break;
-      case 'spawn':
+      case CommandType.SPAWN:
         ok = this.doSpawn(cmd.q, cmd.r, cmd.unitType);
         break;
-      case 'build':
+      case CommandType.BUILD:
         ok = cmd.unitId !== undefined
           ? this.doBuildWithUnit(cmd.unitId, cmd.q, cmd.r, cmd.kind)
           : this.doBuild(cmd.q, cmd.r, cmd.kind as BuildingKind);
         break;
-      case 'repair':
+      case CommandType.REPAIR:
         ok = this.doRepair(cmd.q, cmd.r);
         break;
-      case 'destroyBuilding':
+      case CommandType.DESTROY_BUILDING:
         ok = this.doDestroyBuilding(cmd.q, cmd.r);
         break;
-      case 'burn':
+      case CommandType.BURN:
         ok = this.doBurn(cmd.unitId);
         break;
-      case 'burnRoad':
+      case CommandType.BURN_ROAD:
         ok = this.doBurnRoad(cmd.unitId);
         break;
-      case 'buildWall':
+      case CommandType.BUILD_WALL:
         ok = this.doBuildWall(cmd.q, cmd.r);
         break;
-      case 'buildRoad':
+      case CommandType.BUILD_ROAD:
         ok = this.doBuildRoad(cmd.q, cmd.r);
         break;
-      case 'buildBridge':
+      case CommandType.BUILD_BRIDGE:
         ok = this.doBuildBridge(cmd.q, cmd.r);
         break;
-      case 'upgradeVillage':
+      case CommandType.UPGRADE_VILLAGE:
         ok = this.doUpgradeVillage(cmd.q, cmd.r);
         break;
-      case 'upgradeShip':
+      case CommandType.UPGRADE_SHIP:
         ok = this.doUpgradeShip(cmd.unitId);
         break;
-      case 'openSkill':
+      case CommandType.OPEN_SKILL:
         ok = this.doOpenSkill(cmd.skill);
         break;
-      case 'heal':
+      case CommandType.HEAL:
         ok = this.doHeal(cmd.unitId);
         break;
-      case 'disband':
+      case CommandType.DISBAND:
         ok = this.doDisband(cmd.unitId);
         break;
-      case 'deal':
+      case CommandType.DEAL:
         ok = this.doDeal(cmd.unitId);
         break;
-      case 'shipLanding':
+      case CommandType.SHIP_LANDING:
         ok = this.doShipLanding(cmd.unitId, cmd.q, cmd.r);
         break;
-      case 'claimBonus':
+      case CommandType.CLAIM_BONUS:
         ok = this.doClaimBonus();
         break;
-      case 'getBottle':
+      case CommandType.GET_BOTTLE:
         ok = this.doGetBottle();
         break;
-      case 'enableStealth':
+      case CommandType.ENABLE_STEALTH:
         ok = this.doEnableStealth(cmd.unitId);
         break;
-      case 'trap':
+      case CommandType.TRAP:
         ok = this.doBuildTrap(cmd.unitId, cmd.q, cmd.r);
         break;
-      case 'storm':
+      case CommandType.STORM:
         ok = this.doStorm(cmd.unitId);
         break;
-      case 'stun':
+      case CommandType.STUN:
         ok = this.doStun(cmd.unitId, cmd.q, cmd.r);
         break;
-      case 'endTurn':
+      case CommandType.END_TURN:
         this.doEndTurn();
         ok = true;
         break;
-      case 'giveToAI':
+      case CommandType.GIVE_TO_AI:
         ok = this.doGiveToAI(cmd.playerIndex);
         break;
-      case 'forfeit':
+      case CommandType.FORFEIT:
         ok = this.doForfeit(cmd.playerIndex);
         break;
     }
     // A farm or granary, or a unit (a mouth to feed), appeared or disappeared:
     // re-evaluate starving villages.
     const foodChanged = this.foodSignature() !== foodBefore;
-    if (ok && cmd.type !== 'endTurn' && foodChanged) {
+    if (ok && cmd.type !== CommandType.END_TURN && foodChanged) {
       for (const player of this.players) if (player.isActive) refreshStarving(this.map, player);
     }
     this.syncDiscoveries();
@@ -317,12 +314,25 @@ export class Simulator {
     return ok;
   }
 
+  /** `applyCommand` as a generator for the one command that can run for a long
+   *  time: ending the turn plays every AI seat's turn, so this pauses after each
+   *  AI planning step and the caller can yield to the browser in between (see
+   *  `runSliced`). Every other command completes in a single step. Returns the
+   *  same boolean as `applyCommand`, and leaves the sim in the same state. */
+  *applyCommandSteps(cmd: Command): Generator<void, boolean, void> {
+    if (cmd.type !== CommandType.END_TURN) return this.applyCommand(cmd);
+    yield* this.endTurnSteps(true);
+    this.syncDiscoveries();
+    if (!this.gameOver) this.evaluateAchievementsForAll();
+    return true;
+  }
+
   private evaluateAchievementsForAll(): void {
     this.ensureAchievementBaseline();
     for (const p of this.players) {
       const skip = this.achievementBaseline.get(p.index) ?? new Set<AchievementId>();
       for (const id of evaluateAchievements(this.map, p, skip)) {
-        this.emit({ type: 'achievementUnlocked', playerIndex: p.index, achievement: id });
+        this.emit({ type: GameEventType.ACHIEVEMENT_UNLOCKED, playerIndex: p.index, achievement: id });
       }
     }
   }
@@ -353,7 +363,7 @@ export class Simulator {
   }
 
   private emitScoreFly(playerIndex: number, amount: number, tile: MapTile): void {
-    this.emit({ type: 'scoreFly', playerIndex, amount, q: tile.q, r: tile.r });
+    this.emit({ type: GameEventType.SCORE_FLY, playerIndex, amount, q: tile.q, r: tile.r });
   }
 
   private findUnit(unitId: string): Unit | undefined {
@@ -366,7 +376,7 @@ export class Simulator {
       const u = t.unit;
       if (u && u.owner === playerIndex && canHeal(u)) {
         healUnit(u);
-        this.emit({ type: 'healed', unitId: u.id, playerIndex });
+        this.emit({ type: GameEventType.HEALED, unitId: u.id, playerIndex });
       }
     }
   }
@@ -397,8 +407,8 @@ export class Simulator {
     if (!unit || unit.owner !== this.currentPlayerIndex) return false;
     if (!canMove(unit)) return false;
     const player = this.players[unit.owner]!;
-    const canClimb = hasSkill(player, 'climbing');
-    const canDock = hasSkill(player, 'navigation');
+    const canClimb = hasSkill(player, SkillId.CLIMBING);
+    const canDock = hasSkill(player, SkillId.NAVIGATION);
     const target = tileAt(this.map, q, r);
     if (!target) return false;
     if (unit.shipLevel !== undefined && target.terrain !== TileType.Water) return false;
@@ -407,7 +417,7 @@ export class Simulator {
     // A stalker's first move after spawning enables stealth before the walk
     // starts, so no one but its owner ever sees it move. The owner still sees
     // its own stalker moving normally.
-    if (unit.type === 'stalker' && !unit.isStealthed && !unit.firstMoveStealthDone && unit.shipLevel === undefined) {
+    if (unit.type === UnitType.STALKER && !unit.isStealthed && !unit.firstMoveStealthDone && unit.shipLevel === undefined) {
       unit.isStealthed = true;
       unit.firstMoveStealthDone = true;
     }
@@ -463,7 +473,7 @@ export class Simulator {
       unit.hasAttacked = true;
     }
     this.emit({
-      type: 'unitMoved',
+      type: GameEventType.UNIT_MOVED,
       unitId,
       from,
       path: emitPath,
@@ -483,7 +493,7 @@ export class Simulator {
     const village = adjacentEnemyVillages(this.map, unit, unit.owner)[0];
     if (!village) return;
     this.revealStalker(unit);
-    this.emit({ type: 'stalkerSpotted', unitId: unit.id, villageQ: village.q, villageR: village.r });
+    this.emit({ type: GameEventType.STALKER_SPOTTED, unitId: unit.id, villageQ: village.q, villageR: village.r });
   }
 
   /** A village that just changed hands may suddenly be an enemy of a stealthed
@@ -495,7 +505,7 @@ export class Simulator {
       const u = t?.unit;
       if (!u || u.isStealthed !== true || u.owner === newOwner) continue;
       this.revealStalker(u);
-      this.emit({ type: 'stalkerSpotted', unitId: u.id, villageQ: village.q, villageR: village.r });
+      this.emit({ type: GameEventType.STALKER_SPOTTED, unitId: u.id, villageQ: village.q, villageR: village.r });
     }
   }
 
@@ -506,7 +516,7 @@ export class Simulator {
     victim.hp = Math.max(0, victim.hp - damage);
     trapTile.trap = null;
     this.emit({
-      type: 'trapTriggered',
+      type: GameEventType.TRAP_TRIGGERED,
       q: trapTile.q,
       r: trapTile.r,
       targetId: victim.id,
@@ -530,13 +540,13 @@ export class Simulator {
   private revealStalker(unit: Unit): void {
     if (!unit.isStealthed) return;
     unit.isStealthed = false;
-    this.emit({ type: 'stealthRevealed', unitId: unit.id, q: unit.q, r: unit.r });
+    this.emit({ type: GameEventType.STEALTH_REVEALED, unitId: unit.id, q: unit.q, r: unit.r });
   }
 
   private doEnableStealth(unitId: string): boolean {
     const unit = this.findUnit(unitId);
     if (!unit || unit.owner !== this.currentPlayerIndex) return false;
-    if (unit.type !== 'stalker') return false;
+    if (unit.type !== UnitType.STALKER) return false;
     if (unit.shipLevel !== undefined) return false;
     if (unit.isStealthed) return false;
     if (unit.hasMoved || unit.hasAttacked || unit.hasHealed) return false;
@@ -547,7 +557,7 @@ export class Simulator {
     unit.hasMoved = true;
     unit.hasAttacked = true;
     unit.hasHealed = true;
-    this.emit({ type: 'stealthEnabled', unitId });
+    this.emit({ type: GameEventType.STEALTH_ENABLED, unitId });
     return true;
   }
 
@@ -555,7 +565,7 @@ export class Simulator {
   private doBuildTrap(unitId: string, q: number, r: number): boolean {
     const unit = this.findUnit(unitId);
     if (!unit || unit.owner !== this.currentPlayerIndex) return false;
-    if (unit.type !== 'trapper') return false;
+    if (unit.type !== UnitType.TRAPPER) return false;
     if (unit.shipLevel !== undefined) return false;
     if (unit.hasMoved || unit.hasAttacked || unit.hasHealed) return false;
     if ((unit.stunTurns ?? 0) >= 1) return false;
@@ -567,7 +577,7 @@ export class Simulator {
     if (!payAt(this.map, player, tile, TRAP_COST)) return false;
     target.trap = { owner: unit.owner, placedTurn: this.turn };
     this.consumeUnitTurn(unit);
-    this.emit({ type: 'trapPlaced', q, r, playerIndex: player.index });
+    this.emit({ type: GameEventType.TRAP_PLACED, q, r, playerIndex: player.index });
     return true;
   }
 
@@ -576,7 +586,7 @@ export class Simulator {
   private doStorm(unitId: string): boolean {
     const unit = this.findUnit(unitId);
     if (!unit || unit.owner !== this.currentPlayerIndex) return false;
-    if (unit.type !== 'stormcaller') return false;
+    if (unit.type !== UnitType.STORMCALLER) return false;
     if (unit.hasMoved || unit.hasAttacked || unit.hasHealed) return false;
     if ((unit.stunTurns ?? 0) >= 1) return false;
     if (!stormEligible(this.map, unit)) return false;
@@ -600,7 +610,7 @@ export class Simulator {
       }
     }
     this.consumeUnitTurn(unit);
-    this.emit({ type: 'storm', unitId, q: unit.q, r: unit.r, targets: report });
+    this.emit({ type: GameEventType.STORM, unitId, q: unit.q, r: unit.r, targets: report });
     return true;
   }
 
@@ -609,7 +619,7 @@ export class Simulator {
   private doStun(unitId: string, q: number, r: number): boolean {
     const attacker = this.findUnit(unitId);
     if (!attacker || attacker.owner !== this.currentPlayerIndex) return false;
-    if (attacker.type !== 'stunner') return false;
+    if (attacker.type !== UnitType.STUNNER) return false;
     if (!canAttack(attacker)) return false;
     const target = tileAt(this.map, q, r);
     if (!target) return false;
@@ -623,7 +633,7 @@ export class Simulator {
     if (this.rng() < missChanceFor(player)) {
       attacker.hasAttacked = true;
       this.emit({
-        type: 'stunShot',
+        type: GameEventType.STUN_SHOT,
         attackerId: unitId,
         targetId: targetUnit.id,
         attackerTile,
@@ -640,7 +650,7 @@ export class Simulator {
     const stunned = (targetUnit.stunTurns ?? 0) >= 1;
     attacker.hasAttacked = true;
     this.emit({
-      type: 'stunShot',
+      type: GameEventType.STUN_SHOT,
       attackerId: unitId,
       targetId: targetUnit.id,
       attackerTile,
@@ -681,7 +691,7 @@ export class Simulator {
                 : PIRATE_OWNER;
       const outcome = performSiege(attacker, target, this.rng, missChanceFor(attackerPlayer));
       this.emit({
-        type: 'siege',
+        type: GameEventType.SIEGE,
         attackerId: unitId,
         attackerIndex: attacker.owner,
         targetIndex: targetIndex ?? PIRATE_OWNER,
@@ -696,7 +706,7 @@ export class Simulator {
     const attackerPlayer = this.players[attacker.owner]!;
     const targetPlayer = target.unit.owner >= 0 ? this.players[target.unit.owner] : null;
     const targetId = target.unit.id;
-    const targetWasPirate = target.unit.type === 'pirate';
+    const targetWasPirate = target.unit.type === UnitType.PIRATE;
     // Attacking a pirate you had a deal with breaks the deal: it is free to
     // hunt your tribe again (and may retaliate now or next turn).
     if (targetWasPirate && hasPirateDeal(target.unit, attacker.owner)) {
@@ -704,7 +714,7 @@ export class Simulator {
       if (remaining.length === 0) delete target.unit.paidBy;
       else target.unit.paidBy = remaining;
       this.emit({
-        type: 'pirateDealCanceled',
+        type: GameEventType.PIRATE_DEAL_CANCELED,
         unitId: target.unit.id,
         q: target.q,
         r: target.r,
@@ -751,7 +761,7 @@ export class Simulator {
       exploreUnitPath(this.map, [{ q: attacker.q, r: attacker.r }], attacker, attacker.owner);
     }
     this.emit({
-      type: 'attack',
+      type: GameEventType.ATTACK,
       attackerId: unitId,
       targetId,
       attackerIndex: attacker.owner,
@@ -779,7 +789,7 @@ export class Simulator {
     }
     // A land knight that kills may attack again in the same turn. Every 3 kills
     // in one turn triggers a Combo kill bonus of 30 points at the kill tile.
-    if (attacker.type === 'knight' && attacker.shipLevel === undefined && attacker.hp > 0) {
+    if (attacker.type === UnitType.KNIGHT && attacker.shipLevel === undefined && attacker.hp > 0) {
       const killed = result.targetDied && !result.attackerDied;
       attacker.canExtraAttack = killed;
       if (killed) {
@@ -788,7 +798,7 @@ export class Simulator {
           awardScore(attackerPlayer, COMBO_SCORE);
           this.emitScoreFly(attackerPlayer.index, COMBO_SCORE, target);
           this.statsOf(attackerPlayer).knightCombos += 1;
-          this.emit({ type: 'knightCombo', unitId, q: target.q, r: target.r, playerIndex: attacker.owner });
+          this.emit({ type: GameEventType.KNIGHT_COMBO, unitId, q: target.q, r: target.r, playerIndex: attacker.owner });
         }
       }
     }
@@ -816,7 +826,7 @@ export class Simulator {
         if (owned.length === 0) p.isActive = false;
       }
     }
-    this.emit({ type: 'captured', q, r, oldOwner, newOwner: unit.owner, ownerDied: result.ownerDied });
+    this.emit({ type: GameEventType.CAPTURED, q, r, oldOwner, newOwner: unit.owner, ownerDied: result.ownerDied });
     return true;
   }
 
@@ -825,7 +835,7 @@ export class Simulator {
     if (!village || village.settlement?.owner !== this.currentPlayerIndex) return false;
     const player = this.currentPlayer;
     if (spawnUnit(this.map, village, unitType, player)) {
-      this.emit({ type: 'spawned', unitType, q, r, playerIndex: player.index });
+      this.emit({ type: GameEventType.SPAWNED, unitType, q, r, playerIndex: player.index });
       return true;
     }
     return false;
@@ -836,8 +846,8 @@ export class Simulator {
     if (!tile) return false;
     const player = this.currentPlayer;
     if (buildBuilding(this.map, tile, kind, player)) {
-      if (tile.building?.kind === 'temple' || tile.building?.kind === 'forestTemple') tile.building.bornTurn = this.turn;
-      this.emit({ type: 'built', kind, q, r, playerIndex: player.index });
+      if (tile.building?.kind === BuildingKind.TEMPLE || tile.building?.kind === BuildingKind.FOREST_TEMPLE) tile.building.bornTurn = this.turn;
+      this.emit({ type: GameEventType.BUILT, kind, q, r, playerIndex: player.index });
       return true;
     }
     return false;
@@ -849,7 +859,7 @@ export class Simulator {
   private doBuildWithUnit(unitId: string, q: number, r: number, kind: BuilderBuildKind): boolean {
     const unit = this.findUnit(unitId);
     if (!unit || unit.owner !== this.currentPlayerIndex) return false;
-    if (unit.type !== 'builder') return false;
+    if (unit.type !== UnitType.BUILDER) return false;
     if (unit.shipLevel !== undefined) return false;
     if (unit.hasMoved || unit.hasAttacked || unit.hasHealed) return false;
     if ((unit.stunTurns ?? 0) >= 1) return false;
@@ -858,15 +868,15 @@ export class Simulator {
     const target = tileAt(this.map, q, r);
     if (!target) return false;
     if (!builderBuildable(this.map, tile, kind, player).some((t) => t.q === q && t.r === r)) return false;
-    if (kind === 'bridge') {
+    if (kind === BuilderExtraKind.BRIDGE) {
       if (!buildBridgeIgnoringSkill(this.map, target, player)) return false;
       this.consumeUnitTurn(unit);
-      this.emit({ type: 'bridgeBuilt', q, r, playerIndex: player.index });
+      this.emit({ type: GameEventType.BRIDGE_BUILT, q, r, playerIndex: player.index });
       return true;
     }
     if (!buildBuildingIgnoringSkill(this.map, target, kind, player)) return false;
     this.consumeUnitTurn(unit);
-    this.emit({ type: 'built', kind, q, r, playerIndex: player.index });
+    this.emit({ type: GameEventType.BUILT, kind, q, r, playerIndex: player.index });
     return true;
   }
 
@@ -881,7 +891,7 @@ export class Simulator {
     if (!tile) return false;
     const player = this.currentPlayer;
     if (!repairBuilding(this.map, tile, player)) return false;
-    this.emit({ type: 'buildingRepaired', q, r, playerIndex: player.index });
+    this.emit({ type: GameEventType.BUILDING_REPAIRED, q, r, playerIndex: player.index });
     return true;
   }
 
@@ -890,7 +900,7 @@ export class Simulator {
     if (!tile) return false;
     const player = this.currentPlayer;
     if (!destroyBuilding(this.map, tile, player)) return false;
-    this.emit({ type: 'buildingDestroyed', q, r, playerIndex: player.index });
+    this.emit({ type: GameEventType.BUILDING_DESTROYED, q, r, playerIndex: player.index });
     return true;
   }
 
@@ -902,7 +912,7 @@ export class Simulator {
     if (!tile) return false;
     const owner = tile.roadOwner;
     if (owner === null || owner === undefined || !burnRoad(tile, unit)) return false;
-    this.emit({ type: 'roadBurned', unitId, q: tile.q, r: tile.r, playerIndex: unit.owner, owner });
+    this.emit({ type: GameEventType.ROAD_BURNED, unitId, q: tile.q, r: tile.r, playerIndex: unit.owner, owner });
     return true;
   }
 
@@ -913,20 +923,20 @@ export class Simulator {
     const tile = tileAt(this.map, unit.q, unit.r);
     if (!tile) return false;
     const kind = tile.building?.kind;
-    if (kind !== 'farm' && kind !== 'granary') return false;
+    if (kind !== BuildingKind.FARM && kind !== BuildingKind.GRANARY) return false;
     if (!burnBuilding(tile, unit)) return false;
-    this.emit({ type: 'burned', unitId, kind, q: tile.q, r: tile.r, playerIndex: unit.owner });
+    this.emit({ type: GameEventType.BURNED, unitId, kind, q: tile.q, r: tile.r, playerIndex: unit.owner });
     return true;
   }
 
   private growTemples(): void {
     for (const t of this.map.tiles) {
       const b = t.building;
-      if (!b || (b.kind !== 'temple' && b.kind !== 'forestTemple') || b.level >= 4) continue;
+      if (!b || (b.kind !== BuildingKind.TEMPLE && b.kind !== BuildingKind.FOREST_TEMPLE) || b.level >= 4) continue;
       const born = b.bornTurn ?? this.turn;
       if (this.turn - born >= 2 && (this.turn - born) % 2 === 0) {
         b.level += 1;
-        this.emit({ type: 'templeGrown', q: t.q, r: t.r, level: b.level, playerIndex: t.ownedBy ?? -1 });
+        this.emit({ type: GameEventType.TEMPLE_GROWN, q: t.q, r: t.r, level: b.level, playerIndex: t.ownedBy ?? -1 });
       }
     }
   }
@@ -936,7 +946,7 @@ export class Simulator {
     if (!tile) return false;
     const player = this.currentPlayer;
     if (buildRoad(this.map, tile, player)) {
-      this.emit({ type: 'roadBuilt', q, r, playerIndex: player.index });
+      this.emit({ type: GameEventType.ROAD_BUILT, q, r, playerIndex: player.index });
       return true;
     }
     return false;
@@ -947,7 +957,7 @@ export class Simulator {
     if (!tile) return false;
     const player = this.currentPlayer;
     if (buildBridge(this.map, tile, player)) {
-      this.emit({ type: 'bridgeBuilt', q, r, playerIndex: player.index });
+      this.emit({ type: GameEventType.BRIDGE_BUILT, q, r, playerIndex: player.index });
       return true;
     }
     return false;
@@ -962,7 +972,7 @@ export class Simulator {
     upgradeVillage(this.map, tile, this.rng);
     awardScore(player, UPGRADE_SCORE);
     this.statsOf(player).villageUpgrades += 1;
-    this.emit({ type: 'villageUpgraded', q, r, level: tile.settlement.level, playerIndex: player.index });
+    this.emit({ type: GameEventType.VILLAGE_UPGRADED, q, r, level: tile.settlement.level, playerIndex: player.index });
     this.emitScoreFly(player.index, UPGRADE_SCORE, tile);
     return true;
   }
@@ -973,7 +983,7 @@ export class Simulator {
     const player = this.currentPlayer;
     if (!canBuildWall(this.map, tile, player)) return false;
     if (!applyWall(this.map, tile, player)) return false;
-    this.emit({ type: 'wallBuilt', q, r, playerIndex: player.index });
+    this.emit({ type: GameEventType.WALL_BUILT, q, r, playerIndex: player.index });
     return true;
   }
 
@@ -984,7 +994,7 @@ export class Simulator {
     const player = this.currentPlayer;
     if (upgradeShip(this.map, unit, tile, player)) {
       exploreUnitPath(this.map, [{ q: unit.q, r: unit.r }], unit, unit.owner);
-      this.emit({ type: 'shipUpgraded', unitId, level: unit.shipLevel!, playerIndex: player.index });
+      this.emit({ type: GameEventType.SHIP_UPGRADED, unitId, level: unit.shipLevel!, playerIndex: player.index });
       return true;
     }
     return false;
@@ -995,7 +1005,7 @@ export class Simulator {
     if (applySkill(player, skill)) {
       awardScore(player, SKILL_SCORE);
       this.statsOf(player).skillsOpened += 1;
-      this.emit({ type: 'skillOpened', playerIndex: player.index, skill });
+      this.emit({ type: GameEventType.SKILL_OPENED, playerIndex: player.index, skill });
       this.emitScoreFly(player.index, SKILL_SCORE, tileAt(this.map, 0, 0)!);
       return true;
     }
@@ -1006,7 +1016,7 @@ export class Simulator {
     const unit = this.findUnit(unitId);
     if (!unit || unit.owner !== this.currentPlayerIndex || !canHeal(unit)) return false;
     healUnit(unit);
-    this.emit({ type: 'healed', unitId, playerIndex: unit.owner });
+    this.emit({ type: GameEventType.HEALED, unitId, playerIndex: unit.owner });
     return true;
   }
 
@@ -1027,19 +1037,19 @@ export class Simulator {
     // full-turn wait at the next turn start).
     this.clearAbandonedReady(tile, unit.owner);
     tile.unit = null;
-    this.emit({ type: 'unitDisbanded', unitId, q, r, playerIndex: unit.owner });
+    this.emit({ type: GameEventType.UNIT_DISBANDED, unitId, q, r, playerIndex: unit.owner });
     return true;
   }
 
   private doDeal(unitId: string): boolean {
     const unit = this.findUnit(unitId);
-    if (!unit || unit.type !== 'pirate') return false;
+    if (!unit || unit.type !== UnitType.PIRATE) return false;
     const player = this.currentPlayer;
     if (hasPirateDeal(unit, player.index)) return false;
     if (player.resources.money < PIRATE_DEAL_COST) return false;
     player.resources.money -= PIRATE_DEAL_COST;
     (unit.paidBy ??= []).push(player.index);
-    this.emit({ type: 'pirateDeal', unitId: unit.id, q: unit.q, r: unit.r, playerIndex: player.index });
+    this.emit({ type: GameEventType.PIRATE_DEAL, unitId: unit.id, q: unit.q, r: unit.r, playerIndex: player.index });
     return true;
   }
 
@@ -1049,8 +1059,8 @@ export class Simulator {
     const target = tileAt(this.map, q, r);
     if (!target || target.terrain === TileType.Water) return false;
     const player = this.players[unit.owner]!;
-    const canClimb = hasSkill(player, 'climbing');
-    const canDock = hasSkill(player, 'navigation');
+    const canClimb = hasSkill(player, SkillId.CLIMBING);
+    const canDock = hasSkill(player, SkillId.NAVIGATION);
     const reachable = reachableTargets(this.map, unit, movePoints(unit), canClimb, canDock, unit.owner);
     if (!reachable.some((t) => t.q === q && t.r === r)) return false;
     const from = { q: unit.q, r: unit.r };
@@ -1067,8 +1077,8 @@ export class Simulator {
     unit.hasAttacked = true;
     unit.hasHealed = true;
     unit.hasLanded = true;
-    this.emit({ type: 'unitMoved', unitId, from, path, to: { q, r }, shipLevel });
-    this.emit({ type: 'shipReverted', unitId });
+    this.emit({ type: GameEventType.UNIT_MOVED, unitId, from, path, to: { q, r }, shipLevel });
+    this.emit({ type: GameEventType.SHIP_REVERTED, unitId });
     return true;
   }
 
@@ -1089,7 +1099,7 @@ export class Simulator {
       const result = this.applyBonus(t, kind, player);
       this.statsOf(player).bonusesCollected += 1;
       this.emit({
-        type: 'bonusClaimed',
+        type: GameEventType.BONUS_CLAIMED,
         q: t.q,
         r: t.r,
         kind: result.kind,
@@ -1102,48 +1112,48 @@ export class Simulator {
 
   private applyBonus(tile: MapTile, kind: BonusKind, player: Player): { kind: BonusKind; skill?: SkillId } {
     switch (kind) {
-      case 'money':
+      case BonusKind.MONEY:
         player.resources.money += 15;
         this.emitScoreFly(player.index, 15, tile);
-        return { kind: 'money' };
-      case 'resources':
+        return { kind: BonusKind.MONEY };
+      case BonusKind.RESOURCES:
         // The materials go to the village nearest to the bonus.
         const nearest = findClosestVillage(this.map, tile, player.index);
         if (nearest) addStock(nearest, { wood: 10, stone: 5, ore: 5 });
-        return { kind: 'resources' };
-      case 'villageUpgrade': {
+        return { kind: BonusKind.RESOURCES };
+      case BonusKind.VILLAGE_UPGRADE: {
         const village = findClosestVillage(this.map, tile, player.index);
         if (village) {
           upgradeVillage(this.map, village, this.rng);
           this.statsOf(player).villageUpgrades += 1;
           this.emit({
-            type: 'villageUpgraded',
+            type: GameEventType.VILLAGE_UPGRADED,
             q: village.q,
             r: village.r,
             level: village.settlement!.level,
             playerIndex: player.index,
           });
-          return { kind: 'villageUpgrade' };
+          return { kind: BonusKind.VILLAGE_UPGRADE };
         }
         player.resources.money += 15;
         this.emitScoreFly(player.index, 15, tile);
-        return { kind: 'money' };
+        return { kind: BonusKind.MONEY };
       }
-      case 'skill': {
+      case BonusKind.SKILL: {
         const skill = randomUnopenedSkill(player, this.rng);
         if (skill) {
           player.skills.push(skill);
-          return { kind: 'skill', skill };
+          return { kind: BonusKind.SKILL, skill };
         }
         player.resources.money += 15;
         this.emitScoreFly(player.index, 15, tile);
-        return { kind: 'money' };
+        return { kind: BonusKind.MONEY };
       }
-      case 'explorer': {
+      case BonusKind.EXPLORER: {
         const path = explorerPath(this.map, tile, this.rng, player.index);
         revealExplorerPath(this.map, tile, path, player.index);
-        this.emit({ type: 'explorer', q: tile.q, r: tile.r, path, playerIndex: player.index });
-        return { kind: 'explorer' };
+        this.emit({ type: GameEventType.EXPLORER, q: tile.q, r: tile.r, path, playerIndex: player.index });
+        return { kind: BonusKind.EXPLORER };
       }
     }
   }
@@ -1157,10 +1167,10 @@ export class Simulator {
     const unit = tile.unit;
     const kind = randomBottleEffectKind(this.rng);
     let skill: SkillId | undefined;
-    if (kind === 'money') {
+    if (kind === BottleEffect.MONEY) {
       player.resources.money += BOTTLE_MONEY;
       this.emitScoreFly(player.index, BOTTLE_MONEY, tile);
-    } else if (kind === 'skill') {
+    } else if (kind === BottleEffect.SKILL) {
       const s = randomUnopenedSkill(player, this.rng);
       if (s) {
         player.skills.push(s);
@@ -1177,10 +1187,10 @@ export class Simulator {
     unit.hasHealed = true;
     delete (tile as { bottle?: unknown }).bottle;
     this.emit({
-      type: 'bottleCollected',
+      type: GameEventType.BOTTLE_COLLECTED,
       q: tile.q,
       r: tile.r,
-      kind: skill !== undefined ? 'skill' : kind,
+      kind: skill !== undefined ? BottleEffect.SKILL : kind,
       playerIndex: player.index,
       skill,
     });
@@ -1207,7 +1217,7 @@ export class Simulator {
     const player = this.players[playerIndex];
     if (!player || !player.isHuman) return false;
     player.isHuman = false;
-    this.emit({ type: 'aiTakeover', playerIndex });
+    this.emit({ type: GameEventType.AI_TAKEOVER, playerIndex });
     return true;
   }
 
@@ -1216,7 +1226,7 @@ export class Simulator {
    *  end conditions can resolve. */
   private doForfeit(playerIndex: number): boolean {
     if (!this.eliminatePlayer(playerIndex)) return false;
-    this.emit({ type: 'playerForfeited', playerIndex });
+    this.emit({ type: GameEventType.PLAYER_FORFEITED, playerIndex });
     if (!this.gameOver) this.checkEndConditions();
     return true;
   }
@@ -1252,6 +1262,14 @@ export class Simulator {
   }
 
   private doEndTurn(): void {
+    const steps = this.endTurnSteps(false);
+    while (!steps.next().done);
+  }
+
+  /** The end-of-turn loop. With `sliced` it pauses between AI planning steps;
+   *  without, it runs straight through (the synchronous `doEndTurn` path, which
+   *  keeps calling `runAiTurn` so tools can wrap it). */
+  private *endTurnSteps(sliced: boolean): Generator<void, void, void> {
     if (this.gameOver) return;
     this.autoHealFor(this.currentPlayerIndex);
     let guard = 0;
@@ -1268,6 +1286,7 @@ export class Simulator {
         this.sweepTraps();
         this.resetUnitFlags();
         this.evaluateAchievementsForAll();
+        if (sliced) yield;
         if (this.checkEndConditions()) return;
         const hasActiveHuman = this.players.some((p) => p.isActive && p.isHuman);
         if (!hasActiveHuman) return;
@@ -1275,13 +1294,15 @@ export class Simulator {
       this.currentPlayerIndex = next;
       if (!this.players[next]!.isActive) continue;
       if (!this.players[next]!.isHuman) {
-        this.runAiTurn(next);
+        if (sliced) yield* this.runAiTurnSteps(next);
+        else this.runAiTurn(next);
         this.autoHealFor(next);
+        if (sliced) yield;
         continue;
       }
       this.markCaptureReadyFor(next);
       this.decrementStunsFor(next);
-      this.emit({ type: 'turnStarted', playerIndex: next, turn: this.turn });
+      this.emit({ type: GameEventType.TURN_STARTED, playerIndex: next, turn: this.turn });
       return;
     }
   }
@@ -1291,10 +1312,10 @@ export class Simulator {
     const season = seasonForTurn(this.turn);
     this.map.season = season;
     if (season === prev) return;
-    if (season === 'winter') {
+    if (season === Season.WINTER) {
       const r = freezeCoast(this.map);
       this.emit({
-        type: 'seasonChanged',
+        type: GameEventType.SEASON_CHANGED,
         season,
         frozen: r.frozen,
         thawed: [],
@@ -1302,10 +1323,10 @@ export class Simulator {
         removed: r.removed,
         killed: []
       });
-    } else if (prev === 'winter') {
+    } else if (prev === Season.WINTER) {
       const r = thawIce(this.map);
       this.emit({
-        type: 'seasonChanged',
+        type: GameEventType.SEASON_CHANGED,
         season,
         frozen: [],
         thawed: r.thawed,
@@ -1314,7 +1335,7 @@ export class Simulator {
         killed: r.killed
       });
     } else {
-      this.emit({ type: 'seasonChanged', season, frozen: [], thawed: [], landed: [], removed: [], killed: [] });
+      this.emit({ type: GameEventType.SEASON_CHANGED, season, frozen: [], thawed: [], landed: [], removed: [], killed: [] });
     }
   }
 
@@ -1334,13 +1355,18 @@ export class Simulator {
   }
 
   private runAiTurn(playerIndex: number): void {
+    const steps = this.runAiTurnSteps(playerIndex);
+    while (!steps.next().done);
+  }
+
+  private *runAiTurnSteps(playerIndex: number): Generator<void, void, void> {
     const ai = this.players[playerIndex]!;
     logAiTurnStart(ai, this.turn);
     this.doClaimBonus();
     this.collectAiBottles(playerIndex);
     this.markCaptureReadyFor(playerIndex);
     this.decrementStunsFor(playerIndex);
-    this.emit({ type: 'aiTurn', playerIndex });
+    this.emit({ type: GameEventType.AI_TURN, playerIndex });
     const markers: AiActionMarker[] = [];
     let actionNo = 0;
     const exec = (a: AiAction, marker?: AiActionMarker): boolean => {
@@ -1353,8 +1379,8 @@ export class Simulator {
       }
       return ok;
     };
-    if (ai.aiEngine !== 'batch') {
-      planAiActions(this.map, ai, this.aiRng(), this.mode, undefined, this.turn, exec);
+    if (ai.aiEngine !== AiEngine.BATCH) {
+      yield* planAiActionsSteps(this.map, ai, this.aiRng(), this.mode, undefined, this.turn, exec);
     } else {
       const actions = planAiActions(this.map, ai, this.aiRng(), this.mode, markers, this.turn);
       for (const a of actions) exec(a);
@@ -1365,58 +1391,58 @@ export class Simulator {
   private execAiAction(a: AiAction): boolean {
     let ok = false;
     switch (a.type) {
-      case 'upgrade':
+      case AiActionType.UPGRADE:
         ok = this.doUpgradeVillage(a.q, a.r);
         break;
-      case 'move':
+      case AiActionType.MOVE:
         ok = this.doMove(a.unitId, a.q, a.r);
         break;
-      case 'attack':
+      case AiActionType.ATTACK:
         ok = this.doAttack(a.unitId, a.q, a.r);
         break;
-      case 'spawn':
+      case AiActionType.SPAWN:
         ok = this.doSpawn(a.q, a.r, a.unitType);
         break;
-      case 'capture':
+      case AiActionType.CAPTURE:
         ok = this.doCapture(a.q, a.r, a.unitId);
         break;
-      case 'heal':
+      case AiActionType.HEAL:
         ok = this.doHeal(a.unitId);
         break;
-      case 'build':
+      case AiActionType.BUILD:
         ok = this.doBuild(a.q, a.r, a.kind);
         break;
-      case 'buildRoad':
+      case AiActionType.BUILD_ROAD:
         ok = this.doBuildRoad(a.q, a.r);
         break;
-      case 'buildBridge':
+      case AiActionType.BUILD_BRIDGE:
         ok = this.doBuildBridge(a.q, a.r);
         break;
-      case 'upgradeShip':
+      case AiActionType.UPGRADE_SHIP:
         ok = this.doUpgradeShip(a.unitId);
         break;
-      case 'openSkill':
+      case AiActionType.OPEN_SKILL:
         ok = this.doOpenSkill(a.skill);
         break;
-      case 'enableStealth':
+      case AiActionType.ENABLE_STEALTH:
         ok = this.doEnableStealth(a.unitId);
         break;
-      case 'storm':
+      case AiActionType.STORM:
         ok = this.doStorm(a.unitId);
         break;
-      case 'trap':
+      case AiActionType.TRAP:
         ok = this.doBuildTrap(a.unitId, a.q, a.r);
         break;
-      case 'burn':
+      case AiActionType.BURN:
         ok = this.doBurn(a.unitId);
         break;
-      case 'burnRoad':
+      case AiActionType.BURN_ROAD:
         ok = this.doBurnRoad(a.unitId);
         break;
-      case 'builderBuild':
+      case AiActionType.BUILDER_BUILD:
         ok = this.doBuildWithUnit(a.unitId, a.q, a.r, a.kind);
         break;
-      case 'stun':
+      case AiActionType.STUN:
         ok = this.doStun(a.unitId, a.q, a.r);
         break;
     }
@@ -1426,7 +1452,7 @@ export class Simulator {
   private runPirateTurn(): void {
     if (this.disablePirates) return;
     this.trySpawnPirate();
-    const pirates = this.map.tiles.filter((t) => t.unit && t.unit.type === 'pirate').map((t) => t.unit!);
+    const pirates = this.map.tiles.filter((t) => t.unit && t.unit.type === UnitType.PIRATE).map((t) => t.unit!);
     const acted = new Set<string>();
     for (const u of pirates) {
       if (acted.has(u.id)) continue;
@@ -1450,11 +1476,11 @@ export class Simulator {
     if (edge.length === 0) return;
     const spot = edge[Math.floor(this.rng() * edge.length)]!;
     const used = new Set<string>();
-    for (const t of this.map.tiles) if (t.unit && t.unit.type === 'pirate') used.add(t.unit.id);
+    for (const t of this.map.tiles) if (t.unit && t.unit.type === UnitType.PIRATE) used.add(t.unit.id);
     let n = 1;
     while (used.has(`pirate-${n}`)) n++;
-    spot.unit = makeUnit(PIRATE_OWNER, 'pirate', spot.q, spot.r, { id: `pirate-${n}` });
-    this.emit({ type: 'pirateSpawned', q: spot.q, r: spot.r });
+    spot.unit = makeUnit(PIRATE_OWNER, UnitType.PIRATE, spot.q, spot.r, { id: `pirate-${n}` });
+    this.emit({ type: GameEventType.PIRATE_SPAWNED, q: spot.q, r: spot.r });
   }
 
   /** Whether the pirate may hunt this tribe: it is alive, has a unit on the map
@@ -1531,7 +1557,7 @@ export class Simulator {
     const targetOwner = ship.owner;
     const success = this.rng() < 0.25;
     if (success) {
-      ship.type = 'pirate';
+      ship.type = UnitType.PIRATE;
       ship.owner = PIRATE_OWNER;
       ship.hasMoved = false;
       ship.hasAttacked = false;
@@ -1557,7 +1583,7 @@ export class Simulator {
         }
       }
     }
-    this.emit({ type: 'pirateCapture', q: targetTile.q, r: targetTile.r, playerIndex: targetOwner, success });
+    this.emit({ type: GameEventType.PIRATE_CAPTURE, q: targetTile.q, r: targetTile.r, playerIndex: targetOwner, success });
   }
 
   private pirateMoveRandom(unit: Unit): void {
@@ -1588,7 +1614,7 @@ export class Simulator {
     const from = { q: unit.q, r: unit.r };
     const to = steps[steps.length - 1]!;
     moveUnit(this.map, unit, tileAt(this.map, to.q, to.r)!);
-    this.emit({ type: 'unitMoved', unitId: unit.id, from, path: steps, to });
+    this.emit({ type: GameEventType.UNIT_MOVED, unitId: unit.id, from, path: steps, to });
   }
 
   private nearestPlayerUnitTo(unit: Unit, owner?: number): MapTile | null {
@@ -1644,7 +1670,7 @@ export class Simulator {
       }
     }
     this.emit({
-      type: 'attack',
+      type: GameEventType.ATTACK,
       attackerId: attacker.id,
       targetId,
       attackerIndex: PIRATE_OWNER,
@@ -1675,7 +1701,7 @@ export class Simulator {
     const from = { q: unit.q, r: unit.r };
     const to = steps[steps.length - 1]!;
     moveUnit(this.map, unit, tileAt(this.map, to.q, to.r)!);
-    this.emit({ type: 'unitMoved', unitId: unit.id, from, path: steps, to });
+    this.emit({ type: GameEventType.UNIT_MOVED, unitId: unit.id, from, path: steps, to });
   }
 
   /** BFS over unoccupied water tiles from the pirate toward any water cell
@@ -1735,7 +1761,7 @@ export class Simulator {
       if (!player.isActive) continue;
       for (const report of applyFood(this.map, player)) {
         this.emit({
-          type: 'starvation',
+          type: GameEventType.STARVATION,
           q: report.village.q,
           r: report.village.r,
           playerIndex: player.index,
@@ -1765,7 +1791,7 @@ export class Simulator {
       this.endGame(computeWinner(this.players, this.map));
       return true;
     }
-    if (this.mode === 'capture') {
+    if (this.mode === GameMode.CAPTURE) {
       const w = captureWinnerIndex(this.map);
       if (w !== null) {
         awardTempleScores(this.map, this.players);
@@ -1789,7 +1815,7 @@ export class Simulator {
   private endGame(winnerIndex: number): void {
     const winner = this.players[winnerIndex]!;
     const bonus =
-      this.mode === 'capture' && this.turn <= this.expectedTurns
+      this.mode === GameMode.CAPTURE && this.turn <= this.expectedTurns
         ? quickCaptureScore(this.players.length)
         : 0;
     if (bonus > 0) {
@@ -1798,6 +1824,6 @@ export class Simulator {
     }
     this.winnerIndex = winnerIndex;
     this.gameOver = true;
-    this.emit({ type: 'gameOver', winnerIndex, bonus });
+    this.emit({ type: GameEventType.GAME_OVER, winnerIndex, bonus });
   }
 }

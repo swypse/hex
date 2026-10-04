@@ -1,29 +1,8 @@
 import { t } from '../../i18n';
-import type { SkillId } from '../skills';
 import { TUTORIAL_CAPITAL, TUTORIAL_PORT_TILE } from './tutorial-map';
+import { SkillId, TutorialStepId } from '@enums';
 
-export type TutorialStepId =
-  | 'welcome'
-  | 'moveUnit'
-  | 'upgradeVillage'
-  | 'openForestry'
-  | 'endTurn1'
-  | 'endTurn2'
-  | 'buildSawmill'
-  | 'openClimbingSmithery'
-  | 'buildMine'
-  | 'spawnArcher'
-  | 'attackEnemy'
-  | 'upgradeVillage3'
-  | 'openWaterNavigation'
-  | 'buildPort'
-  | 'boardShip'
-  | 'upgradeShip'
-  | 'attackEnemyShip'
-  | 'collectBonus'
-  | 'approachFreeVillage'
-  | 'captureFreeVillage'
-  | 'end';
+
 
 export interface TutorialStepDef {
   id: TutorialStepId;
@@ -42,27 +21,27 @@ export interface TutorialStepDef {
 }
 
 export const STEP_ORDER: TutorialStepId[] = [
-  'welcome',
-  'moveUnit',
-  'upgradeVillage',
-  'openForestry',
-  'endTurn1',
-  'endTurn2',
-  'buildSawmill',
-  'openClimbingSmithery',
-  'buildMine',
-  'spawnArcher',
-  'attackEnemy',
-  'upgradeVillage3',
-  'openWaterNavigation',
-  'buildPort',
-  'boardShip',
-  'upgradeShip',
-  'attackEnemyShip',
-  'collectBonus',
-  'approachFreeVillage',
-  'captureFreeVillage',
-  'end',
+  TutorialStepId.WELCOME,
+  TutorialStepId.MOVE_UNIT,
+  TutorialStepId.UPGRADE_VILLAGE,
+  TutorialStepId.OPEN_FORESTRY,
+  TutorialStepId.END_TURN1,
+  TutorialStepId.END_TURN2,
+  TutorialStepId.BUILD_SAWMILL,
+  TutorialStepId.OPEN_CLIMBING_SMITHERY,
+  TutorialStepId.BUILD_MINE,
+  TutorialStepId.SPAWN_ARCHER,
+  TutorialStepId.ATTACK_ENEMY,
+  TutorialStepId.UPGRADE_VILLAGE3,
+  TutorialStepId.OPEN_WATER_NAVIGATION,
+  TutorialStepId.BUILD_PORT,
+  TutorialStepId.BOARD_SHIP,
+  TutorialStepId.UPGRADE_SHIP,
+  TutorialStepId.ATTACK_ENEMY_SHIP,
+  TutorialStepId.COLLECT_BONUS,
+  TutorialStepId.APPROACH_FREE_VILLAGE,
+  TutorialStepId.CAPTURE_FREE_VILLAGE,
+  TutorialStepId.END,
 ];
 
 const CAPITAL = { ...TUTORIAL_CAPITAL };
@@ -70,7 +49,7 @@ const PORT_TILE = { ...TUTORIAL_PORT_TILE };
 
 export const STEP_CONFIG: Record<TutorialStepId, TutorialStepDef> = {
   welcome: {
-    id: 'welcome',
+    id: TutorialStepId.WELCOME,
     heading: 'Welcome to the Hex tutorial',
     text: 'Welcome to the Hex demo. This tutorial teaches you the basics: move a unit, upgrade your village, collect income each turn, research skills, build a sawmill and a mine, spawn an archer, and fight an enemy. Follow each instruction; your current objective is shown at the top of the screen.',
     markers: [],
@@ -81,7 +60,7 @@ export const STEP_CONFIG: Record<TutorialStepId, TutorialStepDef> = {
     buttonLabel: 'Continue',
   },
   moveUnit: {
-    id: 'moveUnit',
+    id: TutorialStepId.MOVE_UNIT,
     heading: 'Move your Warrior',
     text: 'Select your Warrior (it is already selected) and click a highlighted tile to move it to a new hex.',
     markers: [CAPITAL],
@@ -92,7 +71,7 @@ export const STEP_CONFIG: Record<TutorialStepId, TutorialStepDef> = {
     buttonLabel: '',
   },
   upgradeVillage: {
-    id: 'upgradeVillage',
+    id: TutorialStepId.UPGRADE_VILLAGE,
     heading: 'Upgrade your village',
     text: 'Click your village, then press the pulsing Upgrade button (2 wood + 1 stone + 2 money). Each level raises its income, territory and unit capacity.',
     markers: [CAPITAL],
@@ -104,18 +83,18 @@ export const STEP_CONFIG: Record<TutorialStepId, TutorialStepDef> = {
     buttonLabel: '',
   },
   openForestry: {
-    id: 'openForestry',
+    id: TutorialStepId.OPEN_FORESTRY,
     heading: 'Open the Forestry skill',
     text: 'You need wood to build. Open the skill tree (the pulsing skills button, bottom right) and open the Forestry skill. It lets you build sawmills next to forests.',
     markers: [],
-    highlightSkills: ['forestry'],
+    highlightSkills: [SkillId.FORESTRY],
     highlightEndTurn: false,
     pulseSkillsButton: true,
     dialog: false,
     buttonLabel: '',
   },
   endTurn1: {
-    id: 'endTurn1',
+    id: TutorialStepId.END_TURN1,
     heading: 'End your turn',
     text: 'You are done with this turn. Press the highlighted End Turn button.',
     markers: [],
@@ -126,7 +105,7 @@ export const STEP_CONFIG: Record<TutorialStepId, TutorialStepDef> = {
     buttonLabel: '',
   },
   endTurn2: {
-    id: 'endTurn2',
+    id: TutorialStepId.END_TURN2,
     heading: 'Income is collected each turn',
     text: 'Money is collected each turn: a village pays 3 + 2 × its level, minus upkeep for the units it raised (warriors cost 1, archers/shields/riders 2, swordsmen 3, knights 4, catapults 5; ships cost 2-4). Press End Turn again to collect another turn of income.',
     markers: [],
@@ -137,7 +116,7 @@ export const STEP_CONFIG: Record<TutorialStepId, TutorialStepDef> = {
     buttonLabel: '',
   },
   buildSawmill: {
-    id: 'buildSawmill',
+    id: TutorialStepId.BUILD_SAWMILL,
     heading: 'Build a sawmill',
     text: 'Select the highlighted tile beside the forest and press the pulsing Build sawmill button (10 money). Sawmills produce +1 wood per adjacent forest each turn.',
     markers: [{ q: 0, r: 1 }],
@@ -149,18 +128,18 @@ export const STEP_CONFIG: Record<TutorialStepId, TutorialStepDef> = {
     buttonLabel: '',
   },
   openClimbingSmithery: {
-    id: 'openClimbingSmithery',
+    id: TutorialStepId.OPEN_CLIMBING_SMITHERY,
     heading: 'Research Climbing and Smithery',
     text: 'You will need stone and ore for mines and stronger units. Open the skill tree and research Climbing, then its child Smithery. Both nodes are highlighted.',
     markers: [],
-    highlightSkills: ['climbing', 'smithery'],
+    highlightSkills: [SkillId.CLIMBING, SkillId.SMITHERY],
     highlightEndTurn: false,
     pulseSkillsButton: true,
     dialog: false,
     buttonLabel: '',
   },
   buildMine: {
-    id: 'buildMine',
+    id: TutorialStepId.BUILD_MINE,
     heading: 'Build a mine',
     text: 'Select the highlighted mountain and press the pulsing Build mine button (15 money). Mines produce 1 stone and 1 ore each turn.',
     markers: [{ q: 2, r: -2 }],
@@ -172,7 +151,7 @@ export const STEP_CONFIG: Record<TutorialStepId, TutorialStepDef> = {
     buttonLabel: '',
   },
   spawnArcher: {
-    id: 'spawnArcher',
+    id: TutorialStepId.SPAWN_ARCHER,
     heading: 'Spawn an Archer',
     text: 'Select your village and press Spawn, then choose the Archer (6 money). Archers attack from up to 2 hexes away.',
     markers: [CAPITAL],
@@ -183,7 +162,7 @@ export const STEP_CONFIG: Record<TutorialStepId, TutorialStepDef> = {
     buttonLabel: '',
   },
   attackEnemy: {
-    id: 'attackEnemy',
+    id: TutorialStepId.ATTACK_ENEMY,
     heading: 'Attack the enemy Warrior',
     text: 'An enemy Warrior appeared three hexes away. Your fresh Archer cannot act until next turn, so end your turn to let it act — the enemy will not move. Then move your Archer to within 2 hexes and click the enemy to attack it.',
     markers: [],
@@ -194,7 +173,7 @@ export const STEP_CONFIG: Record<TutorialStepId, TutorialStepDef> = {
     buttonLabel: '',
   },
   upgradeVillage3: {
-    id: 'upgradeVillage3',
+    id: TutorialStepId.UPGRADE_VILLAGE3,
     heading: 'Upgrade your village again',
     text: 'Your village is at its building limit. Select it and press the pulsing Upgrade button (4 wood + 2 stone + 4 money) to reach level 3 and make room for a port.',
     markers: [CAPITAL],
@@ -206,18 +185,18 @@ export const STEP_CONFIG: Record<TutorialStepId, TutorialStepDef> = {
     buttonLabel: '',
   },
   openWaterNavigation: {
-    id: 'openWaterNavigation',
+    id: TutorialStepId.OPEN_WATER_NAVIGATION,
     heading: 'Open the Water and Navigation skills',
     text: 'You need Water, then Navigation, to build a port and sail. Open the skill tree and research both — the nodes are highlighted.',
     markers: [],
-    highlightSkills: ['water', 'navigation'],
+    highlightSkills: [SkillId.WATER, SkillId.NAVIGATION],
     highlightEndTurn: false,
     pulseSkillsButton: true,
     dialog: false,
     buttonLabel: '',
   },
   buildPort: {
-    id: 'buildPort',
+    id: TutorialStepId.BUILD_PORT,
     heading: 'Build a port',
     text: 'Select the highlighted water tile next to your village and press the pulsing Build port button (10 wood + 30 money + 2 ore).',
     markers: [PORT_TILE],
@@ -229,7 +208,7 @@ export const STEP_CONFIG: Record<TutorialStepId, TutorialStepDef> = {
     buttonLabel: '',
   },
   boardShip: {
-    id: 'boardShip',
+    id: TutorialStepId.BOARD_SHIP,
     heading: 'Turn a unit into a ship',
     text: 'Move your Warrior onto the port to turn it into a ship. Ships sail on water and can move then attack in the same turn.',
     markers: [PORT_TILE],
@@ -240,7 +219,7 @@ export const STEP_CONFIG: Record<TutorialStepId, TutorialStepDef> = {
     buttonLabel: '',
   },
   upgradeShip: {
-    id: 'upgradeShip',
+    id: TutorialStepId.UPGRADE_SHIP,
     heading: 'Upgrade your ship',
     text: 'Select your ship and press the pulsing Upgrade Ship button (8 money + 4 wood). Level-2 ships move farther.',
     markers: [],
@@ -252,7 +231,7 @@ export const STEP_CONFIG: Record<TutorialStepId, TutorialStepDef> = {
     buttonLabel: '',
   },
   attackEnemyShip: {
-    id: 'attackEnemyShip',
+    id: TutorialStepId.ATTACK_ENEMY_SHIP,
     heading: 'Sail and attack the enemy ship',
     text: 'An enemy ship appeared on the sea. If your ship cannot act yet, end your turn. Then sail within range and click the enemy ship to attack — it will not move.',
     markers: [],
@@ -263,7 +242,7 @@ export const STEP_CONFIG: Record<TutorialStepId, TutorialStepDef> = {
     buttonLabel: '',
   },
   collectBonus: {
-    id: 'collectBonus',
+    id: TutorialStepId.COLLECT_BONUS,
     heading: 'Collect a bonus',
     text: 'Bonus markers are scattered across the map. Move one of your units onto the glowing bonus, then press End your turn. On the next turn a "Get the bonus" button appears — press it to collect rewards such as money or resources.',
     markers: [],
@@ -274,7 +253,7 @@ export const STEP_CONFIG: Record<TutorialStepId, TutorialStepDef> = {
     buttonLabel: '',
   },
   approachFreeVillage: {
-    id: 'approachFreeVillage',
+    id: TutorialStepId.APPROACH_FREE_VILLAGE,
     heading: 'Claim an empty village',
     text: 'An unclaimed village appeared next to your unit. Move that unit onto the village — if it already acted this turn, press End your turn first so it can move.',
     markers: [],
@@ -285,7 +264,7 @@ export const STEP_CONFIG: Record<TutorialStepId, TutorialStepDef> = {
     buttonLabel: '',
   },
   captureFreeVillage: {
-    id: 'captureFreeVillage',
+    id: TutorialStepId.CAPTURE_FREE_VILLAGE,
     heading: 'Capture the empty village',
     text: 'Press End your turn so the village becomes capturable, then select it and press the Capture button. Villages expand your income and unit capacity.',
     markers: [],
@@ -296,7 +275,7 @@ export const STEP_CONFIG: Record<TutorialStepId, TutorialStepDef> = {
     buttonLabel: '',
   },
   end: {
-    id: 'end',
+    id: TutorialStepId.END,
     heading: 'Basic tutorial complete',
     text: 'You now know how to move, upgrade, build, research and fight. Good luck in the real game!',
     markers: [],
@@ -309,7 +288,7 @@ export const STEP_CONFIG: Record<TutorialStepId, TutorialStepDef> = {
 };
 
 export function skillPulseStep(step: TutorialStepId | null): boolean {
-  return step === 'openForestry' || step === 'openClimbingSmithery' || step === 'openWaterNavigation';
+  return step === TutorialStepId.OPEN_FORESTRY || step === TutorialStepId.OPEN_CLIMBING_SMITHERY || step === TutorialStepId.OPEN_WATER_NAVIGATION;
 }
 
 /** "[N/M]" counter where N is the 1-based step index and M is the total

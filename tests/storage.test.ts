@@ -51,7 +51,7 @@ describe('saveRepository', () => {
     expect(loaded?.turn).toBe(3);
     expect(loaded?.players[0]!.name).toBe('P');
     expect(loaded?.map.tiles[0]!.q).toBe(0);
-    expect(loaded?.mode).toBe('capture');
+    expect(loaded?.mode).toBe(GameMode.CAPTURE);
   });
 
   it('hasSave reflects save and clear', () => {

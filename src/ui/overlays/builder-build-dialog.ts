@@ -7,12 +7,13 @@ import { Button } from '../kit/button';
 import { makeLabel } from '../kit/label';
 import { Popup } from '../kit/popup';
 import type { BuilderBuildKind } from '../../game/buildings';
+import { BuilderExtraKind, BuildingKind, FontSize, OverlayKind } from '@enums';
 
 const BUILD_KINDS: Array<{ kind: BuilderBuildKind; labelKey: string }> = [
-  { kind: 'sawmill', labelKey: 'ui.buildsawmill10' },
-  { kind: 'mine', labelKey: 'ui.buildmine15' },
-  { kind: 'port', labelKey: 'ui.buildport10w302ore' },
-  { kind: 'bridge', labelKey: 'ui.buildbridge10w5s15m' },
+  { kind: BuildingKind.SAWMILL, labelKey: 'ui.buildsawmill10' },
+  { kind: BuildingKind.MINE, labelKey: 'ui.buildmine15' },
+  { kind: BuildingKind.PORT, labelKey: 'ui.buildport10w302ore' },
+  { kind: BuilderExtraKind.BRIDGE, labelKey: 'ui.buildbridge10w5s15m' },
 ];
 
 export class BuilderBuildDialog {
@@ -23,7 +24,7 @@ export class BuilderBuildDialog {
   mount(host: UIHost, root: Container): void {
     this.host = host;
     const s = useGameStore.getState();
-    if (s.overlay?.kind !== 'builderBuild') return;
+    if (s.overlay?.kind !== OverlayKind.BUILDER_BUILD) return;
 
     const buttons: Button[] = BUILD_KINDS.map(({ kind, labelKey }) =>
       new Button({
@@ -41,7 +42,7 @@ export class BuilderBuildDialog {
     });
 
     const text = makeLabel(t('help.builder.abuild'), {
-      fontSize: 14,
+      fontSize: FontSize.SMALL,
       fill: 0xcccccc,
       wordWrap: true,
       wordWrapWidth: popup.contentWidth,

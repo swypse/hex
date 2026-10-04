@@ -1,4 +1,4 @@
-import { GameMode } from '@enums';
+import { BuildingKind, CommandType, GameEventType, GameMode, NetMode, SelectionKind, UnitFacing, UnitType } from '@enums';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Application, Container, Graphics, ImageSource, Text, Texture } from 'pixi.js';
 import { RenderGate, installRenderGate, markDirty, type RenderGateApp } from '../src/render/render-gate';
@@ -98,7 +98,7 @@ function makeMap(): GameMap {
     unit: {
       id: 'u1',
       owner: 0,
-      type: 'warrior',
+      type: UnitType.WARRIOR,
       q: 0,
       r: 0,
       hasMoved: false,
@@ -162,7 +162,7 @@ function makeEnemy(id: string, owner: number, q: number, r: number): Unit {
   return {
     id,
     owner,
-    type: 'warrior',
+    type: UnitType.WARRIOR,
     q,
     r,
     hasMoved: false,
@@ -220,9 +220,9 @@ function setupGame(map: GameMap, players: Player[]): Harness {
 
   const store = useGameStore.getState();
   store.setLocalPlayerIndex(0);
-  store.setNetMode('single');
+  store.setNetMode(NetMode.SINGLE);
   store.setAiActive(false);
-  store.setSelection({ kind: 'unit', q: 0, r: 0 });
+  store.setSelection({ kind: SelectionKind.UNIT, q: 0, r: 0 });
   store.setPlayers(players);
 
   const gc = gameController as unknown as Harness['gc'];
@@ -273,7 +273,7 @@ describe('move animation', () => {
     h = setupGame(map, [player(0, Tribe.Cats)]);
     const from = unitAt(map, 0, 0);
     const rider: Unit = {
-      id: 'r1', owner: 0, type: 'rider', q: 0, r: 0,
+      id: 'r1', owner: 0, type: UnitType.RIDER, q: 0, r: 0,
       hasMoved: false, hasAttacked: false, hasHealed: false,
       hp: 5, attack: 2, attackDistance: 1, spawnVillage: { q: 0, r: 0 },
     };
@@ -306,7 +306,7 @@ describe('move animation', () => {
     (h.gc as { app: unknown }).app = app;
 
     const events: GameEvent[] = [
-      { type: 'unitMoved', unitId: 'r1', from: { q: 0, r: 0 }, path: [{ q: 1, r: 0 }, { q: 2, r: 0 }], to: { q: 2, r: 0 } },
+      { type: GameEventType.UNIT_MOVED, unitId: 'r1', from: { q: 0, r: 0 }, path: [{ q: 1, r: 0 }, { q: 2, r: 0 }], to: { q: 2, r: 0 } },
     ];
     const p = h.gc.presentEvents(events, h.gc.exploredKeysFor(0));
 
@@ -334,7 +334,7 @@ describe('move animation', () => {
   });
 
   it('keeps the unit off the destination while a ghost walks from the start, then reveals it', async () => {
-    const p = h.gc.runCommand({ type: 'move', unitId: 'u1', q: 1, r: 0 });
+    const p = h.gc.runCommand({ type: CommandType.MOVE, unitId: 'u1', q: 1, r: 0 });
 
     await waitFor(() => h.gc.hiddenUnitIds.has('u1'));
 
@@ -389,8 +389,8 @@ describe('move animation', () => {
     e2.q = -2; e2.r = 0;
 
     const events: GameEvent[] = [
-      { type: 'unitMoved', unitId: 'e1', from: { q: 1, r: 0 }, path: [{ q: 2, r: 0 }], to: { q: 2, r: 0 } },
-      { type: 'unitMoved', unitId: 'e2', from: { q: -1, r: 0 }, path: [{ q: -2, r: 0 }], to: { q: -2, r: 0 } },
+      { type: GameEventType.UNIT_MOVED, unitId: 'e1', from: { q: 1, r: 0 }, path: [{ q: 2, r: 0 }], to: { q: 2, r: 0 } },
+      { type: GameEventType.UNIT_MOVED, unitId: 'e2', from: { q: -1, r: 0 }, path: [{ q: -2, r: 0 }], to: { q: -2, r: 0 } },
     ];
 
     const p = h.gc.presentEvents(events, h.gc.exploredKeysFor(0));
@@ -424,7 +424,7 @@ describe('move animation', () => {
     const from = unitAt(map, 0, 0);
     from.terrain = TileType.Water;
     const ship: Unit = {
-      id: 's1', owner: 0, type: 'warrior', q: 0, r: 0,
+      id: 's1', owner: 0, type: UnitType.WARRIOR, q: 0, r: 0,
       hasMoved: false, hasAttacked: false, hasHealed: false,
       hp: 5, attack: 2, attackDistance: 1, spawnVillage: { q: 0, r: 0 }, shipLevel: 1,
     };
@@ -432,7 +432,7 @@ describe('move animation', () => {
     const dest = unitAt(map, 1, 0);
     from.unit = null;
     const landed: Unit = {
-      id: 's1', owner: 0, type: 'warrior', q: 1, r: 0,
+      id: 's1', owner: 0, type: UnitType.WARRIOR, q: 1, r: 0,
       hasMoved: false, hasAttacked: false, hasHealed: false,
       hp: 5, attack: 2, attackDistance: 1, spawnVillage: { q: 0, r: 0 },
     };
@@ -442,7 +442,7 @@ describe('move animation', () => {
     });
 
     const events: GameEvent[] = [
-      { type: 'unitMoved', unitId: 's1', from: { q: 0, r: 0 }, path: [{ q: 1, r: 0 }], to: { q: 1, r: 0 }, shipLevel: 1 },
+      { type: GameEventType.UNIT_MOVED, unitId: 's1', from: { q: 0, r: 0 }, path: [{ q: 1, r: 0 }], to: { q: 1, r: 0 }, shipLevel: 1 },
     ];
     const p = h.gc.presentEvents(events, h.gc.exploredKeysFor(0));
     await waitFor(() =>
@@ -463,7 +463,7 @@ describe('move animation', () => {
     h = setupGame(map, [player(0, Tribe.Cats)]);
     const from = unitAt(map, 0, 0);
     const unit: Unit = {
-      id: 'u1', owner: 0, type: 'warrior', q: 0, r: 0,
+      id: 'u1', owner: 0, type: UnitType.WARRIOR, q: 0, r: 0,
       hasMoved: true, hasAttacked: false, hasHealed: false,
       hp: 5, attack: 2, attackDistance: 1, spawnVillage: { q: 0, r: 0 },
     };
@@ -477,7 +477,7 @@ describe('move animation', () => {
     });
 
     const events: GameEvent[] = [
-      { type: 'unitMoved', unitId: 'u1', from: { q: 0, r: 0 }, path: [{ q: 1, r: 0 }, { q: 2, r: 0 }], to: { q: 2, r: 0 } },
+      { type: GameEventType.UNIT_MOVED, unitId: 'u1', from: { q: 0, r: 0 }, path: [{ q: 1, r: 0 }, { q: 2, r: 0 }], to: { q: 2, r: 0 } },
     ];
     const p = h.gc.presentEvents(events, h.gc.exploredKeysFor(0));
     await waitFor(() =>
@@ -498,7 +498,7 @@ describe('move animation', () => {
     h = setupGame(map, [player(0, Tribe.Cats)]);
     const from = unitAt(map, 0, 0);
     const unit: Unit = {
-      id: 'u1', owner: 0, type: 'warrior', q: 0, r: 0,
+      id: 'u1', owner: 0, type: UnitType.WARRIOR, q: 0, r: 0,
       hasMoved: true, hasAttacked: false, hasHealed: false,
       hp: 5, attack: 2, attackDistance: 1, spawnVillage: { q: 0, r: 0 },
     };
@@ -512,10 +512,10 @@ describe('move animation', () => {
     });
     // A prior attack flipped the unit to face left; the upcoming rightward
     // move should override that and leave it facing right once it settles.
-    h.mapView.setUnitFacing('u1', 'left');
+    h.mapView.setUnitFacing('u1', UnitFacing.LEFT);
 
     const events: GameEvent[] = [
-      { type: 'unitMoved', unitId: 'u1', from: { q: 0, r: 0 }, path: [{ q: 1, r: 0 }, { q: 2, r: 0 }], to: { q: 2, r: 0 } },
+      { type: GameEventType.UNIT_MOVED, unitId: 'u1', from: { q: 0, r: 0 }, path: [{ q: 1, r: 0 }, { q: 2, r: 0 }], to: { q: 2, r: 0 } },
     ];
     const p = h.gc.presentEvents(events, h.gc.exploredKeysFor(0));
     // Wait until the walk is over and the unit is revealed on the destination.
@@ -533,7 +533,7 @@ describe('move animation', () => {
     h = setupGame(map, [player(0, Tribe.Cats)]);
     const from = unitAt(map, 0, 0);
     const unit: Unit = {
-      id: 'u1', owner: 0, type: 'warrior', q: 0, r: 0,
+      id: 'u1', owner: 0, type: UnitType.WARRIOR, q: 0, r: 0,
       hasMoved: true, hasAttacked: false, hasHealed: false,
       hp: 5, attack: 2, attackDistance: 1, spawnVillage: { q: 0, r: 0 },
     };
@@ -547,7 +547,7 @@ describe('move animation', () => {
     });
 
     const events: GameEvent[] = [
-      { type: 'unitMoved', unitId: 'u1', from: { q: 0, r: 0 }, path: [{ q: -1, r: 0 }], to: { q: -1, r: 0 } },
+      { type: GameEventType.UNIT_MOVED, unitId: 'u1', from: { q: 0, r: 0 }, path: [{ q: -1, r: 0 }], to: { q: -1, r: 0 } },
     ];
     const p = h.gc.presentEvents(events, h.gc.exploredKeysFor(0));
     await waitFor(() =>
@@ -568,7 +568,7 @@ describe('move animation', () => {
     h = setupGame(map, [player(0, Tribe.Cats)]);
     const from = unitAt(map, 0, 0);
     const unit: Unit = {
-      id: 'u1', owner: 0, type: 'warrior', q: 0, r: 0,
+      id: 'u1', owner: 0, type: UnitType.WARRIOR, q: 0, r: 0,
       hasMoved: true, hasAttacked: false, hasHealed: false,
       hp: 5, attack: 2, attackDistance: 1, spawnVillage: { q: 0, r: 0 },
     };
@@ -583,7 +583,7 @@ describe('move animation', () => {
 
     const events: GameEvent[] = [
       {
-        type: 'unitMoved',
+        type: GameEventType.UNIT_MOVED,
         unitId: 'u1',
         from: { q: 0, r: 0 },
         path: [{ q: 1, r: 0 }, { q: 1, r: 1 }, { q: 0, r: 1 }],
@@ -617,9 +617,9 @@ describe('move animation', () => {
     // The sim already holds the post-move state: the enemy unit has boarded and
     // stands on the port cell as a ship.
     const port = unitAt(map, 1, 0);
-    port.building = { kind: 'port', level: 1 };
+    port.building = { kind: BuildingKind.PORT, level: 1 };
     const boarded: Unit = {
-      id: 'e1', owner: 1, type: 'warrior', q: 1, r: 0,
+      id: 'e1', owner: 1, type: UnitType.WARRIOR, q: 1, r: 0,
       hasMoved: true, hasAttacked: true, hasHealed: false,
       hp: 5, attack: 2, attackDistance: 1, spawnVillage: { q: 1, r: 0 }, shipLevel: 1,
     };
@@ -629,7 +629,7 @@ describe('move animation', () => {
     });
 
     const events: GameEvent[] = [
-      { type: 'unitMoved', unitId: 'e1', from: { q: 0, r: 0 }, path: [{ q: 1, r: 0 }], to: { q: 1, r: 0 } },
+      { type: GameEventType.UNIT_MOVED, unitId: 'e1', from: { q: 0, r: 0 }, path: [{ q: 1, r: 0 }], to: { q: 1, r: 0 } },
     ];
     const p = h.gc.presentEvents(events, h.gc.exploredKeysFor(0));
     // The ghost standing on the starting cell must still show the land unit.
@@ -649,9 +649,9 @@ describe('move animation', () => {
     // The sim holds the post-move state: the ship has docked and stands on the
     // port cell as a land unit.
     const port = unitAt(map, 1, 0);
-    port.building = { kind: 'port', level: 1 };
+    port.building = { kind: BuildingKind.PORT, level: 1 };
     const landed: Unit = {
-      id: 'e1', owner: 1, type: 'warrior', q: 1, r: 0,
+      id: 'e1', owner: 1, type: UnitType.WARRIOR, q: 1, r: 0,
       hasMoved: true, hasAttacked: false, hasHealed: false,
       hp: 5, attack: 2, attackDistance: 1, spawnVillage: { q: 1, r: 0 },
     };
@@ -661,7 +661,7 @@ describe('move animation', () => {
     });
 
     const events: GameEvent[] = [
-      { type: 'unitMoved', unitId: 'e1', from: { q: 0, r: 1 }, path: [{ q: 1, r: 0 }], to: { q: 1, r: 0 }, shipLevel: 1 },
+      { type: GameEventType.UNIT_MOVED, unitId: 'e1', from: { q: 0, r: 1 }, path: [{ q: 1, r: 0 }], to: { q: 1, r: 0 }, shipLevel: 1 },
     ];
     const p = h.gc.presentEvents(events, h.gc.exploredKeysFor(0));
     // The ghost standing on the starting water cell must still show the ship.
@@ -681,7 +681,7 @@ describe('move animation', () => {
     village.settlement = { owner: 1, level: 1, captureReady: false };
     village.settlement.owner = 0;
     const events: GameEvent[] = [
-      { type: 'captured', q: 1, r: 0, oldOwner: 1, newOwner: 0, ownerDied: true },
+      { type: GameEventType.CAPTURED, q: 1, r: 0, oldOwner: 1, newOwner: 0, ownerDied: true },
     ];
     const p = h.gc.presentEvents(events, h.gc.exploredKeysFor(0));
     await p;
@@ -715,7 +715,7 @@ describe('move animation', () => {
 
     const events: GameEvent[] = [
       {
-        type: 'attack', attackerId: 'att', targetId: 'def',
+        type: GameEventType.ATTACK, attackerId: 'att', targetId: 'def',
         attackerIndex: 0, targetIndex: 1,
         attackerTile: { q: 0, r: 0 }, targetTile: { q: 1, r: 0 },
         attackerDamage: 0, targetDamage: 0, missed: false,
@@ -758,7 +758,7 @@ describe('move animation', () => {
 
     const events: GameEvent[] = [
       {
-        type: 'attack', attackerId: 'att', targetId: 'def',
+        type: GameEventType.ATTACK, attackerId: 'att', targetId: 'def',
         attackerIndex: 0, targetIndex: 1,
         attackerTile: { q: 0, r: 0 }, targetTile: { q: 1, r: 0 },
         attackerDamage: 0, targetDamage: 0, missed: false,
@@ -778,7 +778,7 @@ describe('move animation', () => {
     const from = unitAt(map, 0, 0);
     from.terrain = TileType.Water;
     const ship: Unit = {
-      id: 's1', owner: 0, type: 'warrior', q: 0, r: 0,
+      id: 's1', owner: 0, type: UnitType.WARRIOR, q: 0, r: 0,
       hasMoved: false, hasAttacked: false, hasHealed: false,
       hp: 5, attack: 2, attackDistance: 1, spawnVillage: { q: 0, r: 0 }, shipLevel: 1,
     };
@@ -795,7 +795,7 @@ describe('move animation', () => {
     const spy = vi.spyOn(sfx, 'play').mockImplementation((name) => { played.push(name); });
     try {
       const events: GameEvent[] = [
-        { type: 'unitMoved', unitId: 's1', from: { q: 0, r: 0 }, path: [{ q: 1, r: 0 }], to: { q: 1, r: 0 }, shipLevel: 1 },
+        { type: GameEventType.UNIT_MOVED, unitId: 's1', from: { q: 0, r: 0 }, path: [{ q: 1, r: 0 }], to: { q: 1, r: 0 }, shipLevel: 1 },
       ];
       const p = h.gc.presentEvents(events, h.gc.exploredKeysFor(0));
       await waitFor(() => played.includes('waterSplash'));
@@ -814,7 +814,7 @@ describe('move animation', () => {
     h = setupGame(map, players);
     const from = unitAt(map, 0, 0);
     const land: Unit = {
-      id: 'u1', owner: 0, type: 'warrior', q: 0, r: 0,
+      id: 'u1', owner: 0, type: UnitType.WARRIOR, q: 0, r: 0,
       hasMoved: false, hasAttacked: false, hasHealed: false,
       hp: 5, attack: 2, attackDistance: 1, spawnVillage: { q: 0, r: 0 },
     };
@@ -830,7 +830,7 @@ describe('move animation', () => {
     const spy = vi.spyOn(sfx, 'play').mockImplementation((name) => { played.push(name); });
     try {
       const events: GameEvent[] = [
-        { type: 'unitMoved', unitId: 'u1', from: { q: 0, r: 0 }, path: [{ q: 1, r: 0 }], to: { q: 1, r: 0 } },
+        { type: GameEventType.UNIT_MOVED, unitId: 'u1', from: { q: 0, r: 0 }, path: [{ q: 1, r: 0 }], to: { q: 1, r: 0 } },
       ];
       const p = h.gc.presentEvents(events, h.gc.exploredKeysFor(0));
       await waitFor(() => played.includes('waterSquish'));
@@ -851,8 +851,8 @@ describe('move animation', () => {
     const played: string[] = [];
     const spy = vi.spyOn(sfx, 'play').mockImplementation((name) => { played.push(name); });
     try {
-      const localSpawn: GameEvent[] = [{ type: 'spawned', unitType: 'warrior', q: 0, r: 0, playerIndex: 0 }];
-      const enemySpawn: GameEvent[] = [{ type: 'spawned', unitType: 'warrior', q: 1, r: 0, playerIndex: 1 }];
+      const localSpawn: GameEvent[] = [{ type: GameEventType.SPAWNED, unitType: UnitType.WARRIOR, q: 0, r: 0, playerIndex: 0 }];
+      const enemySpawn: GameEvent[] = [{ type: GameEventType.SPAWNED, unitType: UnitType.WARRIOR, q: 1, r: 0, playerIndex: 1 }];
       await h.gc.presentEvents(localSpawn, h.gc.exploredKeysFor(0));
       await h.gc.presentEvents(enemySpawn, h.gc.exploredKeysFor(0));
 
@@ -876,7 +876,7 @@ describe('move animation', () => {
     const bounce = vi.spyOn(h.mapView, 'bounceHex');
     try {
       const events: GameEvent[] = [
-        { type: 'villageUpgraded', q: 1, r: 0, level: 2, playerIndex: 0 },
+        { type: GameEventType.VILLAGE_UPGRADED, q: 1, r: 0, level: 2, playerIndex: 0 },
       ];
       const p = h.gc.presentEvents(events, h.gc.exploredKeysFor(0));
       await p;
@@ -900,13 +900,13 @@ describe('move animation', () => {
     const bounce = vi.spyOn(h.mapView, 'bounceHex');
     try {
       const other: GameEvent[] = [
-        { type: 'villageUpgraded', q: 1, r: 0, level: 2, playerIndex: 1 },
+        { type: GameEventType.VILLAGE_UPGRADED, q: 1, r: 0, level: 2, playerIndex: 1 },
       ];
       await h.gc.presentEvents(other, h.gc.exploredKeysFor(0));
       expect(bounce).not.toHaveBeenCalledWith(1, 0);
 
       const local: GameEvent[] = [
-        { type: 'villageUpgraded', q: 1, r: 0, level: 3, playerIndex: 0 },
+        { type: GameEventType.VILLAGE_UPGRADED, q: 1, r: 0, level: 3, playerIndex: 0 },
       ];
       await h.gc.presentEvents(local, h.gc.exploredKeysFor(0));
       expect(bounce).not.toHaveBeenCalledWith(1, 0);
@@ -925,7 +925,7 @@ describe('move animation', () => {
     village.ownedBy = 0;
     village.claimedByVillage = { q: 0, r: 0 };
     village.unit = {
-      id: 'sc', owner: 0, type: 'stormcaller', q: 0, r: 0,
+      id: 'sc', owner: 0, type: UnitType.STORMCALLER, q: 0, r: 0,
       hasMoved: true, hasAttacked: true, hasHealed: true,
       hp: 40, attack: 20, attackDistance: 1, spawnVillage: { q: 0, r: 0 },
     };
@@ -943,7 +943,7 @@ describe('move animation', () => {
 
     const pulse = vi.spyOn(h.mapView, 'stormWaterPulse');
     try {
-      const events: GameEvent[] = [{ type: 'storm', unitId: 'sc', q: 0, r: 0, targets: [] }];
+      const events: GameEvent[] = [{ type: GameEventType.STORM, unitId: 'sc', q: 0, r: 0, targets: [] }];
       await h.gc.presentEvents(events, h.gc.exploredKeysFor(0));
       expect(pulse).toHaveBeenCalledTimes(1);
       const [waterTiles, origin] = pulse.mock.calls[0]!;
@@ -959,7 +959,7 @@ describe('move animation', () => {
     const players = [player(0, Tribe.Cats)];
     h = setupGame(map, players);
     const ship: Unit = {
-      id: 's1', owner: 0, type: 'warrior', q: 0, r: 0,
+      id: 's1', owner: 0, type: UnitType.WARRIOR, q: 0, r: 0,
       hasMoved: false, hasAttacked: false, hasHealed: false,
       hp: 5, attack: 2, attackDistance: 1, spawnVillage: { q: 0, r: 0 }, shipLevel: 1,
     };
@@ -975,7 +975,7 @@ describe('move animation', () => {
     });
 
     const events: GameEvent[] = [
-      { type: 'unitMoved', unitId: 's1', from: { q: 0, r: 0 }, path: [{ q: 1, r: 0 }], to: { q: 1, r: 0 }, shipLevel: 1 },
+      { type: GameEventType.UNIT_MOVED, unitId: 's1', from: { q: 0, r: 0 }, path: [{ q: 1, r: 0 }], to: { q: 1, r: 0 }, shipLevel: 1 },
     ];
     const p = h.gc.presentEvents(events, h.gc.exploredKeysFor(0));
     await waitFor(() =>
@@ -995,7 +995,7 @@ describe('move animation', () => {
     const players = [player(0, Tribe.Cats)];
     h = setupGame(map, players);
     const ship: Unit = {
-      id: 's1', owner: 0, type: 'warrior', q: 0, r: 0,
+      id: 's1', owner: 0, type: UnitType.WARRIOR, q: 0, r: 0,
       hasMoved: false, hasAttacked: false, hasHealed: false,
       hp: 5, attack: 2, attackDistance: 1, spawnVillage: { q: 0, r: 0 }, shipLevel: 1,
     };
@@ -1007,7 +1007,7 @@ describe('move animation', () => {
     });
 
     const events: GameEvent[] = [
-      { type: 'unitMoved', unitId: 's1', from: { q: 0, r: 0 }, path: [{ q: 1, r: 0 }], to: { q: 1, r: 0 }, shipLevel: 1 },
+      { type: GameEventType.UNIT_MOVED, unitId: 's1', from: { q: 0, r: 0 }, path: [{ q: 1, r: 0 }], to: { q: 1, r: 0 }, shipLevel: 1 },
     ];
     await h.gc.presentEvents(events, h.gc.exploredKeysFor(0));
 
@@ -1022,7 +1022,7 @@ describe('move animation', () => {
     const players = [player(0, Tribe.Cats)];
     h = setupGame(map, players);
     const pirate: Unit = {
-      id: 'p1', owner: -1, type: 'pirate', q: 0, r: 0,
+      id: 'p1', owner: -1, type: UnitType.PIRATE, q: 0, r: 0,
       hasMoved: false, hasAttacked: false, hasHealed: false,
       hp: 5, attack: 2, attackDistance: 1, spawnVillage: null,
     };
@@ -1036,7 +1036,7 @@ describe('move animation', () => {
     });
 
     const events: GameEvent[] = [
-      { type: 'unitMoved', unitId: 'p1', from: { q: 0, r: 0 }, path: [{ q: 1, r: 0 }], to: { q: 1, r: 0 } },
+      { type: GameEventType.UNIT_MOVED, unitId: 'p1', from: { q: 0, r: 0 }, path: [{ q: 1, r: 0 }], to: { q: 1, r: 0 } },
     ];
     const p = h.gc.presentEvents(events, h.gc.exploredKeysFor(0));
     await waitFor(() =>

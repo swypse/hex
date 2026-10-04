@@ -1,11 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { GameMode } from '../src/game/game-mode';
 import { generateMap } from '../src/game/map-gen';
 import { buildMultiplayerPlayers } from '../src/game/players';
 import { Simulator } from '../src/game/simulator';
 import { SeededRandom } from '../src/util/random';
 import { initialExplorationFor } from '../src/game/explore';
 import { Tribe } from '../src/game/tribes';
+import { CommandType, GameMode } from '@enums';
 
 function buildSim(): Simulator {
   const players = buildMultiplayerPlayers(
@@ -27,14 +27,14 @@ describe('host/client state sync', () => {
     host.startGame();
     host.drainEvents();
 
-    host.applyCommand({ type: 'endTurn' }); // host (0) -> client (1)
+    host.applyCommand({ type: CommandType.END_TURN }); // host (0) -> client (1)
     let snap = host.snapshot();
     expect(snap.currentPlayerIndex).toBe(1);
     expect(snap.turn).toBe(1);
     const client = Simulator.fromSnapshot(snap);
     expect(client.snapshot()).toEqual(snap);
 
-    host.applyCommand({ type: 'endTurn' }); // client (1) -> AI (2) -> host (0), turn 2
+    host.applyCommand({ type: CommandType.END_TURN }); // client (1) -> AI (2) -> host (0), turn 2
     snap = host.snapshot();
     expect(snap.currentPlayerIndex).toBe(0);
     expect(snap.turn).toBe(2);
@@ -48,7 +48,7 @@ describe('host/client state sync', () => {
     const v = host.map.tiles.find((t) => t.settlement && t.settlement.owner === 0)!;
     host.players[0]!.resources.money = 100;
 
-    const ok = host.applyCommand({ type: 'upgradeVillage', q: v.q, r: v.r });
+    const ok = host.applyCommand({ type: CommandType.UPGRADE_VILLAGE, q: v.q, r: v.r });
     expect(ok).toBe(true);
 
     const client = Simulator.fromSnapshot(host.snapshot());

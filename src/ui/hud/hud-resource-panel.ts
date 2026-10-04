@@ -14,6 +14,7 @@ import { makeLabel } from '../kit/label';
 import { Popup } from '../kit/popup';
 import { Button } from '../kit/button';
 import { RESOURCE_TOOLTIPS } from './resource-tooltips';
+import { FontSize, ResourceKind } from '@enums';
 
 /** How often the panel re-checks the map-derived income. Game events that alter
  *  income (unit spawn, capture, death, skill, building) may not touch the store,
@@ -103,7 +104,7 @@ export class HudResourcePanel implements Widget {
 
     const compact = this.host.app.screen.width <= 600;
     const iconSize = compact ? 12 : 16;
-    const fontSize = compact ? 14 : 16;
+    const fontSize = compact ? FontSize.SMALL : FontSize.NORMAL;
     const padSide = 6;
     const padTop = 10;
     const cy = padTop + iconSize / 2;
@@ -125,7 +126,7 @@ export class HudResourcePanel implements Widget {
       icon.eventMode = 'static';
       icon.cursor = 'pointer';
       icon.position.set(x + iconSize / 2 + 6, cy);
-      const open = (): void => this.openResourcePopup(row.key as 'money' | 'wood' | 'stone' | 'ore' | 'food');
+      const open = (): void => this.openResourcePopup(row.key as ResourceKind);
       icon.on('pointertap', open);
       const value = makeLabel(row.value, { fontSize });
       value.eventMode = 'static';
@@ -135,7 +136,7 @@ export class HudResourcePanel implements Widget {
       this.el.addChild(icon, value);
       let rowW = value.width;
       if (row.income !== '') {
-        const income = makeLabel(row.income, { fontSize: 13, fill: 0xffffff });
+        const income = makeLabel(row.income, { fontSize: FontSize.VERY_SMALL, fill: 0xffffff });
         income.alpha = 0.8;
         income.eventMode = 'static';
         income.cursor = 'pointer';
@@ -150,11 +151,11 @@ export class HudResourcePanel implements Widget {
     this.layout();
   }
 
-  private openResourcePopup(resource: 'money' | 'wood' | 'stone' | 'ore' | 'food'): void {
+  private openResourcePopup(resource: ResourceKind): void {
     if (!this.host) return;
     const r = this.resources();
     const info = RESOURCE_TOOLTIPS[resource];
-    const income = resource === 'money' ? r.moneyIncome : resource === 'food' ? 0 : r.building[resource];
+    const income = resource === ResourceKind.MONEY ? r.moneyIncome : resource === ResourceKind.FOOD ? 0 : r.building[resource];
     const amount = r[resource];
     if (this.popup) {
       this.popup.destroy();
@@ -168,13 +169,13 @@ export class HudResourcePanel implements Widget {
       onClose: () => this.closePopup(),
     });
     const lines = [t('res.collect.' + resource)];
-    if (resource !== 'money' && r.networkSize > 1) lines.push(t('res.shared', { n: r.networkSize }));
-    else if (resource !== 'money') lines.push(t('res.sharedOne'));
+    if (resource !== ResourceKind.MONEY && r.networkSize > 1) lines.push(t('res.shared', { n: r.networkSize }));
+    else if (resource !== ResourceKind.MONEY) lines.push(t('res.sharedOne'));
     if (info.requiredFor.length > 0) lines.push(t('res.required', { text: info.requiredFor }));
     let y = 0;
     for (const line of lines) {
       const label = makeLabel(line, {
-        fontSize: 14,
+        fontSize: FontSize.SMALL,
         fill: 0xeeeeee,
         wordWrap: true,
         wordWrapWidth: popup.contentWidth,

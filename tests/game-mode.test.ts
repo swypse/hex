@@ -7,7 +7,7 @@ import { Player } from '@/game/players';
 import { TileType } from '@/game/tile-types';
 import { Tribe } from '@/game/tribes';
 import { Unit } from '@/game/units';
-import { GameMode } from '@enums';
+import { GameMode, NetMode, OverlayKind, UnitType } from '@enums';
 import { describe, expect, it } from 'vitest';
 
 function tile(
@@ -33,7 +33,7 @@ function unit(owner: number, id: string): Unit {
   return {
     id,
     owner,
-    type: 'warrior',
+    type: UnitType.WARRIOR,
     q: 0,
     r: 0,
     hasMoved: false,
@@ -157,7 +157,7 @@ describe('gameMode', () => {
 
 describe('shouldPromptWatch', () => {
   const base = {
-    netMode: 'single',
+    netMode: NetMode.SINGLE,
     mode: GameMode.CAPTURE,
     gameOver: false,
     watching: false,
@@ -174,11 +174,11 @@ describe('shouldPromptWatch', () => {
     expect(shouldPromptWatch({ ...base, gameOver: true })).toBe(false);
   });
   it('does not prompt in multiplayer or non-capture mode', () => {
-    expect(shouldPromptWatch({ ...base, netMode: 'host' })).toBe(false);
+    expect(shouldPromptWatch({ ...base, netMode: NetMode.HOST })).toBe(false);
     expect(shouldPromptWatch({ ...base, mode: GameMode.TURNS30 })).toBe(false);
   });
   it('does not prompt while already watching or already prompted', () => {
     expect(shouldPromptWatch({ ...base, watching: true })).toBe(false);
-    expect(shouldPromptWatch({ ...base, overlayKind: 'watchingPrompt' })).toBe(false);
+    expect(shouldPromptWatch({ ...base, overlayKind: OverlayKind.WATCHING_PROMPT })).toBe(false);
   });
 });

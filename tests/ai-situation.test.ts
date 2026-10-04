@@ -5,7 +5,7 @@ import { Player } from '@/game/players';
 import { TileType } from '@/game/tile-types';
 import { Tribe } from '@/game/tribes';
 import { Unit, UNIT_TYPES } from '@/game/units';
-import { GameMode } from '@enums';
+import { AiStance, GameMode, UnitType } from '@enums';
 import { describe, expect, it } from 'vitest';
 
 function tile(q: number, r: number, opts: Partial<MapTile> = {}): MapTile {
@@ -58,10 +58,10 @@ describe('aiSituation', () => {
   it('visibleEnemies returns only explored non-own units', () => {
     const map: GameMap = { radius: 4, tiles: [], spawns: [] };
     map.tiles.push(
-      tile(0, 0, { unit: unit('a', 1, 'warrior', 0, 0) }),
-      tile(1, 0, { unit: unit('e', 0, 'warrior', 1, 0) }),
+      tile(0, 0, { unit: unit('a', 1, UnitType.WARRIOR, 0, 0) }),
+      tile(1, 0, { unit: unit('e', 0, UnitType.WARRIOR, 1, 0) }),
     );
-    const foggy = tile(2, 0, { unit: unit('fog', 0, 'warrior', 2, 0) });
+    const foggy = tile(2, 0, { unit: unit('fog', 0, UnitType.WARRIOR, 2, 0) });
     foggy.exploredBy = [0];
     map.tiles.push(foggy);
     const enemies = visibleEnemies(map, 1);
@@ -71,8 +71,8 @@ describe('aiSituation', () => {
   it('turnsToOccupy uses the mover movement', () => {
     const from = tile(0, 0);
     const to = tile(4, 0);
-    const rider = unit('r', 0, 'rider', 0, 0); // movement 4
-    const warrior = unit('w', 0, 'warrior', 0, 0); // movement 1
+    const rider = unit('r', 0, UnitType.RIDER, 0, 0); // movement 4
+    const warrior = unit('w', 0, UnitType.WARRIOR, 0, 0); // movement 1
     expect(turnsToOccupy(from, to, rider)).toBe(1);
     expect(turnsToOccupy(from, to, warrior)).toBe(4);
   });
@@ -81,10 +81,10 @@ describe('aiSituation', () => {
     const map: GameMap = { radius: 4, tiles: [], spawns: [] };
     map.tiles.push(
       tile(0, 0, { settlement: { owner: 1, level: 1, captureReady: false }, ownedBy: 1 }),
-      tile(2, 0, { unit: unit('e', 0, 'rider', 2, 0) }), // reaches the village in 1 turn (movement 4)
+      tile(2, 0, { unit: unit('e', 0, UnitType.RIDER, 2, 0) }), // reaches the village in 1 turn (movement 4)
     );
     const s = analyzeSituation(map, player(1), GameMode.CAPTURE, AI_DIFFICULTY_PROFILES.normal);
-    expect(s.stance).toBe('defend');
+    expect(s.stance).toBe(AiStance.DEFEND);
     expect(s.endangered).toBe(true);
     expect(s.dangers.some((d) => d.village.q === 0 && d.village.r === 0)).toBe(true);
   });
@@ -94,15 +94,15 @@ describe('aiSituation', () => {
     map.tiles.push(
       tile(0, 0, {
         settlement: { owner: 1, level: 1, captureReady: false },
-        unit: unit('k1', 1, 'knight', 0, 0),
+        unit: unit('k1', 1, UnitType.KNIGHT, 0, 0),
         ownedBy: 1
       }),
-      tile(1, 0, { unit: unit('k2', 1, 'knight', 1, 0) }),
-      tile(2, 0, { unit: unit('k3', 1, 'knight', 2, 0) }),
+      tile(1, 0, { unit: unit('k2', 1, UnitType.KNIGHT, 1, 0) }),
+      tile(2, 0, { unit: unit('k3', 1, UnitType.KNIGHT, 2, 0) }),
       tile(5, 0, { settlement: { owner: 0, level: 1, captureReady: false }, ownedBy: 0 }),
     );
     const s = analyzeSituation(map, player(1), GameMode.CAPTURE, AI_DIFFICULTY_PROFILES.normal);
-    expect(s.stance).toBe('war');
+    expect(s.stance).toBe(AiStance.WAR);
     expect(s.frontTarget).not.toBeNull();
     expect(s.frontTarget!.q).toBe(5);
   });
@@ -112,15 +112,15 @@ describe('aiSituation', () => {
     map.tiles.push(
       tile(0, 0, {
         settlement: { owner: 1, level: 1, captureReady: false },
-        unit: unit('k1', 1, 'knight', 0, 0),
+        unit: unit('k1', 1, UnitType.KNIGHT, 0, 0),
         ownedBy: 1
       }),
-      tile(1, 0, { unit: unit('k2', 1, 'knight', 1, 0) }),
-      tile(2, 0, { unit: unit('k3', 1, 'knight', 2, 0) }),
+      tile(1, 0, { unit: unit('k2', 1, UnitType.KNIGHT, 1, 0) }),
+      tile(2, 0, { unit: unit('k3', 1, UnitType.KNIGHT, 2, 0) }),
       tile(5, 0, { settlement: { owner: 0, level: 1, captureReady: false }, ownedBy: 0 }),
     );
     const s = analyzeSituation(map, player(1), GameMode.TURNS30, AI_DIFFICULTY_PROFILES.normal);
-    expect(s.stance).toBe('settle');
+    expect(s.stance).toBe(AiStance.SETTLE);
     expect(s.frontTarget).toBeNull();
   });
 
@@ -131,22 +131,22 @@ describe('aiSituation', () => {
     map.tiles.push(
       tile(0, 0, {
         settlement: { owner: 1, level: 1, captureReady: false },
-        unit: unit('k1', 1, 'knight', 0, 0),
+        unit: unit('k1', 1, UnitType.KNIGHT, 0, 0),
         ownedBy: 1
       }),
-      tile(1, 0, { unit: unit('k2', 1, 'knight', 1, 0) }),
-      tile(2, 0, { unit: unit('k3', 1, 'knight', 2, 0) }),
-      tile(3, 0, { unit: unit('k4', 1, 'knight', 3, 0) }),
+      tile(1, 0, { unit: unit('k2', 1, UnitType.KNIGHT, 1, 0) }),
+      tile(2, 0, { unit: unit('k3', 1, UnitType.KNIGHT, 2, 0) }),
+      tile(3, 0, { unit: unit('k4', 1, UnitType.KNIGHT, 3, 0) }),
       tile(5, 0, {
         settlement: { owner: 0, level: 1, captureReady: false },
-        unit: unit('e1', 0, 'knight', 5, 0),
+        unit: unit('e1', 0, UnitType.KNIGHT, 5, 0),
         ownedBy: 0
       }),
-      tile(6, 0, { unit: unit('e2', 0, 'knight', 6, 0) }),
+      tile(6, 0, { unit: unit('e2', 0, UnitType.KNIGHT, 6, 0) }),
     );
     const normal = analyzeSituation(map, player(1), GameMode.CAPTURE, AI_DIFFICULTY_PROFILES.normal);
     const easy = analyzeSituation(map, player(1), GameMode.CAPTURE, AI_DIFFICULTY_PROFILES.easy);
-    expect(normal.stance).toBe('war');
-    expect(easy.stance).toBe('settle');
+    expect(normal.stance).toBe(AiStance.WAR);
+    expect(easy.stance).toBe(AiStance.SETTLE);
   });
 });

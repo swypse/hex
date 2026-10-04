@@ -6,6 +6,7 @@ import { type UIHost } from '../host';
 import { Button } from '../kit/button';
 import { makeLabel } from '../kit/label';
 import { Popup } from '../kit/popup';
+import { DisconnectChoice, FontSize, NetMode, PauseReason } from '@enums';
 
 /** Shown while the game is paused due to a disconnect: an in-game peer on the
  *  host (Wait / Give to AI / Forfeit) or the host for waiting clients
@@ -18,7 +19,7 @@ export class DisconnectDialog {
   mount(host: UIHost, root: Container): void {
     this.host = host;
     const s = useGameStore.getState();
-    const isHost = s.netMode === 'host';
+    const isHost = s.netMode === NetMode.HOST;
     const name = s.pausedName;
 
     let title: string;
@@ -30,8 +31,8 @@ export class DisconnectDialog {
       hint = name ? t('disconnect.hostInfo', { name }) : t('disconnect.hostInfoGeneric');
       buttons = [
         new Button({ label: t('disconnect.wait'), onClick: () => gameController.waitForDisconnected() }),
-        new Button({ label: t('disconnect.giveToAI'), onClick: () => this.resolve('ai') }),
-        new Button({ label: t('disconnect.forfeit'), onClick: () => this.resolve('forfeit') }),
+        new Button({ label: t('disconnect.giveToAI'), onClick: () => this.resolve(DisconnectChoice.AI) }),
+        new Button({ label: t('disconnect.forfeit'), onClick: () => this.resolve(DisconnectChoice.FORFEIT) }),
       ];
     } else {
       title = t('disconnect.waitingTitle');
@@ -54,7 +55,7 @@ export class DisconnectDialog {
     });
 
     const text = makeLabel(hint, {
-      fontSize: 14,
+      fontSize: FontSize.SMALL,
       fill: 0xcccccc,
       wordWrap: true,
       wordWrapWidth: popup.contentWidth,
@@ -68,9 +69,9 @@ export class DisconnectDialog {
     popup.finish();
   }
 
-  private resolve(kind: 'ai' | 'forfeit'): void {
-    if (useGameStore.getState().paused !== 'disconnect') return;
-    void (kind === 'ai' ? gameController.giveDisconnectedToAI() : gameController.forfeitDisconnected());
+  private resolve(kind: DisconnectChoice): void {
+    if (useGameStore.getState().paused !== PauseReason.DISCONNECT) return;
+    void (kind === DisconnectChoice.AI ? gameController.giveDisconnectedToAI() : gameController.forfeitDisconnected());
   }
 
   hide(onDone: () => void): void {

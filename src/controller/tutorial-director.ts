@@ -8,12 +8,13 @@ import { isLandType, isWaterType } from '../game/tile-types';
 import { isExploredFor } from '../game/explore';
 import { hasSkill } from '../game/skills';
 import { makeUnit } from '../game/units';
-import { STEP_ORDER, type TutorialStepId } from '../game/tutorial/tutorial-steps';
+import { STEP_ORDER } from '../game/tutorial/tutorial-steps';
 import {
   TUTORIAL_CAPITAL, TUTORIAL_ENEMY_PLAYER, TUTORIAL_ARCHER_ENEMY_PREFERRED,
   TUTORIAL_SHIP_ENEMY_PREFERRED, TUTORIAL_ENEMY_SHIP_ID, TUTORIAL_ENEMY_WARRIOR_ID,
   TUTORIAL_HUMAN, TUTORIAL_PORT_TILE, TUTORIAL_START_WARRIOR_ID,
 } from '../game/tutorial/tutorial-map';
+import { BonusKind, BuildingKind, GameEventType, SkillId, TutorialStepId, UnitType } from '@enums';
 
 export interface TutorialHost {
   sim(): Simulator | null;
@@ -37,7 +38,7 @@ export class TutorialDirector {
   }
 
   welcomeClosed(): boolean {
-    if (this.currentStep() !== 'welcome') return false;
+    if (this.currentStep() !== TutorialStepId.WELCOME) return false;
     const before = this.stepIndex;
     this.stepIndex++;
     this.enterCurrent();
@@ -49,7 +50,7 @@ export class TutorialDirector {
   afterCommand(events: GameEvent[]): boolean {
     const step = this.currentStep();
     let changed = false;
-    if (step !== 'welcome' && step !== 'end' && this.completesOnEvents(step, events)) {
+    if (step !== TutorialStepId.WELCOME && step !== TutorialStepId.END && this.completesOnEvents(step, events)) {
       this.stepIndex++;
       this.enterCurrent();
       changed = true;
@@ -62,7 +63,7 @@ export class TutorialDirector {
     let changed = false;
     for (let guard = 0; guard < STEP_ORDER.length; guard++) {
       const step = this.currentStep();
-      if (step === 'welcome' || step === 'end') break;
+      if (step === TutorialStepId.WELCOME || step === TutorialStepId.END) break;
       if (!this.done(step)) break;
       this.stepIndex++;
       this.enterCurrent();
@@ -73,12 +74,12 @@ export class TutorialDirector {
 
   private enterCurrent(): void {
     const step = this.currentStep();
-    if (step === 'attackEnemy') this.placeEnemyWarrior();
-    else if (step === 'boardShip') this.repositionWarriorForBoarding();
-    else if (step === 'attackEnemyShip') this.placeEnemyShip();
-    else if (step === 'collectBonus') this.placeTutorialBonus();
-    else if (step === 'approachFreeVillage') this.placeFreeVillage();
-    else if (step === 'end') this.removeDummyUnits();
+    if (step === TutorialStepId.ATTACK_ENEMY) this.placeEnemyWarrior();
+    else if (step === TutorialStepId.BOARD_SHIP) this.repositionWarriorForBoarding();
+    else if (step === TutorialStepId.ATTACK_ENEMY_SHIP) this.placeEnemyShip();
+    else if (step === TutorialStepId.COLLECT_BONUS) this.placeTutorialBonus();
+    else if (step === TutorialStepId.APPROACH_FREE_VILLAGE) this.placeFreeVillage();
+    else if (step === TutorialStepId.END) this.removeDummyUnits();
   }
 
   private done(step: TutorialStepId): boolean {
@@ -87,63 +88,63 @@ export class TutorialDirector {
     const human = sim.players[TUTORIAL_HUMAN];
     if (!human) return false;
     switch (step) {
-      case 'moveUnit': {
+      case TutorialStepId.MOVE_UNIT: {
         const cap = tileAt(sim.map, TUTORIAL_CAPITAL.q, TUTORIAL_CAPITAL.r);
         return !cap?.unit || cap.unit.id !== TUTORIAL_START_WARRIOR_ID;
       }
-      case 'upgradeVillage': {
+      case TutorialStepId.UPGRADE_VILLAGE: {
         const cap = tileAt(sim.map, TUTORIAL_CAPITAL.q, TUTORIAL_CAPITAL.r);
         return (cap?.settlement?.level ?? 0) >= 2;
       }
-      case 'openForestry':
-        return hasSkill(human, 'forestry');
-      case 'endTurn1':
-      case 'endTurn2':
+      case TutorialStepId.OPEN_FORESTRY:
+        return hasSkill(human, SkillId.FORESTRY);
+      case TutorialStepId.END_TURN1:
+      case TutorialStepId.END_TURN2:
         return false;
-      case 'buildSawmill':
+      case TutorialStepId.BUILD_SAWMILL:
         return sim.map.tiles.some(
-          (t) => t.building?.kind === 'sawmill' && t.ownedBy === TUTORIAL_HUMAN,
+          (t) => t.building?.kind === BuildingKind.SAWMILL && t.ownedBy === TUTORIAL_HUMAN,
         );
-      case 'openClimbingSmithery':
-        return hasSkill(human, 'climbing') && hasSkill(human, 'smithery');
-      case 'buildMine':
+      case TutorialStepId.OPEN_CLIMBING_SMITHERY:
+        return hasSkill(human, SkillId.CLIMBING) && hasSkill(human, SkillId.SMITHERY);
+      case TutorialStepId.BUILD_MINE:
         return sim.map.tiles.some(
-          (t) => t.building?.kind === 'mine' && t.ownedBy === TUTORIAL_HUMAN,
+          (t) => t.building?.kind === BuildingKind.MINE && t.ownedBy === TUTORIAL_HUMAN,
         );
-      case 'spawnArcher':
+      case TutorialStepId.SPAWN_ARCHER:
         return sim.map.tiles.some(
-          (t) => t.unit && t.unit.owner === TUTORIAL_HUMAN && t.unit.type === 'archer',
+          (t) => t.unit && t.unit.owner === TUTORIAL_HUMAN && t.unit.type === UnitType.ARCHER,
         );
-      case 'attackEnemy':
+      case TutorialStepId.ATTACK_ENEMY:
         return !sim.map.tiles.some((t) => t.unit?.owner === TUTORIAL_ENEMY_PLAYER);
-      case 'upgradeVillage3': {
+      case TutorialStepId.UPGRADE_VILLAGE3: {
         const cap = tileAt(sim.map, TUTORIAL_CAPITAL.q, TUTORIAL_CAPITAL.r);
         return (cap?.settlement?.level ?? 0) >= 3;
       }
-      case 'openWaterNavigation':
-        return hasSkill(human, 'water') && hasSkill(human, 'navigation');
-      case 'buildPort':
+      case TutorialStepId.OPEN_WATER_NAVIGATION:
+        return hasSkill(human, SkillId.WATER) && hasSkill(human, SkillId.NAVIGATION);
+      case TutorialStepId.BUILD_PORT:
         return sim.map.tiles.some(
-          (t) => t.building?.kind === 'port' && t.ownedBy === TUTORIAL_HUMAN,
+          (t) => t.building?.kind === BuildingKind.PORT && t.ownedBy === TUTORIAL_HUMAN,
         );
-      case 'boardShip':
+      case TutorialStepId.BOARD_SHIP:
         return sim.map.tiles.some(
           (t) => t.unit && t.unit.owner === TUTORIAL_HUMAN && t.unit.shipLevel !== undefined,
         );
-      case 'upgradeShip':
+      case TutorialStepId.UPGRADE_SHIP:
         return sim.map.tiles.some(
           (t) => t.unit && t.unit.owner === TUTORIAL_HUMAN && (t.unit.shipLevel ?? 0) >= 2,
         );
-      case 'attackEnemyShip':
+      case TutorialStepId.ATTACK_ENEMY_SHIP:
         return !sim.map.tiles.some((t) => t.unit?.owner === TUTORIAL_ENEMY_PLAYER);
-      case 'collectBonus':
+      case TutorialStepId.COLLECT_BONUS:
         return !sim.map.tiles.some((t) => t.bonus !== undefined && t.bonus !== null);
-      case 'approachFreeVillage': {
+      case TutorialStepId.APPROACH_FREE_VILLAGE: {
         if (!this.freeVillageSet) return false;
         const v = tileAt(sim.map, this.freeVillageQ, this.freeVillageR);
         return v !== undefined && v.settlement?.owner === null && v.unit?.owner === TUTORIAL_HUMAN;
       }
-      case 'captureFreeVillage': {
+      case TutorialStepId.CAPTURE_FREE_VILLAGE: {
         if (!this.freeVillageSet) return false;
         const v = tileAt(sim.map, this.freeVillageQ, this.freeVillageR);
         return v?.settlement?.owner === TUTORIAL_HUMAN;
@@ -158,12 +159,12 @@ export class TutorialDirector {
     if (!sim) return false;
     for (const e of events) {
       switch (step) {
-        case 'moveUnit':
-          if (e.type === 'unitMoved' && e.unitId === TUTORIAL_START_WARRIOR_ID) return true;
+        case TutorialStepId.MOVE_UNIT:
+          if (e.type === GameEventType.UNIT_MOVED && e.unitId === TUTORIAL_START_WARRIOR_ID) return true;
           break;
-        case 'upgradeVillage':
+        case TutorialStepId.UPGRADE_VILLAGE:
           if (
-            e.type === 'villageUpgraded' &&
+            e.type === GameEventType.VILLAGE_UPGRADED &&
             e.q === TUTORIAL_CAPITAL.q &&
             e.r === TUTORIAL_CAPITAL.r &&
             e.playerIndex === TUTORIAL_HUMAN
@@ -171,27 +172,27 @@ export class TutorialDirector {
             return true;
           }
           break;
-        case 'openForestry':
-          if (e.type === 'skillOpened' && e.playerIndex === TUTORIAL_HUMAN && e.skill === 'forestry') return true;
+        case TutorialStepId.OPEN_FORESTRY:
+          if (e.type === GameEventType.SKILL_OPENED && e.playerIndex === TUTORIAL_HUMAN && e.skill === SkillId.FORESTRY) return true;
           break;
-        case 'endTurn1':
-        case 'endTurn2':
-          if (e.type === 'turnStarted' && e.playerIndex === TUTORIAL_HUMAN) return true;
+        case TutorialStepId.END_TURN1:
+        case TutorialStepId.END_TURN2:
+          if (e.type === GameEventType.TURN_STARTED && e.playerIndex === TUTORIAL_HUMAN) return true;
           break;
-        case 'attackEnemy': {
-          if (e.type !== 'attack' || e.attackerIndex !== TUTORIAL_HUMAN || e.targetIndex !== TUTORIAL_ENEMY_PLAYER) break;
+        case TutorialStepId.ATTACK_ENEMY: {
+          if (e.type !== GameEventType.ATTACK || e.attackerIndex !== TUTORIAL_HUMAN || e.targetIndex !== TUTORIAL_ENEMY_PLAYER) break;
           const attacker = sim.map.tiles.find((t) => t.unit?.id === e.attackerId)?.unit;
-          if (attacker?.type === 'archer') return true;
+          if (attacker?.type === UnitType.ARCHER) return true;
           break;
         }
-        case 'attackEnemyShip': {
-          if (e.type !== 'attack' || e.attackerIndex !== TUTORIAL_HUMAN || e.targetIndex !== TUTORIAL_ENEMY_PLAYER) break;
+        case TutorialStepId.ATTACK_ENEMY_SHIP: {
+          if (e.type !== GameEventType.ATTACK || e.attackerIndex !== TUTORIAL_HUMAN || e.targetIndex !== TUTORIAL_ENEMY_PLAYER) break;
           const attacker = sim.map.tiles.find((t) => t.unit?.id === e.attackerId)?.unit;
           if (attacker?.shipLevel !== undefined) return true;
           break;
         }
-        case 'collectBonus':
-          if (e.type === 'bonusClaimed' && e.playerIndex === TUTORIAL_HUMAN) return true;
+        case TutorialStepId.COLLECT_BONUS:
+          if (e.type === GameEventType.BONUS_CLAIMED && e.playerIndex === TUTORIAL_HUMAN) return true;
           break;
         default:
           break;
@@ -204,7 +205,7 @@ export class TutorialDirector {
     const sim = this.host.sim();
     if (!sim) return;
     const archer = sim.map.tiles.find(
-      (t) => t.unit && t.unit.owner === TUTORIAL_HUMAN && t.unit.type === 'archer',
+      (t) => t.unit && t.unit.owner === TUTORIAL_HUMAN && t.unit.type === UnitType.ARCHER,
     );
     const from = archer ?? tileAt(sim.map, TUTORIAL_CAPITAL.q, TUTORIAL_CAPITAL.r);
     if (!from) return;
@@ -222,7 +223,7 @@ export class TutorialDirector {
       );
     const spot = candidates[0];
     if (!spot) return;
-    spot.unit = makeUnit(TUTORIAL_ENEMY_PLAYER, 'warrior', spot.q, spot.r, {
+    spot.unit = makeUnit(TUTORIAL_ENEMY_PLAYER, UnitType.WARRIOR, spot.q, spot.r, {
       id: TUTORIAL_ENEMY_WARRIOR_ID,
       spawnVillage: null,
     });
@@ -276,7 +277,7 @@ export class TutorialDirector {
       );
     const spot = candidates[0];
     if (!spot) return;
-    spot.unit = makeUnit(TUTORIAL_ENEMY_PLAYER, 'warrior', spot.q, spot.r, {
+    spot.unit = makeUnit(TUTORIAL_ENEMY_PLAYER, UnitType.WARRIOR, spot.q, spot.r, {
       id: TUTORIAL_ENEMY_SHIP_ID,
       shipLevel: 1,
       spawnVillage: null,
@@ -302,13 +303,13 @@ export class TutorialDirector {
     for (const n of hexNeighbors(anchor)) {
       const t = tileAt(sim.map, n.q, n.r);
       if (freeLand(t)) {
-        t!.bonus = { kind: 'money', claimer: null, arrivalTurn: 0 };
+        t!.bonus = { kind: BonusKind.MONEY, claimer: null, arrivalTurn: 0 };
         return;
       }
     }
     for (const t of sim.map.tiles) {
       if (hexDistance(t, anchor) <= 2 && freeLand(t)) {
-        t.bonus = { kind: 'money', claimer: null, arrivalTurn: 0 };
+        t.bonus = { kind: BonusKind.MONEY, claimer: null, arrivalTurn: 0 };
         return;
       }
     }

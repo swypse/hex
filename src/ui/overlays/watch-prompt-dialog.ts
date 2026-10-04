@@ -5,6 +5,7 @@ import { type UIHost } from '../host';
 import { Button } from '../kit/button';
 import { makeLabel } from '../kit/label';
 import { Popup } from '../kit/popup';
+import { FontSize } from '@enums';
 
 export class WatchPromptDialog {
   private el: Container | null = null;
@@ -24,7 +25,7 @@ export class WatchPromptDialog {
     });
 
     const hint = makeLabel(t('watch.body'), {
-      fontSize: 14,
+      fontSize: FontSize.SMALL,
       fill: 0xcccccc,
       wordWrap: true,
       wordWrapWidth: popup.contentWidth,

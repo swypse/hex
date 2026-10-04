@@ -6,7 +6,7 @@ import { TileType } from '@/game/tile-types';
 import { Tribe } from '@/game/tribes';
 import { PIRATE_OWNER, type Unit } from '@/game/units';
 import { SeededRandom } from '@/util';
-import { GameMode } from '@enums';
+import { AiActionType, AiDifficulty, CommandType, GameEventType, GameMode, SkillId, UnitType } from '@enums';
 import { describe, expect, it } from 'vitest';
 import { makeTestMap, makeUnit, tileAt } from './helpers/test-map';
 
@@ -18,7 +18,7 @@ function fund<T extends import('../src/game/players').Player>(map: import('../sr
 
 
 function aiUnit(id: string, q: number, r: number, hp = 50): Unit {
-  const u = makeUnit(id, 1, 'warrior', q, r);
+  const u = makeUnit(id, 1, UnitType.WARRIOR, q, r);
   u.hp = hp;
   return u;
 }
@@ -27,7 +27,7 @@ function makePirate(id: string, q: number, r: number): Unit {
   return {
     id,
     owner: PIRATE_OWNER,
-    type: 'pirate',
+    type: UnitType.PIRATE,
     q,
     r,
     hasMoved: false,
@@ -42,7 +42,7 @@ function makePirate(id: string, q: number, r: number): Unit {
 }
 
 function makeShip(id: string, owner: number, q: number, r: number): Unit {
-  const ship = makeUnit(id, owner, 'warrior', q, r);
+  const ship = makeUnit(id, owner, UnitType.WARRIOR, q, r);
   ship.shipLevel = 1;
   return ship;
 }
@@ -58,14 +58,14 @@ describe('AI grind and capture behaviour', () => {
     const humanCap = tileAt(map, 2, 0)!;
     humanCap.settlement = { owner: 0, level: 1, captureReady: false, capital: true };
     humanCap.ownedBy = 0;
-    const human = makeUnit('hum1', 0, 'warrior', 2, 0);
+    const human = makeUnit('hum1', 0, UnitType.WARRIOR, 2, 0);
     human.hp = 35;
     humanCap.unit = human;
 
-    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1), 'normal');
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1), AiDifficulty.NORMAL);
     const actions = planAiActions(map, fund(map, players[1]!), new SeededRandom(2), GameMode.CAPTURE);
     expect(actions).toContainEqual({ type: 'attack', unitId: 'ai1', q: 2, r: 0 });
-    expect(actions.some((a) => a.type === 'move' && a.unitId === 'ai1' && a.q === 0 && a.r === 0)).toBe(false);
+    expect(actions.some((a) => a.type === AiActionType.MOVE && a.unitId === 'ai1' && a.q === 0 && a.r === 0)).toBe(false);
   });
 
   it('never chains an attack right after stepping onto a foreign village', () => {
@@ -78,13 +78,13 @@ describe('AI grind and capture behaviour', () => {
     const enemyVillage = tileAt(map, 2, 0)!;
     enemyVillage.settlement = { owner: 0, level: 1, captureReady: false };
     enemyVillage.ownedBy = 0;
-    const enemy = makeUnit('hum1', 0, 'warrior', 3, 0);
+    const enemy = makeUnit('hum1', 0, UnitType.WARRIOR, 3, 0);
     tileAt(map, 3, 0)!.unit = enemy;
 
-    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1), 'normal');
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1), AiDifficulty.NORMAL);
     const actions = planAiActions(map, fund(map, players[1]!), new SeededRandom(2), GameMode.CAPTURE);
-    const moveOntoVillage = actions.some((a) => a.type === 'move' && a.unitId === 'ai1' && a.q === 2 && a.r === 0);
-    const attackFromThere = actions.some((a) => a.type === 'attack' && a.unitId === 'ai1' && a.q === 3 && a.r === 0);
+    const moveOntoVillage = actions.some((a) => a.type === AiActionType.MOVE && a.unitId === 'ai1' && a.q === 2 && a.r === 0);
+    const attackFromThere = actions.some((a) => a.type === AiActionType.ATTACK && a.unitId === 'ai1' && a.q === 3 && a.r === 0);
     expect(moveOntoVillage && attackFromThere).toBe(false);
   });
 
@@ -96,12 +96,12 @@ describe('AI grind and capture behaviour', () => {
     const freeVillage = tileAt(map, 2, 0)!;
     freeVillage.settlement = { owner: null, level: 1, captureReady: false };
 
-    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1), 'normal');
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1), AiDifficulty.NORMAL);
     const p = players[1]!;
-    p.skills = ['roads'];
+    p.skills = [SkillId.ROADS];
     p.resources = { wood: 50, stone: 50, money: 100, ore: 0, food: 20 };
     const actions = planAiActions(map, fund(map, p), new SeededRandom(2), GameMode.CAPTURE);
-    expect(actions.some((a) => a.type === 'buildRoad' && a.q === 1 && a.r === 0)).toBe(true);
+    expect(actions.some((a) => a.type === AiActionType.BUILD_ROAD && a.q === 1 && a.r === 0)).toBe(true);
   });
 });
 
@@ -116,15 +116,15 @@ describe('AI vs AI shuttle regression', () => {
     const humanCap = tileAt(map, 2, 0)!;
     humanCap.settlement = { owner: 0, level: 1, captureReady: false, capital: true };
     humanCap.ownedBy = 0;
-    humanCap.unit = makeUnit('hum1', 0, 'warrior', 2, 0);
-    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1), 'normal');
+    humanCap.unit = makeUnit('hum1', 0, UnitType.WARRIOR, 2, 0);
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1), AiDifficulty.NORMAL);
     const sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5, aiRng: () => new SeededRandom(2) });
     sim.startGame();
     sim.drainEvents();
     const pos = () => `${ai.q},${ai.r}`;
     const trace: string[] = [];
     for (let i = 0; i < 14; i++) {
-      sim.applyCommand({ type: 'endTurn' });
+      sim.applyCommand({ type: CommandType.END_TURN });
       sim.drainEvents();
       trace.push(pos());
     }
@@ -160,7 +160,7 @@ describe('Pirate pathing', () => {
     const sim = new Simulator(map, players, GameMode.TURNS30, { rng: () => 0.5 });
     sim.startGame();
     sim.drainEvents();
-    sim.applyCommand({ type: 'endTurn' });
+    sim.applyCommand({ type: CommandType.END_TURN });
     sim.drainEvents();
     // It must have moved along the detour, not remained at its start hex.
     expect(pirate.q !== 0 || pirate.r !== 0).toBe(true);
@@ -184,10 +184,10 @@ describe('Pirate pathing', () => {
     const sim = new Simulator(map, players, GameMode.TURNS30, { rng: () => 0.5 });
     sim.startGame();
     sim.drainEvents();
-    sim.applyCommand({ type: 'endTurn' });
+    sim.applyCommand({ type: CommandType.END_TURN });
     const events = sim.drainEvents();
     const moved = events.some(
-      (e) => e.type === 'unitMoved' && (e as { unitId: string }).unitId === 'pirate-1',
+      (e) => e.type === GameEventType.UNIT_MOVED && (e as { unitId: string }).unitId === 'pirate-1',
     );
     expect(moved).toBe(true);
   });

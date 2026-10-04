@@ -4,6 +4,7 @@ import { GameScreen } from '../src/ui/screens/game-screen';
 import { gameController } from '../src/controller/game-controller';
 import { useGameStore } from '../src/store/game-store';
 import { type UIHost } from '../src/ui/host';
+import { Screen } from '@enums';
 
 function makeHost(): UIHost {
   const app = {
@@ -56,13 +57,13 @@ describe('GameScreen lifecycle', () => {
         height: 0,
       }) }),
     };
-    useGameStore.setState({ screen: 'start', texturesLoading: false });
+    useGameStore.setState({ screen: Screen.START, texturesLoading: false });
     gameController.shutdown();
   });
 
   afterEach(() => {
     gameController.shutdown();
-    useGameStore.setState({ screen: 'start', texturesLoading: false });
+    useGameStore.setState({ screen: Screen.START, texturesLoading: false });
     vi.restoreAllMocks();
   });
 
@@ -84,7 +85,7 @@ describe('GameScreen lifecycle', () => {
     const hud = root.children[1] as Container;
     const content = hud.children[0] as Container;
 
-    useGameStore.setState({ screen: 'game', texturesLoading: true });
+    useGameStore.setState({ screen: Screen.GAME, texturesLoading: true });
     expect(mapLayer.visible).toBe(false);
     expect(content.visible).toBe(false);
     const loadingOwner = findTextOwner(hud, 'Loading...');

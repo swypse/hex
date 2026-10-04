@@ -2,6 +2,11 @@
 
 Base project information for AI agents.
 
+Core rules:
+- be as brief and specific as possible
+- prefer enums
+- prefer extracting funtions/classes/enums to a single file
+
 ## Overview
 
 2D turn-based strategy on a hex map, singleplayer or multiplayer. The gameplay rules and content are documented in
@@ -10,8 +15,7 @@ Base project information for AI agents.
 ## Tech stack
 
 - TypeScript
-- PixiJS 8 (map rendering)
-- React (UI / HUD)
+- PixiJS 8 (map rendering, ui)
 - Zustand (state store)
 - Vite (dev/build: `npm run dev`, `npm run build`)
 - Vitest (tests: `npm test`), `npm run typecheck`

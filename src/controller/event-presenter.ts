@@ -21,7 +21,6 @@ import { EXPLORED_SCORE } from '../game/score';
 import { makeLabel } from '../ui/kit/label';
 import { FONT_BLACK, sizedFontFamily } from '../ui/kit/bitmap-fonts';
 import { saveRepository } from '../storage/save-game';
-import { BonusKind } from '../game/bonus';
 import { SKILLS } from '../game/skills';
 import { achievementIcon, achievementNameKey } from '../game/achievements';
 import { CameraController } from './camera-controller';
@@ -31,6 +30,7 @@ import { t } from '../i18n';
 import { sfx } from '../sound/sfx';
 import { attackSound } from '../sound/attack-sounds';
 import { markDirty } from '../render/render-gate';
+import { AttackImpact, BonusKind, FontSize, GameEventType, NetMode, SelectionKind, UnitFacing, UnitType } from '@enums';
 
 const HEX_SIZE = 40;
 
@@ -61,18 +61,18 @@ const ENEMY_STEP_GAP_MS = 10;
 
 /** Events that only update state / HUD and leave nothing to wait for. */
 const INSTANT_EVENTS: ReadonlySet<GameEvent['type']> = new Set<GameEvent['type']>([
-  'aiTurn',
-  'turnStarted',
-  'spawned',
-  'built',
-  'templeGrown',
-  'skillOpened',
-  'shipUpgraded',
-  'shipReverted',
-  'seasonChanged',
-  'scoreFly',
-  'knightCombo',
-  'achievementUnlocked',
+  GameEventType.AI_TURN,
+  GameEventType.TURN_STARTED,
+  GameEventType.SPAWNED,
+  GameEventType.BUILT,
+  GameEventType.TEMPLE_GROWN,
+  GameEventType.SKILL_OPENED,
+  GameEventType.SHIP_UPGRADED,
+  GameEventType.SHIP_REVERTED,
+  GameEventType.SEASON_CHANGED,
+  GameEventType.SCORE_FLY,
+  GameEventType.KNIGHT_COMBO,
+  GameEventType.ACHIEVEMENT_UNLOCKED,
 ]);
 
 /** Tiles an event happens on (empty when it has no location). */
@@ -189,7 +189,7 @@ export class EventPresenter {
   private deferExplorerFog(events: GameEvent[], local: number, preExplored: Set<string>): Set<string> {
     const pathTiles: { q: number; r: number }[] = [];
     for (const e of events) {
-      if (e.type !== 'explorer' || e.playerIndex !== local) continue;
+      if (e.type !== GameEventType.EXPLORER || e.playerIndex !== local) continue;
       pathTiles.push({ q: e.q, r: e.r }, ...e.path);
     }
     const defer = deferredExplorerKeys(pathTiles, preExplored);
@@ -231,7 +231,7 @@ export class EventPresenter {
     // unit animates.
     const movedIds = new Set<string>();
     for (const e of events) {
-      if (e.type === 'unitMoved') {
+      if (e.type === GameEventType.UNIT_MOVED) {
         movedIds.add(e.unitId);
         this.host.hiddenUnitIds().add(e.unitId);
       }
@@ -241,7 +241,7 @@ export class EventPresenter {
     // for the whole opening of the turn).
     this.moveGhosts = [];
     for (const e of events) {
-      if (e.type !== 'unitMoved') continue;
+      if (e.type !== GameEventType.UNIT_MOVED) continue;
       const unit = this.findUnitById(e.unitId);
       if (!unit || unit.owner === local) continue;
       const fromTile = tileAt(sim.map, e.from.q, e.from.r);
@@ -269,27 +269,27 @@ export class EventPresenter {
       for (let i = 0; i < events.length; i++) {
         const e = events[i]!;
         switch (e.type) {
-          case 'unitMoved':
+          case GameEventType.UNIT_MOVED:
             await this.presentUnitMoved(e);
             break;
-          case 'attack':
+          case GameEventType.ATTACK:
             hadAttack = true;
             await this.presentAttack(e, this.presenceOverrides(events, i + 1), () => this.setPostAttackHp(events, i));
             // Idempotent safety net for early exits inside presentAttack.
             this.setPostAttackHp(events, i);
             this.host.render();
             break;
-          case 'siege':
+          case GameEventType.SIEGE:
             hadAttack = true;
             this.presentSiege(e);
             break;
-          case 'spawned':
+          case GameEventType.SPAWNED:
             if (e.playerIndex === local) sfx.play('spawn');
             break;
-          case 'captured':
+          case GameEventType.CAPTURED:
             this.presentCaptured(e);
             break;
-          case 'villageUpgraded': {
+          case GameEventType.VILLAGE_UPGRADED: {
             if (e.playerIndex === local) sfx.play('upgrade');
             const tile = tileAt(sim.map, e.q, e.r);
             // No celebration animation; just re-render the upgraded village for
@@ -300,20 +300,20 @@ export class EventPresenter {
             }
             break;
           }
-          case 'built':
+          case GameEventType.BUILT:
             break;
-          case 'buildingRepaired':
+          case GameEventType.BUILDING_REPAIRED:
             this.host.render();
             break;
-          case 'buildingDestroyed':
+          case GameEventType.BUILDING_DESTROYED:
             this.host.render();
             break;
-          case 'templeGrown':
+          case GameEventType.TEMPLE_GROWN:
             break;
-          case 'skillOpened':
+          case GameEventType.SKILL_OPENED:
             if (e.playerIndex === local) sfx.play('claim');
             break;
-          case 'healed': {
+          case GameEventType.HEALED: {
             const unit = this.findUnitById(e.unitId);
             if (unit) {
               const t = tileAt(sim.map, unit.q, unit.r);
@@ -321,45 +321,45 @@ export class EventPresenter {
             }
             break;
           }
-          case 'shipUpgraded':
+          case GameEventType.SHIP_UPGRADED:
             break;
-          case 'shipReverted':
+          case GameEventType.SHIP_REVERTED:
             break;
-          case 'scoreFly': {
+          case GameEventType.SCORE_FLY: {
             if (e.playerIndex !== useGameStore.getState().localPlayerIndex) break;
             const tile = tileAt(sim.map, e.q, e.r);
             if (tile) this.spawnScoreFly(tile, e.playerIndex, e.amount);
             break;
           }
-          case 'knightCombo': {
+          case GameEventType.KNIGHT_COMBO: {
             if (e.playerIndex === useGameStore.getState().localPlayerIndex) {
               useGameStore.getState().setCenterMessage(t('msg.comboKill'));
             }
             break;
           }
-          case 'bonusClaimed':
+          case GameEventType.BONUS_CLAIMED:
             this.presentBonusClaimed(e);
             if (e.playerIndex === local) sfx.play('claim');
             break;
-          case 'bottleCollected':
+          case GameEventType.BOTTLE_COLLECTED:
             this.presentBottleCollected(e);
             break;
-          case 'explorer':
+          case GameEventType.EXPLORER:
             await this.presentExplorer(e);
             break;
-          case 'stealthEnabled':
+          case GameEventType.STEALTH_ENABLED:
             this.host.render();
             break;
-          case 'stealthRevealed':
+          case GameEventType.STEALTH_REVEALED:
             this.host.render();
             break;
-          case 'stalkerSpotted':
+          case GameEventType.STALKER_SPOTTED:
             this.presentStalkerSpotted(e);
             break;
-          case 'trapPlaced':
+          case GameEventType.TRAP_PLACED:
             this.host.render();
             break;
-          case 'roadBurned': {
+          case GameEventType.ROAD_BURNED: {
             this.host.render();
             const roadTile = tileAt(sim.map, e.q, e.r);
             if (e.owner === local && e.playerIndex !== local) {
@@ -368,7 +368,7 @@ export class EventPresenter {
             if (roadTile && isExploredFor(roadTile, local)) this.host.mapView()?.bounceHex(e.q, e.r);
             break;
           }
-          case 'burned': {
+          case GameEventType.BURNED: {
             this.host.render();
             const victim = tileAt(sim.map, e.q, e.r)?.ownedBy;
             if (victim === local && e.playerIndex !== local) {
@@ -376,7 +376,7 @@ export class EventPresenter {
             }
             break;
           }
-          case 'starvation': {
+          case GameEventType.STARVATION: {
             for (const u of e.units) {
               const ut = tileAt(sim.map, u.q, u.r);
               if (ut && u.damage > 0 && isExploredFor(ut, local)) this.spawnHpText(ut, `-${u.damage}`, 0xff4d4d);
@@ -390,13 +390,13 @@ export class EventPresenter {
             this.host.render();
             break;
           }
-          case 'trapTriggered': {
+          case GameEventType.TRAP_TRIGGERED: {
             this.host.render();
             const t = tileAt(sim.map, e.q, e.r);
             if (t) this.spawnHpText(t, `-${e.damage}`, 0xff6666);
             break;
           }
-          case 'storm': {
+          case GameEventType.STORM: {
             // Storming clears the unit's selection (its turn is spent), so
             // render the deselection first: otherwise the render below the
             // pulse would see the selection just changed to null and stop the
@@ -417,7 +417,7 @@ export class EventPresenter {
             }
             break;
           }
-          case 'stunShot': {
+          case GameEventType.STUN_SHOT: {
             const from = tileAt(sim.map, e.attackerTile.q, e.attackerTile.r);
             const to = tileAt(sim.map, e.targetTile.q, e.targetTile.r);
             const tex = this.host.textures()?.cannonbalTexture;
@@ -427,7 +427,7 @@ export class EventPresenter {
             if (!e.missed) this.host.render();
             break;
           }
-          case 'seasonChanged': {
+          case GameEventType.SEASON_CHANGED: {
             this.host.render();
             const store = useGameStore.getState();
             // Water that froze and ice that thawed bounce top row to bottom.
@@ -454,16 +454,16 @@ export class EventPresenter {
             else if (e.landed.some((l) => l.owner === local)) store.setCenterMessage(t('msg.iceLanded'));
             break;
           }
-          case 'turnStarted':
+          case GameEventType.TURN_STARTED:
             this.presentTurnStarted(e.playerIndex, e.turn);
             break;
-          case 'aiTurn':
+          case GameEventType.AI_TURN:
             useGameStore.getState().setCurrentPlayerIndex(e.playerIndex);
             break;
-          case 'pirateSpawned':
+          case GameEventType.PIRATE_SPAWNED:
             useGameStore.getState().setCenterMessage(t('msg.pirates'));
             break;
-          case 'pirateCapture': {
+          case GameEventType.PIRATE_CAPTURE: {
             if (e.playerIndex === useGameStore.getState().localPlayerIndex) {
               useGameStore.getState().setCenterMessage(
                 e.success ? t('msg.shipCaptured') : t('msg.shipCaptureFailed'),
@@ -471,19 +471,19 @@ export class EventPresenter {
             }
             break;
           }
-          case 'pirateDeal': {
+          case GameEventType.PIRATE_DEAL: {
             if (e.playerIndex === useGameStore.getState().localPlayerIndex) {
               useGameStore.getState().setCenterMessage(t('msg.pirateDeal'));
             }
             break;
           }
-          case 'pirateDealCanceled': {
+          case GameEventType.PIRATE_DEAL_CANCELED: {
             if (e.playerIndex === useGameStore.getState().localPlayerIndex) {
               useGameStore.getState().setCenterMessage(t('msg.pirateDealCanceled'));
             }
             break;
           }
-          case 'achievementUnlocked': {
+          case GameEventType.ACHIEVEMENT_UNLOCKED: {
             if (e.playerIndex === useGameStore.getState().localPlayerIndex) {
               useGameStore.getState().setCenterMessage(
                 t('ach.unlocked', { name: t(achievementNameKey(e.achievement)) }),
@@ -493,7 +493,7 @@ export class EventPresenter {
             }
             break;
           }
-          case 'gameOver':
+          case GameEventType.GAME_OVER:
             this.presentGameOver(e.winnerIndex, e.bonus);
             break;
         }
@@ -570,7 +570,7 @@ export class EventPresenter {
     }
     // Ships and pirates fire a cannonball projectile along the same trajectory.
     if (
-      (e.attackerPre?.shipLevel !== undefined || e.attackerPre?.type === 'pirate') &&
+      (e.attackerPre?.shipLevel !== undefined || e.attackerPre?.type === UnitType.PIRATE) &&
       attackerVisible &&
       attackerTile !== undefined &&
       targetTile !== undefined
@@ -580,7 +580,7 @@ export class EventPresenter {
     }
     // Catapults lob a cannonball projectile on a higher arc at their ranged target.
     if (
-      e.attackerPre?.type === 'catapult' &&
+      e.attackerPre?.type === UnitType.CATAPULT &&
       attackerVisible &&
       attackerTile !== undefined &&
       targetTile !== undefined
@@ -598,11 +598,11 @@ export class EventPresenter {
 
     // Face the attacker toward its target: flip left when the target is on the
     // left, otherwise keep the default right-facing sprite.
-    let facing: 'left' | 'right' = 'right';
+    let facing: UnitFacing = UnitFacing.RIGHT;
     if (attackerTile && targetTile) {
       const ax = hexToPixel(e.attackerTile, HEX_SIZE).x;
       const tx = hexToPixel(e.targetTile, HEX_SIZE).x;
-      facing = tx < ax ? 'left' : 'right';
+      facing = tx < ax ? UnitFacing.LEFT : UnitFacing.RIGHT;
       mapView?.setUnitFacing(e.attackerId, facing);
     }
 
@@ -720,12 +720,12 @@ export class EventPresenter {
     if (!sim) return;
     const attacker = this.findUnitById(e.attackerId);
     if (!attacker || attacker.shipLevel !== undefined) return;
-    if (attacker.type === 'rider' && canMove(attacker)) {
-      store.setSelection({ kind: 'unit', q: attacker.q, r: attacker.r });
+    if (attacker.type === UnitType.RIDER && canMove(attacker)) {
+      store.setSelection({ kind: SelectionKind.UNIT, q: attacker.q, r: attacker.r });
       return;
     }
-    if (attacker.type === 'knight' && canAttack(attacker)) {
-      store.setSelection({ kind: 'unit', q: attacker.q, r: attacker.r });
+    if (attacker.type === UnitType.KNIGHT && canAttack(attacker)) {
+      store.setSelection({ kind: SelectionKind.UNIT, q: attacker.q, r: attacker.r });
     }
   }
 
@@ -742,8 +742,8 @@ export class EventPresenter {
     targetTile: MapTile,
     targetVisible: boolean,
     attackerAdvanced: boolean,
-    facing: 'left' | 'right',
-    impact?: 'swordHit' | 'hit',
+    facing: UnitFacing,
+    impact?: AttackImpact,
     keep: Map<string, Unit> = new Map(),
     attackerShot: Promise<void> | null = null,
   ): Promise<void> {
@@ -780,17 +780,17 @@ export class EventPresenter {
     // defenders (archers, ships, catapults) fire their own projectile back
     // once the initial attack animation has finished.
     if (e.targetDamage > 0) {
-      const counterFacing: 'left' | 'right' = facing === 'left' ? 'right' : 'left';
+      const counterFacing: UnitFacing = facing === UnitFacing.LEFT ? UnitFacing.RIGHT : UnitFacing.LEFT;
       mapView.faceUnitAtKey(targetKey, counterFacing);
       const targetPre = e.targetPre!;
-      if (targetPre.type === 'archer' && targetPre.shipLevel === undefined) {
+      if (targetPre.type === UnitType.ARCHER && targetPre.shipLevel === undefined) {
         await this.spawnArrowFromTo(targetTile, attackerTile);
       } else if (targetPre.shipLevel !== undefined) {
         this.spawnMuzzleSmokeAt(targetTile);
         await this.spawnCannonballFromTo(targetTile, attackerTile, false);
-      } else if (targetPre.type === 'catapult') {
+      } else if (targetPre.type === UnitType.CATAPULT) {
         await this.spawnCannonballFromTo(targetTile, attackerTile, true);
-      } else if (targetPre.type === 'pirate') {
+      } else if (targetPre.type === UnitType.PIRATE) {
         this.spawnMuzzleSmokeAt(targetTile);
         await this.spawnCannonballFromTo(targetTile, attackerTile, false);
       } else {
@@ -831,7 +831,7 @@ export class EventPresenter {
     attackerTile: MapTile,
     targetTile: MapTile,
     targetVisible: boolean,
-    facing: 'left' | 'right',
+    facing: UnitFacing,
     keep: Map<string, Unit>,
   ): Promise<void> {
     const mapView = this.host.mapView();
@@ -898,7 +898,7 @@ export class EventPresenter {
     const store = useGameStore.getState();
     const tribe = unit.owner >= 0 ? store.players[unit.owner]?.tribe : undefined;
     const unitTex =
-      unit.type === 'pirate'
+      unit.type === UnitType.PIRATE
         ? textures.pirateTexture
         : shipLevel !== undefined && tribe !== undefined
           ? textures.shipTextures[tribe]?.[shipLevel]
@@ -960,7 +960,7 @@ export class EventPresenter {
     }
     const store = useGameStore.getState();
     const tribe = store.players[unit.owner]?.tribe;
-    const unitTex = unit.type === 'pirate'
+    const unitTex = unit.type === UnitType.PIRATE
       ? { texture: textures.pirateTexture.texture, anchorY: textures.pirateTexture.anchorY }
       : e.shipLevel !== undefined && tribe !== undefined
         ? textures.shipTextures[tribe]?.[e.shipLevel]
@@ -988,12 +988,12 @@ export class EventPresenter {
     const fromTile = tileAt(map, e.from.q, e.from.r);
     sprite.position.set(startPos.x, startPos.y - (fromTile ? tileElevation(fromTile, HEX_SIZE) : 0));
     mapView.container.addChild(sprite);
-    const seaUnit = e.shipLevel !== undefined || unit.type === 'pirate';
-    let facing: 'left' | 'right' = 'right';
+    const seaUnit = e.shipLevel !== undefined || unit.type === UnitType.PIRATE;
+    let facing: UnitFacing = UnitFacing.RIGHT;
     let prev = e.from;
     for (const step of steps) {
       const to = hexToPixel(step, HEX_SIZE);
-      const stepFacing: 'left' | 'right' = to.x < hexToPixel(prev, HEX_SIZE).x ? 'left' : 'right';
+      const stepFacing: UnitFacing = to.x < hexToPixel(prev, HEX_SIZE).x ? UnitFacing.LEFT : UnitFacing.RIGHT;
       if (stepFacing !== facing) {
         facing = stepFacing;
         sprite.scale.x = -sprite.scale.x;
@@ -1050,7 +1050,7 @@ export class EventPresenter {
       }
     }
     if (e.playerIndex !== local) return;
-    if (e.kind === 'skill') {
+    if (e.kind === BonusKind.SKILL) {
       if (e.skill) store.setCenterMessage(t('msg.skillOpened', { skill: SKILLS[e.skill].name }));
       return;
     }
@@ -1085,7 +1085,7 @@ export class EventPresenter {
     const player = sim.players[e.playerIndex];
     const startTile = tileAt(sim.map, e.q, e.r);
     if (!player || !startTile) return;
-    const unitTex = textures.unitTextures[player.tribe]?.['warrior'];
+    const unitTex = textures.unitTextures[player.tribe]?.[UnitType.WARRIOR];
     if (!unitTex) return;
     const sprite = new Sprite(unitTex.texture);
     sprite.anchor.set(0.5, unitTex.anchorY);
@@ -1165,7 +1165,7 @@ export class EventPresenter {
     // Keep the last selected hex between turns.
     store.setAiActive(playerIndex !== store.localPlayerIndex);
     if (playerIndex === store.localPlayerIndex) store.setCenterMessage(t('msg.yourTurn'));
-    if (playerIndex === store.localPlayerIndex && store.netMode === 'single') this.host.saveGame();
+    if (playerIndex === store.localPlayerIndex && store.netMode === NetMode.SINGLE) this.host.saveGame();
   }
 
   private presentGameOver(winnerIndex: number, bonus: number): void {
@@ -1200,7 +1200,7 @@ export class EventPresenter {
     el.zIndex = 10;
     const label = new BitmapText({
       text,
-      style: { fontFamily: sizedFontFamily(FONT_BLACK, 20), fontSize: 20, fill: color },
+      style: { fontFamily: sizedFontFamily(FONT_BLACK, FontSize.BIG), fontSize: FontSize.BIG, fill: color },
     });
     label.anchor.set(0.5);
     el.addChild(label);
@@ -1413,7 +1413,7 @@ export class EventPresenter {
     el.zIndex = 10;
     mapRoot.addChild(el);
 
-    const score = makeLabel(`+${EXPLORED_SCORE}`, { fontSize: 16, fill: 0xffffff, fontWeight: '700', roundPixels: false });
+    const score = makeLabel(`+${EXPLORED_SCORE}`, { fontSize: FontSize.NORMAL, fill: 0xffffff, fontWeight: '700', roundPixels: false });
     score.anchor.set(0.5, 0.5);
     const fogH = sprite.height;
     score.position.set(

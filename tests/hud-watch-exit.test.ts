@@ -3,6 +3,7 @@ import { Container, Text } from 'pixi.js';
 import { HudWatchExit } from '../src/ui/hud/hud-watch-exit';
 import { useGameStore } from '../src/store/game-store';
 import { type UIHost } from '../src/ui/host';
+import { Screen } from '@enums';
 
 function makeHost(): UIHost {
   return { app: { screen: { width: 1280, height: 800 } }, overlayLayer: new Container() } as unknown as UIHost;
@@ -24,7 +25,7 @@ describe('HudWatchExit', () => {
     const root = new Container();
     const w = new HudWatchExit();
     w.mount(host, root);
-    useGameStore.setState({ screen: 'game', watching: false, gameOver: false });
+    useGameStore.setState({ screen: Screen.GAME, watching: false, gameOver: false });
     expect(w.elVisible()).toBe(false);
     useGameStore.setState({ watching: true, gameOver: false });
     expect(w.elVisible()).toBe(true);

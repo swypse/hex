@@ -9,7 +9,7 @@ import { useGameStore } from '../src/store/game-store';
 import { buildPlayers } from '../src/game/players';
 import { Simulator } from '../src/game/simulator';
 import { SeededRandom } from '../src/util/random';
-import { GameMode } from '@enums';
+import { CommandType, GameMode, UnitType } from '@enums';
 
 function player(index: number, tribe: Tribe): Player {
   return { index, tribe, isHuman: index === 0, name: `p${index}`, resources: { ...START_RESOURCES }, score: 0, kills: 0, skills: [], isActive: true };
@@ -25,7 +25,7 @@ describe('knownTribesFor', () => {
   it('discovers a tribe whose unit stands on an explored tile', () => {
     const map = makeTestMap();
     const players = [player(0, Tribe.Villagers), player(1, Tribe.Warriors)];
-    tileAt(map, 1, 0)!.unit = makeUnit('u1', 1, 'warrior', 1, 0);
+    tileAt(map, 1, 0)!.unit = makeUnit('u1', 1, UnitType.WARRIOR, 1, 0);
     expect(knownTribesFor(map, players, 0)).toEqual(new Set([Tribe.Villagers, Tribe.Warriors]));
   });
 
@@ -34,14 +34,14 @@ describe('knownTribesFor', () => {
     const players = [player(0, Tribe.Villagers), player(1, Tribe.Warriors)];
     const tile = tileAt(map, 1, 0)!;
     tile.exploredBy = [1];
-    tile.unit = makeUnit('u1', 1, 'warrior', 1, 0);
+    tile.unit = makeUnit('u1', 1, UnitType.WARRIOR, 1, 0);
     expect(knownTribesFor(map, players, 0)).toEqual(new Set([Tribe.Villagers]));
   });
 
   it('ignores pirates (owner -1)', () => {
     const map = makeTestMap();
     const players = [player(0, Tribe.Villagers)];
-    tileAt(map, 1, 0)!.unit = makeUnit('pirate', -1, 'pirate', 1, 0);
+    tileAt(map, 1, 0)!.unit = makeUnit('pirate', -1, UnitType.PIRATE, 1, 0);
     expect(knownTribesFor(map, players, 0)).toEqual(new Set([Tribe.Villagers]));
   });
 
@@ -50,7 +50,7 @@ describe('knownTribesFor', () => {
     const players = [player(0, Tribe.Villagers), player(1, Tribe.Cats), player(2, Tribe.Aqua)];
     const tile = tileAt(map, 1, 0)!;
     tile.exploredBy = [2];
-    tile.unit = makeUnit('u1', 2, 'warrior', 1, 0);
+    tile.unit = makeUnit('u1', 2, UnitType.WARRIOR, 1, 0);
     expect(knownTribesFor(map, players, 0)).toEqual(new Set([Tribe.Villagers]));
     expect(knownTribesFor(map, players, 2)).toEqual(new Set([Tribe.Aqua]));
   });
@@ -92,7 +92,7 @@ describe('simulator discovery persistence', () => {
   it('records a tribe whose unit stands on an explored tile', () => {
     const map = makeTestMap();
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(42));
-    tileAt(map, 1, 0)!.unit = makeUnit('u1', 1, 'warrior', 1, 0);
+    tileAt(map, 1, 0)!.unit = makeUnit('u1', 1, UnitType.WARRIOR, 1, 0);
     const sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5 });
     sim.startGame();
     const sync = (sim as unknown as { syncDiscoveries(): void }).syncDiscoveries.bind(sim);
@@ -105,7 +105,7 @@ describe('simulator discovery persistence', () => {
     const map = makeTestMap();
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(42));
     const enemyTile = tileAt(map, 1, 0)!;
-    enemyTile.unit = makeUnit('u1', 1, 'warrior', 1, 0);
+    enemyTile.unit = makeUnit('u1', 1, UnitType.WARRIOR, 1, 0);
     const sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5 });
     sim.startGame();
     const sync = (sim as unknown as { syncDiscoveries(): void }).syncDiscoveries.bind(sim);
@@ -118,10 +118,10 @@ describe('simulator discovery persistence', () => {
   it('runs syncDiscoveries on every applied command', () => {
     const map = makeTestMap();
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(42));
-    tileAt(map, 1, 0)!.unit = makeUnit('u1', 1, 'warrior', 1, 0);
+    tileAt(map, 1, 0)!.unit = makeUnit('u1', 1, UnitType.WARRIOR, 1, 0);
     const sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5 });
     sim.startGame();
-    sim.applyCommand({ type: 'heal', unitId: 'does-not-exist' });
+    sim.applyCommand({ type: CommandType.HEAL, unitId: 'does-not-exist' });
     expect(players[0]!.knownTribes).toContain(players[1]!.tribe);
   });
 

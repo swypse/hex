@@ -5,13 +5,13 @@ import { analyzeSituation } from '@/game/ai-situation';
 import {
   deriveDirectives, ensurePlayerStrategy, goalTargetKey, productionBuildings, updateStrategy
 } from '@/game/ai-strategy';
-import { AiStrategyState, SpawnPreference } from '@/game/ai-types';
+import { AiStrategyState } from '@/game/ai-types';
 import { GameMap, MapTile, Settlement } from '@/game/map-gen';
 import { Player } from '@/game/players';
 import { TileType } from '@/game/tile-types';
 import { Unit } from '@/game/units';
 import { SeededRandom } from '@/util';
-import { GameMode } from '@enums';
+import { AiActionType, AiGoalId, AiPace, BuildingKind, GameMode, SpawnPreference, UnitType } from '@enums';
 import { describe, expect, it } from 'vitest';
 
 function aiPlayer(name: string): Player {
@@ -40,7 +40,7 @@ function makeWarrior(id: string, owner: number, q: number, r: number): Unit {
   return {
     id,
     owner,
-    type: 'warrior',
+    type: UnitType.WARRIOR,
     q,
     r,
     hasMoved: false,
@@ -89,7 +89,7 @@ describe('AI strategy types & personalities', () => {
   });
 
   it('exposes the SpawnPreference union through aiTypes', () => {
-    const prefs: SpawnPreference[] = ['offense', 'defense', 'scout', 'naval'];
+    const prefs: SpawnPreference[] = [SpawnPreference.OFFENSE, SpawnPreference.DEFENSE, SpawnPreference.SCOUT, SpawnPreference.NAVAL];
     expect(prefs).toHaveLength(4);
   });
 });
@@ -135,15 +135,15 @@ describe('AiStrategy lifecycle', () => {
     const p = v1();
     const profile = profileFor(p);
     const s = updateStrategy(map, p, analyzeSituation(map, p, mode, profile), mode, profile, 1, new SeededRandom(1));
-    expect(s.goals.some((g) => g.id === 'defense')).toBe(true);
+    expect(s.goals.some((g) => g.id === AiGoalId.DEFENSE)).toBe(true);
     map.tiles.pop();
     const s2 = updateStrategy(map, p, analyzeSituation(map, p, mode, profile), mode, profile, 1 + profile.strategy.planIntervalTurns, new SeededRandom(1));
-    expect(s2.goals.some((g) => g.id === 'defense')).toBe(false);
+    expect(s2.goals.some((g) => g.id === AiGoalId.DEFENSE)).toBe(false);
   });
 
   it('tracks production buildings and exposes a stable goal target key', () => {
     const map = twoVillageMap();
-    map.tiles[1]!.building = { kind: 'mine', level: 1 };
+    map.tiles[1]!.building = { kind: BuildingKind.MINE, level: 1 };
     const p = v1();
     expect(productionBuildings(map, p)).toBe(1);
     const s = updateStrategy(map, p, analyzeSituation(map, p, mode, profileFor(p)), mode, profileFor(p), 1, new SeededRandom(1));
@@ -156,7 +156,7 @@ describe('AiStrategy deriveDirectives', () => {
   const rng = new SeededRandom(1);
 
   function pickPrimary(s: AiStrategyState): string {
-    return s.goals.find((g) => g.id === 'economy' || g.id === 'army')!.id;
+    return s.goals.find((g) => g.id === AiGoalId.ECONOMY || g.id === AiGoalId.ARMY)!.id;
   }
 
   function planState(name: string, turn = 1, m = mode): AiStrategyState {
@@ -178,7 +178,7 @@ describe('AiStrategy deriveDirectives', () => {
     expect(d.spawnPlan).toEqual([]);
     expect(d.moneyReserve).toBe(8);
     expect(d.skillChain).toBeNull();
-    expect(d.pace).toBe('normal');
+    expect(d.pace).toBe(AiPace.NORMAL);
   });
 
   it('economy goal sets a slow pace, reserve, and economy skill chain', () => {
@@ -189,7 +189,7 @@ describe('AiStrategy deriveDirectives', () => {
     const profile = profileFor(p);
     const situation = analyzeSituation(map, p, mode, profile);
     const d = deriveDirectives(map, p, situation, profile, state);
-    expect(d.pace).toBe('slow');
+    expect(d.pace).toBe(AiPace.SLOW);
     expect(d.moneyReserve).toBeGreaterThanOrEqual(12);
     expect(d.skillChain).not.toBeNull();
   });
@@ -203,7 +203,7 @@ describe('AiStrategy deriveDirectives', () => {
     const situation = analyzeSituation(map, p, mode, profile);
     const d = deriveDirectives(map, p, situation, profile, state);
     expect(d.frontTarget).not.toBeNull();
-    expect(d.spawnPlan.some((s) => s.prefer === 'offense')).toBe(true);
+    expect(d.spawnPlan.some((s) => s.prefer === SpawnPreference.OFFENSE)).toBe(true);
   });
 
   it('defense goal reverts the money reserve to 0 and targets the endangered village', () => {
@@ -213,10 +213,10 @@ describe('AiStrategy deriveDirectives', () => {
     const profile = profileFor(p);
     const situation = analyzeSituation(map, p, mode, profile);
     const state = updateStrategy(map, p, situation, mode, profile, 1, rng);
-    expect(state.goals.some((g) => g.id === 'defense')).toBe(true);
+    expect(state.goals.some((g) => g.id === AiGoalId.DEFENSE)).toBe(true);
     const d = deriveDirectives(map, p, situation, profile, state);
     expect(d.moneyReserve).toBe(0);
-    expect(d.pace).toBe('rushed');
+    expect(d.pace).toBe(AiPace.RUSHED);
     expect(d.frontTarget).not.toBeNull();
   });
 
@@ -227,20 +227,20 @@ describe('AiStrategy deriveDirectives', () => {
     const profile = profileFor(p);
     const situation = analyzeSituation(map, p, mode, profile);
     const state = updateStrategy(map, p, situation, mode, profile, 1, rng);
-    expect(state.goals.some((g) => g.id === 'naval')).toBe(true);
+    expect(state.goals.some((g) => g.id === AiGoalId.NAVAL)).toBe(true);
     const d = deriveDirectives(map, p, situation, profile, state);
     expect(d.skillChain).not.toBeNull();
   });
 
   it('score goal sets a rushed pace and zero reserve in 30-turn mode', () => {
     const state = planState('Kade', 12, GameMode.TURNS30);
-    expect(state.goals.some((g) => g.id === 'score')).toBe(true);
+    expect(state.goals.some((g) => g.id === AiGoalId.SCORE)).toBe(true);
     const p = aiPlayer('Kade');
     const map = twoVillageMap();
     const profile = profileFor(p);
     const situation = analyzeSituation(map, p, GameMode.TURNS30, profile);
     const d = deriveDirectives(map, p, situation, profile, state);
-    expect(d.pace).toBe('rushed');
+    expect(d.pace).toBe(AiPace.RUSHED);
     expect(d.moneyReserve).toBe(0);
   });
 
@@ -273,9 +273,9 @@ describe('planAiActions with strategy', () => {
       ], spawns: []
     };
     const actions = planAiActions(map, aiPlayer('Ragnar'), new SeededRandom(1), GameMode.CAPTURE);
-    const moves = actions.filter((a) => a.type === 'move');
+    const moves = actions.filter((a) => a.type === AiActionType.MOVE);
     expect(moves.length).toBeGreaterThan(0);
-    expect(moves.some((m) => m.type === 'move' && m.q > 0)).toBe(true);
+    expect(moves.some((m) => m.type === AiActionType.MOVE && m.q > 0)).toBe(true);
   });
 
   it('passes the turn through to the planner (no crash across turns)', () => {

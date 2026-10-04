@@ -4,7 +4,8 @@ import { tileMapByKey, type GameMap, type MapTile } from './map-gen';
 import type { Player } from './players';
 import { foodNetworks, networkStock, readStock, stockOf, totalStock } from './stock';
 import { hasSkill } from './skills';
-import { unitFoodUpkeep, type Unit, type UnitType } from './units';
+import { unitFoodUpkeep, type Unit } from './units';
+import { BuildingKind, FoodPressure, Season, SkillId, UnitType } from '@enums';
 
 export { foodNetworks } from './stock';
 
@@ -20,14 +21,14 @@ export const STARVATION_DAMAGE = 10;
 
 /** Order in which equally hungry units are fed (the hungriest go first). */
 const UNIT_FEED_PRIORITY: UnitType[] = [
-  'knight', 'catapult', 'swordsman', 'stormcaller', 'berserker', 'trapper', 'stunner', 'stalker', 'builder', 'banner',
-  'shield', 'rider', 'archer', 'warrior', 'pirate',
+  UnitType.KNIGHT, UnitType.CATAPULT, UnitType.SWORDSMAN, UnitType.STORMCALLER, UnitType.BERSERKER, UnitType.TRAPPER, UnitType.STUNNER, UnitType.STALKER, UnitType.BUILDER, UnitType.BANNER,
+  UnitType.SHIELD, UnitType.RIDER, UnitType.ARCHER, UnitType.WARRIOR, UnitType.PIRATE,
 ];
 
 /** Farm yield per round: nothing in winter, otherwise 2 (3 with Science). */
 export function farmYield(owner: Player | null | undefined, map?: Pick<GameMap, 'season'>): number {
-  if (map?.season === 'winter') return 0;
-  return owner && hasSkill(owner, 'science') ? FARM_FOOD_SCIENCE : FARM_FOOD;
+  if (map?.season === Season.WINTER) return 0;
+  return owner && hasSkill(owner, SkillId.SCIENCE) ? FARM_FOOD_SCIENCE : FARM_FOOD;
 }
 
 /** Units are fed from the hungriest to the least hungry. */
@@ -47,12 +48,12 @@ function keysOf(villages: MapTile[]): Set<string> {
 
 /** Farms of the player standing on the territory of these villages. */
 function farmsOf(map: GameMap, ownerIndex: number, villageKeys: Set<string>): MapTile[] {
-  return map.tiles.filter((t) => t.building?.kind === 'farm' && t.ownedBy === ownerIndex && claimedBy(t, villageKeys));
+  return map.tiles.filter((t) => t.building?.kind === BuildingKind.FARM && t.ownedBy === ownerIndex && claimedBy(t, villageKeys));
 }
 
 /** Granaries of the player standing on the territory of these villages. */
 function granariesOf(map: GameMap, ownerIndex: number, villageKeys: Set<string>): MapTile[] {
-  return map.tiles.filter((t) => t.building?.kind === 'granary' && t.ownedBy === ownerIndex && claimedBy(t, villageKeys));
+  return map.tiles.filter((t) => t.building?.kind === BuildingKind.GRANARY && t.ownedBy === ownerIndex && claimedBy(t, villageKeys));
 }
 
 /** Units raised by these villages that eat food, in feeding order: village by
@@ -108,7 +109,7 @@ export function adjacentFarmCount(map: GameMap, tile: MapTile, ownerIndex: numbe
   let n = 0;
   for (const nb of hexNeighbors(tile)) {
     const t = byKey.get(axialKey(nb));
-    if (t?.building?.kind === 'farm' && t.ownedBy === ownerIndex) n += 1;
+    if (t?.building?.kind === BuildingKind.FARM && t.ownedBy === ownerIndex) n += 1;
   }
   return n;
 }
@@ -158,7 +159,7 @@ export interface StarvationReport {
 export function playerFoodStock(map: GameMap, player: Player): number {
   let stock = totalStock(map, player.index).food;
   for (const t of map.tiles) {
-    if (t.building?.kind === 'granary' && t.ownedBy === player.index) stock += t.building.food ?? 0;
+    if (t.building?.kind === BuildingKind.GRANARY && t.ownedBy === player.index) stock += t.building.food ?? 0;
   }
   return stock;
 }
@@ -186,7 +187,7 @@ export function foodNetIncome(map: GameMap, player: Player): number {
 export function applyFood(map: GameMap, player: Player, dryRun = false): StarvationReport[] {
   const owner = player.index;
   const byKey = tileMapByKey(map);
-  const granaries = map.tiles.filter((t) => t.building?.kind === 'granary' && t.ownedBy === owner);
+  const granaries = map.tiles.filter((t) => t.building?.kind === BuildingKind.GRANARY && t.ownedBy === owner);
   const granarySet = new Set(granaries);
   // Working copies, so a dry run leaves granaries, reserve and units untouched.
   const amounts = new Map<MapTile, number>(granaries.map((g) => [g, g.building!.food ?? 0]));
@@ -258,7 +259,7 @@ export function applyFood(map: GameMap, player: Player, dryRun = false): Starvat
     feedFromFarms(farms, net.eaters);
   }
   // Farms that belong to no network feed nobody but still fill adjacent granaries.
-  feedFromFarms(map.tiles.filter((t) => t.building?.kind === 'farm' && t.ownedBy === owner && !covered.has(axialKey(t))), []);
+  feedFromFarms(map.tiles.filter((t) => t.building?.kind === BuildingKind.FARM && t.ownedBy === owner && !covered.has(axialKey(t))), []);
 
   // Stage 2: units still hungry eat from the network's granaries, then from the
   // food its villages hold, smallest shortage first. Nothing crosses networks.
@@ -317,7 +318,7 @@ export function refreshStarving(map: GameMap, player: Player): void {
   applyFood(map, player, true);
 }
 
-export type FoodPressure = 'none' | 'low' | 'urgent';
+
 
 /** Food situation of one network of connected villages (AI planning). */
 export interface FoodNetworkState {
@@ -336,9 +337,9 @@ export interface FoodNetworkState {
  *  `low` when the balance is negative or the stock is thin and the farms barely
  *  cover the upkeep, otherwise `none`. */
 function pressureOf(balance: number, stock: number): FoodPressure {
-  if (balance < 0 && stock + balance * 3 < 0) return 'urgent';
-  if (balance < 0 || (stock < 8 && balance < 2)) return 'low';
-  return 'none';
+  if (balance < 0 && stock + balance * 3 < 0) return FoodPressure.URGENT;
+  if (balance < 0 || (stock < 8 && balance < 2)) return FoodPressure.LOW;
+  return FoodPressure.NONE;
 }
 
 /** The food state of each of the player's networks. */
@@ -378,7 +379,7 @@ export function foodPressure(map: GameMap, player: Player, village?: MapTile): F
     const own = states.find((n) => n.keys.has(axialKey(village)));
     if (own) return own.pressure;
   }
-  return states.reduce<FoodPressure>((worst, n) => (PRESSURE_RANK[n.pressure] > PRESSURE_RANK[worst] ? n.pressure : worst), 'none');
+  return states.reduce<FoodPressure>((worst, n) => (PRESSURE_RANK[n.pressure] > PRESSURE_RANK[worst] ? n.pressure : worst), FoodPressure.NONE);
 }
 
 /** Whether feeding one more unit of `type` raised by `village` keeps its
@@ -397,8 +398,8 @@ export function canSustainUnit(map: GameMap, player: Player, type: UnitType, hor
  *  there is no farm and no stone income yet. */
 export function eatsFarmMaterials(map: GameMap, player: Player, cost: { wood: number; stone: number }, village?: MapTile): boolean {
   if (cost.wood <= 0 && cost.stone <= 0) return false;
-  const noFarmYet = !map.tiles.some((t) => t.ownedBy === player.index && t.building?.kind === 'farm');
-  const needFarm = foodPressure(map, player) !== 'none' || (noFarmYet && buildingIncome(map, player).stone === 0);
+  const noFarmYet = !map.tiles.some((t) => t.ownedBy === player.index && t.building?.kind === BuildingKind.FARM);
+  const needFarm = foodPressure(map, player) !== FoodPressure.NONE || (noFarmYet && buildingIncome(map, player).stone === 0);
   if (!needFarm) return false;
   const farm = BUILDING_COSTS.farm;
   const have = village ? networkStock(map, village) : totalStock(map, player.index);

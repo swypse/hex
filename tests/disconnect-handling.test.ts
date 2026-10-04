@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { GameMode } from '@enums';
+import { GameMode, NetMode, PauseReason, Screen, UnitType } from '@enums';
 import { Simulator } from '../src/game/simulator';
 import { gameController } from '../src/controller/game-controller';
 import { useGameStore } from '../src/store/game-store';
@@ -35,8 +35,8 @@ describe('multiplayer disconnect handling', () => {
       players: [],
       paused: null,
       pausedName: '',
-      screen: 'start',
-      netMode: 'single',
+      screen: Screen.START,
+      netMode: NetMode.SINGLE,
       currentPlayerIndex: 0,
       aiActive: false,
     });
@@ -64,7 +64,7 @@ describe('multiplayer disconnect handling', () => {
     net().hostPlayers = [
       { peerId: 'guest-1', name: 'G', tribeId: Tribe.Warriors, playerIndex: 1, ready: true, online: true },
     ];
-    useGameStore.setState({ screen: 'game', netMode: 'host', players, currentPlayerIndex: 1 });
+    useGameStore.setState({ screen: Screen.GAME, netMode: NetMode.HOST, players, currentPlayerIndex: 1 });
     controller.handleClientClosed('guest-1');
     // Grace window: offline dot updates, but no modal yet.
     const s = useGameStore.getState();
@@ -72,7 +72,7 @@ describe('multiplayer disconnect handling', () => {
     expect(net().hostPlayers[0]!.online).toBe(false);
     vi.advanceTimersByTime(DISCONNECT_GRACE_MS);
     const sNow = useGameStore.getState();
-    expect(sNow.paused).toBe('disconnect');
+    expect(sNow.paused).toBe(PauseReason.DISCONNECT);
     expect(sNow.pausedName).toBe('G');
     expect(broadcast!).toHaveBeenCalled();
     vi.useRealTimers();
@@ -91,7 +91,7 @@ describe('multiplayer disconnect handling', () => {
     net().hostPlayers = [
       { peerId: 'guest-1', name: 'G', tribeId: Tribe.Warriors, playerIndex: 1, ready: true, online: true },
     ];
-    useGameStore.setState({ screen: 'game', netMode: 'host', players, currentPlayerIndex: 0 });
+    useGameStore.setState({ screen: Screen.GAME, netMode: NetMode.HOST, players, currentPlayerIndex: 0 });
     controller.handleClientClosed('guest-1');
     expect(useGameStore.getState().paused).toBeNull();
   });
@@ -110,7 +110,7 @@ describe('multiplayer disconnect handling', () => {
     net().hostPlayers = [
       { peerId: 'old-id', name: 'G', tribeId: Tribe.Warriors, playerIndex: 1, ready: true, online: true },
     ];
-    useGameStore.setState({ screen: 'game', netMode: 'host', players, currentPlayerIndex: 1 });
+    useGameStore.setState({ screen: Screen.GAME, netMode: NetMode.HOST, players, currentPlayerIndex: 1 });
     controller.handleClientClosed('old-id');
     expect(useGameStore.getState().paused).toBeNull();
     // The client re-joins before the grace window lapses.
@@ -135,9 +135,9 @@ describe('multiplayer disconnect handling', () => {
     net().hostPlayers = [
       { peerId: 'old-id', name: 'G', tribeId: Tribe.Warriors, playerIndex: 1, ready: true, online: false },
     ];
-    useGameStore.setState({ screen: 'game', netMode: 'host', players });
+    useGameStore.setState({ screen: Screen.GAME, netMode: NetMode.HOST, players });
     // Mark paused (drop on their turn)
-    useGameStore.getState().setPaused('disconnect', 'G');
+    useGameStore.getState().setPaused(PauseReason.DISCONNECT, 'G');
     // A new connection re-binds via onHostData join.
     const onData = net().hostSession && (net() as unknown as { onHostData: (pid: string, msg: unknown) => void }).onHostData
       ? (net() as unknown as { onHostData: (pid: string, msg: unknown) => void }).onHostData
@@ -151,18 +151,18 @@ describe('multiplayer disconnect handling', () => {
   });
 
   it('client pauses on host loss while in game and stays quiet in the lobby', () => {
-    useGameStore.setState({ screen: 'game', netMode: 'client', currentPlayerIndex: 1 });
+    useGameStore.setState({ screen: Screen.GAME, netMode: NetMode.CLIENT, currentPlayerIndex: 1 });
     net().noteHostDisconnected();
-    expect(useGameStore.getState().paused).toBe('disconnect');
+    expect(useGameStore.getState().paused).toBe(PauseReason.DISCONNECT);
     // A second signal does not reset the paused name/label.
     net().noteHostDisconnected();
     expect(useGameStore.getState().pausedName).toBe('');
 
     // Leaving the game clears the paused state.
-    useGameStore.getState().setScreen('start');
+    useGameStore.getState().setScreen(Screen.START);
     net().noteHostDisconnected();
     expect(useGameStore.getState().paused).toBeNull();
-    expect(useGameStore.getState().netMode).toBe('client');
+    expect(useGameStore.getState().netMode).toBe(NetMode.CLIENT);
   });
 
   it('giveToAI via the network flips the seat to AI, resumes play, and broadcasts', async () => {
@@ -180,8 +180,8 @@ describe('multiplayer disconnect handling', () => {
     net().hostPlayers = [
       { peerId: 'guest-1', name: 'G', tribeId: Tribe.Warriors, playerIndex: 1, ready: true, online: false },
     ];
-    useGameStore.setState({ screen: 'game', netMode: 'host', players, currentPlayerIndex: 1 });
-    useGameStore.getState().setPaused('disconnect', 'G');
+    useGameStore.setState({ screen: Screen.GAME, netMode: NetMode.HOST, players, currentPlayerIndex: 1 });
+    useGameStore.getState().setPaused(PauseReason.DISCONNECT, 'G');
     await net().giveDisconnectedToAI(1);
     expect(useGameStore.getState().paused).toBeNull();
     expect(controller.sim!.players[1]!.isHuman).toBe(false);
@@ -204,7 +204,7 @@ describe('multiplayer disconnect handling', () => {
     net().hostPlayers = [
       { peerId: 'old-id', name: 'G', tribeId: Tribe.Warriors, playerIndex: 1, ready: true, online: false },
     ];
-    useGameStore.setState({ screen: 'game', netMode: 'host', players, currentPlayerIndex: 1 });
+    useGameStore.setState({ screen: Screen.GAME, netMode: NetMode.HOST, players, currentPlayerIndex: 1 });
     await net().giveDisconnectedToAI(1);
     expect(controller.sim!.players[1]!.isHuman).toBe(false);
 
@@ -220,7 +220,7 @@ describe('multiplayer disconnect handling', () => {
     const map = makeTestMap();
     tileAt(map, 0, 0)!.settlement = { owner: 0, level: 1, captureReady: false };
     tileAt(map, 0, 1)!.settlement = { owner: 1, level: 1, captureReady: false };
-    tileAt(map, 0, 1)!.unit = makeUnit('u2', 1, 'warrior', 0, 1);
+    tileAt(map, 0, 1)!.unit = makeUnit('u2', 1, UnitType.WARRIOR, 0, 1);
     const players = buildPlayers(Tribe.Cats, 1, new SeededRandom(1));
     players[1]!.name = 'G';
     players[1]!.isHuman = true;
@@ -232,8 +232,8 @@ describe('multiplayer disconnect handling', () => {
     net().hostPlayers = [
       { peerId: 'guest-1', name: 'G', tribeId: Tribe.Warriors, playerIndex: 1, ready: true, online: false },
     ];
-    useGameStore.setState({ screen: 'game', netMode: 'host', players, currentPlayerIndex: 1 });
-    useGameStore.getState().setPaused('disconnect', 'G');
+    useGameStore.setState({ screen: Screen.GAME, netMode: NetMode.HOST, players, currentPlayerIndex: 1 });
+    useGameStore.getState().setPaused(PauseReason.DISCONNECT, 'G');
     await net().forfeitDisconnected(1);
     const s = useGameStore.getState();
     expect(s.paused).toBeNull();

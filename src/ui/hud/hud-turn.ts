@@ -6,6 +6,7 @@ import { type UIHost, type Widget } from '../host';
 import { makeLabel } from '../kit/label';
 import { t } from '../../i18n';
 import { TURN_BAR_HEIGHT } from '../layout';
+import { FontSize, GameMode, Screen } from '@enums';
 
 export class HudTurn implements Widget {
   private el: Container | null = null;
@@ -17,7 +18,7 @@ export class HudTurn implements Widget {
   mount(host: UIHost, root: Container): void {
     this.host = host;
     const el = new Container();
-    const fontSize = 13;
+    const fontSize = FontSize.VERY_SMALL;
     const text = makeLabel('', { fontSize, fill: 0xffffff });
     text.anchor.set(0.5, 0.5);
     el.addChild(text);
@@ -39,7 +40,7 @@ export class HudTurn implements Widget {
   private update(): void {
     if (!this.el || !this.text || !this.host) return;
     const s = useGameStore.getState();
-    this.el.visible = s.screen === 'game';
+    this.el.visible = s.screen === Screen.GAME;
     const local = s.players[s.localPlayerIndex];
     const current = s.players[s.currentPlayerIndex];
     // On another player's (AI or human) turn show only the waiting line —
@@ -53,7 +54,7 @@ export class HudTurn implements Widget {
       this.text.text = s.tutorial
         ? t('hud.turn.tutorial', { turn: s.turn })
         : t('hud.turn.mode', {
-            mode: t(s.mode === 'capture' ? 'mode.capture' : 'mode.turns30'),
+            mode: t(s.mode === GameMode.CAPTURE ? 'mode.capture' : 'mode.turns30'),
             turn: s.turn,
           });
     }

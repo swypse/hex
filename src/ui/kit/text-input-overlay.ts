@@ -1,6 +1,7 @@
 import { Container, BitmapText } from 'pixi.js';
 import { makeLabel } from './label';
 import { makePanel } from './panel';
+import { FontSize } from '@enums';
 
 interface TextInputOpts {
   x: number;
@@ -26,7 +27,7 @@ export class TextInputOverlay {
     this.field.eventMode = 'static';
     this.field.cursor = 'text';
     this.field.addChild(makePanel(opts.width, opts.height));
-    this.label = makeLabel(opts.value, { fontSize: 16 });
+    this.label = makeLabel(opts.value, { fontSize: FontSize.NORMAL });
     this.field.addChild(this.label);
     this.positionLabel();
     this.field.on('pointertap', () => this.focus());

@@ -10,6 +10,7 @@ import {
 } from '../src/game/selection';
 import { TileType } from '../src/game/tile-types';
 import { Unit } from '../src/game/units';
+import { BridgeDir, BuildingKind, SelectionKind, UnitType } from '@enums';
 
 function makeTile(
   q: number,
@@ -25,7 +26,7 @@ function makeMap(): GameMap {
   const warrior: Unit = {
     id: 'w0',
     owner: 0,
-    type: 'warrior',
+    type: UnitType.WARRIOR,
     q: 0,
     r: 0,
     hasMoved: false,
@@ -39,7 +40,7 @@ function makeMap(): GameMap {
   const other: Unit = {
     id: 'w1',
     owner: 1,
-    type: 'warrior',
+    type: UnitType.WARRIOR,
     q: -1,
     r: 0,
     hasMoved: false,
@@ -71,47 +72,47 @@ describe('tileAt', () => {
 describe('contentLayers', () => {
   it('lists the armed-unit layer first when a unit stands on the tile', () => {
     const map = makeMap();
-    expect(contentLayers(map.tiles[0]!)).toEqual(['unit', 'tile']);
-    expect(contentLayers(map.tiles[1]!)).toEqual(['tile']);
+    expect(contentLayers(map.tiles[0]!)).toEqual([SelectionKind.UNIT, SelectionKind.TILE]);
+    expect(contentLayers(map.tiles[1]!)).toEqual([SelectionKind.TILE]);
     // a village without a unit is just a selected tile
-    expect(contentLayers(map.tiles[3]!)).toEqual(['tile']);
+    expect(contentLayers(map.tiles[3]!)).toEqual([SelectionKind.TILE]);
   });
 });
 
 describe('cycleSelection', () => {
   it('selects the unit when the tile has one, else just the tile', () => {
     const map = makeMap();
-    expect(cycleSelection(null, map.tiles[0]!).kind).toBe('unit');
-    expect(cycleSelection(null, map.tiles[3]!).kind).toBe('tile');
+    expect(cycleSelection(null, map.tiles[0]!).kind).toBe(SelectionKind.UNIT);
+    expect(cycleSelection(null, map.tiles[3]!).kind).toBe(SelectionKind.TILE);
   });
 
   it('toggles the unit between armed and not armed on repeated clicks of the same tile', () => {
     const map = makeMap();
     const first = cycleSelection(null, map.tiles[0]!);
-    expect(first.kind).toBe('unit');
+    expect(first.kind).toBe(SelectionKind.UNIT);
     const second = cycleSelection(first, map.tiles[0]!);
-    expect(second).toEqual({ kind: 'tile', q: 0, r: 0 });
+    expect(second).toEqual({ kind: SelectionKind.TILE, q: 0, r: 0 });
     const third = cycleSelection(second, map.tiles[0]!);
-    expect(third.kind).toBe('unit');
+    expect(third.kind).toBe(SelectionKind.UNIT);
   });
 
   it('keeps a tile without a unit selected on repeated clicks', () => {
     const map = makeMap();
     const first = cycleSelection(null, map.tiles[1]!);
-    expect(cycleSelection(first, map.tiles[1]!).kind).toBe('tile');
+    expect(cycleSelection(first, map.tiles[1]!).kind).toBe(SelectionKind.TILE);
   });
 
   it('arms the unit when clicking a different tile that has one', () => {
     const map = makeMap();
-    const selectedTile = { kind: 'tile' as const, q: 9, r: 9 };
-    expect(cycleSelection(selectedTile, map.tiles[0]!).kind).toBe('unit');
+    const selectedTile = { kind: SelectionKind.TILE, q: 9, r: 9 };
+    expect(cycleSelection(selectedTile, map.tiles[0]!).kind).toBe(SelectionKind.UNIT);
   });
 });
 
 // NOTE: the file's existing `makeTile`/`makeMap` helpers (defined before the
 // `tileAt` describe) stay where they are and are reused below. Only add these
 // new helpers:
-function mkUnit(owner: number, type: string, q: number, r: number, shipLevel?: 1 | 2 | 3): Unit {
+function mkUnit(owner: number, type: UnitType, q: number, r: number, shipLevel?: 1 | 2 | 3): Unit {
   return {
     id: 'u',
     owner,
@@ -160,7 +161,7 @@ describe('reachableTargets', () => {
   });
 
   it('reaches tiles whose total leaving cost fits the move points', () => {
-    const unit = mkUnit(0, 'warrior', 0, 0);
+    const unit = mkUnit(0, UnitType.WARRIOR, 0, 0);
     const start = L(0, 0, { unit });
     const map = lineMap(start, L(1, 0), L(2, 0), L(3, 0));
     const keys = (pts: number) => reachableTargets(map, unit, pts).map((t) => `${t.q},${t.r}`);
@@ -170,7 +171,7 @@ describe('reachableTargets', () => {
   });
 
 it('a forest tile costs 14 to leave', () => {
-    const unit = mkUnit(0, 'warrior', 0, 0);
+    const unit = mkUnit(0, UnitType.WARRIOR, 0, 0);
     const start = L(0, 0, { unit });
     const map = lineMap(start, F(1, 0), L(2, 0), L(3, 0));
     const keys = (pts: number) => reachableTargets(map, unit, pts).map((t) => `${t.q},${t.r}`);
@@ -182,9 +183,9 @@ it('a forest tile costs 14 to leave', () => {
   });
 
   it('an enemy stealthed stalker does not block reachability and does not block the path beyond it', () => {
-    const unit = mkUnit(0, 'warrior', 0, 0);
+    const unit = mkUnit(0, UnitType.WARRIOR, 0, 0);
     const start = L(0, 0, { unit });
-    const stalker = mkUnit(1, 'stalker', 1, 0);
+    const stalker = mkUnit(1, UnitType.STALKER, 1, 0);
     stalker.isStealthed = true;
     const map = lineMap(start, L(1, 0, { unit: stalker }), L(2, 0), L(3, 0));
     const keys = reachableTargets(map, unit, 30).map((t) => `${t.q},${t.r}`);
@@ -197,7 +198,7 @@ it('a forest tile costs 14 to leave', () => {
 
   it('a stealthed stalker cannot target an enemy settlement cell, but a visible one can', () => {
     const enemyVillage = { owner: 1, level: 1, captureReady: false };
-    const stealthed = mkUnit(0, 'stalker', 0, 0);
+    const stealthed = mkUnit(0, UnitType.STALKER, 0, 0);
     stealthed.isStealthed = true;
     stealthed.firstMoveStealthDone = true;
     const map = lineMap(L(0, 0, { unit: stealthed }), L(1, 0), L(2, 0, { settlement: enemyVillage }), L(3, 0));
@@ -206,18 +207,18 @@ it('a forest tile costs 14 to leave', () => {
     expect(keys).not.toContain('2,0'); // the village cell itself is barred
     expect(keys).not.toContain('3,0'); // the barred cell blocks passage through it
 
-    const fresh = mkUnit(0, 'stalker', 0, 0); // first move will auto-stealth
+    const fresh = mkUnit(0, UnitType.STALKER, 0, 0); // first move will auto-stealth
     const map2 = lineMap(L(0, 0, { unit: fresh }), L(1, 0), L(2, 0, { settlement: enemyVillage }));
     expect(reachableTargets(map2, fresh, 30).map((t) => `${t.q},${t.r}`)).not.toContain('2,0');
 
-    const visible = mkUnit(0, 'stalker', 0, 0);
+    const visible = mkUnit(0, UnitType.STALKER, 0, 0);
     visible.firstMoveStealthDone = true;
     const map3 = lineMap(L(0, 0, { unit: visible }), L(1, 0), L(2, 0, { settlement: enemyVillage }));
     expect(reachableTargets(map3, visible, 30).map((t) => `${t.q},${t.r}`)).toContain('2,0');
   });
 
   it('a mountain tile costs 20 to leave', () => {
-    const unit = mkUnit(0, 'warrior', 0, 0);
+    const unit = mkUnit(0, UnitType.WARRIOR, 0, 0);
     const start = L(0, 0, { unit });
     const map = lineMap(start, M(1, 0), L(2, 0));
     const keys = (pts: number) => reachableTargets(map, unit, pts, true).map((t) => `${t.q},${t.r}`);
@@ -226,7 +227,7 @@ it('a forest tile costs 14 to leave', () => {
   });
 
   it('halves the cost on the unit own road, not on a foreign road', () => {
-    const unit = mkUnit(0, 'warrior', 0, 0);
+    const unit = mkUnit(0, UnitType.WARRIOR, 0, 0);
     const ownRoad = L(0, 0, { unit, roadOwner: 0 });
     const enemyRoad = L(0, 0, { unit, roadOwner: 1 });
     // Own road: leaving it costs 5, so (2,0) needs 15.
@@ -237,9 +238,9 @@ it('a forest tile costs 14 to leave', () => {
   });
 
   it('a land unit may dock on its own port but never cross it to the far shore', () => {
-    const unit = mkUnit(0, 'rider', 0, 0);
+    const unit = mkUnit(0, UnitType.RIDER, 0, 0);
     const port = W(1, 0);
-    port.building = { kind: 'port', level: 1 };
+    port.building = { kind: BuildingKind.PORT, level: 1 };
     port.ownedBy = 0;
     const map: GameMap = { radius: 8, tiles: [L(0, 0, { unit }), port, L(2, 0)], spawns: [] };
     const keys = (canDock: boolean) =>
@@ -251,7 +252,7 @@ it('a forest tile costs 14 to leave', () => {
   });
 
   it('always allows an adjacent tile even without enough move points', () => {
-    const unit = mkUnit(0, 'warrior', 0, 0);
+    const unit = mkUnit(0, UnitType.WARRIOR, 0, 0);
     const start = L(0, 0, { unit });
     const map = lineMap(start, F(1, 0), L(2, 0));
     const keys = (pts: number) => reachableTargets(map, unit, pts).map((t) => `${t.q},${t.r}`);
@@ -260,7 +261,7 @@ it('a forest tile costs 14 to leave', () => {
   });
 
   it('mountains block movement unless climbing is opened', () => {
-    const unit = mkUnit(0, 'warrior', 0, 0);
+    const unit = mkUnit(0, UnitType.WARRIOR, 0, 0);
     const start = L(0, 0, { unit });
     const map = lineMap(start, M(1, 0), L(2, 0));
     expect(reachableTargets(map, unit).map((t) => `${t.q},${t.r}`)).not.toContain('1,0');
@@ -268,7 +269,7 @@ it('a forest tile costs 14 to leave', () => {
   });
 
   it('ships move on water and land only on coast tiles', () => {
-    const unit = mkUnit(0, 'warrior', 0, 0, 1);
+    const unit = mkUnit(0, UnitType.WARRIOR, 0, 0, 1);
     const start = W(0, 0);
     start.unit = unit;
     const map: GameMap = { radius: 8, tiles: [start, L(1, 0), L(2, 0)], spawns: [] };
@@ -278,15 +279,15 @@ it('a forest tile costs 14 to leave', () => {
   });
 
   it('halves water-route travel for the owner', () => {
-    const unit = mkUnit(0, 'warrior', 0, 0, 1);
+    const unit = mkUnit(0, UnitType.WARRIOR, 0, 0, 1);
     const portA = W(0, 0);
     portA.unit = unit;
-    portA.building = { kind: 'port', level: 1 };
+    portA.building = { kind: BuildingKind.PORT, level: 1 };
     portA.ownedBy = 0;
     const mid = W(1, 0);
     mid.ownedBy = 0;
     const portB = W(2, 0);
-    portB.building = { kind: 'port', level: 1 };
+    portB.building = { kind: BuildingKind.PORT, level: 1 };
     portB.ownedBy = 0;
     const routeMap: GameMap = { radius: 8, tiles: [portA, mid, portB], spawns: [] };
     // Route present: leaving the port (5) + leaving the water-road (5) = 10.
@@ -302,10 +303,10 @@ it('a forest tile costs 14 to leave', () => {
   });
 
   it('a non-ship can step onto its own port water tile only with navigation', () => {
-    const unit = mkUnit(0, 'warrior', 0, 0);
+    const unit = mkUnit(0, UnitType.WARRIOR, 0, 0);
     const map = makeMap();
     const port = makeTile(1, 0, TileType.Water);
-    port.building = { kind: 'port', level: 1 };
+    port.building = { kind: BuildingKind.PORT, level: 1 };
     port.ownedBy = 0;
     map.tiles = [map.tiles[0]!, port];
     expect(reachableTargets(map, unit).some((t) => t.q === 1 && t.r === 0)).toBe(false);
@@ -313,8 +314,8 @@ it('a forest tile costs 14 to leave', () => {
   });
 
   it('stops movement at the first cell adjacent to an enemy', () => {
-    const unit = mkUnit(0, 'rider', 0, 0);
-    const enemy = mkUnit(1, 'warrior', 2, 1);
+    const unit = mkUnit(0, UnitType.RIDER, 0, 0);
+    const enemy = mkUnit(1, UnitType.WARRIOR, 2, 1);
     const map: GameMap = { radius: 8, tiles: [L(0, 0, { unit }), L(1, 0), L(2, 0), L(3, 0), L(2, 1, { unit: enemy })], spawns: [] };
     const keys = reachableTargets(map, unit, 40).map((t) => `${t.q},${t.r}`);
     expect(keys).toContain('2,0');
@@ -375,7 +376,7 @@ describe('pathBetween', () => {
   });
 
   it('returns an empty array when the shortest path overspends the move points', () => {
-    const unit = mkUnit(0, 'warrior', 0, 0);
+    const unit = mkUnit(0, UnitType.WARRIOR, 0, 0);
     const map: GameMap = { radius: 8, tiles: [L(0, 0, { unit }), M(1, 0), M(2, 0), L(3, 0)], spawns: [] };
     // Walking onto (3,0) over both mountains costs 10 + 20 + 20 = 50.
     expect(pathBetween(map, { q: 0, r: 0 }, { q: 3, r: 0 }, true, false, false, 0, 40)).toEqual([]);
@@ -387,7 +388,7 @@ describe('pathBetween', () => {
   });
 
   it('picks a cost-feasible detour when the shortest path overspends', () => {
-    const unit = mkUnit(0, 'rider', 0, 0);
+    const unit = mkUnit(0, UnitType.RIDER, 0, 0);
     const start = L(0, 0, { unit });
     const map: GameMap = {
       radius: 8,
@@ -420,7 +421,7 @@ describe('pathBetween', () => {
   });
 
   it('walks a direct neighbour even when the first step costs more than the move points', () => {
-    const unit = mkUnit(0, 'warrior', 0, 0);
+    const unit = mkUnit(0, UnitType.WARRIOR, 0, 0);
     const start: MapTile = { ...L(0, 0), terrain: TileType.GrasslandForest, unit };
     const map: GameMap = { radius: 8, tiles: [start, L(1, 0)], spawns: [] };
     // Leaving the forest costs 14 > the warrior's 10 points, yet the adjacent
@@ -435,7 +436,7 @@ describe('pathBetween', () => {
 
   it('does not route a land unit through its own port to the far shore', () => {
     const port = W(1, 0);
-    port.building = { kind: 'port', level: 1 };
+    port.building = { kind: BuildingKind.PORT, level: 1 };
     port.ownedBy = 0;
     const map: GameMap = { radius: 8, tiles: [L(0, 0), port, L(2, 0)], spawns: [] };
     // Walking onto the port (docking into a ship) is a legal destination...
@@ -448,11 +449,11 @@ describe('pathBetween', () => {
 
   it('a ship can still sail out of its own port', () => {
     const port = W(0, 0);
-    port.building = { kind: 'port', level: 1 };
+    port.building = { kind: BuildingKind.PORT, level: 1 };
     port.ownedBy = 0;
     const map: GameMap = { radius: 8, tiles: [port, W(1, 0)], spawns: [] };
     const ship: Unit = {
-      id: 'sh', owner: 0, type: 'warrior', q: 0, r: 0,
+      id: 'sh', owner: 0, type: UnitType.WARRIOR, q: 0, r: 0,
       hasMoved: false, hasAttacked: false, hasHealed: false,
       hp: 5, attack: 2, attackDistance: 1, spawnVillage: null, shipLevel: 1,
     };
@@ -465,7 +466,7 @@ describe('pathBetween', () => {
 
   it('stops movement at the first cell adjacent to an enemy', () => {
     const map: GameMap = { radius: 4, tiles: [], spawns: [] };
-    const enemy = mkUnit(1, 'warrior', 2, 1);
+    const enemy = mkUnit(1, UnitType.WARRIOR, 2, 1);
     map.tiles.push(L(0, 0), L(1, 0), L(2, 0), L(3, 0), L(2, 1, { unit: enemy }));
     expect(pathBetween(map, { q: 0, r: 0 }, { q: 3, r: 0 }, false, false, false, 0)).toEqual([]);
     expect(pathBetween(map, { q: 0, r: 0 }, { q: 2, r: 0 }, false, false, false, 0)).toEqual([
@@ -476,7 +477,7 @@ describe('pathBetween', () => {
 
   it('a unit adjacent to an enemy can still move at least one cell', () => {
     const map: GameMap = { radius: 4, tiles: [], spawns: [] };
-    const enemy = mkUnit(1, 'warrior', 1, 0);
+    const enemy = mkUnit(1, UnitType.WARRIOR, 1, 0);
     map.tiles.push(L(0, 0), L(1, 0, { unit: enemy }), L(0, 1));
     expect(pathBetween(map, { q: 0, r: 0 }, { q: 0, r: 1 }, false, false, false, 0)).toEqual([{ q: 0, r: 1 }]);
   });
@@ -499,7 +500,7 @@ describe('moveUnit', () => {
 describe('bridged water movement', () => {
   function bridgeGap(): GameMap {
     const map = makeMap();
-    tileAt(map, 1, 0)!.bridge = { owner: 0, dir: 'we' };
+    tileAt(map, 1, 0)!.bridge = { owner: 0, dir: BridgeDir.WE };
     return map;
   }
 
@@ -514,7 +515,7 @@ describe('bridged water movement', () => {
   it('a land unit can cross a bridged water tile to the far shore', () => {
     const map = makeMap();
     map.tiles.push(makeTile(2, 0, TileType.GrasslandLand));
-    tileAt(map, 1, 0)!.bridge = { owner: 0, dir: 'we' };
+    tileAt(map, 1, 0)!.bridge = { owner: 0, dir: BridgeDir.WE };
     expect(pathBetween(map, { q: 0, r: 0 }, { q: 2, r: 0 })).toEqual([
       { q: 1, r: 0 },
       { q: 2, r: 0 },
@@ -531,13 +532,13 @@ describe('bridged water movement', () => {
   it('a ship can still sail through a bridged water tile', () => {
     const map: GameMap = { radius: 4, tiles: [], spawns: [] };
     const ship: Unit = {
-      id: 'sh', owner: 0, type: 'warrior', q: 0, r: 0,
+      id: 'sh', owner: 0, type: UnitType.WARRIOR, q: 0, r: 0,
       hasMoved: false, hasAttacked: false, hasHealed: false,
       hp: 5, attack: 2, attackDistance: 1, spawnVillage: null, shipLevel: 1,
     };
     map.tiles.push(makeTile(0, 0, TileType.Water, null, ship));
     const middle = makeTile(1, 0, TileType.Water);
-    middle.bridge = { owner: 0, dir: 'we' };
+    middle.bridge = { owner: 0, dir: BridgeDir.WE };
     map.tiles.push(middle);
     map.tiles.push(makeTile(2, 0, TileType.Water));
     const reached = reachableTargets(map, ship, 30).map((t) => `${t.q},${t.r}`);

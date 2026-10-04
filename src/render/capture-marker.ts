@@ -1,5 +1,5 @@
-/** Screen edges a capture-adjacent village can sit off-screen at. */
-export type CaptureMarkerSide = 'l' | 'r' | 't' | 'b';
+import { CaptureMarkerSide } from '@enums';
+
 
 /** Side length of the capture triangle in screen px. */
 export const CAPTURE_EDGE_MARKER_SIZE = 20;
@@ -33,22 +33,22 @@ export function captureMarkerPoints(
   const half = size / 2;
   const z = (v: number): number => (v === 0 ? 0 : v);
   switch (side) {
-    case 't': {
+    case CaptureMarkerSide.TOP: {
       const vertexY = z(-slide);
       const baseY = size - slide;
       return [along - half, baseY, along, vertexY, along + half, baseY];
     }
-    case 'b': {
+    case CaptureMarkerSide.BOTTOM: {
       const vertexY = H + slide;
       const baseY = H - size + slide;
       return [along - half, baseY, along, vertexY, along + half, baseY];
     }
-    case 'l': {
+    case CaptureMarkerSide.LEFT: {
       const vertexX = z(-slide);
       const baseX = size - slide;
       return [baseX, along - half, vertexX, along, baseX, along + half];
     }
-    case 'r': {
+    case CaptureMarkerSide.RIGHT: {
       const vertexX = W + slide;
       const baseX = W - size + slide;
       return [baseX, along - half, vertexX, along, baseX, along + half];

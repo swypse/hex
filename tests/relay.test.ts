@@ -3,6 +3,7 @@ import { WebSocket as WsWebSocket } from 'ws';
 import { createRelayServer, type RelayServerHandle } from '../server/relay.mjs';
 import { RelayHostSession, RelayClientSession, type WebSocketLike } from '../src/net/relay-session';
 import type { HostMessage } from '../src/net/peer-session';
+import { ClientMessageType, HostMessageType } from '@enums';
 
 let relay: RelayServerHandle;
 
@@ -63,7 +64,7 @@ describe('WebSocket relay', () => {
         onReady: () => hostReady.resolve(),
         onClientJoined: (id) => hostClientJoined.resolve(id),
         onData: (clientId, msg) => {
-          if (msg.type === 'join') hostGotJoin.resolve(clientId);
+          if (msg.type === ClientMessageType.JOIN) hostGotJoin.resolve(clientId);
         },
         onClientClosed: () => {},
         onError: (e) => hostReady.reject(e),
@@ -82,7 +83,7 @@ describe('WebSocket relay', () => {
         onRegistered: (id) => clientRegistered.resolve(id),
         onJoined: () => clientJoined.resolve(),
         onData: (msg) => {
-          if (msg.type === 'lobbyUpdate') clientGotLobby.resolve(msg);
+          if (msg.type === HostMessageType.LOBBY_UPDATE) clientGotLobby.resolve(msg);
         },
         onClose: () => {},
         onError: () => {},
@@ -99,9 +100,9 @@ describe('WebSocket relay', () => {
     await withTimeout(clientJoined.promise);
     await withTimeout(hostGotJoin.promise);
 
-    host.broadcast({ type: 'lobbyUpdate', joined: [], totalPlayers: 2, aiCount: 0 });
+    host.broadcast({ type: HostMessageType.LOBBY_UPDATE, joined: [], totalPlayers: 2, aiCount: 0 });
     const lobby = await withTimeout(clientGotLobby.promise);
-    expect(lobby.type).toBe('lobbyUpdate');
+    expect(lobby.type).toBe(HostMessageType.LOBBY_UPDATE);
 
     host.close();
     client.close();
@@ -235,7 +236,7 @@ describe('WebSocket relay', () => {
         onReady: () => host2Ready.resolve(),
         onClientJoined: (id) => host2GotClient.resolve(id),
         onData: (clientId, msg) => {
-          if (msg.type === 'join') host2GotJoin.resolve(clientId);
+          if (msg.type === ClientMessageType.JOIN) host2GotJoin.resolve(clientId);
         },
         onClientClosed: () => {},
         onError: () => {},
@@ -264,9 +265,9 @@ it('a reloaded client re-joins the same room and receives host data again', asyn
         onReady: () => hostReady.resolve(),
         onClientJoined: () => {},
         onData: (clientId, msg) => {
-          if (msg.type === 'join') {
+          if (msg.type === ClientMessageType.JOIN) {
             hostJoins.push(clientId);
-            host.sendTo(clientId, { type: 'state', state: {} as never, playerIndex: 1 });
+            host.sendTo(clientId, { type: HostMessageType.STATE, state: {} as never, playerIndex: 1 });
           }
         },
         onClientClosed: (clientId) => hostLeft.push(clientId),
@@ -285,7 +286,7 @@ it('a reloaded client re-joins the same room and receives host data again', asyn
         onRegistered: (id) => firstRegistered.resolve(id),
         onJoined: () => {},
         onData: (msg) => {
-          if (msg.type === 'state') firstGotState.resolve('state');
+          if (msg.type === HostMessageType.STATE) firstGotState.resolve('state');
         },
         onClose: () => {},
         onError: () => {},
@@ -309,7 +310,7 @@ it('a reloaded client re-joins the same room and receives host data again', asyn
         onRegistered: (id) => c2Registered.resolve(id),
         onJoined: () => {},
         onData: (msg) => {
-          if (msg.type === 'state') c2GotState.resolve('state');
+          if (msg.type === HostMessageType.STATE) c2GotState.resolve('state');
         },
         onClose: () => {},
         onError: () => {},
