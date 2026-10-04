@@ -18,7 +18,7 @@ import { SeededRandom } from '../util/random';
 import { seasonForTurn } from '../game/season';
 import { createTextures, TextureSet } from '../render/texture-factory';
 import { activeMatchStore } from '../storage/active-match';
-import { ClientMessageType, CommandType, ConnectionState, GameMode, HostMessageType, LobbyRole, MapSize, NetMode, OverlayKind, PauseReason, Screen, SelectionKind } from '@enums';
+import { ClientMessageType, CommandType, ConnectionState, GameMode, HostMessageType, LobbyRole, NetMode, OverlayKind, PauseReason, Screen, SelectionKind } from '@enums';
 
 /** How long a dropped player stays unmarked-by-modal before the host pause
  *  modal fires: transient network flaps (or a fast refresh) that resolve within
@@ -57,7 +57,7 @@ export class NetworkController {
   hostSession: RelayHostSession | null = null;
   hostName = '';
   hostTribe: Tribe | null = null;
-  hostConfig: { mode: GameMode; totalPlayers: number; aiCount: number; mapSize: MapSize } | null = null;
+  hostConfig: { mode: GameMode; totalPlayers: number; aiCount: number } | null = null;
   clientSession: RelayClientSession | null = null;
   clientName = '';
   hostStarted = false;
@@ -80,13 +80,13 @@ export class NetworkController {
 
   constructor(private readonly host: NetworkHost) {}
 
-  hostGame(opts: { mode: GameMode; totalPlayers: number; aiCount: number; mapSize?: MapSize; name: string; tribe: Tribe }): string {
+  hostGame(opts: { mode: GameMode; totalPlayers: number; aiCount: number; name: string; tribe: Tribe }): string {
     this.canceled = false;
     this.hostStarted = false;
     // Hosting is not a client match — drop any saved rejoin for it.
     activeMatchStore.clear();
     const code = generateRoomCode();
-    this.hostConfig = { mode: opts.mode, totalPlayers: opts.totalPlayers, aiCount: opts.aiCount, mapSize: opts.mapSize ?? MapSize.NORMAL };
+    this.hostConfig = { mode: opts.mode, totalPlayers: opts.totalPlayers, aiCount: opts.aiCount };
     this.hostName = opts.name;
     this.hostTribe = opts.tribe;
     this.hostPlayers = [];
@@ -398,7 +398,7 @@ export class NetworkController {
       ...clients.map((p) => ({ name: p.name, tribe: p.tribeId! })),
     ];
     const players = buildMultiplayerPlayers(humans, this.hostConfig.aiCount, new SeededRandom(Math.floor(Math.random() * 100000)), loadSettings().aiDifficulty);
-    const map = generateMap(players.length, Math.floor(Math.random() * 100000), this.hostConfig.mapSize);
+    const map = generateMap(players.length, Math.floor(Math.random() * 100000));
     for (const p of players) {
       initialExplorationFor(map, p.index);
       exploreVillageSights(map, p.index);

@@ -5,7 +5,7 @@ import { MapTile, Settlement } from '../src/game/map-gen';
 import { isLandType, isWaterType, TileType } from '../src/game/tile-types';
 import { isForestType, isMountainType } from '../src/game/tile-types';
 import { Biome } from '../src/game/biomes';
-import { MapSize, UnitType } from '@enums';
+import { UnitType } from '@enums';
 
 describe('map generation', () => {
   it('chooses radius by player count', () => {
@@ -19,26 +19,11 @@ describe('map generation', () => {
     expect(() => mapRadiusFor(8)).toThrow();
   });
 
-  it('scales the radius by map size (normal ~1x, big ~2x, huge ~3x)', () => {
+  it('generates a map of the base radius plus the water border', () => {
+    const map = generateMap(2, 42);
     expect(mapRadiusFor(2)).toBe(7);
-    expect(mapRadiusFor(2, MapSize.NORMAL)).toBe(7);
-    expect(mapRadiusFor(2, MapSize.BIG)).toBe(14);
-    expect(mapRadiusFor(2, MapSize.HUGE)).toBe(21);
-    expect(mapRadiusFor(6, MapSize.BIG)).toBe(22);
-    expect(mapRadiusFor(6, MapSize.HUGE)).toBe(33);
-  });
-
-  it('generates larger maps for big and huge sizes', () => {
-    const normal = generateMap(2, 42);
-    const big = generateMap(2, 42, MapSize.BIG);
-    const huge = generateMap(2, 42, MapSize.HUGE);
-    expect(normal.radius).toBe(9);
-    expect(big.radius).toBe(16);
-    expect(huge.radius).toBe(23);
-    expect(big.tiles.length).toBeGreaterThan(normal.tiles.length * 3);
-    expect(huge.tiles.length).toBeGreaterThan(big.tiles.length * 1.8);
-    expect(big.tiles).toHaveLength(allTiles(16).length);
-    expect(huge.tiles).toHaveLength(allTiles(23).length);
+    expect(map.radius).toBe(9);
+    expect(generateMap(6, 42).radius).toBe(mapRadiusFor(6) + 2);
   });
 
   it('generates the expected number of tiles', () => {

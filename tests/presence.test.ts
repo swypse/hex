@@ -7,7 +7,7 @@ import { Tribe } from '../src/game/tribes';
 import { useGameStore } from '../src/store/game-store';
 import { SeededRandom } from '../src/util';
 import { makeTestMap } from './helpers/test-map';
-import { GameMode, LobbyRole, MapSize } from '@enums';
+import { GameMode, LobbyRole } from '@enums';
 
 const controller = gameController as unknown as {
   getNetwork: () => NetworkController;
@@ -67,7 +67,7 @@ describe('multiplayer presence', () => {
     useGameStore.setState({
       lobby: { role: LobbyRole.HOST, code: 'ABC123', mode: GameMode.CAPTURE, totalPlayers: 2, aiCount: 0, players: [] },
     });
-    net().hostConfig = { mode: GameMode.CAPTURE, totalPlayers: 2, aiCount: 0, mapSize: MapSize.NORMAL };
+    net().hostConfig = { mode: GameMode.CAPTURE, totalPlayers: 2, aiCount: 0 };
     net().hostName = 'Host';
     net().hostTribe = Tribe.Cats;
     net().hostPlayers = [

@@ -30,7 +30,6 @@ export * from './host-message-type.enum';
 export * from './language.enum';
 export * from './lobby-role.enum';
 export * from './lobby-view.enum';
-export * from './map-size.enum';
 export * from './net-mode.enum';
 export * from './noun-kind.enum';
 export * from './overlay-kind.enum';

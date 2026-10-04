@@ -42,7 +42,7 @@ import { saveRepository } from '@/storage/save-game';
 import { welcomeDismissed } from '@/storage/settings';
 import { confirmLeaveGame, useGameStore } from '@/store/game-store';
 import { SeededRandom } from '@/util';
-import { AiDifficulty, BuildingKind, CommandType, GameMode, MapSize, NetMode, OverlayKind, Screen, Season, SelectionKind, SkillId, TutorialStepId, UnitType } from '@enums';
+import { AiDifficulty, BuildingKind, CommandType, GameMode, NetMode, OverlayKind, Screen, Season, SelectionKind, SkillId, TutorialStepId, UnitType } from '@enums';
 import { Application, Container } from 'pixi.js';
 import { CAMERA_FOLLOW_MS, CameraController } from './camera-controller';
 import { damagePreviewVictim } from './damage-preview';
@@ -610,7 +610,7 @@ class GameController {
     });
   }
 
-  async startGame(tribe: Tribe, enemyCount: number, mode: GameMode, difficulty: AiDifficulty = DEFAULT_AI_DIFFICULTY, mapSize: MapSize = MapSize.NORMAL): Promise<void> {
+  async startGame(tribe: Tribe, enemyCount: number, mode: GameMode, difficulty: AiDifficulty = DEFAULT_AI_DIFFICULTY): Promise<void> {
     const store = useGameStore.getState();
     this.tutorial = null;
     store.setTutorial(false);
@@ -618,7 +618,7 @@ class GameController {
     store.setTutorialHighlightSkills([]);
     store.setTutorialHighlightEndTurn(false);
     const players = buildPlayers(tribe, enemyCount, new SeededRandom(Math.floor(Math.random() * 100000)), difficulty);
-    const map = generateMap(players.length, Math.floor(Math.random() * 100000), mapSize);
+    const map = generateMap(players.length, Math.floor(Math.random() * 100000));
     for (const p of players) {
       initialExplorationFor(map, p.index);
       exploreVillageSights(map, p.index);
@@ -1604,7 +1604,6 @@ class GameController {
     aiCount: number;
     name: string;
     tribe: Tribe;
-    mapSize?: MapSize
   }): string {
     return this.getNetwork().hostGame(opts);
   }

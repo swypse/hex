@@ -7,7 +7,7 @@ import { SeededRandom } from '../util/random';
 import { makeUnit, type Unit } from './units';
 import { claimTileForVillage } from './claim';
 import { placeBonuses, type Bonus } from './bonus';
-import { BridgeDir, BuildingKind, MapSize, Season, TerrainFeature, UnitType, VillageBlockVariant } from '@enums';
+import { BridgeDir, BuildingKind, Season, TerrainFeature, UnitType, VillageBlockVariant } from '@enums';
 
 const WATER_BORDER = 2;
 const FREE_VILLAGE_MAX_DIST = 7;
@@ -128,14 +128,6 @@ export interface GameMap {
 
 
 
-/** Linear map-size multiplier per option: big is ~2x the normal radius, huge
- *  ~3x. The map hex count therefore scales ~4x and ~9x. */
-const MAP_RADIUS_FACTOR: Record<MapSize, number> = {
-  normal: 1,
-  big: 2,
-  huge: 3,
-};
-
 function baseMapRadius(playerCount: number): number {
   if (playerCount === 2) return Math.round(11 / 1.5);
   if (playerCount === 3) return Math.round(12 / 1.5);
@@ -146,8 +138,8 @@ function baseMapRadius(playerCount: number): number {
   throw new Error(`Unsupported player count: ${playerCount}`);
 }
 
-export function mapRadiusFor(playerCount: number, size: MapSize = MapSize.NORMAL): number {
-  return Math.round(baseMapRadius(playerCount) * MAP_RADIUS_FACTOR[size]);
+export function mapRadiusFor(playerCount: number): number {
+  return baseMapRadius(playerCount);
 }
 
 export function bridgeIslandVillages(tiles: MapTile[]): void {
@@ -328,8 +320,8 @@ function angleDiff(a: number, b: number): number {
   return Math.min(d, 2 * Math.PI - d);
 }
 
-export function generateMap(playerCount: number, seed: number, size: MapSize = MapSize.NORMAL): GameMap {
-  const radius = mapRadiusFor(playerCount, size) + WATER_BORDER;
+export function generateMap(playerCount: number, seed: number): GameMap {
+  const radius = mapRadiusFor(playerCount) + WATER_BORDER;
   const rng = new SeededRandom(seed);
   const villageNames = generateVillageNames(playerCount * 2, rng);
   const tiles = allTiles(radius);

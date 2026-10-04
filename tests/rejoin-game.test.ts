@@ -1,4 +1,4 @@
-import { GameMode, MapSize, NetMode, Screen } from '@enums';
+import { GameMode, NetMode, Screen } from '@enums';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { gameController } from '../src/controller/game-controller';
 import { NetworkController } from '../src/controller/network-controller';
@@ -88,7 +88,7 @@ describe('rejoinGame', () => {
 
   it('hosting a game clears a previously saved client match', () => {
     vi.spyOn(RelayHostSession.prototype, 'open').mockImplementation(() => {});
-    network().hostGame({ mode: GameMode.CAPTURE, totalPlayers: 2, aiCount: 0, mapSize: MapSize.NORMAL, name: 'H', tribe: 'Cats' as never });
+    network().hostGame({ mode: GameMode.CAPTURE, totalPlayers: 2, aiCount: 0, name: 'H', tribe: 'Cats' as never });
     expect(activeMatchStore.loadFresh()).toBeNull();
   });
 });
