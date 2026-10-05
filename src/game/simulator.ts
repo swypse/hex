@@ -1274,6 +1274,9 @@ export class Simulator {
   private *endTurnSteps(sliced: boolean): Generator<void, void, void> {
     if (this.gameOver) return;
     this.autoHealFor(this.currentPlayerIndex);
+    // Watching: a call ends on the last player after a round; the next one
+    // starts a new round instead of repeating the round end.
+    if (this.currentPlayerIndex === this.players.length - 1 && !this.players.some((p) => p.isActive && p.isHuman)) this.currentPlayerIndex = 0;
     let guard = 0;
     for (; ;) {
       if (guard++ > 64) break;

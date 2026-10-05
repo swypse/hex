@@ -9,7 +9,9 @@ import { canAffordAt, networkStock, payerVillage, totalStock } from './stock';
 import { canOpenSkill, hasSkill, skillCost } from './skills';
 import { reachableTargets, tileAt } from './selection';
 import { foodNetworkStates, networkStateOfTile, foodPressure, canSustainUnit, eatsFarmMaterials } from './food';
-import { planFoodFixes } from './ai-food';
+import { blockedByOpening, openingAction } from './ai-opening';
+import { blockedByStone, villagesNeedingMine } from './ai-stone';
+import { planFoodFixes, planWinterStorage } from './ai-food';
 import { canHeal, unitSpawnCost, UNIT_TYPES, Unit } from './units';
 import { SeededRandom } from '../util/random';
 import { buildingsInVillage, villageBuildingLimit } from './village';
@@ -25,9 +27,12 @@ import { isShip } from './ship';
 import { updateStrategy, deriveDirectives } from './ai-strategy';
 import { flagsFor } from './ai-flags';
 import { OPERATION_PATTERN, updateOperation } from './ai-operations';
-import { AiActionType, AiPace, AiPickMode, AiStance, BuildingKind, FoodPressure, GameMode, GarrisonGuardKind, SkillId, SpawnPreference, UnitType } from '@enums';
+import { AiActionType, AiPace, AiPickMode, AiStance, BuildingKind, FoodPressure, GameMode, GarrisonGuardKind, Season, SkillId, SpawnPreference, UnitType } from '@enums';
 
 const MAX_PLAN_STEPS = 200;
+
+/** Stone stock under which the AI wants Geology (double mine output). */
+const GEOLOGY_STONE_BELOW = 20;
 
 /** Pattern list with the squad operation slotted in after the lone-hunter and
  *  naval patterns, right before frontier exploration: a unit that can kill or
@@ -37,8 +42,32 @@ const MAX_PLAN_STEPS = 200;
  *  regressed the AI (44% win rate, fewer enemy villages captured) because it
  *  pulled units away from easy solo kills to wait for the group instead. */
 function buildPatterns() {
-  return AI_PATTERNS.flatMap((p) => (p.id === 'explore-frontier' ? [OPERATION_PATTERN, p] : [p]));
+  return AI_PATTERNS.flatMap((p) => (p.id === 'explore-frontier' ? [OPENING_PATTERN, OPERATION_PATTERN, p] : [p])).map(withStoneGate);
 }
+
+/** A pattern whose step would spend money while a mine is still missing
+ *  yields nothing, so the planner moves on to the next pattern. */
+function withStoneGate<T extends { evaluate(ctx: AiPatternContext): AiAction[] | null }>(pattern: T): T {
+  return {
+    ...pattern,
+    evaluate(ctx: AiPatternContext): AiAction[] | null {
+      const steps = pattern.evaluate(ctx);
+      if (!steps) return steps;
+      if (steps.some((a) => blockedByOpening(ctx.map, ctx.player, a, ctx.situation, ctx.state))) return null;
+      if (!flagsFor(ctx.player).stoneFocus) return steps;
+      const needy = ctx.state.plannedKinds?.has(BuildingKind.MINE) ? [] : villagesNeedingMine(ctx.map, ctx.player);
+      return steps.some((a) => blockedByStone(ctx.map, ctx.player, a, ctx.situation, needy)) ? null : steps;
+    },
+  };
+}
+
+/** The opening build order of the first village: upgrade, sawmill, mine, farm,
+ *  granary. Placed after the fighting patterns so danger still comes first. */
+const OPENING_PATTERN = {
+  id: 'opening-build-order',
+  priority: 72,
+  evaluate: ({ map, player, state }: AiPatternContext): AiAction[] | null => openingAction(map, player, state),
+};
 
 /** Strong penalty for idle land units standing where a naval enemy can hit. */
 const NAVAL_EXPOSURE_PENALTY = 400;
@@ -454,6 +483,24 @@ function bestAvailableAction(
   // cheaper per food gained.
   const foodStates = foodNetworkStates(map, player);
   const foodPlan = planFoodFixes(map, player, foodStates);
+  // Farms give nothing in winter: a network with no granary eats from nothing
+  // then, so it builds one (or is linked to a network that has one) before.
+  const storage = planWinterStorage(map, player, foodStates);
+  const storageScore = map.season === Season.SPRING ? 300 : 520;
+  // Money kept for the granary (or the skill that unlocks it) a network needs
+  // before winter, so other spends do not keep the purse below its price.
+  const granarySite = storage.needy.size > 0 && map.tiles.some((t) => canBuildGranary(map, t, player));
+  const storageReserve = storage.needy.size === 0 ? 0
+    : !hasSkill(player, SkillId.GRANARY) ? (hasSkill(player, SkillId.AGRICULTURE) ? skillCost(SkillId.GRANARY, player.skills.length) : 0)
+      : granarySite ? BUILDING_COSTS.granary.money : BUILDING_COSTS.farm.money;
+  for (const { tile } of storage.roads) {
+    if (state.built.has(key(tile.q, tile.r)) || !canBuildRoad(map, tile, player)) continue;
+    candidates.push({ score: storageScore + jitter(), action: { type: AiActionType.BUILD_ROAD, q: tile.q, r: tile.r } });
+  }
+  for (const { tile } of storage.ports) {
+    if (state.built.has(key(tile.q, tile.r)) || !canBuildPort(map, tile, player) || !canAffordAt(map, player, tile, BUILDING_COSTS.port)) continue;
+    candidates.push({ score: storageScore + jitter(), action: { type: AiActionType.BUILD, q: tile.q, r: tile.r, kind: BuildingKind.PORT } });
+  }
   for (const { tile, pressure } of foodPlan.roads) {
     if (state.built.has(key(tile.q, tile.r))) continue;
     if (!canBuildRoad(map, tile, player)) continue;
@@ -480,11 +527,18 @@ function bestAvailableAction(
       const net = networkStateOfTile(foodStates, tile);
       const roadFirst = net !== undefined && foodPlan.linkFirst.has(axialKeyOf(net.villages[0]!));
       const pressure = net?.pressure ?? foodPressure(map, player);
-      const farmScore = roadFirst ? 0 : pressure === FoodPressure.URGENT ? 650 : pressure === FoodPressure.LOW ? 450 : (net?.balance ?? 0) < 2 ? 260 : 0;
-      if (farmScore > 0) candidates.push({ score: farmScore + jitter(), action: { type: AiActionType.BUILD, q: tile.q, r: tile.r, kind: BuildingKind.FARM } });
+      const baseScore = roadFirst ? 0 : pressure === FoodPressure.URGENT ? 650 : pressure === FoodPressure.LOW ? 450 : (net?.balance ?? 0) < 2 ? 260 : 0;
+      // A network that needs a granary needs a farm to put it next to.
+      const farmForGranary = !roadFirst && !granarySite && hasSkill(player, SkillId.GRANARY) && net !== undefined && storage.needy.has(axialKeyOf(net.villages[0]!));
+      const farmScore = farmForGranary ? Math.max(storageScore - 10, baseScore) : baseScore;
+      // A granary that is only short of money comes before a cheaper farm.
+      const savingForGranary = hasSkill(player, SkillId.GRANARY) && storageReserve > 0 && farmScore < storageScore && player.resources.money - BUILDING_COSTS.farm.money < storageReserve;
+      if (farmScore > 0 && !savingForGranary) candidates.push({ score: farmScore + jitter(), action: { type: AiActionType.BUILD, q: tile.q, r: tile.r, kind: BuildingKind.FARM } });
     }
-    if (canBuildGranary(map, tile, player) && canAffordAt(map, player, tile, BUILDING_COSTS.granary) && (networkStateOfTile(foodStates, tile)?.balance ?? 0) > 0) {
-      candidates.push({ score: 120 + jitter(), action: { type: AiActionType.BUILD, q: tile.q, r: tile.r, kind: BuildingKind.GRANARY } });
+    const granaryNet = networkStateOfTile(foodStates, tile);
+    const needsStorage = granaryNet !== undefined && storage.needy.has(axialKeyOf(granaryNet.villages[0]!));
+    if (canBuildGranary(map, tile, player) && canAffordAt(map, player, tile, BUILDING_COSTS.granary) && (needsStorage || (granaryNet?.balance ?? 0) > 0)) {
+      candidates.push({ score: (needsStorage ? storageScore : 120) + jitter(), action: { type: AiActionType.BUILD, q: tile.q, r: tile.r, kind: BuildingKind.GRANARY } });
     }
     if (canBuildPort(map, tile, player) && canAffordAt(map, player, tile, BUILDING_COSTS.port)) {
       if (!reserveLastSlotForMine(map, player, tile) || situation?.navalThreat) {
@@ -541,19 +595,26 @@ function bestAvailableAction(
     candidates.push({ score: 550 + jitter(), action: { type: AiActionType.OPEN_SKILL, skill: SkillId.AGRICULTURE } });
   }
 
+  if (storage.needy.size > 0 && hasSkill(player, SkillId.AGRICULTURE) && !hasSkill(player, SkillId.GRANARY) && !state.opened.has(SkillId.GRANARY) && canOpenSkill(player, SkillId.GRANARY)) {
+    candidates.push({ score: storageScore + 10 + jitter(), action: { type: AiActionType.OPEN_SKILL, skill: SkillId.GRANARY } });
+  }
+
   // Farms cost wood and stone: with food under pressure and no income of one of
   // them, head for the skill whose building produces it (Forestry -> sawmill,
   // Climbing + Smithery -> mine) so the first farm can be paid for.
   // Money the AI must keep to afford the food-path skill it is waiting for.
   let foodSkillReserve = 0;
-  if (hasSkill(player, SkillId.AGRICULTURE) && foodPressure(map, player) !== FoodPressure.NONE) {
+  if (hasSkill(player, SkillId.AGRICULTURE) && (foodPressure(map, player) !== FoodPressure.NONE || storage.needy.size > 0)) {
     const wanted: SkillId[] = [];
     // Roads (and granaries) need stone: a planned road link with no stone in
     // sight also heads for the mine skills.
-    const stoneNeeded = foodPlan.roads.length > 0 ? ROAD_COST.stone : BUILDING_COSTS.farm.stone;
+    const stoneNeeded = Math.max(
+      foodPlan.roads.length > 0 ? ROAD_COST.stone : BUILDING_COSTS.farm.stone,
+      storage.needy.size > 0 && hasSkill(player, SkillId.GRANARY) ? BUILDING_COSTS.granary.stone : 0,
+    );
     // Judged per hungry network: its own wood/stone and the income of the
     // buildings feeding it.
-    for (const net of foodStates.filter((n) => n.pressure !== FoodPressure.NONE)) {
+    for (const net of foodStates.filter((n) => n.pressure !== FoodPressure.NONE || storage.needy.has(axialKeyOf(n.villages[0]!)))) {
       const home = net.villages[0]!;
       const have = networkStock(map, home);
       const income = networkBuildingIncome(map, player, home);
@@ -564,6 +625,16 @@ function bestAvailableAction(
       if (hasSkill(player, id) || state.opened.has(id)) continue;
       foodSkillReserve = skillCost(id, player.skills.length);
       if (canOpenSkill(player, id)) candidates.push({ score: 540 + jitter(), action: { type: AiActionType.OPEN_SKILL, skill: id } });
+      break;
+    }
+  }
+
+  // Geology doubles what a mine yields: worth learning once the AI has mines
+  // but is still short of stone (Science first, its parent).
+  if (hasSkill(player, SkillId.SMITHERY) && !hasSkill(player, SkillId.GEOLOGY) && totalStock(map, player.index).stone < GEOLOGY_STONE_BELOW && map.tiles.some((t) => t.ownedBy === player.index && t.building?.kind === BuildingKind.MINE)) {
+    for (const id of [SkillId.GEOLOGY, SkillId.SCIENCE]) {
+      if (state.opened.has(id) || !canOpenSkill(player, id)) continue;
+      candidates.push({ score: 450 + jitter(), action: { type: AiActionType.OPEN_SKILL, skill: id } });
       break;
     }
   }
@@ -593,14 +664,14 @@ function bestAvailableAction(
   // discretionary spends of wood/stone, and of money once wood and stone are
   // ready, so the money for the farm is saved.
   const needFood = foodPressure(map, player) !== FoodPressure.NONE || !map.tiles.some((t) => t.ownedBy === player.index && t.building?.kind === BuildingKind.FARM);
-  if (needFood && (!hasSkill(player, SkillId.AGRICULTURE) || map.tiles.some((t) => canBuildFarm(map, t, player)))) {
+  if ((needFood && (!hasSkill(player, SkillId.AGRICULTURE) || map.tiles.some((t) => canBuildFarm(map, t, player)))) || storageReserve > 0) {
     for (let i = candidates.length - 1; i >= 0; i--) {
       const action = candidates[i]!.action;
       const first: AiAction = Array.isArray(action) ? action[0]! : action;
       const cost = discretionaryCost(map, player, first);
       if (!cost) continue;
       // Wood and stone trickle in slowly: never spend below one farm's worth.
-      if (eatsFarmMaterials(map, player, cost, actionVillage(map, player, first))) {
+      if (needFood && eatsFarmMaterials(map, player, cost, actionVillage(map, player, first))) {
         candidates.splice(i, 1);
         continue;
       }
@@ -610,9 +681,18 @@ function bestAvailableAction(
       const home = actionVillage(map, player, first);
       const have = home ? networkStock(map, home) : totalStock(map, player.index);
       const materialsReady = hasSkill(player, SkillId.AGRICULTURE) && have.wood >= BUILDING_COSTS.farm.wood && have.stone >= BUILDING_COSTS.farm.stone;
-      const reserve = foodSkillReserve > 0 ? foodSkillReserve : materialsReady ? BUILDING_COSTS.farm.money : 0;
+      const reserve = Math.max(storageReserve, foodSkillReserve > 0 ? foodSkillReserve : needFood && materialsReady ? BUILDING_COSTS.farm.money : 0);
       if (reserve > 0 && !urgentSpawn && player.resources.money - cost.money < reserve) candidates.splice(i, 1);
     }
+  }
+
+  // A mine first: money-spending candidates wait until every village that can
+  // have a mine has one (see ai-stone.ts).
+  const needy = flagsFor(player).stoneFocus && !state.plannedKinds?.has(BuildingKind.MINE) ? villagesNeedingMine(map, player) : [];
+  for (let i = candidates.length - 1; i >= 0; i--) {
+    const action = candidates[i]!.action;
+    const first: AiAction = Array.isArray(action) ? action[0]! : action;
+    if (blockedByOpening(map, player, first, situation, state) || blockedByStone(map, player, first, situation, needy)) candidates.splice(i, 1);
   }
 
   if (difficulty && difficulty.mistakeChance > 0 && candidates.length > 0 && rng.next() < difficulty.mistakeChance) {
@@ -682,6 +762,7 @@ function markUsed(state: AiPlannerState, action: AiAction): void {
       state.upgraded.add(key(action.q, action.r));
       break;
     case AiActionType.BUILD:
+      state.plannedKinds?.add(action.kind);
       state.built.add(key(action.q, action.r));
       state.occupied.add(key(action.q, action.r));
       break;
@@ -759,6 +840,7 @@ export function* planAiActionsSteps(
     upgraded: new Set(),
     spawned: new Set(),
     built: new Set(),
+    plannedKinds: new Set(),
     opened: new Set(),
     occupied: new Set(),
   };

@@ -54,6 +54,8 @@ export interface AiPlannerState {
   built: Set<string>;
   opened: Set<SkillId>;
   occupied: Set<string>;
+  /** Kinds of buildings planned this turn (not yet on the board in snapshot planning). */
+  plannedKinds?: Set<BuildingKind>;
 }
 
 /** A persistent multi-unit plan against one enemy village: the squad first

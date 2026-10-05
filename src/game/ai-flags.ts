@@ -22,6 +22,9 @@ export interface AiFlags {
    *  concentrating spawns on the single best duelist sacrifices the army diversity/mobility that
    *  grabs territory. Would need a garrison-aware duel model to be worth another try. */
   composition: boolean;
+  /** While a village that could have a mine has none, money is saved for it: no spawns, upgrades,
+   *  roads or buildings (except a mine, one sawmill per village, or in danger / urgent hunger). */
+  stoneFocus: boolean;
 }
 
 /** Shipped defaults. `multiSpecial` stays off: a 160-game benchmark showed no gain (44% wins,
@@ -29,9 +32,9 @@ export interface AiFlags {
  *  the solo-hunt/naval patterns so it only ever claims units those left idle — an earlier
  *  placement ahead of them regressed the AI (44% wins, fewer enemy villages captured) by pulling
  *  units off easy solo kills to wait for the group. */
-export const DEFAULT_AI_FLAGS: AiFlags = { militarySkills: true, berserkerHold: true, stunnerHunt: true, multiSpecial: false, operations: true, composition: false };
-export const ALL_AI_FLAGS_ON: AiFlags = { militarySkills: true, berserkerHold: true, stunnerHunt: true, multiSpecial: true, operations: true, composition: true };
-export const ALL_AI_FLAGS_OFF: AiFlags = { militarySkills: false, berserkerHold: false, stunnerHunt: false, multiSpecial: false, operations: false, composition: false };
+export const DEFAULT_AI_FLAGS: AiFlags = { militarySkills: true, berserkerHold: true, stunnerHunt: true, multiSpecial: false, operations: true, composition: false, stoneFocus: true };
+export const ALL_AI_FLAGS_ON: AiFlags = { militarySkills: true, berserkerHold: true, stunnerHunt: true, multiSpecial: true, operations: true, composition: true, stoneFocus: true };
+export const ALL_AI_FLAGS_OFF: AiFlags = { militarySkills: false, berserkerHold: false, stunnerHunt: false, multiSpecial: false, operations: false, composition: false, stoneFocus: false };
 
 export function flagsFor(player: Pick<Player, 'aiFlags'>): AiFlags {
   return player.aiFlags ? { ...DEFAULT_AI_FLAGS, ...player.aiFlags } : DEFAULT_AI_FLAGS;

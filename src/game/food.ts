@@ -6,6 +6,7 @@ import { foodNetworks, networkStock, readStock, stockOf, totalStock } from './st
 import { hasSkill } from './skills';
 import { unitFoodUpkeep, type Unit } from './units';
 import { BuildingKind, FoodPressure, Season, SkillId, UnitType } from '@enums';
+import { SEASON_LENGTH } from './season';
 import { droughtOverTile, halvedYield } from './weather';
 
 export { foodNetworks } from './stock';
@@ -333,7 +334,16 @@ export interface FoodNetworkState {
   balance: number;
   /** Granary food of the network plus the food its villages hold. */
   stock: number;
+  /** Granaries standing on the network's territory. */
+  granaries: number;
   pressure: FoodPressure;
+}
+
+/** Whether the network would run dry in winter: it eats, has no granary and its
+ *  stock does not comfortably cover a winter of upkeep (farms yield nothing then, and only
+ *  a granary keeps summer food). Moot in winter itself: it is too late. */
+export function needsWinterStorage(map: Pick<GameMap, 'season'>, net: FoodNetworkState): boolean {
+  return map.season !== Season.WINTER && net.upkeep > 0 && net.granaries === 0 && net.stock < net.upkeep * SEASON_LENGTH * 3;
 }
 
 /** `urgent` when the stock runs out within three turns at the current rate,
@@ -361,6 +371,7 @@ export function foodNetworkStates(map: GameMap, player: Player): FoodNetworkStat
       upkeep: n.upkeep,
       balance: n.balance,
       stock,
+      granaries: granariesOf(map, player.index, n.keys).length,
       pressure: pressureOf(n.balance, stock),
     };
   });

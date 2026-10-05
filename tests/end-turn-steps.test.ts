@@ -6,6 +6,9 @@ import { Tribe, TRIBES } from '../src/game/tribes';
 import { SeededRandom } from '../src/util/random';
 import { AiDifficulty, CommandType, GameMode } from '@enums';
 
+/** Spawned unit ids embed a timestamp and a process-wide counter, so two sims side by side never share them. */
+const normalized = (v: unknown): string => JSON.stringify(v).replace(/spawn-\d+-\d+/g, 'spawn');
+
 function makeSim(seed: number): Simulator {
   const players = buildPlayers(TRIBES[0]!.id as Tribe, 3, new SeededRandom(seed), AiDifficulty.HARD);
   const map = generateMap(players.length, seed);
@@ -32,8 +35,8 @@ describe('applyCommandSteps(END_TURN)', () => {
         step = steps.next();
       }
       expect(step.value).toBe(okA);
-      expect(JSON.stringify(b.snapshot())).toBe(JSON.stringify(a.snapshot()));
-      expect(b.drainEvents()).toEqual(a.drainEvents());
+      expect(normalized(b.snapshot())).toBe(normalized(a.snapshot()));
+      expect(normalized(b.drainEvents())).toBe(normalized(a.drainEvents()));
       // an AI round pauses at least once per AI seat
       expect(yields).toBeGreaterThanOrEqual(a.players.filter((p) => !p.isHuman && p.isActive).length);
     }

@@ -69,6 +69,11 @@ export function spawnMuzzleSmoke(
   const tickStart = performance.now();
   const ticker = app.ticker;
   const fn = (): void => {
+    // The map was torn down (exit to menu) while the smoke was still rising.
+    if (el.destroyed) {
+      ticker.remove(fn);
+      return;
+    }
     const age = performance.now() - tickStart;
     for (const p of particles) {
       const localAge = age - p.delay;

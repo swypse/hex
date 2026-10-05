@@ -470,6 +470,12 @@ class GameController {
     this.startVillageIntroPending = true;
     store.setScreen(Screen.GAME);
     this.syncKnownTribes(false);
+    // The save was made while watching (the local player is out): nothing else
+    // would end the turn, so the AIs would stand still. Carry on watching.
+    if (!snap.gameOver && snap.mode === GameMode.CAPTURE && snap.players[0]?.isActive === false) {
+      store.setAiActive(false);
+      this.watchGame();
+    }
   }
 
   /** Marks that the WebGL context was lost. Kept so a later foreground event can

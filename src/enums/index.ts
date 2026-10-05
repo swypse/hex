@@ -33,6 +33,7 @@ export * from './lobby-role.enum';
 export * from './lobby-view.enum';
 export * from './net-mode.enum';
 export * from './noun-kind.enum';
+export * from './opening-stage.enum';
 export * from './overlay-kind.enum';
 export * from './pause-reason.enum';
 export * from './popup-position.enum';
