@@ -169,7 +169,7 @@ export class UnitActions {
 
   /** Closes the open target dialog of `kind` and returns its target with the
    *  selected unit; null when the dialog is not open or no unit is selected. */
-  private takeDialogTarget(kind: OverlayKind.STUN_CHOICE | OverlayKind.SHIP_LANDING | OverlayKind.STALKER_REVEAL | OverlayKind.MOVE_ATTACK): { target: { q: number; r: number }; unit: Unit } | null {
+  private takeDialogTarget(kind: OverlayKind.STUN_CHOICE | OverlayKind.BONUS_LEAVE | OverlayKind.SHIP_LANDING | OverlayKind.STALKER_REVEAL | OverlayKind.MOVE_ATTACK): { target: { q: number; r: number }; unit: Unit } | null {
     const store = useGameStore.getState();
     const pending = store.overlay?.kind === kind ? store.overlay.target : null;
     store.setOverlay(null);
@@ -343,6 +343,25 @@ export class UnitActions {
     const store = useGameStore.getState();
     store.setSelection(null);
     this.sendCommand({ type: CommandType.ATTACK, unitId: unit.id, q: pending.q, r: pending.r });
+  }
+
+  /** Bonus dialog: go ahead with the move and give the bonus up. */
+  chooseLeaveBonus(): void {
+    const hit = this.takeDialogTarget(OverlayKind.BONUS_LEAVE);
+    if (!hit) return;
+    this.sendCommand({ type: CommandType.MOVE, unitId: hit.unit.id, q: hit.target.q, r: hit.target.r });
+    useGameStore.getState().setSelection({ kind: SelectionKind.UNIT, q: hit.target.q, r: hit.target.r });
+    sfx.play('click');
+  }
+
+  /** Bonus dialog: stay put and claim the bonus instead. */
+  claimBonusFromDialog(): void {
+    if (!this.takeDialogTarget(OverlayKind.BONUS_LEAVE)) return;
+    this.sendCommand({ type: CommandType.CLAIM_BONUS });
+  }
+
+  cancelBonusLeave(): void {
+    useGameStore.getState().setOverlay(null);
   }
 
   cancelMoveAttack(): void {

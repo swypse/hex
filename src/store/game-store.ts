@@ -30,6 +30,7 @@ type OverlayState =
   | { kind: OverlayKind.MOVE_ATTACK; target: { q: number; r: number } }
   | { kind: OverlayKind.STALKER_REVEAL; target: { q: number; r: number } }
   | { kind: OverlayKind.STUN_CHOICE; target: { q: number; r: number } }
+  | { kind: OverlayKind.BONUS_LEAVE; target: { q: number; r: number } }
   | { kind: OverlayKind.BUILDER_BUILD }
   | { kind: OverlayKind.THORN_TRAP }
   | { kind: OverlayKind.DISBAND; unitId: string }

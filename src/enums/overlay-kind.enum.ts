@@ -14,6 +14,7 @@ export enum OverlayKind {
   MOVE_ATTACK = 'moveAttack',
   STALKER_REVEAL = 'stalkerReveal',
   STUN_CHOICE = 'stunChoice',
+  BONUS_LEAVE = 'bonusLeave',
   BUILDER_BUILD = 'builderBuild',
   THORN_TRAP = 'thornTrap',
   DISBAND = 'disband',

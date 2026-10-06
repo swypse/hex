@@ -154,21 +154,24 @@ export class HudSelected implements Widget {
       const statusBits: string[] = [];
       if ((unit.stunTurns ?? 0) >= 1) statusBits.push(t('hud.selected.stunned'));
       if (unit.isStealthed) statusBits.push(t('hud.selected.stealth'));
+      const defenseBuffs = unitDefenseBuffs(map, unit, tile);
+      const bonusDefense = defenseBuffs.reduce((sum, b) => sum + b.amount, 0);
       unitRow = {
         name:
           t('hud.selected.unit', { name: UNIT_TYPE_NAMES[unit.type] }) +
           (statusBits.length > 0 ? ` (${statusBits.join(' ')})` : ''),
         pairs: [
           { icon: 'attack-32', value: rageBonus > 0 ? `${attackDamage(unit)} +${rageBonus}` : String(attackDamage(unit)) },
-          { icon: 'def-32', value: String(unit.defense ?? 0) },
+          { icon: 'def-32', value: bonusDefense > 0 ? `${unit.defense ?? 0} + ${bonusDefense}` : String(unit.defense ?? 0) },
           { icon: 'gold-32', value: String(unitMaintenance(unit)) },
           ...(unitFoodEaten(unit) > 0 ? [{ icon: 'food-32', value: `-${unitFoodEaten(unit)}` }] : []),
         ],
       };
       lines.push(''); // placeholder — the unit line renders as a composite icon row
       bolds.push(true);
-      for (const buff of unitDefenseBuffs(map, unit, tile)) {
-        lines.push(t(buff.key, { n: buff.amount }));
+      for (const buff of defenseBuffs) {
+        extraRows.set(lines.length, { name: '', pairs: [{ icon: 'def-32', value: t(buff.key, { n: buff.amount }) }] });
+        lines.push('');
         bolds.push(false);
       }
       if (unit.type === UnitType.PIRATE) {
@@ -193,15 +196,16 @@ export class HudSelected implements Widget {
       // The village line carries the income as an icon + value pair, like the
       // unit characteristics row.
       settlementRow = {
-        name: t('hud.selected.settlement', { name: settlement.name ?? t('hud.selected.settlementDefault'), level: settlement.level, units: unitsInVillage(map, tile), cap: villageCapacity(settlement.level) }),
-        pairs: [],
+        name: t('hud.selected.settlement', { name: settlement.name ?? t('hud.selected.settlementDefault'), level: settlement.level }),
+        pairs: [{ icon: 'unit-32', value: `${unitsInVillage(map, tile)}/${villageCapacity(settlement.level)}` }],
       };
       lines.push('');
       bolds.push(true);
       if (settlement.owner !== null) {
         const income = villageIncomeBreakdown(map, tile);
-        // Result first, then the raw income less the upkeep of units, roads and buildings.
-        const value = settlement.owner === human.index ? `${income.total} (${income.raw} - ${income.units + income.structures})` : String(income.total);
+        // Result first, then the gross income (connection bonus included) less the upkeep actually charged,
+        // so the bracket always adds up to the result.
+        const value = settlement.owner === human.index ? `${income.total} (${income.gross} - ${income.deducted})` : String(income.total);
         const pairs = [{ icon: 'gold-32', value }];
         if (settlement.owner === human.index) {
           const food = villageFood(map, tile, human);
@@ -308,7 +312,7 @@ export class HudSelected implements Widget {
         lines.push(t('hud.selected.quakeProtected'));
         bolds.push(false);
       }
-      if (mine && stormProtected(weatherMap, tile, human.index)) {
+      if (mine && isWaterType(tile.terrain) && stormProtected(weatherMap, tile, human.index)) {
         lines.push(t('hud.selected.stormProtected'));
         bolds.push(false);
       }

@@ -34,6 +34,7 @@ import { markDirty } from '@/gfx/render-gate';
 import { createTextures, destroyTextureSet } from '@/render/texture-factory';
 import { pickTileAt } from '@/render/tile-pick';
 import { type Viewport } from '@/render/tile-signature';
+import { bonusEligibleFor } from '@/game/map/bonus';
 import { sfx } from '@/sound/sfx';
 import { activeMatchStore } from '@/storage/active-match';
 import { saveRepository } from '@/storage/save-game';
@@ -973,6 +974,12 @@ class GameController {
         }
         if (unit.shipLevel !== undefined && tile.terrain !== TileType.Water) {
           store.setOverlay({ kind: OverlayKind.SHIP_LANDING, target: { q: tile.q, r: tile.r } });
+          return;
+        }
+        // A unit that can claim the bonus under it is asked before it walks away.
+        const origin = tileAt(this.sim.map, selection.q, selection.r);
+        if (origin && bonusEligibleFor(this.sim.map, store.localPlayerIndex, store.turn).includes(origin)) {
+          store.setOverlay({ kind: OverlayKind.BONUS_LEAVE, target: { q: tile.q, r: tile.r } });
           return;
         }
         this.sendCommand({ type: CommandType.MOVE, unitId: unit.id, q, r });

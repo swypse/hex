@@ -79,6 +79,10 @@ export interface VillageIncomeBreakdown {
   connection: number;
   /** What the village pays into the treasury each turn. */
   total: number;
+  /** Income before upkeep, connection bonus included. */
+  gross: number;
+  /** Upkeep actually deducted: gross minus total (upkeep above the raw income is not charged). */
+  deducted: number;
 }
 
 export function villageIncomeBreakdown(map: GameMap, villageTile: MapTile): VillageIncomeBreakdown {
@@ -87,7 +91,8 @@ export function villageIncomeBreakdown(map: GameMap, villageTile: MapTile): Vill
   const structures = villageStructureUpkeep(map, villageTile);
   const connection = isVillageRoadConnected(map, villageTile) ? VILLAGE_CONNECTION_BONUS : 0;
   const total = villageEnemyOccupied(villageTile) ? 0 : Math.max(0, raw - units - structures) + connection;
-  return { raw, units, structures, connection, total };
+  const gross = raw + connection;
+  return { raw, units, structures, connection, total, gross, deducted: gross - total };
 }
 
 export function villageIncome(map: GameMap, villageTile: MapTile): number {

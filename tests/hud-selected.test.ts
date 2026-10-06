@@ -217,10 +217,12 @@ describe('HudSelected village building constraints', () => {
     // The unit hp no longer appears in the selected-cell panel.
     expect(labels.some((x) => x.startsWith('50/50'))).toBe(false);
     expect(labels).toContain('20');
-    expect(labels).toContain('10');
+    // Unit defense 10 plus 8 from the village (5) and its wall (3).
+    expect(labels).toContain('10 + 8');
     expect(labels).toContain('1');
-    expect(all).toContain('+3 DEF — village wall');
-    expect(all).not.toContain('DEF 0');
+    expect(all).toContain('+3 — village wall');
+    expect(all).toContain('+5 — village');
+    expect(all).not.toContain('DEF');
     expect(all).not.toContain('UPKEEP');
   });
 
@@ -236,9 +238,10 @@ describe('HudSelected village building constraints', () => {
       .map((s) => s.width)
       .filter((w) => w === 16);
     // 3 unit stats (attack/defense/gold, hp removed) + the money and food icons
-    // on the income line, plus the three 16px help
+    // on the income line, the units icon on the village line, the defense icon of
+    // the village buff row, plus the three 16px help
     // buttons (unit / settlement / building limit) and the 16px close icon.
-    expect(widths).toEqual([16, 16, 16, 16, 16, 16, 16, 16, 16]);
+    expect(widths).toEqual([16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16]);
   });
 
   it('draws a button-style drop shadow behind the info panel', () => {
@@ -488,7 +491,7 @@ describe('HudSelected connected village income bonus', () => {
   it('shows the income line as result (raw - upkeep) when connected', () => {
     boot(true);
     const all = texts().join('\n');
-    expect(all).toContain('6 (5 - 0)');
+    expect(all).toContain('6 (6 - 0)');
     const width16 = findSprites((hud as unknown as { el: Container }).el!)
       .map((s) => s.width)
       .filter((w) => w === 16);
