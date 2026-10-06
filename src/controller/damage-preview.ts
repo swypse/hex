@@ -1,6 +1,6 @@
-import { GameMap, MapTile } from '../game/map-gen';
-import { Selection } from '../game/selection';
-import { isExploredFor } from '../game/explore';
+import { type GameMap, type MapTile } from '../game/map/map-gen';
+import { type Selection } from '../game/units/selection';
+import { isExploredFor } from '../game/map/explore';
 import { SelectionKind } from '@enums';
 
 /** Whether a long-press on `tile` should start a damage preview, and returns

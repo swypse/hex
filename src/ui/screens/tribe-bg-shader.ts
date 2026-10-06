@@ -8,7 +8,7 @@ import {
   Shader,
   Texture,
 } from 'pixi.js';
-import { THEME } from '../kit/theme';
+import { THEME } from '../../gfx/theme';
 
 /** How far down the screen the tribe color has fully faded into the screen bg
  *  (fraction of the screen height; below this the bg is solid). */

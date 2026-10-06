@@ -1,5 +1,5 @@
 import { ClientMessageType, RelayClientMessageType, RelayServerMessageType } from '@enums';
-import { ClientMessage, HostMessage } from './peer-session';
+import { type ClientMessage, type HostMessage } from './peer-session';
 import { t } from '../i18n';
 
 export interface WebSocketLike {

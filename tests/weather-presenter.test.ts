@@ -3,7 +3,7 @@ import { Container } from 'pixi.js';
 import { EventPresenter, type EventHost } from '../src/controller/event-presenter';
 import { useGameStore } from '../src/store/game-store';
 import { GameEventType, WeatherType } from '@enums';
-import type { WeatherEvent } from '../src/game/weather';
+import type { WeatherEvent } from '../src/game/weather/weather';
 
 function weather(type: WeatherType, q: number, r: number, over: Partial<WeatherEvent> = {}): WeatherEvent {
   return { id: `${type}@9`, type, q, r, radius: 2, startTurn: 9, age: 1, lifetime: 6, ...over };

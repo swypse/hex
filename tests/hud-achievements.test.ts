@@ -9,7 +9,7 @@ import {
   SCORE_ACHIEVEMENTS_CHIP_GAP,
   SKILLS_BUTTON_SIZE,
   scoreButtonsPosition,
-} from '../src/ui/layout';
+} from '../src/ui/hud/layout';
 import { type UIHost } from '../src/ui/host';
 
 function makeHost(width = 1280, height = 800): UIHost {

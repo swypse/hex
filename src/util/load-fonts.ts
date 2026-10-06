@@ -1,4 +1,4 @@
-import { enableSizedFonts, loadBitmapFonts } from '../ui/kit/bitmap-fonts';
+import { enableSizedFonts, loadBitmapFonts } from '../gfx/bitmap-fonts';
 
 export async function loadFonts() {
   await Promise.all([

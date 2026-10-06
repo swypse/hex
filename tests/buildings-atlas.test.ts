@@ -1,6 +1,6 @@
 import { beforeEach, describe, it, expect, afterEach, vi } from 'vitest';
 import { Texture, type Container } from 'pixi.js';
-import { BUILDINGS_ATLAS_FRAMES, BUILDINGS_ATLAS_CELL_W, BUILDINGS_ATLAS_CELL_H } from '../src/game/buildings-atlas-data.gen';
+import { BUILDINGS_ATLAS_FRAMES, BUILDINGS_ATLAS_CELL_W, BUILDINGS_ATLAS_CELL_H } from '../src/atlas-data/buildings-atlas-data.gen';
 import { BUILDING_TILE_FILES } from '../src/render/buildings-atlas';
 
 class FakeImage {

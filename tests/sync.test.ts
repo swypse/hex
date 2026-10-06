@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { generateMap } from '../src/game/map-gen';
+import { generateMap } from '../src/game/map/map-gen';
 import { buildMultiplayerPlayers } from '../src/game/players';
 import { Simulator } from '../src/game/simulator';
 import { SeededRandom } from '../src/util/random';
-import { initialExplorationFor } from '../src/game/explore';
+import { initialExplorationFor } from '../src/game/map/explore';
 import { Tribe } from '../src/game/tribes';
 import { CommandType, GameMode } from '@enums';
 

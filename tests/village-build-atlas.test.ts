@@ -1,6 +1,6 @@
 import { beforeEach, describe, it, expect, afterEach, vi } from 'vitest';
 import { Texture, type Container } from 'pixi.js';
-import { VILLAGE_VILLAGERS_ATLAS_FRAMES, VILLAGE_VILLAGERS_ATLAS_CELL_W, VILLAGE_VILLAGERS_ATLAS_CELL_H } from '../src/game/village-villagers-atlas-data.gen';
+import { VILLAGE_VILLAGERS_ATLAS_FRAMES, VILLAGE_VILLAGERS_ATLAS_CELL_W, VILLAGE_VILLAGERS_ATLAS_CELL_H } from '../src/atlas-data/village-villagers-atlas-data.gen';
 
 class FakeImage {
   src = '';

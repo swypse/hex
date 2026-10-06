@@ -1,19 +1,19 @@
 import { describe, it, expect } from 'vitest';
-import { AI_DIFFICULTY_PROFILES } from '../src/game/ai-difficulty';
-import { planAiActions } from '../src/game/ai';
-import { analyzeSituation, isNavalEnemy } from '../src/game/ai-situation';
+import { AI_DIFFICULTY_PROFILES } from '../src/game/ai/ai-difficulty';
+import { planAiActions } from '../src/game/ai/ai';
+import { analyzeSituation, isNavalEnemy } from '../src/game/ai/ai-situation';
 import { makeTestMap, tileAt, makeUnit } from './helpers/test-map';
-import { TileType } from '../src/game/tile-types';
+import { TileType } from '../src/game/map/tile-types';
 import { Tribe } from '../src/game/tribes';
 import type { Player } from '../src/game/players';
 import { SeededRandom } from '../src/util/random';
-import { PIRATE_OWNER, type Unit } from '../src/game/units';
-import { hexDistance } from '../src/game/hex';
-import { migrateLegacyResources } from '../src/game/stock';
+import { PIRATE_OWNER, type Unit } from '../src/game/units/units';
+import { hexDistance } from '../src/game/map/hex';
+import { migrateLegacyResources } from '../src/game/economy/stock';
 import { AiActionType, AiDifficulty, BuildingKind, GameMode, SkillId, UnitType } from '@enums';
 
 /** Moves the legacy-literal materials of a test player into its capital before planning. */
-function fund<T extends import('../src/game/players').Player>(map: import('../src/game/map-gen').GameMap, player: T): T {
+function fund<T extends import('../src/game/players').Player>(map: import('../src/game/map/map-gen').GameMap, player: T): T {
   migrateLegacyResources(map, [player]);
   return player;
 }

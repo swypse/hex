@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { generateMap, type GameMap } from '../src/game/map-gen';
+import { generateMap, type GameMap } from '../src/game/map/map-gen';
 import { stripUndefinedValues } from '../src/game/state';
-import { isShip } from '../src/game/ship';
-import type { Unit } from '../src/game/units';
+import { isShip } from '../src/game/units/ship';
+import type { Unit } from '../src/game/units/units';
 
 function lossyCodec(node: unknown): unknown {
   return JSON.parse(JSON.stringify(node, (_key, value) => (value === undefined ? null : value)));

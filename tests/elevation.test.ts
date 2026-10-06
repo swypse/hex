@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { tileElevation } from '../src/render/elevation';
-import { TileType } from '../src/game/tile-types';
-import type { MapTile } from '../src/game/map-gen';
+import { TileType } from '../src/game/map/tile-types';
+import type { MapTile } from '../src/game/map/map-gen';
 
 const tile = (terrain: TileType): MapTile =>
   ({ q: 0, r: 0, terrain, height: 0.5, settlement: null, building: null, unit: null, ownedBy: null, claimedByVillage: null }) as MapTile;

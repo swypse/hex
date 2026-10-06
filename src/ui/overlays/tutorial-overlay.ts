@@ -3,7 +3,7 @@ import { useGameStore } from '../../store/game-store';
 import { type UIHost } from '../host';
 import { t } from '../../i18n';
 import { Button } from '../kit/button';
-import { makeLabel } from '../kit/label';
+import { makeLabel } from '../../gfx/label';
 import { Popup } from '../kit/popup';
 import { STEP_CONFIG, stepCounter } from '../../game/tutorial/tutorial-steps';
 import { gameController } from '../../controller/game-controller';

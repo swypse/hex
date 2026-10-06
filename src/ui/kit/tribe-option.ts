@@ -1,6 +1,6 @@
 import { BitmapText, Container, Graphics } from 'pixi.js';
 import { makeIcon } from './icon';
-import { makeLabel } from './label';
+import { makeLabel } from '../../gfx/label';
 import { FontSize } from '@enums';
 
 export interface TribeOption {

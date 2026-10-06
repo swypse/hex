@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Container, Text } from 'pixi.js';
 import { Popup } from '../src/ui/kit/popup';
-import { makeLabel } from '../src/ui/kit/label';
+import { makeLabel } from '../src/gfx/label';
 import { FontSize } from '@enums';
 
 function fakeCanvasContext() {

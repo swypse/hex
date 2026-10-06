@@ -1,6 +1,7 @@
 import { t } from '../i18n';
 import type { Player } from './players';
 import { SkillId } from '@enums';
+import { pickRandom } from '../util/random';
 
 
 
@@ -174,5 +175,5 @@ export function randomUnopenedSkill(player: Player, rng: () => number): SkillId 
   const opened = new Set(player.skills);
   const unopened = (Object.keys(SKILLS) as SkillId[]).filter((id) => !opened.has(id));
   if (unopened.length === 0) return null;
-  return unopened[Math.floor(rng() * unopened.length)]!;
+  return pickRandom(unopened, rng)!;
 }

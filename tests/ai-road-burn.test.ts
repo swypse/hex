@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { planAiActions } from '../src/game/ai';
-import { roadCutSplits } from '../src/game/roads';
+import { planAiActions } from '../src/game/ai/ai';
+import { roadCutSplits } from '../src/game/economy/roads';
 import { buildPlayers } from '../src/game/players';
 import { Tribe } from '../src/game/tribes';
 import { SeededRandom } from '../src/util/random';
 import { makeTestMap, tileAt, makeUnit } from './helpers/test-map';
-import type { GameMap } from '../src/game/map-gen';
+import type { GameMap } from '../src/game/map/map-gen';
 import { AiActionType, AiDifficulty, UnitType } from '@enums';
 
 function makeAI(): ReturnType<typeof buildPlayers>[number] {

@@ -15,7 +15,7 @@ import {
   ringOf,
   splitHexBorder,
   tilesInRange,
-} from '../src/game/hex';
+} from '../src/game/map/hex';
 
 describe('hex math', () => {
   it('computes distance for adjacent tiles', () => {

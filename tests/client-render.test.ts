@@ -1,16 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { Application, Container, Graphics, ImageSource, Sprite, Text, Texture } from 'pixi.js';
 import { MapView } from '../src/render/map-renderer';
-import { GameMap, MapTile } from '../src/game/map-gen';
-import { TileType } from '../src/game/tile-types';
-import { Player } from '../src/game/players';
-import { START_RESOURCES } from '../src/game/resources';
+import { type GameMap, type MapTile } from '../src/game/map/map-gen';
+import { TileType } from '../src/game/map/tile-types';
+import { type Player } from '../src/game/players';
+import { START_RESOURCES } from '../src/game/economy/resources';
 import { Tribe } from '../src/game/tribes';
-import { Unit } from '../src/game/units';
-import { axialKey } from '../src/game/hex';
-import { generateMap } from '../src/game/map-gen';
+import { type Unit } from '../src/game/units/units';
+import { axialKey } from '../src/game/map/hex';
+import { generateMap } from '../src/game/map/map-gen';
 import { buildMultiplayerPlayers } from '../src/game/players';
-import { initialExplorationFor } from '../src/game/explore';
+import { initialExplorationFor } from '../src/game/map/explore';
 import { SeededRandom } from '../src/util/random';
 import { type TextureSet, type TileTexture } from '../src/render/texture-factory';
 
@@ -118,7 +118,7 @@ describe('client (player 1) sees his own units', () => {
     expect(tile.unit?.owner).toBe(1);
     expect(tile.exploredBy).toContain(1);
 
-    view = new MapView(makeApp(), textures, HEX, SPRITE_SCALE, 2);
+    view = new MapView(makeApp(), textures, HEX, SPRITE_SCALE);
     view.update(map, pl, null, new Set(), new Set(), 1, new Set(), {
       x: 640, y: 400, scale: 1, width: 1280, height: 800,
     });
@@ -131,7 +131,7 @@ describe('client (player 1) sees his own units', () => {
   it('renders the host capital unit NOT visible for localPlayerIndex=1 (fogged to client)', () => {
     const spawn = map.spawns[0]!.start;
     const tile = map.tiles.find((t) => t.q === spawn.q && t.r === spawn.r)!;
-    view = new MapView(makeApp(), textures, HEX, SPRITE_SCALE, 2);
+    view = new MapView(makeApp(), textures, HEX, SPRITE_SCALE);
     view.update(map, pl, null, new Set(), new Set(), 1, new Set(), {
       x: 640, y: 400, scale: 1, width: 1280, height: 800,
     });

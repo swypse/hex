@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { GameMap, MapTile, Settlement, SettlementBuild } from '../src/game/map-gen';
-import { TileType } from '../src/game/tile-types';
-import { claimRadius, ownedTilesFor, upgradeVillage } from '../src/game/village';
+import { type GameMap, type MapTile, type Settlement, type SettlementBuild } from '../src/game/map/map-gen';
+import { TileType } from '../src/game/map/tile-types';
+import { claimRadius, ownedTilesFor, upgradeVillage } from '../src/game/economy/village';
 import { VillageBlockVariant } from '@enums';
 
 function makeTile(

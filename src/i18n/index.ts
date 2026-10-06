@@ -18,10 +18,3 @@ export function t(key: string, params?: Record<string, string | number>): string
   }
   return text;
 }
-
-function availableLanguages(): { code: Language; label: string }[] {
-  return [
-    { code: Language.EN, label: dicts.en['lang.en'] ?? 'English' },
-    { code: Language.RU, label: dicts.ru['lang.ru'] ?? 'Русский' },
-  ];
-}

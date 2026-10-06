@@ -1,20 +1,20 @@
 import { giveResources } from './helpers/test-map';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Simulator } from '../src/game/simulator';
-import { generateMap, type MapTile } from '../src/game/map-gen';
+import { generateMap, type MapTile } from '../src/game/map/map-gen';
 import { buildPlayers } from '../src/game/players';
 import { SeededRandom } from '../src/util/random';
 import { gameController } from '../src/controller/game-controller';
 import { useGameStore } from '../src/store/game-store';
 import { toolbarSpecs } from '../src/ui/hud/toolbar-specs';
-import { TileType } from '../src/game/tile-types';
-import { hexNeighbors } from '../src/game/hex';
-import { UNIT_TYPES } from '../src/game/units';
+import { TileType } from '../src/game/map/tile-types';
+import { hexNeighbors } from '../src/game/map/hex';
+import { UNIT_TYPES } from '../src/game/units/units';
 import { Tribe } from '../src/game/tribes';
-import { tileAt } from '../src/game/selection';
-import { addStock } from '../src/game/stock';
+import { addStock } from '../src/game/economy/stock';
 import { sfx } from '../src/sound/sfx';
 import { BuildingKind, GameMode, PauseReason, SelectionKind, SkillId, UnitType } from '@enums';
+import { tileAt } from '../src/game/map/tile-index';
 
 describe('toolbarSpecs', () => {
   let map: ReturnType<typeof generateMap>;
@@ -150,7 +150,7 @@ describe('toolbarSpecs', () => {
     const spy = vi
       .spyOn(gameController as unknown as { runCommand: (c: unknown) => Promise<void> }, 'runCommand')
       .mockResolvedValue(undefined);
-    gameController.healSelectedUnit();
+    gameController.actions.healSelectedUnit();
     expect(spy).toHaveBeenCalledWith({ type: 'heal', unitId: 'h' });
     spy.mockRestore();
     selectCell(tile);
@@ -185,7 +185,7 @@ describe('toolbarSpecs', () => {
     const spy = vi
       .spyOn(gameController as unknown as { runCommand: (c: unknown) => Promise<void> }, 'runCommand')
       .mockResolvedValue(undefined);
-    gameController.upgradeSelectedShip();
+    gameController.actions.upgradeSelectedShip();
     expect(spy).toHaveBeenCalledWith({ type: 'upgradeShip', unitId: 's' });
     spy.mockRestore();
     selectCell(tile);
@@ -274,7 +274,7 @@ describe('toolbarSpecs', () => {
   it('offers an enabled deal action for an affordable pirate with no active deal', () => {
     const tile = map.tiles.find((t) => t.unit === null)!;
     tile.terrain = TileType.Water;
-    tile.ownedBy = null;
+    tile.ownedBy = 0;
     tile.unit = {
       id: 'p', owner: -1, type: UnitType.PIRATE, q: tile.q, r: tile.r,
       hasMoved: false, hasAttacked: false, hasHealed: false,
@@ -289,10 +289,23 @@ describe('toolbarSpecs', () => {
     expect(spec!.label).toContain('50');
   });
 
-  it('disables the deal action when the player cannot afford it', () => {
+  it('offers no deal action for a pirate on water the player does not own', () => {
     const tile = map.tiles.find((t) => t.unit === null)!;
     tile.terrain = TileType.Water;
     tile.ownedBy = null;
+    tile.unit = {
+      id: 'p', owner: -1, type: UnitType.PIRATE, q: tile.q, r: tile.r,
+      hasMoved: false, hasAttacked: false, hasHealed: false,
+      hp: 80, attack: 30, attackDistance: 3, defense: 5, spawnVillage: null,
+    };
+    select(tile);
+    expect(toolbarSpecs().find((a) => a.key === 'deal')).toBeUndefined();
+  });
+
+  it('disables the deal action when the player cannot afford it', () => {
+    const tile = map.tiles.find((t) => t.unit === null)!;
+    tile.terrain = TileType.Water;
+    tile.ownedBy = 0;
     tile.unit = {
       id: 'p', owner: -1, type: UnitType.PIRATE, q: tile.q, r: tile.r,
       hasMoved: false, hasAttacked: false, hasHealed: false,
@@ -307,7 +320,7 @@ describe('toolbarSpecs', () => {
   it('disables the deal action once the deal with the pirate is already active', () => {
     const tile = map.tiles.find((t) => t.unit === null)!;
     tile.terrain = TileType.Water;
-    tile.ownedBy = null;
+    tile.ownedBy = 0;
     tile.unit = {
       id: 'p', owner: -1, type: UnitType.PIRATE, q: tile.q, r: tile.r,
       hasMoved: false, hasAttacked: false, hasHealed: false,

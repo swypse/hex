@@ -1,9 +1,9 @@
 import { GameEventType, GameMode } from '@enums';
 import { describe, it, expect } from 'vitest';
-import { GameEvent } from '../src/game/events';
-import { GameStateSnapshot } from '../src/game/state';
-import { GameMap } from '../src/game/map-gen';
-import { Player } from '../src/game/players';
+import { type GameEvent } from '../src/game/events';
+import { type GameStateSnapshot } from '../src/game/state';
+import { type GameMap } from '../src/game/map/map-gen';
+import { type Player } from '../src/game/players';
 
 describe('game events & state', () => {
   it('GameEvent objects survive JSON round-trip', () => {

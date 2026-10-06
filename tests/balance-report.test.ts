@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { runDuels, PLAYABLE_UNITS, cheapBeatsCostly } from '../src/game/balance';
-import { buildReport, CAPTION } from '../src/game/balance-report';
+import { runDuels, PLAYABLE_UNITS, cheapBeatsCostly } from '../src/game/balance/balance';
+import { buildReport, CAPTION } from '../src/game/balance/balance-report';
 import { UnitType } from '@enums';
 
 const OUT = resolve(__dirname, '../combat-balance.md');

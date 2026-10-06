@@ -8,9 +8,9 @@ import {
   superStrong,
   superWeak,
   symWin,
-} from '../src/game/balance';
-import { armyFor, armyUnitCost, runSkirmishMatrix, skirmish, skirmishMeans } from '../src/game/balance-skirmish';
-import { Mulberry32 } from '../src/game/balance';
+} from '../src/game/balance/balance';
+import { armyFor, armyUnitCost, runSkirmishMatrix, skirmish, skirmishMeans } from '../src/game/balance/balance-skirmish';
+import { Mulberry32 } from '../src/game/balance/balance';
 import { UnitType } from '@enums';
 
 const duels = runDuels();

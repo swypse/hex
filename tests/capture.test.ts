@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { GameMap, MapTile, Settlement } from '../src/game/map-gen';
-import { TileType } from '../src/game/tile-types';
-import { Unit } from '../src/game/units';
-import { captureVillage, setCaptureReady, villageIncome, villageIncomeTotal } from '../src/game/capture';
+import { type GameMap, type MapTile, type Settlement } from '../src/game/map/map-gen';
+import { TileType } from '../src/game/map/tile-types';
+import { type Unit } from '../src/game/units/units';
+import { captureVillage, setCaptureReady, villageIncome, villageIncomeTotal } from '../src/game/economy/capture';
 import { UnitType } from '@enums';
 
 function makeTile(
@@ -204,7 +204,8 @@ describe('villageIncome', () => {
     a.ownedBy = 0;
     b.ownedBy = 0;
     map.tiles.push(a, b, makeRoadTile(1, 0, 0));
-    expect(villageIncome(map, a)).toBe(5 + 1);
+    // The road tile costs 1 upkeep, paid by village a (tie broken by village order).
+    expect(villageIncome(map, a)).toBe(5 + 1 - 1);
     expect(villageIncome(map, b)).toBe(5 + 1);
   });
 
@@ -215,9 +216,9 @@ describe('villageIncome', () => {
     const c = makeTile(4, 0, { owner: 0, level: 1, captureReady: false });
     for (const t of [a, b, c]) t.ownedBy = 0;
     map.tiles.push(a, b, c, makeRoadTile(1, 0, 0), makeRoadTile(3, 0, 0));
-    expect(villageIncome(map, a)).toBe(5 + 1);
-    expect(villageIncome(map, b)).toBe(5 + 1);
-    expect(villageIncome(map, c)).toBe(5 + 1);
+    // Two road tiles cost 1 each, paid by the villages winning the distance tie.
+    const total = villageIncome(map, a) + villageIncome(map, b) + villageIncome(map, c);
+    expect(total).toBe(3 * (5 + 1) - 2);
   });
 
   it('counts two directly adjacent own villages as connected', () => {
@@ -262,7 +263,7 @@ describe('villageIncomeTotal', () => {
     a.ownedBy = 0;
     b.ownedBy = 0;
     map.tiles.push(a, b, makeRoadTile(1, 0, 0));
-    expect(villageIncomeTotal(map, 0)).toBe((5 + 1) + (7 + 1));
+    expect(villageIncomeTotal(map, 0)).toBe((5 + 1) + (7 + 1) - 1);
   });
 });
 

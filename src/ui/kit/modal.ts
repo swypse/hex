@@ -1,7 +1,7 @@
 import { t } from '../../i18n';
 import { Application, Container } from 'pixi.js';
 import { Button } from './button';
-import { makeLabel } from './label';
+import { makeLabel } from '../../gfx/label';
 import { Popup } from './popup';
 import { FontSize } from '@enums';
 

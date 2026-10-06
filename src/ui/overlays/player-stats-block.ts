@@ -5,10 +5,10 @@ import { tribeById } from '../../game/tribes';
 import { UNKNOWN_TRIBE_COLOR } from '../../game/discovery';
 import { gameOverRows, totalScore } from '../../game/score';
 import { achievementNameKey, achievementTotalScore, unlockedAchievements } from '../../game/achievements';
-import type { GameMap } from '../../game/map-gen';
+import type { GameMap } from '../../game/map/map-gen';
 import type { Player } from '../../game/players';
 import { makeIconChip } from '../kit/tribe-chip';
-import { makeLabel } from '../kit/label';
+import { makeLabel } from '../../gfx/label';
 import { FontSize } from '@enums';
 
 export function placeColor(place: number): number {

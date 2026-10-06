@@ -6,14 +6,14 @@ import {
   qualityFactor,
   decayVelocity,
   inertiaStep,
-  easeInOutCubic,
   cameraPanStep,
   maxZoomFor,
   fitScaleFor,
   PAN_PADDING,
   zoomInertiaStep,
   dragLerpStep,
-} from '../src/game/zoom';
+} from '../src/controller/zoom';
+import { easeInOutCubic } from '../src/util/easing';
 
 describe('clampZoom', () => {
   it('clamps to [0.5, 3]', () => {

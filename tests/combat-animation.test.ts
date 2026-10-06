@@ -3,13 +3,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Application, Container, Graphics, ImageSource, Sprite, Text, Texture } from 'pixi.js';
 import { gameController } from '../src/controller/game-controller';
 import { Simulator } from '../src/game/simulator';
-import { GameMap, MapTile } from '../src/game/map-gen';
-import { TileType } from '../src/game/tile-types';
-import { Player } from '../src/game/players';
-import { START_RESOURCES } from '../src/game/resources';
+import { type GameMap, type MapTile } from '../src/game/map/map-gen';
+import { TileType } from '../src/game/map/tile-types';
+import { type Player } from '../src/game/players';
+import { START_RESOURCES } from '../src/game/economy/resources';
 import { Tribe } from '../src/game/tribes';
-import { UNIT_TYPES, type Unit } from '../src/game/units';
-import { axialKey, hexToPixel } from '../src/game/hex';
+import { UNIT_TYPES, type Unit } from '../src/game/units/units';
+import { axialKey, hexToPixel } from '../src/game/map/hex';
 import { tileElevation } from '../src/render/elevation';
 import { type GameEvent } from '../src/game/events';
 import { MapView } from '../src/render/map-renderer';
@@ -153,7 +153,7 @@ function setup(map: GameMap, players: Player[]): Harness {
   } as unknown as Application;
 
   const textures = buildTextures(map);
-  const mapView = new MapView(app, textures, 40, 0.5, 2);
+  const mapView = new MapView(app, textures, 40, 0.5);
   mapView.update(map, players, null, new Set(), new Set(), 0, new Set(), {
     x: 0, y: 0, scale: 1, width: 800, height: 600,
   });

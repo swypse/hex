@@ -6,18 +6,18 @@
  *
  *   npx vite-node tools/ai-bench.ts -- [games=20] [players=4] [maxTurns=60] [difficulty=hard]
  */
-import { generateMap } from '../src/game/map-gen';
+import { generateMap } from '../src/game/map/map-gen';
 import { buildPlayers } from '../src/game/players';
 import { Simulator } from '../src/game/simulator';
 import { Tribe, TRIBES } from '../src/game/tribes';
 import { SeededRandom } from '../src/util/random';
-import { initialExplorationFor } from '../src/game/explore';
-import { exploreVillageSights } from '../src/game/village';
-import { hexDistance } from '../src/game/hex';
-import { ALL_AI_FLAGS_OFF, ALL_AI_FLAGS_ON, type AiFlags } from '../src/game/ai-flags';
-import { setAiLogging } from '../src/game/ai';
-import { AI_TUNING } from '../src/game/ai-patterns';
-import type { AiDifficulty } from '../src/game/ai-difficulty';
+import { initialExplorationFor } from '../src/game/map/explore';
+import { exploreVillageSights } from '../src/game/economy/village';
+import { hexDistance } from '../src/game/map/hex';
+import { ALL_AI_FLAGS_OFF, ALL_AI_FLAGS_ON, type AiFlags } from '../src/game/ai/ai-flags';
+import { setAiLogging } from '../src/game/ai/ai';
+import { AI_TUNING } from '../src/game/ai/ai-patterns';
+import type { AiDifficulty } from '../src/game/ai/ai-difficulty';
 
 // Seats alternate between variant A (the chosen flags off) and B (all flags on),
 // both on the live engine.  FLAGS=a,b limits the comparison to those flags: A has

@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { GameMap, MapTile, Settlement } from '../src/game/map-gen';
-import { TileType } from '../src/game/tile-types';
+import { type GameMap, type MapTile, type Settlement } from '../src/game/map/map-gen';
+import { TileType } from '../src/game/map/tile-types';
 import { Tribe } from '../src/game/tribes';
-import { buildBuilding, buildingIncome, buildingYield, BUILDING_NAMES, canBuildSawmill, canBuildForestTemple, canBuildMine, canBuildPort, canBuildTemple, canRepairBuilding, canUsePort, repairBuilding, destroyBuilding, DESTROY_BUILDING_COST, REPAIR_COST, BUILDING_MAX_HP, buildingHp, SAWMILL_COST, MINE_COST, portDirection } from '../src/game/buildings';
+import { buildBuilding, buildingIncome, buildingYield, BUILDING_NAMES, canBuildSawmill, canBuildForestTemple, canBuildMine, canBuildPort, canBuildTemple, canRepairBuilding, canUsePort, repairBuilding, destroyBuilding, DESTROY_BUILDING_COST, REPAIR_COST, BUILDING_MAX_HP, buildingHp, SAWMILL_COST, MINE_COST, portDirection } from '../src/game/economy/buildings';
 import { BuildingKind, PortDirection, SkillId, UnitType } from '@enums';
 
 function tile(
@@ -558,7 +558,7 @@ describe('village building capacity', () => {
 
 describe('building hp and repair', () => {
   it('buildings have a max hp of 2 and undamaged buildings read as full', () => {
-    const mine: import('../src/game/map-gen').Building = { kind: BuildingKind.MINE, level: 1 };
+    const mine: import('../src/game/map/map-gen').Building = { kind: BuildingKind.MINE, level: 1 };
     expect(BUILDING_MAX_HP).toBe(2);
     expect(buildingHp(mine)).toBe(2);
     expect(buildingHp({ ...mine, hp: 1 })).toBe(1);

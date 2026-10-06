@@ -1,10 +1,10 @@
 import { AiActionType, GameMode, SkillId, UnitType } from '@enums';
 import { describe, it, expect } from 'vitest';
 import { makeTestMap, tileAt, makeUnit } from './helpers/test-map';
-import { PIRATE_OWNER, type Unit } from '../src/game/units';
-import { TileType } from '../src/game/tile-types';
+import { PIRATE_OWNER, type Unit } from '../src/game/units/units';
+import { TileType } from '../src/game/map/tile-types';
 import { SeededRandom } from '../src/util/random';
-import { planAiActions } from '../src/game/ai';
+import { planAiActions } from '../src/game/ai/ai';
 import { Tribe } from '../src/game/tribes';
 import { type Player } from '../src/game/players';
 

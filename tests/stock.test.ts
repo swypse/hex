@@ -1,17 +1,17 @@
-import { buildBuilding, BUILDING_COSTS, buildingIncomeByVillage, networkBuildingIncome } from '@/game/buildings';
-import { captureVillage } from '@/game/capture';
-import { applyFood } from '@/game/food';
-import type { GameMap, MapTile } from '@/game/map-gen';
+import { buildBuilding, BUILDING_COSTS, buildingIncomeByVillage, networkBuildingIncome } from '@/game/economy/buildings';
+import { captureVillage } from '@/game/economy/capture';
+import { applyFood } from '@/game/economy/food';
+import type { GameMap, MapTile } from '@/game/map/map-gen';
 import type { Player } from '@/game/players';
 import { buildPlayers } from '@/game/players';
-import { START_STOCK } from '@/game/resources';
-import { buildRoad, canBuildRoad } from '@/game/roads';
+import { START_STOCK } from '@/game/economy/resources';
+import { buildRoad, canBuildRoad } from '@/game/economy/roads';
 import { Simulator } from '@/game/simulator';
 import {
   addStock, canAffordAt, capitalOf, migrateLegacyResources, networkStock, payAt, payerVillage, readStock, totalStock,
   villageNetwork, villageOfTile,
-} from '@/game/stock';
-import { TileType } from '@/game/tile-types';
+} from '@/game/economy/stock';
+import { TileType } from '@/game/map/tile-types';
 import { Tribe } from '@/game/tribes';
 import { SeededRandom } from '@/util';
 import { BuildingKind, CommandType, GameMode, SkillId, UnitType } from '@enums';
@@ -327,7 +327,7 @@ describe('food reserve per network', () => {
 
 describe('start and legacy saves', () => {
   it('map generation gives each capital the starting materials and nothing else', async () => {
-    const { generateMap } = await import('../src/game/map-gen');
+    const { generateMap } = await import('../src/game/map/map-gen');
     const map = generateMap(3, 5);
     const capitals = map.tiles.filter((t) => t.settlement?.capital);
     expect(capitals).toHaveLength(3);

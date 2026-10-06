@@ -1,25 +1,26 @@
 import { Application } from 'pixi.js';
-import { Simulator, Command } from '../game/simulator';
+import { Simulator, type Command } from '../game/simulator';
 import { t } from '../i18n';
-import { GameStateSnapshot, stripUndefinedValues } from '../game/state';
-import { GameEvent } from '../game/events';
-import { generateRoomCode, ClientMessage, HostMessage, LobbyPlayer } from '../net/peer-session';
+import { type GameStateSnapshot, stripUndefinedValues } from '../game/state';
+import { type GameEvent } from '../game/events';
+import { generateRoomCode, type ClientMessage, type HostMessage, type LobbyPlayer } from '../net/peer-session';
 import { RelayHostSession, RelayClientSession } from '../net/relay-session';
 import { resolveRelayUrl } from '../net/relay-session';
 import { buildMultiplayerPlayers } from '../game/players';
-import { generateMap } from '../game/map-gen';
-import { initialExplorationFor } from '../game/explore';
-import { exploreVillageSights } from '../game/village';
+import { generateMap } from '../game/map/map-gen';
+import { initialExplorationFor } from '../game/map/explore';
+import { exploreVillageSights } from '../game/economy/village';
 import { runSliced } from '../util/time-slice';
 import { Tribe } from '../game/tribes';
-import { useGameStore } from '../store/game-store';
+import { beginMatchState, useGameStore } from '../store/game-store';
 import { loadSettings, welcomeDismissed } from '../storage/settings';
 import { SeededRandom } from '../util/random';
 import { seasonForTurn } from '../game/season';
-import { createTextures, TextureSet } from '../render/texture-factory';
+import { createTextures, type TextureSet } from '../render/texture-factory';
 import { activeMatchStore } from '../storage/active-match';
 import { ClientMessageType, CommandType, ConnectionState, GameMode, HostMessageType, LobbyRole, NetMode, OverlayKind, PauseReason, Screen, SelectionKind } from '@enums';
-import { weatherCopies } from '../game/weather';
+import { weatherCopies } from '../game/weather/weather';
+import { randomSeed } from '../util/random';
 
 /** How long a dropped player stays unmarked-by-modal before the host pause
  *  modal fires: transient network flaps (or a fast refresh) that resolve within
@@ -338,31 +339,24 @@ export class NetworkController {
 
   /** Host decision: hand the dropped player's seat to the AI and resume. */
   giveDisconnectedToAI(playerIndex: number): Promise<void> {
-    const sim = this.host.sim();
-    if (!sim) return Promise.resolve();
-    return this.host.enqueue(async () => {
-      const pre = this.host.exploredKeysFor(useGameStore.getState().localPlayerIndex);
-      sim.applyCommand({ type: CommandType.GIVE_TO_AI, playerIndex });
-      this.aiTakeoverSeats.add(playerIndex);
-      const wasCurrent = sim.currentPlayerIndex === playerIndex;
-      if (wasCurrent && !sim.gameOver) await runSliced(sim.applyCommandSteps({ type: CommandType.END_TURN }));
-      const events = sim.drainEvents();
-      this.host.syncStore();
-      this.broadcastBatch(events);
-      await this.host.presentEvents(events, pre);
-      this.host.render();
-      useGameStore.getState().setPaused(null);
-    });
+    return this.resumeAfterDrop(playerIndex, CommandType.GIVE_TO_AI, () => this.aiTakeoverSeats.add(playerIndex));
   }
 
   /** Host decision: forfeit the dropped player (frees their villages/units) and
    *  resume the game for the rest. */
   forfeitDisconnected(playerIndex: number): Promise<void> {
+    return this.resumeAfterDrop(playerIndex, CommandType.FORFEIT);
+  }
+
+  /** Applies `command` to the dropped player, ends their turn when it is
+   *  running, shows and broadcasts the outcome, and unpauses the game. */
+  private resumeAfterDrop(playerIndex: number, command: CommandType.GIVE_TO_AI | CommandType.FORFEIT, afterCommand?: () => void): Promise<void> {
     const sim = this.host.sim();
     if (!sim) return Promise.resolve();
     return this.host.enqueue(async () => {
       const pre = this.host.exploredKeysFor(useGameStore.getState().localPlayerIndex);
-      sim.applyCommand({ type: CommandType.FORFEIT, playerIndex });
+      sim.applyCommand({ type: command, playerIndex });
+      afterCommand?.();
       if (sim.currentPlayerIndex === playerIndex && !sim.gameOver) await runSliced(sim.applyCommandSteps({ type: CommandType.END_TURN }));
       const events = sim.drainEvents();
       this.host.syncStore();
@@ -398,8 +392,8 @@ export class NetworkController {
       { name: this.hostName, tribe: this.hostTribe },
       ...clients.map((p) => ({ name: p.name, tribe: p.tribeId! })),
     ];
-    const players = buildMultiplayerPlayers(humans, this.hostConfig.aiCount, new SeededRandom(Math.floor(Math.random() * 100000)), loadSettings().aiDifficulty);
-    const map = generateMap(players.length, Math.floor(Math.random() * 100000));
+    const players = buildMultiplayerPlayers(humans, this.hostConfig.aiCount, new SeededRandom(randomSeed()), loadSettings().aiDifficulty);
+    const map = generateMap(players.length, randomSeed());
     for (const p of players) {
       initialExplorationFor(map, p.index);
       exploreVillageSights(map, p.index);
@@ -408,19 +402,8 @@ export class NetworkController {
     this.host.setSim(sim);
     sim.startGame();
     const startEvents = sim.drainEvents();
-    store.setPlayers(players);
+    beginMatchState({ players: players, mode: this.hostConfig.mode, expectedTurns: sim.expectedTurns, netMode: NetMode.HOST });
     store.setPlayersOnline(players.map(() => true));
-    store.setMode(this.hostConfig.mode);
-    store.setExpectedTurns(sim.expectedTurns);
-    store.setGameOver(false);
-    store.setWinnerIndex(null);
-    store.setBonusAwarded(false);
-    store.setLocalPlayerIndex(0);
-    store.setNetMode(NetMode.HOST);
-    store.setTurn(1);
-    store.setCurrentPlayerIndex(0);
-    store.setAiActive(false);
-    store.setSelection(null);
     store.setScreen(Screen.GAME);
     if (!welcomeDismissed()) store.setOverlay({ kind: OverlayKind.WELCOME });
     this.host.syncKnownTribes(false);

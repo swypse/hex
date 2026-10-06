@@ -1,4 +1,4 @@
-import { hasPirateDeal, type Unit } from '../game/units';
+import { hasPirateDeal, type Unit } from '../game/units/units';
 
 /** Glow behind the player's own selected unit (and neutral ones): cyan. */
 export const OWN_GLOW_COLOR = 0x00ffff;

@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { GameMap, MapTile } from '../src/game/map-gen';
-import { TileType } from '../src/game/tile-types';
+import { type GameMap, type MapTile } from '../src/game/map/map-gen';
+import { TileType } from '../src/game/map/tile-types';
 import { Tribe } from '../src/game/tribes';
-import { Player } from '../src/game/players';
-import { Unit } from '../src/game/units';
-import { unitCanAct } from '../src/game/unit-actions';
+import { type Player } from '../src/game/players';
+import { type Unit } from '../src/game/units/units';
+import { unitCanAct } from '../src/game/units/unit-actions';
 import { UnitType } from '@enums';
 
 function tile(q: number, r: number, terrain: TileType, unit: Unit | null = null, settlement: MapTile['settlement'] = null): MapTile {

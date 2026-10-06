@@ -3,17 +3,11 @@ import { Container } from 'pixi.js';
 import { cancelLeaveGame, confirmLeaveGame } from '../../store/game-store';
 import { type UIHost } from '../host';
 import { Button } from '../kit/button';
-import { makeLabel } from '../kit/label';
 import { Popup } from '../kit/popup';
-import { FontSize } from '@enums';
+import { addPopupHint, PopupDialog } from './popup-dialog';
 
-export class LeaveGameDialog {
-  private el: Container | null = null;
-  private popup: Popup | null = null;
-  private host: UIHost | null = null;
-
+export class LeaveGameDialog extends PopupDialog {
   mount(host: UIHost, root: Container): void {
-    this.host = host;
     const leave = new Button({ label: t('ui.leave'), onClick: () => confirmLeaveGame() });
     const cancel = new Button({ label: t('common.cancel'), onClick: () => cancelLeaveGame() });
     const popup = new Popup({
@@ -23,30 +17,8 @@ export class LeaveGameDialog {
       onClose: () => cancelLeaveGame(),
     });
 
-    const hint = makeLabel(t('leave.hint'), {
-      fontSize: FontSize.SMALL,
-      fill: 0xcccccc,
-      wordWrap: true,
-      wordWrapWidth: popup.contentWidth,
-    });
-    hint.position.set(0, 0);
-    popup.content.addChild(hint);
+    addPopupHint(popup, t('leave.hint'));
 
-    root.addChild(popup.el);
-    this.el = popup.el;
-    this.popup = popup;
-    popup.finish();
-  }
-
-  hide(onDone: () => void): void {
-    if (this.popup) this.popup.animateOut(onDone);
-    else onDone();
-  }
-
-  destroy(): void {
-    this.popup?.destroy();
-    this.popup = null;
-    this.el = null;
-    this.host = null;
+    this.present(root, popup);
   }
 }

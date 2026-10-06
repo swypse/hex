@@ -1,41 +1,40 @@
 import { t } from '../../i18n';
-import { Circle, Container, Graphics, Rectangle, Text } from 'pixi.js';
+import { Circle, Container, Graphics, Rectangle } from 'pixi.js';
 import { gameController } from '../../controller/game-controller';
 import { TRIBES } from '../../game/tribes';
-import { isForestType, isMountainType, isWaterType } from '../../game/tile-types';
-import { UNIT_TYPE_NAMES, unitFoodEaten, unitMaintenance, type Unit } from '../../game/units';
-import { unitCanAct } from '../../game/unit-actions';
-import { tileAt } from '../../game/selection';
-import { attackDamage } from '../../game/combat';
-import { berserkerRage } from '../../game/abilities';
-import { activeBuffs, VILLAGE_DEFENSE } from '../../game/buffs';
-import { isShip } from '../../game/ship';
-import { villageCapacity, villageBuildingLimit, buildingsInVillage, unitsInVillage } from '../../game/village';
-import { villageIncome, VILLAGE_CONNECTION_BONUS } from '../../game/capture';
-import { farmYield, GRANARY_CAPACITY, STARVATION_DAMAGE, villageFood, villageGranaries } from '../../game/food';
-import { villageUpgradeCost } from '../../game/resources';
-import { buildingYield, buildingHp, canPlaceFoodBuilding, BUILDING_MAX_HP, BUILDING_NAMES, DESTROY_BUILDING_COST } from '../../game/buildings';
-import { TRAP_TURNS } from '../../game/traps';
-import { isExploredFor } from '../../game/explore';
-import { hexNeighbors } from '../../game/hex';
+import { isForestType, isMountainType, isWaterType } from '../../game/map/tile-types';
+import { UNIT_TYPE_NAMES, unitFoodEaten, unitMaintenance, type Unit } from '../../game/units/units';
+import { attackDamage } from '../../game/units/combat';
+import { berserkerRage } from '../../game/units/abilities';
+import { activeBuffs, VILLAGE_DEFENSE } from '../../game/units/buffs';
+import { isShip } from '../../game/units/ship';
+import { villageCapacity, villageBuildingLimit, buildingKindsInVillage, unitsInVillage } from '../../game/economy/village';
+import { tileUpkeep, villageIncomeBreakdown } from '../../game/economy/capture';
+import { farmYield, GRANARY_CAPACITY, STARVATION_DAMAGE, villageFood, villageGranaries } from '../../game/economy/food';
+import { villageUpgradeCost } from '../../game/economy/resources';
+import { buildingYield, buildingHp, canPlaceFoodBuilding, BUILDING_NAMES, DESTROY_BUILDING_COST } from '../../game/economy/buildings';
+import { TRAP_TURNS } from '../../game/units/traps';
+import { isExploredFor } from '../../game/map/explore';
+import { hexNeighbors } from '../../game/map/hex';
 import { canOpenSkill, hasSkill, skillCost } from '../../game/skills';
-import { canBuildRoadHere, isVillageRoadConnected } from '../../game/roads';
-import { canBuildBridgeHere, hasBridge } from '../../game/bridges';
+import { canBuildRoadHere } from '../../game/economy/roads';
+import { canBuildBridgeHere, hasBridge } from '../../game/economy/bridges';
 import type { Player } from '../../game/players';
-import type { GameMap, MapTile } from '../../game/map-gen';
+import type { GameMap, MapTile } from '../../game/map/map-gen';
 import { useGameStore } from '../../store/game-store';
 import { type UIHost, type Widget } from '../host';
-import { makeLabel } from '../kit/label';
+import { makeLabel } from '../../gfx/label';
 import { makeIcon } from '../kit/icon';
-import { makeSkillIcon, SKILL_ICON_FILES } from '../kit/skill-icons';
+import { makeSkillIcon, SKILL_ICON_FILES } from '../../gfx/skill-icons';
 import { makePanel } from '../kit/panel';
-import { THEME } from '../kit/theme';
-import { makeActionButtonIcon } from '../kit/action-button-icons';
-import { ACTION_BUTTON_ICON_FILES } from '../kit/action-button-icons';
+import { THEME } from '../../gfx/theme';
+import { makeActionButtonIcon } from '../../gfx/action-button-icons';
+import { ACTION_BUTTON_ICON_FILES } from '../../gfx/action-button-icons';
 import { selectedInfoClosed, setSelectedInfoClosed } from '../../storage/settings';
-import { TOOLBAR_HEIGHT, TURN_BAR_HEIGHT } from '../layout';
+import { TOOLBAR_HEIGHT, TURN_BAR_HEIGHT } from './layout';
 import { BuffId, BuildingKind, FontSize, OverlayKind, SkillId, TutorialStepId, UnitType } from '@enums';
-import { weatherEffectsAt, WEATHER_RULES } from '../../game/weather';
+import { earthquakeProtected, stormProtected, weatherEffectsAt, WEATHER_RULES } from '../../game/weather/weather';
+import { tileAt } from '../../game/map/tile-index';
 
 /** Overlay kinds that open a help dialog from a row of the selection panel. */
 type HelpKind =
@@ -58,6 +57,12 @@ function unitDefenseBuffs(map: GameMap, unit: Unit, tile: MapTile): { key: strin
 
 /** A composite title + icon/value pairs row; `hp` adds green hp squares. */
 interface IconRow {
+  /** Built buildings, one circle per kind with the kind's count (shown as xN when above 1). */
+  slots?: { kind: BuildingKind; count: number }[];
+  /** Free slots, shown as one empty circle that says how many more there are (+N). */
+  freeSlots?: number;
+  /** Draw the values in gold (tutorial emphasis). */
+  highlight?: boolean;
   name: string;
   pairs: { icon: string; value: string }[];
   hp?: number;
@@ -65,12 +70,10 @@ interface IconRow {
 
 const HP_SQUARE = 6;
 const HP_SQUARE_GAP = 3;
+/** Diameter of a building-slot circle and the gap between circles. */
+const SLOT_SIZE = 36;
+const SLOT_GAP = 3;
 const HP_SQUARE_COLOR = 0x49cc5d;
-
-/** Plain `N` for income values; negative values keep their `-N`. */
-function signed(n: number): string {
-  return String(n);
-}
 
 export class HudSelected implements Widget {
   private el: Container | null = null;
@@ -127,6 +130,9 @@ export class HudSelected implements Widget {
     let unitLineIndex = -1;
     let settlementLineIndex = -1;
     let buildingLineIndex = -1;
+    /** Plain icon rows without a title (the village income line), by line index. */
+    const extraRows = new Map<number, IconRow>();
+    const highlightBuildingsLine = s.tutorial && s.tutorialStep === TutorialStepId.UPGRADE_VILLAGE3;
     let buildingLimitLineIndex = -1;
     let bridgeLineIndex = -1;
     let unitRow: IconRow | null = null;
@@ -141,8 +147,6 @@ export class HudSelected implements Widget {
 
     if (tile.unit) {
       const unit = tile.unit;
-      const player = unit.owner >= 0 ? s.players[unit.owner] : null;
-      const canAct = unit.type === UnitType.PIRATE ? false : unitCanAct(map, tile, unit, player!);
       const rageBonus = berserkerRage(unit);
       unitLineIndex = lines.length;
       // Status tags that used to ride on the hp text (stunned / stealth / "can
@@ -190,34 +194,26 @@ export class HudSelected implements Widget {
       // unit characteristics row.
       settlementRow = {
         name: t('hud.selected.settlement', { name: settlement.name ?? t('hud.selected.settlementDefault'), level: settlement.level, units: unitsInVillage(map, tile), cap: villageCapacity(settlement.level) }),
-        pairs: settlement.owner !== null
-          ? [
-              { icon: 'gold-32', value: String(villageIncome(map, tile)) },
-              ...(settlement.owner === human.index
-                ? [{ icon: 'food-32', value: signed(villageFood(map, tile, human).balance) }]
-                : []),
-            ]
-          : [],
+        pairs: [],
       };
       lines.push('');
       bolds.push(true);
-      if (settlement.owner === human.index && isVillageRoadConnected(map, tile)) {
-        lines.push(t('hud.selected.connectedBonus', { bonus: VILLAGE_CONNECTION_BONUS }));
+      if (settlement.owner !== null) {
+        const income = villageIncomeBreakdown(map, tile);
+        // Result first, then the raw income less the upkeep of units, roads and buildings.
+        const value = settlement.owner === human.index ? `${income.total} (${income.raw} - ${income.units + income.structures})` : String(income.total);
+        const pairs = [{ icon: 'gold-32', value }];
+        if (settlement.owner === human.index) {
+          const food = villageFood(map, tile, human);
+          pairs.push({ icon: 'food-32', value: `${food.balance} (${food.production} - ${food.upkeep})` });
+        }
+        extraRows.set(lines.length, { name: '', pairs });
+        lines.push('');
         bolds.push(false);
       }
       if (settlement.owner === human.index) {
-        const food = villageFood(map, tile, human);
-        lines.push(
-          t(food.networkSize > 1 ? 'hud.selected.foodNetwork' : 'hud.selected.foodBalance', {
-            production: food.production,
-            upkeep: food.upkeep,
-            balance: signed(food.balance),
-            n: food.networkSize,
-          }),
-        );
-        bolds.push(false);
         if (villageGranaries(map, tile).length > 0) {
-          lines.push(t('hud.selected.villageGranary', { food: food.granaryFood, cap: villageGranaries(map, tile).length * GRANARY_CAPACITY }));
+          lines.push(t('hud.selected.villageGranary', { food: villageFood(map, tile, human).granaryFood, cap: villageGranaries(map, tile).length * GRANARY_CAPACITY }));
           bolds.push(false);
         }
       }
@@ -227,10 +223,14 @@ export class HudSelected implements Widget {
         bolds.push(true);
       }
       if (settlement.owner === human.index) {
-        const count = buildingsInVillage(map, tile);
         const limit = villageBuildingLimit(settlement.level);
         buildingLimitLineIndex = lines.length;
-        lines.push(t('hud.selected.buildings', { count, limit }));
+        const built = buildingKindsInVillage(map, tile);
+        const grouped = new Map<BuildingKind, number>();
+        for (const kind of built) grouped.set(kind, (grouped.get(kind) ?? 0) + 1);
+        const slots = [...grouped].map(([kind, count]) => ({ kind, count }));
+        extraRows.set(lines.length, { name: '', pairs: [], slots, freeSlots: Math.max(0, limit - built.length), highlight: highlightBuildingsLine });
+        lines.push('');
         bolds.push(false);
         // Cost to upgrade to the next village level (your own village only).
         if (settlement.level < 4) {
@@ -238,7 +238,7 @@ export class HudSelected implements Widget {
           lines.push(t('hud.selected.upgradeCost', { level: settlement.level + 1, wood: cost.wood, stone: cost.stone, money: cost.money }));
           bolds.push(false);
         }
-        if (count >= limit && settlement.level < 4) {
+        if (built.length >= limit && settlement.level < 4) {
           lines.push(t('hud.selected.full', { level: settlement.level + 1 }));
           bolds.push(false);
         }
@@ -274,6 +274,11 @@ export class HudSelected implements Widget {
       }
     }
 
+    if (tileUpkeep(tile) > 0) {
+      lines.push(t('hud.selected.upkeep', { n: tileUpkeep(tile) }));
+      bolds.push(false);
+    }
+
     if (tile.bonus) {
       lines.push(t('hud.selected.bonus.info'));
       bolds.push(false);
@@ -296,6 +301,19 @@ export class HudSelected implements Widget {
       bolds.push(false);
     }
 
+    // Temple protection from weather for own buildings and units here.
+    if (weatherMap) {
+      const mine = (tile.building && tile.ownedBy === human.index) || tile.unit?.owner === human.index;
+      if (mine && earthquakeProtected(weatherMap, tile, human.index)) {
+        lines.push(t('hud.selected.quakeProtected'));
+        bolds.push(false);
+      }
+      if (mine && stormProtected(weatherMap, tile, human.index)) {
+        lines.push(t('hud.selected.stormProtected'));
+        bolds.push(false);
+      }
+    }
+
     if (tile.trap && tile.trap.owner === human.index) {
       const turnsLeft = Math.max(0, TRAP_TURNS - (s.turn - tile.trap.placedTurn));
       lines.push(t('hud.selected.trap', { turns: turnsLeft }));
@@ -316,10 +334,9 @@ export class HudSelected implements Widget {
       return;
     }
 
-    const highlightBuildingsLine = s.tutorial && s.tutorialStep === TutorialStepId.UPGRADE_VILLAGE3;
-
     let maxW = 0;
     const lineH = 18;
+    const lineGap = 4;
     // The info panel is capped at 80% of the screen width; any line that would
     // exceed the panel's inner width is word-wrapped to fit.
     const capW = Math.floor((this.host?.app?.screen?.width ?? 0) * 0.8);
@@ -333,16 +350,17 @@ export class HudSelected implements Widget {
       const iconRow =
         (i === unitLineIndex && unitRow) ||
         (i === settlementLineIndex && settlementRow) ||
-        (i === buildingLineIndex && buildingRow);
+        (i === buildingLineIndex && buildingRow) ||
+        extraRows.get(i);
       if (iconRow) {
         const row =
-          (i === unitLineIndex ? unitRow : i === settlementLineIndex ? settlementRow : buildingRow)!;
-        const fill = 0xeeeeee;
+          extraRows.get(i) ?? (i === unitLineIndex ? unitRow : i === settlementLineIndex ? settlementRow : buildingRow)!;
+        const fill = row.highlight ? 0xffd700 : 0xeeeeee;
         const title = makeLabel(row.name, { fontSize: FontSize.VERY_SMALL, fill, fontWeight: '700', wordWrap: true, wordWrapWidth: innerW });
         title.position.set(10, y);
         const r = new Container();
         r.addChild(title);
-        let x = 10 + title.width + 7;
+        let x = 10 + (row.name ? title.width + 7 : 0);
         // Remaining building hp: one green square per hp point.
         const hpPoints = row.hp ?? 0;
         if (hpPoints > 0) {
@@ -352,6 +370,42 @@ export class HudSelected implements Widget {
           }
           r.addChild(squares);
           x += hpPoints * HP_SQUARE + (hpPoints - 1) * HP_SQUARE_GAP + 7;
+        }
+        if (row.slots) {
+          const drawSlot = (kind: BuildingKind | null, count: number): void => {
+            const cx = x + SLOT_SIZE / 2;
+            const cy = y + SLOT_SIZE / 2;
+            const circle = new Graphics();
+            circle.circle(cx, cy, SLOT_SIZE / 2 - 1).fill({ color: 0x000000, alpha: kind ? 0.45 : 0.2 }).stroke({ width: 2, color: row.highlight ? 0xffd700 : 0x8a8a9a, alpha: kind ? 1 : 0.6 });
+            r.addChild(circle);
+            if (kind) {
+              const icon = makeActionButtonIcon(kind, SLOT_SIZE - 8);
+              icon.position.set(cx, cy);
+              r.addChild(icon);
+            } else if (count > 0) {
+              // The collapsed free-slot circle says how many more there are.
+              const more = makeLabel(`+${count}`, { fontSize: FontSize.VERY_SMALL, fill: 0xcccccc });
+              more.anchor.set(0.5, 0.5);
+              more.position.set(cx, cy);
+              r.addChild(more);
+            }
+            if (kind && count > 1) {
+              // Count badge pinned to the circle's top-right edge, like the skill medallion price.
+              const label = makeLabel(String(count), { fontSize: FontSize.VERY_SMALL, fill: THEME.white });
+              label.anchor.set(0.5, 0.5);
+              const bx = cx + Math.round((SLOT_SIZE / 2) * 0.78);
+              const by = cy - Math.round((SLOT_SIZE / 2) * 0.78);
+              label.position.set(bx, by);
+              const badge = new Graphics();
+              badge.circle(bx, by, Math.max(7, Math.ceil(Math.max(label.width, label.height) / 2) + 2)).fill(THEME.skillTree.closedSkillStroke);
+              r.addChild(badge, label);
+            }
+            // Leave room for the badge overhanging the circle's right edge.
+            x += SLOT_SIZE + (kind && count > 1 ? 5 : 0);
+            x += SLOT_GAP;
+          };
+          for (const slot of row.slots) drawSlot(slot.kind, slot.count);
+          if ((row.freeSlots ?? 0) > 0) drawSlot(null, row.freeSlots! - 1);
         }
         for (const pair of row.pairs) {
           const icon = makeIcon(pair.icon, 16);
@@ -363,18 +417,17 @@ export class HudSelected implements Widget {
           x += 19 + value.width + 7;
         }
         this.el.addChild(r);
-        const contentW = x - 17;
+        const contentW = row.slots ? x - SLOT_GAP - 10 : x - 17;
         lineWidths[i] = contentW;
         maxW = Math.max(maxW, contentW);
-        rowH[i] = Math.max(lineH, title.height);
-        y += rowH[i]!;
+        rowH[i] = Math.max(row.slots ? SLOT_SIZE : lineH, title.height);
+        y += rowH[i]! + lineGap;
         continue;
       }
-      const highlight = highlightBuildingsLine && i === buildingLimitLineIndex;
       const t = makeLabel(lines[i]!, {
         fontSize: FontSize.VERY_SMALL,
-        fill: highlight ? 0xffd700 : redLines.has(i) ? 0xff4d4d : 0xeeeeee,
-        fontWeight: highlight || bolds[i]! ? '700' : undefined,
+        fill: redLines.has(i) ? 0xff4d4d : 0xeeeeee,
+        fontWeight: bolds[i]! ? '700' : undefined,
         wordWrap: true,
         wordWrapWidth: innerW,
       });
@@ -383,7 +436,7 @@ export class HudSelected implements Widget {
       lineWidths[i] = t.width;
       maxW = Math.max(maxW, t.width);
       rowH[i] = Math.max(lineH, t.height);
-      y += rowH[i]!;
+      y += rowH[i]! + lineGap;
     }
     if (actions.length > 0) y += 8;
     // Action rows get a full-width hit area once the panel width is known, so a
@@ -397,7 +450,7 @@ export class HudSelected implements Widget {
       row.cursor = 'pointer';
       row.alpha = disabled ? 0.5 : 1;
       row.on('pointertap', () => {
-        if (!disabled) gameController.openSkill(a.id);
+        if (!disabled) gameController.actions.openSkill(a.id);
       });
       // Just the skill texture (no background or border), then the label
       // "Open <Skill>" followed by the money icon and the price.
@@ -437,7 +490,7 @@ export class HudSelected implements Widget {
       row.cursor = 'pointer';
       row.alpha = disabled ? 0.5 : 1;
       row.on('pointertap', () => {
-        if (!disabled) gameController.destroySelectedBuilding();
+        if (!disabled) gameController.actions.destroySelectedBuilding();
       });
       const size = 44;
       const icon = makeActionButtonIcon(ACTION_BUTTON_ICON_FILES['disband']!, size);
@@ -458,7 +511,7 @@ export class HudSelected implements Widget {
     }
 
     const HELP_SIZE = 16;
-    
+
     const helpRows: { index: number; kind: HelpKind }[] = [];
     if (bridgeLineIndex >= 0) helpRows.push({ index: bridgeLineIndex, kind: OverlayKind.BRIDGE_HELP });
     if (tile.unit) helpRows.push({ index: unitLineIndex, kind: OverlayKind.UNIT_HELP });

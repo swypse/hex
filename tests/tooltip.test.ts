@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Application, Container, Text } from 'pixi.js';
-import { Tooltip } from '../src/ui/kit/tooltip';
+import { Tooltip } from '../src/gfx/tooltip';
 
 class FakeImage {
   src = '';

@@ -1,5 +1,5 @@
-import { hexCorners, pointInPolygon } from '../game/hex';
-import { MapTile } from '../game/map-gen';
+import { hexCorners, pointInPolygon } from '../game/map/hex';
+import { type MapTile } from '../game/map/map-gen';
 import { tileElevation } from './elevation';
 
 export function pickTileAt(

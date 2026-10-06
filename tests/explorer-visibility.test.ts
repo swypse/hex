@@ -2,9 +2,9 @@ import { describe, it, expect, vi } from 'vitest';
 import { Container } from 'pixi.js';
 import { EventPresenter, deferredExplorerKeys, type EventHost } from '../src/controller/event-presenter';
 import { useGameStore } from '../src/store/game-store';
-import { TileType } from '../src/game/tile-types';
-import type { MapTile } from '../src/game/map-gen';
-import { axialKey } from '../src/game/hex';
+import { TileType } from '../src/game/map/tile-types';
+import type { MapTile } from '../src/game/map/map-gen';
+import { axialKey } from '../src/game/map/hex';
 import { GameEventType } from '@enums';
 
 describe('explorer visibility', () => {

@@ -1,8 +1,8 @@
 import { beforeEach, describe, it, expect, afterEach, vi } from 'vitest';
 import { Texture } from 'pixi.js';
-import { TRIBE_ICONS_ATLAS_FRAMES, TRIBE_ICONS_ATLAS_CELL } from '../src/game/tribe-icons-atlas-data.gen';
+import { TRIBE_ICONS_ATLAS_FRAMES, TRIBE_ICONS_ATLAS_CELL } from '../src/atlas-data/tribe-icons-atlas-data.gen';
 import { TRIBES } from '../src/game/tribes';
-import type { RenderGateApp } from '../src/render/render-gate';
+import type { RenderGateApp } from '../src/gfx/render-gate';
 
 class FakeImage {
   src = '';
@@ -27,7 +27,7 @@ describe('tribe icons atlas loader', () => {
     (globalThis as { Image?: unknown }).Image = FakeImage;
     vi.spyOn(Texture, 'from').mockReturnValue(Texture.EMPTY);
     vi.resetModules();
-    icons = await import('../src/ui/kit/tribe-icons');
+    icons = await import('../src/gfx/tribe-icons');
   });
 
   afterEach(() => {
@@ -89,7 +89,7 @@ describe('tribe icons atlas loader', () => {
     } as unknown as RenderGateApp;
     // Imported dynamically so it shares the fresh render-gate module instance
     // that tribe-icons' markDirty references (after the beforeEach module reset).
-    const { installRenderGate } = await import('../src/render/render-gate');
+    const { installRenderGate } = await import('../src/gfx/render-gate');
     const gate = installRenderGate(app);
 
     // Flush the gate's initial dirty frame and establish a clean baseline.

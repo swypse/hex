@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { planAiActions } from '../src/game/ai';
+import { planAiActions } from '../src/game/ai/ai';
 import { buildPlayers } from '../src/game/players';
 import { Tribe } from '../src/game/tribes';
 import { SeededRandom } from '../src/util/random';
 import { makeTestMap, tileAt, makeUnit, giveResources } from './helpers/test-map';
-import { TileType } from '../src/game/tile-types';
+import { TileType } from '../src/game/map/tile-types';
 import { AiActionType, AiDifficulty, BuildingKind, SkillId, UnitType } from '@enums';
 
 function makeAI(): ReturnType<typeof buildPlayers>[number] {

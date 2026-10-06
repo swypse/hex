@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
-import { TileType } from '../src/game/tile-types';
-import { MapTile } from '../src/game/map-gen';
+import { TileType } from '../src/game/map/tile-types';
+import { type MapTile } from '../src/game/map/map-gen';
 import { tileElevation } from '../src/render/elevation';
 import { coastWaterBrightness, destroyTextureSet, suppressPixiWarnings, type TextureSet } from '../src/render/texture-factory';
 

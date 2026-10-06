@@ -10,8 +10,8 @@ import { buildPlayers } from '../src/game/players';
 import { Tribe } from '../src/game/tribes';
 import { SeededRandom } from '../src/util/random';
 import { makeTestMap, tileAt, makeUnit } from './helpers/test-map';
-import type { GameMap } from '../src/game/map-gen';
-import { TileType } from '../src/game/tile-types';
+import type { GameMap } from '../src/game/map/map-gen';
+import { TileType } from '../src/game/map/tile-types';
 
 type KeyboardEventLike = { key: string; preventDefault: () => void };
 

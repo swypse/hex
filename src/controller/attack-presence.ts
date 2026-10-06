@@ -1,5 +1,5 @@
 import type { AttackUnitPre, GameEvent } from '../game/events';
-import type { Axial } from '../game/hex';
+import type { Axial } from '../game/map/hex';
 import { GameEventType, UnitType } from '@enums';
 
 export interface AttackPresenceParticipant {

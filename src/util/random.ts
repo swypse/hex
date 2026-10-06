@@ -30,3 +30,18 @@ export class SeededRandom {
     return copy;
   }
 }
+
+/** Random integer in [min, max]. */
+export function randomInt(min: number, max: number, rng: () => number = Math.random): number {
+  return min + Math.floor(rng() * (max - min + 1));
+}
+
+/** Random element, or undefined for an empty list. */
+export function pickRandom<T>(items: readonly T[], rng: () => number = Math.random): T | undefined {
+  return items[Math.min(items.length - 1, Math.floor(rng() * items.length))];
+}
+
+/** Seed for a new SeededRandom / map generation. */
+export function randomSeed(): number {
+  return randomInt(0, 99999);
+}

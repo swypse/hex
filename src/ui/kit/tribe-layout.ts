@@ -2,7 +2,6 @@ import type { Container } from 'pixi.js';
 
 const TRIBE_DIAM = 56;
 export const TRIBE_GAP = 16;
-const TRIBE_STEP = TRIBE_DIAM + TRIBE_GAP;
 export const TRIBE_ROW_STEP = 88;
 
 interface TribeSlot {

@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { GameMap, MapTile } from '../src/game/map-gen';
-import { TileType } from '../src/game/tile-types';
-import { START_RESOURCES } from '../src/game/resources';
+import { type GameMap, type MapTile } from '../src/game/map/map-gen';
+import { TileType } from '../src/game/map/tile-types';
+import { START_RESOURCES } from '../src/game/economy/resources';
 import { Tribe } from '../src/game/tribes';
 import { SKILLS } from '../src/game/skills';
 import { EMPTY_STATS } from '../src/game/score';
-import { Player } from '../src/game/players';
+import { type Player } from '../src/game/players';
 import { ACHIEVEMENTS, achievementInfo, achievementTotalScore, awardAchievementScores, evaluateAchievements, currentlyMetIds, unlockedAchievements } from '../src/game/achievements';
 import { AchievementId, BuildingKind } from '@enums';
 

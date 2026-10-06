@@ -1,10 +1,10 @@
-import { AI_DIFFICULTY_PROFILES } from '@/game/ai-difficulty';
-import { analyzeSituation, turnsToOccupy, visibleEnemies } from '@/game/ai-situation';
-import { GameMap, MapTile } from '@/game/map-gen';
-import { Player } from '@/game/players';
-import { TileType } from '@/game/tile-types';
+import { AI_DIFFICULTY_PROFILES } from '@/game/ai/ai-difficulty';
+import { analyzeSituation, turnsToOccupy, visibleEnemies } from '@/game/ai/ai-situation';
+import { type GameMap, type MapTile } from '@/game/map/map-gen';
+import { type Player } from '@/game/players';
+import { TileType } from '@/game/map/tile-types';
 import { Tribe } from '@/game/tribes';
-import { Unit, UNIT_TYPES } from '@/game/units';
+import { type Unit, UNIT_TYPES } from '@/game/units/units';
 import { AiStance, GameMode, UnitType } from '@enums';
 import { describe, expect, it } from 'vitest';
 

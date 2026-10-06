@@ -1,20 +1,20 @@
 import { t } from '../../i18n';
 import { Container } from 'pixi.js';
 import { gameController } from '../../controller/game-controller';
-import { villageIncomeTotal } from '../../game/capture';
-import { networkBuildingIncome } from '../../game/buildings';
-import { tileAt } from '../../game/selection';
-import { networkStock, villageNetwork, villageOfTile } from '../../game/stock';
-import type { MapTile } from '../../game/map-gen';
+import { villageIncomeTotal } from '../../game/economy/capture';
+import { networkBuildingIncome } from '../../game/economy/buildings';
+import { networkStock, villageNetwork, villageOfTile } from '../../game/economy/stock';
+import type { MapTile } from '../../game/map/map-gen';
 import { useGameStore } from '../../store/game-store';
-import { markDirty } from '../../render/render-gate';
+import { markDirty } from '../../gfx/render-gate';
 import { type UIHost, type Widget } from '../host';
 import { makeIcon } from '../kit/icon';
-import { makeLabel } from '../kit/label';
+import { makeLabel } from '../../gfx/label';
 import { Popup } from '../kit/popup';
 import { Button } from '../kit/button';
 import { RESOURCE_TOOLTIPS } from './resource-tooltips';
 import { FontSize, ResourceKind } from '@enums';
+import { tileAt } from '../../game/map/tile-index';
 
 /** How often the panel re-checks the map-derived income. Game events that alter
  *  income (unit spawn, capture, death, skill, building) may not touch the store,

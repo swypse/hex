@@ -1,23 +1,24 @@
 import {
   Application, BlurFilter, ColorMatrixFilter, Container, FillGradient, Graphics, Rectangle, Sprite, Texture
 } from 'pixi.js';
-import { axialKey, HEX_TILT, hexNeighbors } from '../game/hex';
-import { tileMapByKey, type GameMap, type MapTile } from '../game/map-gen';
-import { isSolidGround, isWaterType, TileType, TILE_TYPE_COLORS } from '../game/tile-types';
+import { axialKey, HEX_TILT, hexNeighbors } from '../game/map/hex';
+import { type GameMap, type MapTile } from '../game/map/map-gen';
+import { isSolidGround, isWaterType, TileType, TILE_TYPE_COLORS } from '../game/map/tile-types';
 import { TRIBES, Tribe } from '../game/tribes';
-import { UNIT_IMAGE_FILES, UNIT_TYPES } from '../game/units';
+import { UNIT_IMAGE_FILES, UNIT_TYPES } from '../game/units/units';
 import { shadeColor } from '../util/color';
 import { tileElevation } from './elevation';
-import { ensureCanvasResource } from './image-texture';
-import { countIceTiles } from '../game/ice';
+import { ensureCanvasResource } from '../gfx/image-texture';
+import { countIceTiles } from '../game/map/ice';
 import { ensureTerrainAtlas, terrainFrameTexture, terrainTileTexture, TERRAIN_TILE_FILES, TERRAIN_FOG_FILE } from './terrain-atlas';
 import { buildingTileTexture, ensureBuildingsAtlas } from './buildings-atlas';
 import { ensureTribeAtlas, tribeTileTexture } from './tribe-atlas';
-import { ensureActionButtonAtlas, actionButtonFrameTexture } from '../ui/kit/action-button-icons';
-import { ensureIcons32Atlas, icons32FrameTexture } from '../ui/kit/icons32';
+import { ensureActionButtonAtlas, actionButtonFrameTexture } from '../gfx/action-button-icons';
+import { ensureIcons32Atlas, icons32FrameTexture } from '../gfx/icons32';
 import { VillageBuildTextureService } from './village-build-texture';
 import { SLICE_BUDGET_MS, yieldToMain } from '../util/time-slice';
 import { BridgeDir, PortDirection, Season, TileAnchor, TileLayer, UnitType, WeatherType } from '@enums';
+import { tileMapByKey } from '../game/map/tile-index';
 
 const TEXTURE_BASE = `${import.meta.env.BASE_URL}textures/`;
 
@@ -75,7 +76,7 @@ const FOREST_TEMPLE_TILE_FILES: Record<1 | 2 | 3 | 4, string> = {
 };
 
 /** Granary tile art by adjacent farm count (1..6); 0 farms reuses the 1-farm art. */
-export const GRANARY_MAX_FARMS = 6;
+const GRANARY_MAX_FARMS = 6;
 const granaryTileFile = (farms: number): string => (farms <= 1 ? 'granary' : `granary-${farms}`);
 
 /** Terrain art frames are 256x448 with the hex face 254 wide and centred 316 px from the top. */

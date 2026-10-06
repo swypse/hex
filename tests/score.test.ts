@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { GameMap, MapTile, Building, Settlement } from '../src/game/map-gen';
-import { TileType } from '../src/game/tile-types';
+import { type GameMap, type MapTile, type Building, type Settlement } from '../src/game/map/map-gen';
+import { TileType } from '../src/game/map/tile-types';
 import { Tribe } from '../src/game/tribes';
-import { Player } from '../src/game/players';
-import { Unit } from '../src/game/units';
+import { type Player } from '../src/game/players';
+import { type Unit } from '../src/game/units/units';
 import {
   ARCHER_SCORE,
   awardScore,

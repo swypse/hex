@@ -1,7 +1,7 @@
 import { GameMode, NetMode, OverlayKind } from '@enums';
 export { GameMode };
-import { GameMap } from './map-gen';
-import { Player } from './players';
+import { type GameMap } from './map/map-gen';
+import { type Player } from './players';
 import { totalScore } from './score';
 
 export const GAME_MODE_NAMES: Record<GameMode, string> = {

@@ -1,6 +1,6 @@
 import { beforeEach, describe, it, expect, afterEach, vi } from 'vitest';
 import { Texture } from 'pixi.js';
-import { ACHIEVEMENT_ATLAS_FRAMES, ACHIEVEMENT_ATLAS_CELL } from '../src/game/achievement-atlas-data.gen';
+import { ACHIEVEMENT_ATLAS_FRAMES, ACHIEVEMENT_ATLAS_CELL } from '../src/atlas-data/achievement-atlas-data.gen';
 import { ACHIEVEMENTS } from '../src/game/achievements';
 import { AchievementId } from '@enums';
 
@@ -32,7 +32,7 @@ describe('makeAchievementIcon', () => {
     (globalThis as { Image?: unknown }).Image = FakeImage;
     vi.spyOn(Texture, 'from').mockReturnValue(Texture.EMPTY);
     vi.resetModules();
-    icons = await import('../src/ui/kit/achievement-icons');
+    icons = await import('../src/gfx/achievement-icons');
   });
 
   afterEach(() => {

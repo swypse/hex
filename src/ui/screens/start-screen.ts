@@ -4,10 +4,10 @@ import { useGameStore } from '../../store/game-store';
 import { saveRepository } from '../../storage/save-game';
 import { activeMatchStore } from '../../storage/active-match';
 import { loadSettings, setAiDifficulty, setSoundEnabled, welcomeDismissed, setWelcomeDismissed } from '../../storage/settings';
-import { isTouchDevice } from '../touch';
-import { markDirty } from '../../render/render-gate';
+import { isTouchDevice } from '../kit/touch';
+import { markDirty } from '../../gfx/render-gate';
 import { type ScreenController, type UIHost } from '../host';
-import { ScreenScroll } from '../vertical-scroll';
+import { ScreenScroll } from '../kit/vertical-scroll';
 
 /** Half the logo's display height (97px wide on the 194x170 source aspect).
  *  Layout reserves it statically so the menu column never jumps when the logo
@@ -16,13 +16,14 @@ const TITLE_HALF = (97 * 170) / 194 / 2;
 import { t } from '../../i18n';
 import { Button } from '../kit/button';
 import { ButtonGroup } from '../kit/button-group';
-import { makeLabel } from '../kit/label';
+import { makeLabel } from '../../gfx/label';
 import { makeCheckbox } from '../kit/checkbox';
 import { Modal } from '../kit/modal';
 import { Popup } from '../kit/popup';
 import { setLanguage } from '../../storage/settings';
-import { ensureCanvasResource } from '../../render/image-texture';
+import { ensureCanvasResource } from '../../gfx/image-texture';
 import { AiDifficulty, FontSize, Language, Screen, StartModal } from '@enums';
+import { clamp } from '../../util/math';
 
 const IMAGE_BASE = `${import.meta.env.BASE_URL}images/`;
 
@@ -148,12 +149,7 @@ class SettingsPanel {
     content.addChild(langGroup);
     y += langGroup.buttonHeight + blockGap;
 
-    const welcomeLabel = makeLabel(t('settings.dontShowWelcome'), { fontSize: FontSize.SMALL, fill: 0xeeeeee });
-    welcomeLabel.position.set(0, y);
-    content.addChild(welcomeLabel);
-    y += welcomeLabel.height + 8;
-
-    const welcomeCheck = makeCheckbox(welcomeDismissed(), (checked) => setWelcomeDismissed(checked));
+    const welcomeCheck = makeCheckbox(welcomeDismissed(), (checked) => setWelcomeDismissed(checked), { label: t('settings.dontShowWelcome') });
     welcomeCheck.el.position.set(0, y);
     content.addChild(welcomeCheck.el);
   }
@@ -342,7 +338,6 @@ export class StartScreen implements ScreenController {
     const w = this.host.app.screen.width;
     const h = this.host.app.screen.height;
     const titleHalf = TITLE_HALF;
-    const btnH = this.buttons[0]?.height ?? 34;
     const n = this.buttons.length;
     const topPad = 24;
     const bottomPad = 24;
@@ -354,7 +349,7 @@ export class StartScreen implements ScreenController {
     const versionCenter = lastBtnTop + 130;
     const columnBottom = versionCenter + versionHeight / 2;
     let glyphTop = (h - columnBottom) / 2;
-    glyphTop = Math.max(topPad, Math.min(glyphTop, h - columnBottom - bottomPad));
+    glyphTop = clamp(glyphTop, topPad, h - columnBottom - bottomPad);
 
     this.title!.position.set(w / 2, glyphTop + titleHalf);
     let y = glyphTop + firstBtnTop;

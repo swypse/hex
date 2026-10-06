@@ -2,19 +2,20 @@ import { t } from '../../i18n';
 import { Container, Graphics } from 'pixi.js';
 import { gameController } from '../../controller/game-controller';
 import { hasSkill } from '../../game/skills';
-import { tileAt } from '../../game/selection';
-import { networkStock } from '../../game/stock';
-import { UNIT_TYPES, UNIT_TYPE_NAMES } from '../../game/units';
+import { networkStock } from '../../game/economy/stock';
+import { UNIT_TYPES, UNIT_TYPE_NAMES } from '../../game/units/units';
 import { TRIBE_SPECIAL_UNIT, TRIBES } from '../../game/tribes';
 import type { Player } from '../../game/players';
 import { useGameStore } from '../../store/game-store';
 import { type UIHost } from '../host';
 import { Button } from '../kit/button';
-import { makeActionButtonIcon } from '../kit/action-button-icons';
+import { makeActionButtonIcon } from '../../gfx/action-button-icons';
 import { makeIcon } from '../kit/icon';
-import { makeLabel } from '../kit/label';
+import { makeLabel } from '../../gfx/label';
 import { Popup } from '../kit/popup';
+import { PopupDialog } from './popup-dialog';
 import { FontSize, SkillId, UnitType } from '@enums';
+import { tileAt } from '../../game/map/tile-index';
 
 // Fixed 3-icon grid: 3 columns, 4px margins around each cell.
 const COLS = 3;
@@ -49,15 +50,8 @@ export function spawnableTypesFor(player: Player): Exclude<UnitType, 'pirate'>[]
   return [...BASE_PLAYABLE, ...(BASE_PLAYABLE.includes(special) ? [] : [special])];
 }
 
-export class SpawnDialog {
-  private el: Container | null = null;
-  private popup: Popup | null = null;
-  private host: UIHost | null = null;
-  private reasonFor: UnitType | null = null;
-
+export class SpawnDialog extends PopupDialog {
   mount(host: UIHost, root: Container): void {
-    this.host = host;
-    this.reasonFor = null;
     const s = useGameStore.getState();
     const map = gameController.getMap();
     const selection = s.selection;
@@ -75,7 +69,6 @@ export class SpawnDialog {
       onClose: () => useGameStore.getState().setOverlay(null),
     });
     root.addChild(popup.el);
-    this.el = popup.el;
     this.popup = popup;
     this.drawGrid();
     popup.finish();
@@ -130,7 +123,6 @@ export class SpawnDialog {
 
   private drawGrid(): void {
     if (!this.popup) return;
-    this.reasonFor = null;
     this.clearContent();
     const types = this.types();
     const cols = COLS;
@@ -171,7 +163,7 @@ export class SpawnDialog {
         if (disabled) {
           this.drawReasons(type);
         } else {
-          gameController.spawnSelectedVillage(type);
+          gameController.actions.spawnSelectedVillage(type);
         }
       });
       content.addChild(item);
@@ -203,7 +195,6 @@ export class SpawnDialog {
 
   private drawReasons(type: UnitType): void {
     if (!this.popup) return;
-    this.reasonFor = type;
     this.clearContent();
     const content = this.popup.content;
     const lines = this.reasons(type);
@@ -229,18 +220,5 @@ export class SpawnDialog {
     const back = new Button({ label: t('common.back'), width: 120, onClick: () => this.drawGrid() });
     this.popup.setButtons([back]);
     this.popup.reflow();
-  }
-
-  hide(onDone: () => void): void {
-    if (this.popup) this.popup.animateOut(onDone);
-    else onDone();
-  }
-
-  destroy(): void {
-    this.popup?.destroy();
-    this.popup = null;
-    this.el = null;
-    this.host = null;
-    this.reasonFor = null;
   }
 }

@@ -1,15 +1,15 @@
 import { BuildingKind, CommandType, GameMode, SkillId, TutorialStepId, UnitType } from '@enums';
 import { describe, expect, it } from 'vitest';
 import { TutorialDirector, type TutorialHost } from '@/controller/tutorial-director';
-import { hexDistance } from '@/game/hex';
-import { tileAt } from '@/game/selection';
+import { hexDistance } from '@/game/map/hex';
 import { Simulator } from '@/game/simulator';
-import { isWaterType } from '@/game/tile-types';
+import { isWaterType } from '@/game/map/tile-types';
 import {
   buildTutorialMap, buildTutorialPlayers, TUTORIAL_ENEMY_PLAYER, TUTORIAL_ENEMY_SHIP_ID, TUTORIAL_HUMAN,
   TUTORIAL_PORT_TILE,
 } from '@/game/tutorial/tutorial-map';
-import { makeUnit } from '@/game/units';
+import { makeUnit } from '@/game/units/units';
+import { tileAt } from '@/game/map/tile-index';
 
 function makeSim(): Simulator {
   const sim = new Simulator(buildTutorialMap(), buildTutorialPlayers(), GameMode.TURNS30, { rng: () => 0.99 });

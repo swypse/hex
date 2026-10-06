@@ -2,12 +2,12 @@ import { Container, Graphics, BitmapText } from 'pixi.js';
 import { t } from '../../i18n';
 import { gameController } from '../../controller/game-controller';
 import { totalScore } from '../../game/score';
-import { activeBuffs, BUFF_INFO } from '../../game/buffs';
+import { activeBuffs, BUFF_INFO } from '../../game/units/buffs';
 import { tribeById } from '../../game/tribes';
 import { useGameStore } from '../../store/game-store';
 import { type UIHost, type Widget } from '../host';
 import { makeIcon } from '../kit/icon';
-import { makeLabel } from '../kit/label';
+import { makeLabel } from '../../gfx/label';
 import { Popup, POPUP_BODY_SIZE } from '../kit/popup';
 import {
   SCORE_PAD,
@@ -15,8 +15,9 @@ import {
   SCORE_CHIP_RADIUS,
   SCORE_TEXT_Y,
   buffRowPosition,
-} from '../layout';
-import { BuffId, FontSize } from '@enums';
+} from './layout';
+import { BuffId, FontSize, SkillId } from '@enums';
+import { makeSkillMedallion } from '../kit/skill-medallion';
 
 const SCORE_FONT_SIZE = FontSize.BIG;
 const SCORE_COLOR = 0xffffff;
@@ -26,6 +27,16 @@ const TOP_OFFSET = SCORE_TOP_OFFSET;
 const ICON_SIZE = 16;
 /** Vertical gap between buff items (icon + sub score) under the score circle. */
 const BUFF_GAP = 8;
+/** Skill medallion in the buff popup, and the gap to the description. */
+const MEDALLION_SIZE = 56;
+const MEDALLION_GAP = 12;
+/** Room around the medallion so its stroke is not clipped by the popup content box. */
+const MEDALLION_MARGIN = 6;
+/** The skill each protection buff comes from. */
+const BUFF_SKILL: Record<BuffId, SkillId> = {
+  [BuffId.WATER_PROTECTION]: SkillId.WATER_TEMPLES,
+  [BuffId.FOREST_PROTECTION]: SkillId.FOREST_TEMPLE,
+};
 /** Vertical centre of the score readout: just below the resource panel row. */
 const SCORE_BELOW_RESOURCE_Y = SCORE_TEXT_Y;
 
@@ -40,6 +51,8 @@ export class HudScore implements Widget {
   private unsub: (() => void) | null = null;
   private lastScore = 0;
   private buffPopup: Popup | null = null;
+  /** Invisible full-screen catcher behind the buff popup: a tap outside closes it. */
+  private buffCatcher: Graphics | null = null;
 
   mount(host: UIHost, root: Container): void {
     this.host = host;
@@ -142,7 +155,11 @@ export class HudScore implements Widget {
       icon.position.set(0, 0);
       item.eventMode = 'static';
       item.cursor = 'pointer';
-      item.on('pointertap', () => this.openBuffPopup(buff));
+      item.on('pointertap', (e?: { stopPropagation(): void }) => {
+        // Only the buff popup opens, not whatever the score area itself does on tap.
+        e?.stopPropagation();
+        this.openBuffPopup(buff);
+      });
       item.addChild(icon);
       item.position.set(0, y);
       this.buffRow.addChild(item);
@@ -169,24 +186,34 @@ export class HudScore implements Widget {
       closeOnEscape: true,
       onTap: onDone,
     });
+    // The skill that grants the buff, as its medallion beside the description.
+    const medallion = makeSkillMedallion({ skill: BUFF_SKILL[buff], opened: true, size: MEDALLION_SIZE, app: this.host.app });
+    medallion.position.set(MEDALLION_MARGIN + MEDALLION_SIZE / 2, MEDALLION_MARGIN + MEDALLION_SIZE / 2);
     const desc = makeLabel(info.description, {
       fontSize: POPUP_BODY_SIZE,
       fill: 0xeeeeee,
       wordWrap: true,
-      wordWrapWidth: popup.contentWidth,
+      wordWrapWidth: popup.contentWidth - MEDALLION_SIZE - MEDALLION_MARGIN * 2 - MEDALLION_GAP,
     });
-    desc.position.set(0, 0);
-    popup.content.addChild(desc);
+    desc.position.set(MEDALLION_SIZE + MEDALLION_MARGIN * 2 + MEDALLION_GAP, MEDALLION_MARGIN);
+    popup.content.addChild(medallion, desc);
     // Must render in the overlay layer (above the map and HUD), not on the
     // stage — stage children sit below screen/overlay layers by default.
-    this.host.overlayLayer.addChild(popup.el);
+    const catcher = new Graphics();
+    catcher.rect(0, 0, this.host.app.screen.width, this.host.app.screen.height).fill({ color: 0x000000, alpha: 0 });
+    catcher.eventMode = 'static';
+    catcher.on('pointertap', onDone);
+    this.host.overlayLayer.addChild(catcher, popup.el);
     popup.finish();
     this.buffPopup = popup;
+    this.buffCatcher = catcher;
   }
 
   private closeBuffPopup(): void {
     this.buffPopup?.destroy();
     this.buffPopup = null;
+    this.buffCatcher?.destroy();
+    this.buffCatcher = null;
   }
 
   destroy(): void {

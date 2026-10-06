@@ -1,6 +1,6 @@
 import { Tribe, type TribeInfo } from '../game/tribes';
 import { UNKNOWN_TRIBE_COLOR } from '../game/discovery';
-import { contrastTextColor } from '../ui/kit/theme';
+import { contrastTextColor } from '../gfx/theme';
 
 const WHITE = 0xffffff;
 const BLACK = 0x000000;

@@ -1,13 +1,13 @@
-import { countIceTiles, freezeCoast, thawIce } from '@/game/ice';
-import { GameMap, MapTile } from '@/game/map-gen';
-import { TILE_MOVE_COST, tileMoveCost } from '@/game/movement-cost';
-import { canBuildRoadHere } from '@/game/roads';
+import { countIceTiles, freezeCoast, thawIce } from '@/game/map/ice';
+import { type GameMap, type MapTile } from '@/game/map/map-gen';
+import { TILE_MOVE_COST, tileMoveCost } from '@/game/units/movement-cost';
+import { canBuildRoadHere } from '@/game/economy/roads';
 import { seasonForTurn } from '@/game/season';
-import { reachableTargets } from '@/game/selection';
-import { isShip } from '@/game/ship';
+import { reachableTargets } from '@/game/units/selection';
+import { isShip } from '@/game/units/ship';
 import { Simulator } from '@/game/simulator';
-import { TileType } from '@/game/tile-types';
-import { makeUnit } from '@/game/units';
+import { TileType } from '@/game/map/tile-types';
+import { makeUnit } from '@/game/units/units';
 import { BuildingKind, CommandType, GameEventType, GameMode, Season, UnitType } from '@enums';
 import { describe, expect, it } from 'vitest';
 

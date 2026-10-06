@@ -2,15 +2,15 @@ import { giveResources } from './helpers/test-map';
 import { beforeEach, describe, expect, it, afterEach } from 'vitest';
 import { Container, Graphics, Sprite, Text } from 'pixi.js';
 import { Simulator } from '../src/game/simulator';
-import { generateMap, type MapTile } from '../src/game/map-gen';
+import { generateMap, type MapTile } from '../src/game/map/map-gen';
 import { buildPlayers } from '../src/game/players';
 import { SeededRandom } from '../src/util/random';
 import { gameController } from '../src/controller/game-controller';
 import { useGameStore } from '../src/store/game-store';
 import { HudToolbar } from '../src/ui/hud/hud-toolbar';
 import { IconButton } from '../src/ui/kit/icon-button';
-import { TileType } from '../src/game/tile-types';
-import { hexNeighbors } from '../src/game/hex';
+import { TileType } from '../src/game/map/tile-types';
+import { hexNeighbors } from '../src/game/map/hex';
 import { type UIHost } from '../src/ui/host';
 import { BonusKind, GameMode, SelectionKind, SkillId, TutorialStepId, UnitType } from '@enums';
 

@@ -1,8 +1,7 @@
 import { t } from '../../i18n';
 import { Container } from 'pixi.js';
 import { gameController } from '../../controller/game-controller';
-import { tileAt } from '../../game/selection';
-import { unitHelpLines, unitHelpTitle, unitHelpDescription, unitHelpStats } from '../../game/unit-descriptions';
+import { unitHelpLines, unitHelpTitle, unitHelpDescription, unitHelpStats } from '../../game/units/unit-descriptions';
 import {
   bridgeHelpLines,
   bridgeHelpTitle,
@@ -13,26 +12,23 @@ import {
   settlementHelpLines,
   settlementHelpTitle,
 } from '../../game/help-texts';
-import { hasBridge } from '../../game/bridges';
+import { hasBridge } from '../../game/economy/bridges';
 import { useGameStore } from '../../store/game-store';
 import { type UIHost } from '../host';
 import { Button } from '../kit/button';
-import { makeLabel } from '../kit/label';
+import { makeLabel } from '../../gfx/label';
 import { makeIcon } from '../kit/icon';
 import { Popup } from '../kit/popup';
+import { PopupDialog } from './popup-dialog';
 import { FontSize, OverlayKind } from '@enums';
+import { tileAt } from '../../game/map/tile-index';
 
-export class UnitHelpDialog {
-  private el: Container | null = null;
-  private popup: Popup | null = null;
-  private host: UIHost | null = null;
-
+export class UnitHelpDialog extends PopupDialog {
   private close(): void {
     useGameStore.getState().setOverlay(null);
   }
 
   mount(host: UIHost, root: Container): void {
-    this.host = host;
     const s = useGameStore.getState();
     const map = gameController.getMap();
     if (!map || !s.selection) {
@@ -109,10 +105,7 @@ export class UnitHelpDialog {
         y += bullet.height + 6;
         popup.content.addChild(bullet);
       }
-      root.addChild(popup.el);
-      this.el = popup.el;
-      this.popup = popup;
-      popup.finish();
+      this.present(root, popup);
       return;
     }
 
@@ -152,21 +145,6 @@ export class UnitHelpDialog {
       popup.content.addChild(bullet);
     }
 
-    root.addChild(popup.el);
-    this.el = popup.el;
-    this.popup = popup;
-    popup.finish();
-  }
-
-  hide(onDone: () => void): void {
-    if (this.popup) this.popup.animateOut(onDone);
-    else onDone();
-  }
-
-  destroy(): void {
-    this.popup?.destroy();
-    this.popup = null;
-    this.el = null;
-    this.host = null;
+    this.present(root, popup);
   }
 }

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { ImageSource, Texture, type ImageResource } from 'pixi.js';
-import { ensureCanvasResource } from '../src/render/image-texture';
+import { ensureCanvasResource } from '../src/gfx/image-texture';
 
 class FakeImage {
   width = 10;

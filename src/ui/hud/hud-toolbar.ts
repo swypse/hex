@@ -5,14 +5,14 @@ import { skillPulseStep, STEP_CONFIG } from '@/game/tutorial/tutorial-steps';
 import { t } from '@/i18n';
 import { useGameStore } from '@/store/game-store';
 import { FontSize, GameMode, OverlayKind } from '@enums';
-import { Container, Graphics, Rectangle } from 'pixi.js';
+import { Container, Graphics } from 'pixi.js';
 import { type UIHost, type Widget } from '../host';
-import { ACTION_BUTTON_ICON_FILES, makeActionButtonIcon } from '../kit/action-button-icons';
+import { ACTION_BUTTON_ICON_FILES, makeActionButtonIcon } from '../../gfx/action-button-icons';
 import { ActionTooltip } from '../kit/action-tooltip';
 import { Button } from '../kit/button';
 import { IconButton } from '../kit/icon-button';
 import { tooltipsEnabled } from '../kit/tooltip-gate';
-import { TOOLBAR_HEIGHT, TURN_BAR_HEIGHT } from '../layout';
+import { TOOLBAR_HEIGHT, TURN_BAR_HEIGHT } from './layout';
 import { toolbarSpecs } from './toolbar-specs';
 
 const ICON_ACTIONS: Record<string, string> = {
@@ -58,7 +58,6 @@ const ACTION_BTN = {
 
 export class HudToolbar implements Widget {
   private el: Container | null = null;
-  private hit: Graphics | null = null;
   private row: Container | null = null;
   private host: UIHost | null = null;
   private unsub: (() => void) | null = null;
@@ -74,12 +73,10 @@ export class HudToolbar implements Widget {
   mount(host: UIHost, root: Container): void {
     this.host = host;
     const el = new Container();
-    const hit = new Graphics();
     const row = new Container();
-    el.addChild(hit, row);
+    el.addChild(row);
     root.addChild(el);
     this.el = el;
-    this.hit = hit;
     this.row = row;
     this.layout();
     this.update();
@@ -89,11 +86,9 @@ export class HudToolbar implements Widget {
   }
 
   private layout = (): void => {
-    if (!this.el || !this.hit || !this.row || !this.host) return;
+    if (!this.el || !this.row || !this.host) return;
     const screenW = this.host.app.screen.width;
     const screenH = this.host.app.screen.height;
-    this.hit.eventMode = 'static';
-    this.hit.hitArea = new Rectangle(0, 0, screenW, TOOLBAR_HEIGHT);
     this.el.position.set(0, screenH - TURN_BAR_HEIGHT - TOOLBAR_HEIGHT);
     const barY = (TOOLBAR_HEIGHT - 48) / 2;
     const maxW = Math.max(0, screenW - SIDE_PADDING * 2);
@@ -326,7 +321,6 @@ export class HudToolbar implements Widget {
     this.onResize = null;
     this.el?.destroy({ children: true });
     this.el = null;
-    this.hit = null;
     this.row = null;
     this.host = null;
   }

@@ -1,13 +1,13 @@
-// Packs the individual achievement icon PNGs (src/assets/achivements/*.png)
+// Packs the individual achievement icon PNGs (src/assets/achievements/*.png)
 // into a single compressed atlas PNG plus a generated manifest. The source
 // files are never modified. Run with: npm run pack:achievements
 import { readFileSync, writeFileSync, readdirSync } from 'node:fs';
 import { URL } from 'node:url';
 import { decodePng, encodePng, finalizeAtlas } from './packSkills.mjs';
 
-export const SOURCE_DIR_URL = new URL('../src/assets/achivements/', import.meta.url);
+export const SOURCE_DIR_URL = new URL('../src/assets/achievements/', import.meta.url);
 export const ATLAS_URL = new URL('../public/textures/achievements-atlas.png', import.meta.url);
-export const MANIFEST_URL = new URL('../src/game/achievement-atlas-data.gen.ts', import.meta.url);
+export const MANIFEST_URL = new URL('../src/atlas-data/achievement-atlas-data.gen.ts', import.meta.url);
 
 export const ACHIEVEMENT_COLS = 3;
 export const ACHIEVEMENT_CELL = 164;

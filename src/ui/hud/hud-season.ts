@@ -3,9 +3,9 @@ import { t } from '../../i18n';
 import { seasonForTurn, seasonTurn, SEASON_LENGTH } from '../../game/season';
 import { useGameStore } from '../../store/game-store';
 import { type UIHost, type Widget } from '../host';
-import { makeLabel } from '../kit/label';
+import { makeLabel } from '../../gfx/label';
 import { Popup, POPUP_BODY_SIZE } from '../kit/popup';
-import { SCORE_PAD, SCORE_TEXT_Y } from '../layout';
+import { SCORE_PAD, SCORE_TEXT_Y } from './layout';
 import { FontSize } from '@enums';
 
 const SEASON_FONT_SIZE = FontSize.NORMAL;

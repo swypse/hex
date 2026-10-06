@@ -1,10 +1,10 @@
 import { SeededRandom } from '../util/random';
 import { generatePlayerNames } from './names';
-import { PlayerResources, START_RESOURCES } from './resources';
+import { type PlayerResources, START_RESOURCES } from './economy/resources';
 import { EMPTY_STATS, type PlayerStats } from './score';
 import { Tribe, TRIBES, tribeById } from './tribes';
-import { DEFAULT_AI_DIFFICULTY } from './ai-difficulty';
-import type { AiOperation, AiStrategyState } from './ai-types';
+import { DEFAULT_AI_DIFFICULTY } from './ai/ai-difficulty';
+import type { AiOperation, AiStrategyState } from './ai/ai-types';
 import { AchievementId, AiDifficulty, AiEngine, SkillId } from '@enums';
 
 export interface Player {
@@ -23,7 +23,7 @@ export interface Player {
   /** AI planning engine: 'live' (default) applies each step before planning the next; 'batch' plans the whole turn on a frozen board (legacy, kept for benchmarking). */
   aiEngine?: AiEngine;
   /** Per-behaviour AI switches (default: all on). */
-  aiFlags?: Partial<import('./ai-flags').AiFlags>;
+  aiFlags?: Partial<import('./ai/ai-flags').AiFlags>;
   achievements?: AchievementId[];
   strategy?: AiStrategyState;
   /** Current squad operation (AI only), rebuilt at the start of each AI turn. */

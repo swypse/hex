@@ -1,6 +1,6 @@
 import type { Texture } from 'pixi.js';
 import { Tribe } from '../game/tribes';
-import type { Settlement } from '../game/map-gen';
+import type { Settlement } from '../game/map/map-gen';
 import type { Player } from '../game/players';
 import type { TileTexture } from './texture-factory';
 import type { VillageBuildTextureService } from './village-build-texture';

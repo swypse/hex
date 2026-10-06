@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { AI_DIFFICULTY_PROFILES, DEFAULT_AI_DIFFICULTY, difficultyFor, profileFor } from '../src/game/ai-difficulty';
+import { AI_DIFFICULTY_PROFILES, DEFAULT_AI_DIFFICULTY, difficultyFor, profileFor } from '../src/game/ai/ai-difficulty';
 import { AiDifficulty } from '@enums';
 
 describe('AI difficulty', () => {

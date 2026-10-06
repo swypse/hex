@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { IconButton } from '../src/ui/kit/icon-button';
-import { THEME } from '../src/ui/kit/theme';
+import { THEME } from '../src/gfx/theme';
 
 class FakeImage {
   src = '';

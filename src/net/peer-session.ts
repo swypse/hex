@@ -1,6 +1,6 @@
-import { GameEvent } from '../game/events';
-import { GameStateSnapshot } from '../game/state';
-import { Command } from '../game/simulator';
+import { type GameEvent } from '../game/events';
+import { type GameStateSnapshot } from '../game/state';
+import { type Command } from '../game/simulator';
 import { Tribe } from '../game/tribes';
 import { ClientMessageType, HostMessageType } from '@enums';
 

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { Assets } from 'pixi.js';
-import { FONT_BLACK, FONT_REGULAR, fontFamilyForWeight, loadBitmapFonts } from '../src/ui/kit/bitmap-fonts';
+import { FONT_BLACK, FONT_REGULAR, fontFamilyForWeight, loadBitmapFonts } from '../src/gfx/bitmap-fonts';
 
 describe('fontFamilyForWeight', () => {
   it('maps undefined and normal weights to Roboto Regular', () => {

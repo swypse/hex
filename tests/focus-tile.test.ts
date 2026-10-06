@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { gameController } from '../src/controller/game-controller';
-import { hexToPixel } from '../src/game/hex';
+import { hexToPixel } from '../src/game/map/hex';
 
 type Internals = { app: unknown; sim: unknown; mapView: unknown; camera: unknown };
 const internals = gameController as unknown as Internals;

@@ -9,7 +9,7 @@ import {
   acquireVillageBuildTexture,
   releaseVillageBuildTexture,
 } from '../src/render/village-build-texture';
-import type { SettlementBuild } from '../src/game/map-gen';
+import type { SettlementBuild } from '../src/game/map/map-gen';
 import { VillageBlockVariant } from '@enums';
 
 describe('villageBuildFrames', () => {

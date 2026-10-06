@@ -4,20 +4,15 @@ import { useGameStore, confirmLeaveGame } from '../../store/game-store';
 import { gameController } from '../../controller/game-controller';
 import { type UIHost } from '../host';
 import { Button } from '../kit/button';
-import { makeLabel } from '../kit/label';
 import { Popup } from '../kit/popup';
-import { DisconnectChoice, FontSize, NetMode, PauseReason } from '@enums';
+import { addPopupHint, PopupDialog } from './popup-dialog';
+import { DisconnectChoice, NetMode, PauseReason } from '@enums';
 
 /** Shown while the game is paused due to a disconnect: an in-game peer on the
  *  host (Wait / Give to AI / Forfeit) or the host for waiting clients
  *  (Waiting for host… + Leave game). */
-export class DisconnectDialog {
-  private el: Container | null = null;
-  private popup: Popup | null = null;
-  private host: UIHost | null = null;
-
+export class DisconnectDialog extends PopupDialog {
   mount(host: UIHost, root: Container): void {
-    this.host = host;
     const s = useGameStore.getState();
     const isHost = s.netMode === NetMode.HOST;
     const name = s.pausedName;
@@ -54,35 +49,13 @@ export class DisconnectDialog {
       closeOnEscape: false,
     });
 
-    const text = makeLabel(hint, {
-      fontSize: FontSize.SMALL,
-      fill: 0xcccccc,
-      wordWrap: true,
-      wordWrapWidth: popup.contentWidth,
-    });
-    text.position.set(0, 0);
-    popup.content.addChild(text);
+    addPopupHint(popup, hint);
 
-    root.addChild(popup.el);
-    this.el = popup.el;
-    this.popup = popup;
-    popup.finish();
+    this.present(root, popup);
   }
 
   private resolve(kind: DisconnectChoice): void {
     if (useGameStore.getState().paused !== PauseReason.DISCONNECT) return;
     void (kind === DisconnectChoice.AI ? gameController.giveDisconnectedToAI() : gameController.forfeitDisconnected());
-  }
-
-  hide(onDone: () => void): void {
-    if (this.popup) this.popup.animateOut(onDone);
-    else onDone();
-  }
-
-  destroy(): void {
-    this.popup?.destroy();
-    this.popup = null;
-    this.el = null;
-    this.host = null;
   }
 }

@@ -1,8 +1,6 @@
-import { Rectangle, Texture } from 'pixi.js';
-import { BUILDINGS_ATLAS_FILE, BUILDINGS_ATLAS_FRAMES } from '../game/buildings-atlas-data.gen';
-import { ensureCanvasResource } from './image-texture';
-
-const TEXTURE_BASE = `${import.meta.env.BASE_URL}textures/`;
+import type { Texture } from 'pixi.js';
+import { BUILDINGS_ATLAS_FILE, BUILDINGS_ATLAS_FRAMES } from '../atlas-data/buildings-atlas-data.gen';
+import { createAtlas } from '../gfx/atlas';
 
 /** Atlas frame keys of every building tile that textureFactory consumes, one
  *  per PNG in `src/assets/buildings/` (see `npm run pack:buildings`). */
@@ -38,47 +36,17 @@ export const BUILDING_TILE_FILES: string[] = [
   'wall',
 ];
 
-let atlasTexture: Texture | null = null;
-let atlasPromise: Promise<void> | null = null;
-const frameCache = new Map<string, Texture>();
+const atlas = createAtlas({ file: BUILDINGS_ATLAS_FILE, frames: BUILDINGS_ATLAS_FRAMES, tag: 'buildingsAtlas' });
 
 /** Loads the single packed buildings atlas image once and shares the same load
  *  promise with every caller. A failed load resolves without a texture, so
  *  callers degrade to procedurally drawn fallbacks instead of retrying. */
 export function ensureBuildingsAtlas(): Promise<void> {
-  if (atlasPromise) return atlasPromise;
-  atlasPromise = new Promise<void>((resolve) => {
-    const img = new Image();
-    img.onload = () => {
-      try {
-        atlasTexture = Texture.from(img);
-        ensureCanvasResource(atlasTexture);
-      } catch {
-        console.error('[buildingsAtlas] Texture.from failed for', TEXTURE_BASE + BUILDINGS_ATLAS_FILE);
-      }
-      resolve();
-    };
-    img.onerror = () => {
-      console.error('[buildingsAtlas] onerror for', TEXTURE_BASE + BUILDINGS_ATLAS_FILE);
-      resolve();
-    };
-    img.src = TEXTURE_BASE + BUILDINGS_ATLAS_FILE;
-  });
-  return atlasPromise;
+  return atlas.ensure();
 }
 
 /** Returns the building PNG texture for an atlas frame key, sliced out of the
  *  packed atlas (one HTTP image total). Null when the atlas is unavailable. */
 export function buildingTileTexture(frameKey: string): Texture | null {
-  const frame = BUILDINGS_ATLAS_FRAMES[frameKey];
-  if (!frame || !atlasTexture) return null;
-  const cached = frameCache.get(frameKey);
-  if (cached) return cached;
-  const tex = new Texture({
-    source: atlasTexture.source,
-    frame: new Rectangle(frame.x, frame.y, frame.w, frame.h),
-    label: frameKey,
-  });
-  frameCache.set(frameKey, tex);
-  return tex;
+  return atlas.frameTexture(frameKey);
 }

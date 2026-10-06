@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { allTiles, axialKey, hexDistance, hexNeighbors, ringOf, tilesInRange } from '../src/game/hex';
-import { generateMap, mapRadiusFor, bridgeIslandVillages, ensureStartVillagePaths } from '../src/game/map-gen';
-import { MapTile, Settlement } from '../src/game/map-gen';
-import { isLandType, isWaterType, TileType } from '../src/game/tile-types';
-import { isForestType, isMountainType } from '../src/game/tile-types';
-import { Biome } from '../src/game/biomes';
+import { allTiles, axialKey, hexDistance, hexNeighbors, ringOf, tilesInRange } from '../src/game/map/hex';
+import { generateMap, mapRadiusFor, bridgeIslandVillages, ensureStartVillagePaths } from '../src/game/map/map-gen';
+import { type MapTile, type Settlement } from '../src/game/map/map-gen';
+import { isLandType, isWaterType, TileType } from '../src/game/map/tile-types';
+import { isForestType, isMountainType } from '../src/game/map/tile-types';
+import { Biome } from '../src/game/map/biomes';
 import { UnitType } from '@enums';
 
 describe('map generation', () => {

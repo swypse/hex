@@ -1,11 +1,11 @@
-import { isExploredFor } from '@/game/explore';
+import { isExploredFor } from '@/game/map/explore';
 import { quickCaptureScore, quickCaptureTurnsCount } from '@/game/game-mode';
-import { hexNeighbors } from '@/game/hex';
+import { hexNeighbors } from '@/game/map/hex';
 import { buildPlayers } from '@/game/players';
 import { Simulator } from '@/game/simulator';
-import { TileType } from '@/game/tile-types';
+import { TileType } from '@/game/map/tile-types';
 import { Tribe } from '@/game/tribes';
-import { canAttack, canHeal, canMove } from '@/game/units';
+import { canAttack, canHeal, canMove } from '@/game/units/units';
 import { SeededRandom } from '@/util';
 import { BonusKind, BridgeDir, BuildingKind, CommandType, GameEventType, GameMode, SkillId, UnitType } from '@enums';
 import { describe, expect, it } from 'vitest';

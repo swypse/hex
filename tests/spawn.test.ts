@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { GameMap, MapTile, Settlement } from '../src/game/map-gen';
-import { Player } from '../src/game/players';
-import { TileType } from '../src/game/tile-types';
-import { villageCapacity, unitsInVillage } from '../src/game/village';
-import { stockOf } from '../src/game/stock';
-import { spawnUnit } from '../src/game/spawn';
+import { type GameMap, type MapTile, type Settlement } from '../src/game/map/map-gen';
+import { type Player } from '../src/game/players';
+import { TileType } from '../src/game/map/tile-types';
+import { villageCapacity, unitsInVillage } from '../src/game/economy/village';
+import { stockOf } from '../src/game/economy/stock';
+import { spawnUnit } from '../src/game/units/spawn';
 import { Tribe, TRIBE_SPECIAL_UNIT } from '../src/game/tribes';
 import { SkillId, UnitType } from '@enums';
 

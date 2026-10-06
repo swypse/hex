@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { BuildingKind, CommandType, GameEventType, GameMode, SkillId, UnitType, WeatherType } from '@enums';
-import { buildingIncome } from '../src/game/buildings';
-import { farmYield } from '../src/game/food';
-import { axialKey } from '../src/game/hex';
+import { buildingIncome } from '../src/game/economy/buildings';
+import { farmYield } from '../src/game/economy/food';
+import { axialKey } from '../src/game/map/hex';
 import { buildPlayers } from '../src/game/players';
 import { Simulator } from '../src/game/simulator';
-import { TileType } from '../src/game/tile-types';
+import { TileType } from '../src/game/map/tile-types';
 import { Tribe } from '../src/game/tribes';
-import type { WeatherEvent } from '../src/game/weather';
+import type { WeatherEvent } from '../src/game/weather/weather';
 import { SeededRandom } from '../src/util/random';
 import { makeTestMap, makeUnit, tileAt } from './helpers/test-map';
 
@@ -30,8 +30,9 @@ function simOn(map: ReturnType<typeof makeTestMap>, rng: () => number = () => 0.
   return sim;
 }
 
-const advance = (sim: Simulator): void => (sim as unknown as { advanceWeatherEvents(): void }).advanceWeatherEvents();
-const effects = (sim: Simulator): void => (sim as unknown as { applyWeatherEffects(): void }).applyWeatherEffects();
+const environment = (sim: Simulator): { advanceWeatherEvents(): void; applyWeatherEffects(): void } => (sim as unknown as { environment: { advanceWeatherEvents(): void; applyWeatherEffects(): void } }).environment;
+const advance = (sim: Simulator): void => environment(sim).advanceWeatherEvents();
+const effects = (sim: Simulator): void => environment(sim).applyWeatherEffects();
 
 describe('drought economy', () => {
   it('halves the food of farms inside the drought and leaves the others alone', () => {
@@ -92,7 +93,7 @@ describe('round-end weather in the simulator', () => {
     advance(sim);
     const events = sim.drainEvents();
     expect(events.map((e) => e.type)).toEqual([GameEventType.WEATHER_STARTED, GameEventType.WEATHER_DAMAGE]);
-    expect(farm.building!.hp).toBe(1);
+    expect(farm.building).toBeNull();
   });
 
   it('a storm damages the ships in its scope at the end of the turn', () => {

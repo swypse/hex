@@ -1,8 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import { EventPresenter, type EventHost } from '../src/controller/event-presenter';
 import type { GameEvent } from '../src/game/events';
-import type { MapTile } from '../src/game/map-gen';
-import { TileType } from '../src/game/tile-types';
+import type { MapTile } from '../src/game/map/map-gen';
+import { TileType } from '../src/game/map/tile-types';
 import { useGameStore } from '../src/store/game-store';
 import { GameEventType, UnitType } from '@enums';
 
@@ -64,8 +64,8 @@ describe('attack hp holds', () => {
     useGameStore.setState({ localPlayerIndex: 0 });
 
     const presenter = new EventPresenter(host);
-    vi.spyOn(presenter as never, 'spawnHpText').mockImplementation(() => {});
-    vi.spyOn(presenter as never, 'spawnDeath').mockImplementation(() => {});
+    vi.spyOn((presenter as unknown as { effects: object }).effects as never, 'spawnHpText').mockImplementation(() => {});
+    vi.spyOn((presenter as unknown as { effects: object }).effects as never, 'spawnDeath').mockImplementation(() => {});
 
     // Attack 1 (a1 -> b) misses; attack 2 (c -> b) comes later in the same batch.
     // c is damaged in the final sim state, so its real hp differs from its pre hp.

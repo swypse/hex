@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { THEME, parseHexColor, colorCss, isLightColor } from '../src/ui/kit/theme';
+import { THEME, parseHexColor, colorCss, isLightColor } from '../src/gfx/theme';
 
 describe('theme helpers', () => {
   it('parses hex colors', () => {

@@ -1,6 +1,6 @@
 import { Container } from 'pixi.js';
 import { Button, type ButtonCorners } from './button';
-import { THEME } from './theme';
+import { THEME } from '../../gfx/theme';
 import { FontSize } from '@enums';
 
 interface ButtonGroupItem {

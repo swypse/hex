@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { Application, Container, ImageSource, Sprite, Text, Texture } from 'pixi.js';
 import { MapView } from '../src/render/map-renderer';
-import { GameMap, MapTile, Settlement } from '../src/game/map-gen';
-import { TileType } from '../src/game/tile-types';
-import { Player } from '../src/game/players';
+import { type GameMap, type MapTile, type Settlement } from '../src/game/map/map-gen';
+import { TileType } from '../src/game/map/tile-types';
+import { type Player } from '../src/game/players';
 import { Tribe } from '../src/game/tribes';
-import { axialKey } from '../src/game/hex';
-import { generateMap } from '../src/game/map-gen';
+import { axialKey } from '../src/game/map/hex';
+import { generateMap } from '../src/game/map/map-gen';
 import { buildMultiplayerPlayers } from '../src/game/players';
-import { initialExplorationFor } from '../src/game/explore';
+import { initialExplorationFor } from '../src/game/map/explore';
 import { SeededRandom } from '../src/util/random';
 import { type TextureSet, type TileTexture } from '../src/render/texture-factory';
 
@@ -98,7 +98,7 @@ describe('village texture anchor across lifecycle', () => {
     const map: GameMap = generateMap(pl.length, 42);
     for (const p of pl) initialExplorationFor(map, p.index);
     const textures = buildTextures(map);
-    const view = new MapView(makeApp(), textures, HEX, 1, 2);
+    const view = new MapView(makeApp(), textures, HEX, 1);
     const viewport = { x: 640, y: 400, scale: 1, width: 1280, height: 800 };
 
     // Use a free (unowned) settlement.

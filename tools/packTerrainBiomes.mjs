@@ -8,7 +8,7 @@ import { generateTerrainAtlas } from './packTerrain.mjs';
 
 export const TERRAIN_BIOMES = ['grassland', 'desert', 'tundra', 'taiga', 'rainforest'];
 export const TERRAIN_BIOME_COLS = 3;
-export const MANIFEST_URL = new URL('../src/game/terrain-biomes-data.gen.ts', import.meta.url);
+export const MANIFEST_URL = new URL('../src/atlas-data/terrain-biomes-data.gen.ts', import.meta.url);
 
 export const biomeSourceUrl = (biome) => new URL(`../src/assets/terrain-${biome}/`, import.meta.url);
 export const biomeAtlasFile = (biome) => `terrain-${biome}-atlas.png`;

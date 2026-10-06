@@ -1,7 +1,7 @@
 import { beforeEach, describe, it, expect, afterEach, vi } from 'vitest';
 import { Texture, type Container } from 'pixi.js';
-import { TERRAIN_ATLAS_FRAMES, TERRAIN_ATLAS_CELL_W, TERRAIN_ATLAS_CELL_H } from '../src/game/terrain-atlas-data.gen';
-import { TERRAIN_BIOME_ATLASES } from '../src/game/terrain-biomes-data.gen';
+import { TERRAIN_ATLAS_FRAMES, TERRAIN_ATLAS_CELL_W, TERRAIN_ATLAS_CELL_H } from '../src/atlas-data/terrain-atlas-data.gen';
+import { TERRAIN_BIOME_ATLASES } from '../src/atlas-data/terrain-biomes-data.gen';
 import { TERRAIN_TILE_FILES, TERRAIN_FOG_FILE } from '../src/render/terrain-atlas';
 
 class FakeImage {

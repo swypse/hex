@@ -1,16 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { GameMap, MapTile, Settlement } from '../src/game/map-gen';
-import {
-  contentLayers,
-  cycleSelection,
-  moveUnit,
-  pathBetween,
-  reachableTargets,
-  tileAt,
-} from '../src/game/selection';
-import { TileType } from '../src/game/tile-types';
-import { Unit } from '../src/game/units';
+import { type GameMap, type MapTile, type Settlement } from '../src/game/map/map-gen';
+import { contentLayers, cycleSelection, moveUnit, pathBetween, reachableTargets } from '../src/game/units/selection';
+import { TileType } from '../src/game/map/tile-types';
+import { type Unit } from '../src/game/units/units';
 import { BridgeDir, BuildingKind, SelectionKind, UnitType } from '@enums';
+import { tileAt } from '../src/game/map/tile-index';
 
 function makeTile(
   q: number,

@@ -1,12 +1,12 @@
-import { GameMap } from './map-gen';
+import { type GameMap } from './map/map-gen';
 import type { Player } from './players';
-import { canMove, canAttack, canHeal, UNIT_TYPES } from './units';
-import { reachableTargets } from './selection';
-import { attackableTargets } from './combat';
+import { canMove, canAttack, canHeal, UNIT_TYPES } from './units/units';
+import { reachableTargets } from './units/selection';
+import { attackableTargets } from './units/combat';
 import { hasSkill, canOpenSkill, SKILLS } from './skills';
-import { unitsInVillage, villageCapacity, canBuildWall } from './village';
-import { villageUpgradeCost } from './resources';
-import { canAffordAt } from './stock';
+import { unitsInVillage, villageCapacity, canBuildWall } from './economy/village';
+import { villageUpgradeCost } from './economy/resources';
+import { canAffordAt } from './economy/stock';
 import {
   canBuildSawmill,
   canBuildMine,
@@ -18,11 +18,11 @@ import {
   canBurnBuilding,
   canBurnRoad,
   BUILDING_COSTS,
-} from './buildings';
-import { canBuildRoad, ROAD_COST, villageConnectedNodes } from './roads';
-import { canBuildBridge, BRIDGE_COST } from './bridges';
-import { bonusEligibleFor } from './bonus';
-import { bottleCollectableFor } from './bottles';
+} from './economy/buildings';
+import { canBuildRoad, villageConnectedNodes } from './economy/roads';
+import { canBuildBridge, BRIDGE_COST } from './economy/bridges';
+import { bonusEligibleFor } from './map/bonus';
+import { bottleCollectableFor } from './map/bottles';
 import { SkillId } from '@enums';
 
 const CHEAPEST_UNIT_PRICE = Math.min(

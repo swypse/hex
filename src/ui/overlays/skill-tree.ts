@@ -3,20 +3,20 @@ import { Container, Graphics, Sprite, Texture } from 'pixi.js';
 import { gameController } from '../../controller/game-controller';
 import { SKILLS, hasSkill, canOpenSkill, skillCost } from '../../game/skills';
 import { type Player } from '../../game/players';
-import { TRIBES, tribeById } from '../../game/tribes';
-import { clampZoom, zoomAroundCursor, decayVelocity, INERTIA_START_SPEED, INERTIA_STOP_SPEED } from '../../game/zoom';
-import { ensureCanvasResource } from '../../render/image-texture';
+import { tribeById } from '../../game/tribes';
+import { clampZoom, zoomAroundCursor, decayVelocity, INERTIA_START_SPEED, INERTIA_STOP_SPEED } from '../../controller/zoom';
+import { ensureCanvasResource } from '../../gfx/image-texture';
 import { useGameStore } from '../../store/game-store';
 import { type UIHost } from '../host';
 import { Button } from '../kit/button';
-import { makeLabel } from '../kit/label';
+import { makeLabel } from '../../gfx/label';
 import { Popup } from '../kit/popup';
 import { makeRichLabel } from '../kit/rich-label';
 import { makeIcon } from '../kit/icon';
 import { makeIconChip } from '../kit/tribe-chip';
 import { HudResourcePanel } from '../hud/hud-resource-panel';
 import { makeSkillMedallion } from '../kit/skill-medallion';
-import { THEME } from '../kit/theme';
+import { THEME } from '../../gfx/theme';
 import { FontSize, SkillId } from '@enums';
 
 const RING_SPACING = 150;
@@ -400,6 +400,7 @@ export class SkillTree {
         opened,
         priceText: opened ? '\u2713' : String(skillCost(id, human.skills.length)),
         size: 72,
+        app: host.app,
         textBake: TREE_TEXT_BAKE,
       });
       medallion.position.set(pos.x, pos.y);
@@ -436,7 +437,7 @@ export class SkillTree {
         label: t('ui.open'),
         disabled: !canOpenSkill(human, id),
         onClick: () => {
-          gameController.openSkill(id);
+          gameController.actions.openSkill(id);
           this.closeDetail();
         },
       }));
@@ -493,6 +494,7 @@ export class SkillTree {
       skill: id,
       opened,
       size: 48,
+      app: host.app,
     });
     medallion.position.set(coverW - 10 - 24, 10 + 24);
     cover.addChild(medallion);

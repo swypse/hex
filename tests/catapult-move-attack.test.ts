@@ -7,8 +7,8 @@ import { Tribe } from '../src/game/tribes';
 import { SeededRandom } from '../src/util/random';
 import { gameController } from '../src/controller/game-controller';
 import { useGameStore } from '../src/store/game-store';
-import { axialKey } from '../src/game/hex';
-import type { MapTile } from '../src/game/map-gen';
+import { axialKey } from '../src/game/map/hex';
+import type { MapTile } from '../src/game/map/map-gen';
 
 describe('catapult move-or-attack dialog', () => {
   let map: ReturnType<typeof makeTestMap>;
@@ -63,7 +63,7 @@ describe('catapult move-or-attack dialog', () => {
     const spy = vi
       .spyOn(gameController as unknown as { runCommand: (c: unknown) => Promise<void> }, 'runCommand')
       .mockResolvedValue(undefined);
-    gameController.chooseMoveFromDialog();
+    gameController.actions.chooseMoveFromDialog();
     expect(spy).toHaveBeenCalledWith({ type: 'move', unitId: 'c', q: target.q, r: target.r });
     const store = useGameStore.getState();
     expect(store.overlay).toBeNull();
@@ -77,7 +77,7 @@ describe('catapult move-or-attack dialog', () => {
     const spy = vi
       .spyOn(gameController as unknown as { runCommand: (c: unknown) => Promise<void> }, 'runCommand')
       .mockResolvedValue(undefined);
-    gameController.chooseAttackFromDialog();
+    gameController.actions.chooseAttackFromDialog();
     expect(spy).toHaveBeenCalledWith({ type: 'attack', unitId: 'c', q: target.q, r: target.r });
     expect(useGameStore.getState().overlay).toBeNull();
     spy.mockRestore();
@@ -89,7 +89,7 @@ describe('catapult move-or-attack dialog', () => {
     const spy = vi
       .spyOn(gameController as unknown as { runCommand: (c: unknown) => Promise<void> }, 'runCommand')
       .mockResolvedValue(undefined);
-    gameController.cancelMoveAttack();
+    gameController.actions.cancelMoveAttack();
     expect(useGameStore.getState().overlay).toBeNull();
     expect(spy).not.toHaveBeenCalled();
     spy.mockRestore();

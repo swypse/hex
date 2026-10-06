@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { Container, Sprite, BitmapText } from 'pixi.js';
 import { HudScore } from '../src/ui/hud/hud-score';
 import { totalScore } from '../src/game/score';
-import { FONT_REGULAR } from '../src/ui/kit/bitmap-fonts';
+import { FONT_REGULAR } from '../src/gfx/bitmap-fonts';
 import { useGameStore } from '../src/store/game-store';
 import { gameController } from '../src/controller/game-controller';
 import { type UIHost } from '../src/ui/host';
@@ -11,8 +11,8 @@ import { buildPlayers } from '../src/game/players';
 import { Tribe } from '../src/game/tribes';
 import { SeededRandom } from '../src/util/random';
 import { Simulator } from '../src/game/simulator';
-import { TileType } from '../src/game/tile-types';
-import { SCORE_PAD, SCORE_TOP_OFFSET, SCORE_CHIP_RADIUS } from '../src/ui/layout';
+import { TileType } from '../src/game/map/tile-types';
+import { SCORE_PAD, SCORE_TOP_OFFSET, SCORE_CHIP_RADIUS } from '../src/ui/hud/layout';
 import { BuildingKind, GameMode, Screen } from '@enums';
 import { t } from '../src/i18n';
 
@@ -160,7 +160,8 @@ describe('HudScore buff icons', () => {
     const overlay = host.overlayLayer as Container;
     expect(overlay.children.length).toBe(0);
     (item.emit as (event: string) => void)('pointertap');
-    expect(overlay.children.length).toBe(1);
+    // The popup plus the invisible catcher behind it.
+    expect(overlay.children.length).toBe(2);
     const popupTexts: string[] = [];
     const walk = (c: Container): void => {
       for (const ch of c.children) {
@@ -171,6 +172,11 @@ describe('HudScore buff icons', () => {
     walk(overlay);
     expect(popupTexts.join('\n')).toContain('Water Protection');
     expect(popupTexts.join('\n')).toContain('take 10 less damage');
+    // A tap on the catcher outside the popup closes it.
+    (overlay.children[0] as Container).emit('pointertap', {} as never);
+    expect(overlay.children.length).toBe(0);
+    (item.emit as (event: string) => void)('pointertap');
+    expect(overlay.children.length).toBe(2);
     hud.destroy();
     expect(overlay.children.length).toBe(0);
   });

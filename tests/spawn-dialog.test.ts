@@ -10,8 +10,8 @@ import { Simulator } from '../src/game/simulator';
 import { buildPlayers } from '../src/game/players';
 import { Tribe } from '../src/game/tribes';
 import { SeededRandom } from '../src/util/random';
-import { axialKey } from '../src/game/hex';
-import { UNIT_TYPES } from '../src/game/units';
+import { axialKey } from '../src/game/map/hex';
+import { UNIT_TYPES } from '../src/game/units/units';
 
 type KeyboardEventLike = { key: string; preventDefault: () => void };
 
@@ -22,6 +22,8 @@ function makeHost(): UIHost {
     overlayLayer: new Container(),
   } as unknown as UIHost;
 }
+
+const requestedImages: string[] = [];
 
 describe('SpawnDialog', () => {
   let keyHandler: ((e: KeyboardEventLike) => void) | null;
@@ -46,6 +48,12 @@ describe('SpawnDialog', () => {
         width: 0,
         height: 0,
       }),
+    };
+    (globalThis as { Image?: unknown }).Image = class {
+      onload: (() => void) | null = null;
+      set src(url: string) {
+        requestedImages.push(url);
+      }
     };
     keyHandler = null;
     const win = (globalThis as { window: { addEventListener: (t: string, cb: unknown) => void; removeEventListener: (t: string, cb: unknown) => void } }).window;
@@ -84,26 +92,16 @@ describe('SpawnDialog', () => {
   });
 
   it('uses the packed action-buttons atlas for unit icons instead of separate images', () => {
-    class FakeImage {
-      src = '';
-      static instances: FakeImage[] = [];
-      constructor() {
-        FakeImage.instances.push(this);
-      }
-    }
-    FakeImage.instances = [];
-    (globalThis as { Image?: unknown }).Image = FakeImage;
-
     const dialog = new SpawnDialog();
     dialog.mount(host, root);
 
-    const urls = FakeImage.instances.map((i) => i.src);
+    // The atlas load is shared module-wide, so check every image requested so far.
     // All unit spawn icons (archer included) come from the single atlas,
     // never from separate files.
     for (const old of ['fist.png', 'horse.png', 'sword.png', 'shield.png', 'catapult.png', 'knight.png', 'arch.png']) {
-      expect(urls.some((u) => u.endsWith(old))).toBe(false);
+      expect(requestedImages.some((u) => u.endsWith(old))).toBe(false);
     }
-    expect(urls.some((u) => u.endsWith('action-buttons-atlas.png'))).toBe(true);
+    expect(requestedImages.some((u) => u.endsWith('action-buttons-atlas.png'))).toBe(true);
     dialog.destroy();
   });
 

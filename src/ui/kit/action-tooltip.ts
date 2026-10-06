@@ -1,6 +1,6 @@
 import { Container, Graphics } from 'pixi.js';
-import { makeLabel } from './label';
-import { THEME } from './theme';
+import { makeLabel } from '../../gfx/label';
+import { THEME } from '../../gfx/theme';
 import { FontSize } from '@enums';
 
 const GAP = 10;

@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Application, Container, Sprite, Text, Texture } from 'pixi.js';
 import { gameController } from '@/controller/game-controller';
-import { initialExplorationFor } from '@/game/explore';
-import { axialKey } from '@/game/hex';
-import { type GameMap, generateMap } from '@/game/map-gen';
+import { initialExplorationFor } from '@/game/map/explore';
+import { axialKey } from '@/game/map/hex';
+import { type GameMap, generateMap } from '@/game/map/map-gen';
 import { buildMultiplayerPlayers } from '@/game/players';
 import { Simulator } from '@/game/simulator';
 import { Tribe } from '@/game/tribes';
@@ -17,7 +17,7 @@ import { GameMode, HostMessageType, NetMode, Screen } from '@enums';
 
 vi.mock('../src/render/texture-factory', async () => {
   const { Texture, ImageSource } = await import('pixi.js');
-  const { axialKey } = await import('@/game/hex');
+  const { axialKey } = await import('@/game/map/hex');
   const { Tribe } = await import('@/game/tribes');
   const tex = (w: number, h: number): Texture => new Texture({ source: new ImageSource({ width: w, height: h }) });
   const tileTex = (w: number, h: number, anchorY = 0.5): TileTexture => ({ texture: tex(w, h), anchorY });

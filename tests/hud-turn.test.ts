@@ -1,5 +1,5 @@
 import type { Player } from '@/game/players';
-import { START_RESOURCES } from '@/game/resources';
+import { START_RESOURCES } from '@/game/economy/resources';
 import { Tribe } from '@/game/tribes';
 import { useGameStore } from '@/store/game-store';
 import { type UIHost } from '@/ui/host';

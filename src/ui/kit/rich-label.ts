@@ -1,6 +1,6 @@
 import { Container } from 'pixi.js';
 import { makeIcon } from './icon';
-import { makeLabel } from './label';
+import { makeLabel } from '../../gfx/label';
 import { FontSize } from '@enums';
 
 /** Inline resource tokens in rich text: `[money:15]` renders as "15" + the resource icon. */

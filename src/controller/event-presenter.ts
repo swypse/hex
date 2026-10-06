@@ -1,26 +1,21 @@
-import { BUILDING_NAMES } from '../game/buildings';
-import { Application, BitmapText, Container, Graphics, Sprite, Texture } from 'pixi.js';
+import { BUILDING_NAMES } from '../game/economy/buildings';
+import { Application, Container, Sprite } from 'pixi.js';
 import { Simulator } from '../game/simulator';
-import { AttackUnitPre, GameEvent } from '../game/events';
-import { MapTile } from '../game/map-gen';
-import { Player } from '../game/players';
-import { TRIBES, tribeById } from '../game/tribes';
-import { canAttack, canMove, HEAL_AMOUNT, PIRATE_OWNER, Unit, UNIT_TYPES } from '../game/units';
-import { isWaterType } from '../game/tile-types';
-import { tileAt } from '../game/selection';
-import { claimingVillage, villageWaterTiles } from '../game/storm';
-import { isExploredFor } from '../game/explore';
-import { axialKey, hexDistance, hexToPixel, tilesInRange, type Axial } from '../game/hex';
-import { compassDirection, weatherCopies, type WeatherBuildingHit, type WeatherEvent, type WeatherUnitHit } from '../game/weather';
+import { type AttackUnitPre, type GameEvent } from '../game/events';
+import { type MapTile } from '../game/map/map-gen';
+import { type Player } from '../game/players';
+import { tribeById } from '../game/tribes';
+import { canAttack, canMove, HEAL_AMOUNT, PIRATE_OWNER, type Unit, UNIT_TYPES } from '../game/units/units';
+import { isWaterType } from '../game/map/tile-types';
+import { claimingVillage, villageWaterTiles } from '../game/units/storm';
+import { isExploredFor } from '../game/map/explore';
+import { axialKey, hexDistance, hexToPixel, tilesInRange, type Axial } from '../game/map/hex';
+import { compassDirection, weatherCopies, type WeatherBuildingHit, type WeatherEvent, type WeatherUnitHit } from '../game/weather/weather';
 import { tileElevation } from '../render/elevation';
 import { MapView } from '../render/map-renderer';
-import { spawnMuzzleSmoke } from '../render/smoke';
 import { spawnShipWake } from '../render/wake';
-import { TextureSet } from '../render/texture-factory';
+import { type TextureSet } from '../render/texture-factory';
 import { useGameStore } from '../store/game-store';
-import { EXPLORED_SCORE } from '../game/score';
-import { makeLabel } from '../ui/kit/label';
-import { FONT_BLACK, sizedFontFamily } from '../ui/kit/bitmap-fonts';
 import { saveRepository } from '../storage/save-game';
 import { SKILLS } from '../game/skills';
 import { achievementIcon, achievementNameKey } from '../game/achievements';
@@ -30,22 +25,16 @@ import { attackPresenceParticipants, type AttackPresenceParticipant } from './at
 import { t } from '../i18n';
 import { sfx } from '../sound/sfx';
 import { attackSound } from '../sound/attack-sounds';
-import { markDirty } from '../render/render-gate';
-import { AttackImpact, BonusKind, FontSize, GameEventType, NetMode, SelectionKind, UnitFacing, UnitType, WeatherType } from '@enums';
+import { AttackImpact, BonusKind, GameEventType, NetMode, SelectionKind, UnitFacing, UnitType, WeatherType } from '@enums';
+import { sleep } from '../util/sleep';
+import { tileAt } from '../game/map/tile-index';
+import { EventEffects } from './event-effects';
 
 const HEX_SIZE = 40;
-
-
-const DEATH_PARTICLE_COUNT = 10;
-const DEATH_RISE = 200;
-const DEATH_MS = 3000;
-const DEATH_STAGGER_MS = 700;
 
 const COMBAT_DEATH_GAP_MS = 350;
 const COMBAT_ADVANCE_MS = 180;
 
-/** Arrow projectile flight time for the archer attack animation (ms). */
-const PROJECTILE_MS_PER_TILE = 150;
 
 const ACH_CHIP_BG = 0x373748;
 const ACH_CHIP_SIZE = 64;
@@ -107,10 +96,6 @@ export function pauseAfterEvent(e: GameEvent, local: number, isExplored: (q: num
   return ENEMY_EVENT_PAUSE_MS;
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 /** Explorer path cells that should stay under fog until the scout arrives —
  *  only cells the player had not explored before the bonus. Cells that were
  *  already explored must remain visible; deferring (and re-revealing) them
@@ -147,7 +132,11 @@ export interface EventHost {
 }
 
 export class EventPresenter {
-  constructor(private readonly host: EventHost) {}
+  private readonly effects: EventEffects;
+
+  constructor(private readonly host: EventHost) {
+    this.effects = new EventEffects(host);
+  }
 
   /** Static sprites that keep enemy units visible at their starting hex until
    * their own move animation begins (they are otherwise hidden up front). */
@@ -183,7 +172,7 @@ export class EventPresenter {
 
   private spawnFogRevealAt(q: number, r: number): void {
     const tile = this.host.sim()?.map.tiles.find((t) => t.q === q && t.r === r);
-    if (tile) this.spawnFogReveal(tile);
+    if (tile) this.effects.spawnFogReveal(tile);
   }
 
   /** Keep a player's own explorer path under fog until its scout reaches each
@@ -320,7 +309,7 @@ export class EventPresenter {
             const unit = this.findUnitById(e.unitId);
             if (unit) {
               const t = tileAt(sim.map, unit.q, unit.r);
-              if (t) this.spawnHpText(t, `+${HEAL_AMOUNT}`, 0x44ff44);
+              if (t) this.effects.spawnHpText(t, `+${HEAL_AMOUNT}`, 0x44ff44);
             }
             break;
           }
@@ -331,7 +320,7 @@ export class EventPresenter {
           case GameEventType.SCORE_FLY: {
             if (e.playerIndex !== useGameStore.getState().localPlayerIndex) break;
             const tile = tileAt(sim.map, e.q, e.r);
-            if (tile) this.spawnScoreFly(tile, e.playerIndex, e.amount);
+            if (tile) this.effects.spawnScoreFly(tile, e.playerIndex, e.amount);
             break;
           }
           case GameEventType.KNIGHT_COMBO: {
@@ -382,7 +371,7 @@ export class EventPresenter {
           case GameEventType.STARVATION: {
             for (const u of e.units) {
               const ut = tileAt(sim.map, u.q, u.r);
-              if (ut && u.damage > 0 && isExploredFor(ut, local)) this.spawnHpText(ut, `-${u.damage}`, 0xff4d4d);
+              if (ut && u.damage > 0 && isExploredFor(ut, local)) this.effects.spawnHpText(ut, `-${u.damage}`, 0xff4d4d);
             }
             if (e.playerIndex === local) {
               const village = tileAt(sim.map, e.q, e.r);
@@ -396,7 +385,7 @@ export class EventPresenter {
           case GameEventType.TRAP_TRIGGERED: {
             this.host.render();
             const t = tileAt(sim.map, e.q, e.r);
-            if (t) this.spawnHpText(t, `-${e.damage}`, 0xff6666);
+            if (t) this.effects.spawnHpText(t, `-${e.damage}`, 0xff6666);
             break;
           }
           case GameEventType.STORM: {
@@ -416,7 +405,7 @@ export class EventPresenter {
             }
             for (const target of e.targets) {
               const t = tileAt(sim.map, target.q, target.r);
-              if (t) this.spawnHpText(t, `-${target.damage}`, 0x88ccff);
+              if (t) this.effects.spawnHpText(t, `-${target.damage}`, 0x88ccff);
             }
             break;
           }
@@ -425,7 +414,7 @@ export class EventPresenter {
             const to = tileAt(sim.map, e.targetTile.q, e.targetTile.r);
             const tex = this.host.textures()?.cannonbalTexture;
             if (from && to && tex) {
-              await this.spawnProjectile(from, to, tex, 26);
+              await this.effects.spawnProjectile(from, to, tex, 26);
             }
             if (!e.missed) this.host.render();
             break;
@@ -448,7 +437,7 @@ export class EventPresenter {
             for (const k of lost) {
               const kt = tileAt(sim.map, k.q, k.r);
               if (kt && isExploredFor(kt, local)) {
-                this.spawnDeath(kt);
+                this.effects.spawnDeath(kt);
                 burst = true;
               }
             }
@@ -582,7 +571,7 @@ export class EventPresenter {
       attackerTile !== undefined &&
       targetTile !== undefined
     ) {
-      attackerShot = this.spawnArrowFromTo(attackerTile, targetTile);
+      attackerShot = this.effects.spawnArrowFromTo(attackerTile, targetTile);
     }
     // Ships and pirates fire a cannonball projectile along the same trajectory.
     if (
@@ -591,8 +580,8 @@ export class EventPresenter {
       attackerTile !== undefined &&
       targetTile !== undefined
     ) {
-      this.spawnMuzzleSmokeAt(attackerTile);
-      attackerShot = this.spawnCannonballFromTo(attackerTile, targetTile, false);
+      this.effects.spawnMuzzleSmokeAt(attackerTile);
+      attackerShot = this.effects.spawnCannonballFromTo(attackerTile, targetTile, false);
     }
     // Catapults lob a cannonball projectile on a higher arc at their ranged target.
     if (
@@ -601,7 +590,7 @@ export class EventPresenter {
       attackerTile !== undefined &&
       targetTile !== undefined
     ) {
-      attackerShot = this.spawnCannonballFromTo(attackerTile, targetTile, true);
+      attackerShot = this.effects.spawnCannonballFromTo(attackerTile, targetTile, true);
     }
 
     // In the final sim state a melee attacker that killed its target already
@@ -649,13 +638,13 @@ export class EventPresenter {
       if (mapView) this.host.render();
       if (!e.missed && impact) sfx.play(impact);
       if (e.missed) {
-        if (targetTile && attackerVisible) this.spawnHpText(targetTile, t('msg.miss'), 0xffa500);
+        if (targetTile && attackerVisible) this.effects.spawnHpText(targetTile, t('msg.miss'), 0xffa500);
       } else {
-        if (e.attackerDamage > 0 && targetTile && attackerVisible) this.spawnHpText(targetTile, `-${e.attackerDamage}`, 0xff4444);
-        if (e.targetDamage > 0 && attackerTile && targetVisible) this.spawnHpText(attackerTile, `-${e.targetDamage}`, 0xff4444);
+        if (e.attackerDamage > 0 && targetTile && attackerVisible) this.effects.spawnHpText(targetTile, `-${e.attackerDamage}`, 0xff4444);
+        if (e.targetDamage > 0 && attackerTile && targetVisible) this.effects.spawnHpText(attackerTile, `-${e.targetDamage}`, 0xff4444);
       }
-      if (e.targetDied && targetTile && targetVisible) this.spawnDeath(targetTile);
-      if (e.attackerDied && attackerTile && attackerVisible) this.spawnDeath(attackerTile);
+      if (e.targetDied && targetTile && targetVisible) this.effects.spawnDeath(targetTile);
+      if (e.attackerDied && attackerTile && attackerVisible) this.effects.spawnDeath(attackerTile);
       if (mapView) {
         mapView.setUnitOverrides(keep);
         this.host.render();
@@ -680,8 +669,8 @@ export class EventPresenter {
     if (audible) sfx.play('arcShot');
     let shot: Promise<void> | null = null;
     if (audible && attackerVisible && attackerTile !== undefined && targetTile !== undefined) {
-      this.spawnMuzzleSmokeAt(attackerTile);
-      shot = this.spawnCannonballFromTo(attackerTile, targetTile, true);
+      this.effects.spawnMuzzleSmokeAt(attackerTile);
+      shot = this.effects.spawnCannonballFromTo(attackerTile, targetTile, true);
     }
     if (shot) await shot;
     if (!e.missed && targetVisible && targetTile !== undefined) {
@@ -786,7 +775,7 @@ export class EventPresenter {
 
     // Attacker's blow lands on the target first.
     if (e.attackerDamage > 0) {
-      this.spawnHpText(targetTile, `-${e.attackerDamage}`, 0xff4444);
+      this.effects.spawnHpText(targetTile, `-${e.attackerDamage}`, 0xff4444);
       target.hp = Math.max(0, target.hp - e.attackerDamage);
       this.host.render();
     }
@@ -800,30 +789,30 @@ export class EventPresenter {
       mapView.faceUnitAtKey(targetKey, counterFacing);
       const targetPre = e.targetPre!;
       if (targetPre.type === UnitType.ARCHER && targetPre.shipLevel === undefined) {
-        await this.spawnArrowFromTo(targetTile, attackerTile);
+        await this.effects.spawnArrowFromTo(targetTile, attackerTile);
       } else if (targetPre.shipLevel !== undefined) {
-        this.spawnMuzzleSmokeAt(targetTile);
-        await this.spawnCannonballFromTo(targetTile, attackerTile, false);
+        this.effects.spawnMuzzleSmokeAt(targetTile);
+        await this.effects.spawnCannonballFromTo(targetTile, attackerTile, false);
       } else if (targetPre.type === UnitType.CATAPULT) {
-        await this.spawnCannonballFromTo(targetTile, attackerTile, true);
+        await this.effects.spawnCannonballFromTo(targetTile, attackerTile, true);
       } else if (targetPre.type === UnitType.PIRATE) {
-        this.spawnMuzzleSmokeAt(targetTile);
-        await this.spawnCannonballFromTo(targetTile, attackerTile, false);
+        this.effects.spawnMuzzleSmokeAt(targetTile);
+        await this.effects.spawnCannonballFromTo(targetTile, attackerTile, false);
       } else {
         await mapView.lungeUnit(targetKey, attackerKey, 10 / scale);
       }
-      this.spawnHpText(attackerTile, `-${e.targetDamage}`, 0xff4444);
+      this.effects.spawnHpText(attackerTile, `-${e.targetDamage}`, 0xff4444);
       attacker.hp = Math.max(0, attacker.hp - e.targetDamage);
       this.host.render();
     }
 
     const attackerVisible = isExploredFor(attackerTile, local);
     if (e.targetDied && targetVisible) {
-      this.spawnDeath(targetTile);
+      this.effects.spawnDeath(targetTile);
       await sleep(COMBAT_DEATH_GAP_MS);
     }
     if (e.attackerDied && attackerVisible) {
-      this.spawnDeath(attackerTile);
+      this.effects.spawnDeath(attackerTile);
       await sleep(COMBAT_DEATH_GAP_MS);
     }
     if (e.attackerDied) staged.delete(attackerKey);
@@ -862,8 +851,8 @@ export class EventPresenter {
     mapView.faceUnitAtKey(attackerKey, facing);
     this.host.render();
 
-    if (e.attackerDamage > 0 && targetVisible) this.spawnHpText(targetTile, `-${e.attackerDamage}`, 0xff4444);
-    if (targetVisible) this.spawnDeath(targetTile);
+    if (e.attackerDamage > 0 && targetVisible) this.effects.spawnHpText(targetTile, `-${e.attackerDamage}`, 0xff4444);
+    if (targetVisible) this.effects.spawnDeath(targetTile);
     await sleep(COMBAT_DEATH_GAP_MS);
 
     // The walk onto the killed unit's cell is the only animation played.
@@ -1017,7 +1006,7 @@ export class EventPresenter {
       }
       const targetTile = tileAt(map, step.q, step.r);
       const y = targetTile ? to.y - tileElevation(targetTile, HEX_SIZE) : to.y;
-      await this.tweenSpriteTo(sprite, { x: to.x, y }, stepMs);
+      await this.effects.tweenSpriteTo(sprite, { x: to.x, y }, stepMs);
       if (seaUnit) this.spawnShipWakeSegment(prev, step);
       prev = step;
       await sleep(stepGapMs);
@@ -1116,8 +1105,8 @@ export class EventPresenter {
       const to = hexToPixel(step, HEX_SIZE);
       const targetTile = tileAt(sim.map, step.q, step.r);
       const y = targetTile ? to.y - tileElevation(targetTile, HEX_SIZE) : to.y;
-      await this.tweenSpriteTo(sprite, { x: to.x, y }, 100);
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      await this.effects.tweenSpriteTo(sprite, { x: to.x, y }, 100);
+      await sleep(100);
       if (targetTile) this.revealExplorerTile(targetTile);
     }
     mapView.container.removeChild(sprite);
@@ -1130,7 +1119,7 @@ export class EventPresenter {
     const local = useGameStore.getState().localPlayerIndex;
     if (!isExploredFor(tile, local)) {
       (tile.exploredBy ??= []).push(local);
-      this.spawnFogReveal(tile);
+      this.effects.spawnFogReveal(tile);
     }
     this.host.render();
   }
@@ -1193,169 +1182,6 @@ export class EventPresenter {
     saveRepository.clear();
   }
 
-  private spawnScoreFly(tile: MapTile, playerIndex: number, amount: number): void {
-    const local = useGameStore.getState().localPlayerIndex;
-    if (playerIndex !== local && !isExploredFor(tile, local)) return;
-    this.spawnFloatText(tile, `+${amount}`, 0xffd700);
-  }
-
-  private spawnHpText(tile: MapTile, text: string, color: number): void {
-    const local = useGameStore.getState().localPlayerIndex;
-    if (!isExploredFor(tile, local)) return;
-    this.spawnFloatText(tile, text, color);
-  }
-
-  private spawnFloatText(tile: MapTile, text: string, color: number): void {
-    const app = this.host.app();
-    const mapRoot = this.host.mapRoot();
-    if (!app || !mapRoot) return;
-    const camera = this.host.camera();
-    const scale = camera.scale;
-    const world = hexToPixel(tile, HEX_SIZE);
-    const el = new Container();
-    el.zIndex = 10;
-    const label = new BitmapText({
-      text,
-      style: { fontFamily: sizedFontFamily(FONT_BLACK, FontSize.BIG), fontSize: FontSize.BIG, fill: color },
-    });
-    label.anchor.set(0.5);
-    el.addChild(label);
-    const start = {
-      x: camera.pan.x + world.x * scale,
-      y: camera.pan.y + (world.y - tileElevation(tile, HEX_SIZE)) * scale,
-    };
-    el.position.set(start.x, start.y);
-    mapRoot.addChild(el);
-
-    const FLOAT_RISE = 44;
-    const FLOAT_MS = 900;
-    const tickStart = performance.now();
-    const ticker = app.ticker;
-    const fn = (): void => {
-      const t = Math.min(1, (performance.now() - tickStart) / FLOAT_MS);
-      el.position.set(start.x, start.y - FLOAT_RISE * t);
-      el.alpha = t < 0.5 ? 1 : 1 - (t - 0.5) / 0.5;
-      if (t >= 1) {
-        ticker.remove(fn);
-        mapRoot.removeChild(el);
-        el.destroy();
-      }
-    };
-    ticker.add(fn);
-  }
-
-  /** Spawns a projectile that flies along an arc from the attacker's hex to the
- *  target's hex center, rotating to follow the trajectory, and removes itself
- *  on arrival. The texture points right; leftward shots are flipped
- *  horizontally so the projectile never appears upside-down. */
-  private spawnProjectile(
-    fromTile: MapTile,
-    toTile: MapTile,
-    texture: Texture,
-    heightPx: number,
-    /** Multiplier applied to the arc height. 1 keeps the standard archer/ship
-     *  lob; catapults use a higher value for a loftier trajectory. */
-    arcFactor = 1,
-  ): Promise<void> {
-    return new Promise<void>((resolve) => {
-      const app = this.host.app();
-      const mapView = this.host.mapView();
-      if (!app || !mapView) {
-        resolve();
-        return;
-      }
-      const world = (tile: MapTile): { x: number; y: number } => {
-        const center = hexToPixel(tile, HEX_SIZE);
-        return { x: center.x, y: center.y - tileElevation(tile, HEX_SIZE) };
-      };
-      // World-space endpoints: the projectile lives inside the camera-transformed
-      // map container, so panning/zooming mid-flight keeps it glued to the map.
-      const start = world(fromTile);
-      const end = world(toTile);
-      const dist = Math.hypot(end.x - start.x, end.y - start.y) || 1;
-      // Arc apex above the straight line, in world (map) units.
-      const arcHeight = Math.max(10, Math.min(44, dist * 0.3) * arcFactor);
-
-      const sprite = new Sprite(texture);
-      sprite.anchor.set(0.5);
-      // World-unit projectile size; the container's camera scale projects it.
-      const base = heightPx / (texture.height || 1);
-      sprite.scale.set(base, base);
-      sprite.zIndex = 12;
-      mapView.container.addChild(sprite);
-      sprite.position.set(start.x, start.y);
-
-      const startTime = performance.now();
-      const ticker = app.ticker;
-      let finished = false;
-      const flightMs = Math.max(1, hexDistance(fromTile, toTile)) * PROJECTILE_MS_PER_TILE;
-      const finish = (): void => {
-        if (finished) return;
-        finished = true;
-        ticker.remove(fn);
-        mapView.container.removeChild(sprite);
-        sprite.destroy();
-        resolve();
-      };
-      const fn = (): void => {
-        const t = Math.min(1, (performance.now() - startTime) / flightMs);
-        // Position follows a linear x/y path with an upward sine-bulge.
-        const k = Math.sin(t * Math.PI);
-        const x = start.x + (end.x - start.x) * t;
-        const y = start.y + (end.y - start.y) * t - arcHeight * k;
-        sprite.position.set(x, y);
-        // The tangent of the arc: derive the y-bulge term and rotate to match.
-        const dx = end.x - start.x;
-        const dy = end.y - start.y - arcHeight * Math.PI * Math.cos(t * Math.PI);
-        const angle = Math.atan2(dy, dx);
-        const leftward = Math.cos(angle) < 0;
-        // Pixi applies scale then rotation: with scale.x = -1 the sprite's +x
-        // axis maps to (-cos rot, -sin rot). Flip into the mirrored angle so the
-        // projectile still points along the trajectory while the texture stays
-        // upright (never upside-down on leftward shots).
-        if (leftward) {
-          sprite.scale.x = -base;
-          sprite.rotation = angle > 0 ? angle - Math.PI : angle + Math.PI;
-        } else {
-          sprite.scale.x = base;
-          sprite.rotation = angle;
-        }
-        if (t >= 1) finish();
-      };
-      ticker.add(fn);
-    });
-  }
-
-  /** Arrow projectile that resolves when the shot has landed. */
-  private spawnArrowFromTo(fromTile: MapTile, toTile: MapTile): Promise<void> {
-    const texture = this.host.textures()?.arrowTexture;
-    if (!texture) return Promise.resolve();
-    return this.spawnProjectile(fromTile, toTile, texture, 5);
-  }
-
-  /** Cannonball projectile that resolves when the shot has landed; catapults
-   *  use a loftier arc. */
-  private spawnCannonballFromTo(fromTile: MapTile, toTile: MapTile, catapult: boolean): Promise<void> {
-    const texture = this.host.textures()?.cannonballTexture;
-    if (!texture) return Promise.resolve();
-    return this.spawnProjectile(fromTile, toTile, texture, 10, catapult ? 2.2 : 1);
-  }
-
-  private spawnMuzzleSmokeAt(tile: MapTile): void {
-    const app = this.host.app();
-    const mapRoot = this.host.mapRoot();
-    if (!app || !mapRoot) return;
-    const camera = this.host.camera();
-    const scale = camera.scale;
-    const world = hexToPixel(tile, HEX_SIZE);
-    spawnMuzzleSmoke(
-      app,
-      mapRoot,
-      camera.pan.x + world.x * scale,
-      camera.pan.y + (world.y - tileElevation(tile, HEX_SIZE)) * scale,
-    );
-  }
-
   /** The HUD list of active weather follows what has been presented so far. */
   private syncWeatherStore(): void {
     const sim = this.host.sim();
@@ -1406,136 +1232,17 @@ export class EventPresenter {
     for (const hit of units) {
       const tile = tileAt(sim.map, hit.q, hit.r);
       if (!tile || !isExploredFor(tile, local)) continue;
-      this.spawnHpText(tile, `-${hit.damage}`, 0xff4d4d);
+      this.effects.spawnHpText(tile, `-${hit.damage}`, 0xff4d4d);
       if (hit.died) {
-        this.spawnDeath(tile);
+        this.effects.spawnDeath(tile);
         burst = true;
       }
     }
     for (const hit of buildings) {
       const tile = tileAt(sim.map, hit.q, hit.r);
-      if (tile) this.spawnHpText(tile, '-1', 0xffa040);
+      if (tile) this.effects.spawnHpText(tile, '-1', 0xffa040);
     }
     if (burst) await sleep(COMBAT_DEATH_GAP_MS);
   }
 
-  private spawnDeath(tile: MapTile): void {
-    const app = this.host.app();
-    const mapRoot = this.host.mapRoot();
-    if (!app || !mapRoot) return;
-    const camera = this.host.camera();
-    const scale = camera.scale;
-    const world = hexToPixel(tile, HEX_SIZE);
-    const el = new Container();
-    el.zIndex = 10;
-    const particles: { g: Graphics; x0: number; swing: number; phase: number; opacity: number; delay: number }[] = [];
-    for (let i = 0; i < DEATH_PARTICLE_COUNT; i++) {
-      const g = new Graphics();
-      const size = 4 + Math.random() * 12;
-      const opacity = 0.3 + Math.random() * 0.5;
-      g.rect(-size / 2, -size / 2, size, size).fill({ color: 0xffffff, alpha: opacity });
-      g.alpha = 0;
-      el.addChild(g);
-      particles.push({
-        g,
-        x0: (Math.random() - 0.5) * 24,
-        swing: 6 + Math.random() * 14,
-        phase: Math.random() * Math.PI * 2,
-        opacity,
-        delay: Math.random() * DEATH_STAGGER_MS,
-      });
-    }
-    el.position.set(
-      camera.pan.x + world.x * scale,
-      camera.pan.y + (world.y - tileElevation(tile, HEX_SIZE)) * scale,
-    );
-    mapRoot.addChild(el);
-
-    const tickStart = performance.now();
-    const ticker = app.ticker;
-    const fn = (): void => {
-      const age = performance.now() - tickStart;
-      for (const p of particles) {
-        const localAge = age - p.delay;
-        if (localAge <= 0) continue;
-        const t = Math.min(1, localAge / DEATH_MS);
-        p.g.position.set(p.x0 + Math.sin(t * Math.PI * 2 + p.phase) * p.swing, -DEATH_RISE * t);
-        p.g.alpha = p.opacity * (1 - t);
-      }
-      if (age >= DEATH_MS + DEATH_STAGGER_MS) {
-        ticker.remove(fn);
-        mapRoot.removeChild(el);
-        el.destroy();
-      }
-    };
-    ticker.add(fn);
-  }
-
-  private spawnFogReveal(tile: MapTile): void {
-    const app = this.host.app();
-    const mapRoot = this.host.mapRoot();
-    const textures = this.host.textures();
-    if (!app || !mapRoot || !textures) return;
-    const fog = textures.fogTopTexture;
-    const sprite = new Sprite(fog.texture);
-    sprite.anchor.set(0.5, fog.anchorY);
-    const camera = this.host.camera();
-    const scale = camera.scale;
-    const world = hexToPixel(tile, HEX_SIZE);
-    sprite.scale.set(camera.spriteScale * scale, camera.spriteScale * scale);
-    sprite.position.set(
-      camera.pan.x + world.x * scale,
-      camera.pan.y + (world.y - tileElevation(tile, HEX_SIZE)) * scale,
-    );
-    const el = new Container();
-    el.addChild(sprite);
-    el.zIndex = 10;
-    mapRoot.addChild(el);
-
-    const score = makeLabel(`+${EXPLORED_SCORE}`, { fontSize: FontSize.NORMAL, fill: 0xffffff, fontWeight: '700', roundPixels: false });
-    score.anchor.set(0.5, 0.5);
-    const fogH = sprite.height;
-    score.position.set(
-      sprite.position.x,
-      sprite.position.y - (fog.anchorY - 0.5) * fogH,
-    );
-    el.addChild(score);
-
-    const FOG_MS = 900;
-    const FOG_RISE = 60;
-    const tickStart = performance.now();
-    const ticker = app.ticker;
-    const fn = (): void => {
-      const t = Math.min(1, (performance.now() - tickStart) / FOG_MS);
-      el.position.set(0, -FOG_RISE * t);
-      el.alpha = t < 0.6 ? 1 : 1 - (t - 0.6) / 0.4;
-      if (t >= 1) {
-        ticker.remove(fn);
-        mapRoot.removeChild(el);
-        el.destroy();
-      }
-    };
-    ticker.add(fn);
-  }
-
-  private tweenSpriteTo(sprite: Sprite, to: { x: number; y: number }, ms: number): Promise<void> {
-    return new Promise<void>((resolve) => {
-      const from = { x: sprite.position.x, y: sprite.position.y };
-      const start = performance.now();
-      const tick = (): void => {
-        const t = Math.min(1, (performance.now() - start) / ms);
-        sprite.position.set(from.x + (to.x - from.x) * t, from.y + (to.y - from.y) * t);
-        // The render gate skips frames while the scene is static; the walk
-        // sprite only moves between those static states, so request a fresh
-        // render for every animation frame or the unit would teleport.
-        markDirty();
-        if (t >= 1) {
-          resolve();
-        } else {
-          requestAnimationFrame(tick);
-        }
-      };
-      tick();
-    });
-  }
 }

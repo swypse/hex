@@ -44,7 +44,7 @@ export function soundUrl(name: string): string | null {
 
 /** Fetches and decodes every sound, and unlocks the audio context on the first
  *  user gesture (browsers keep it suspended until then). Safe to call twice. */
-export function preload(): void {
+function preload(): void {
   if (preloaded) return;
   preloaded = true;
   const c = audioContext();
@@ -82,7 +82,7 @@ function playBuffer(name: string): boolean {
   return true;
 }
 
-export function play(name: string): void {
+function play(name: string): void {
   if (!soundEnabled()) return;
   if (!soundUrl(name)) return;
   if (playBuffer(name)) return;

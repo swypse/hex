@@ -5,7 +5,7 @@ import { makeTestMap, tileAt, makeUnit } from './helpers/test-map';
 import { buildPlayers } from '../src/game/players';
 import { Tribe } from '../src/game/tribes';
 import { SeededRandom } from '../src/util/random';
-import { unitMaintenance } from '../src/game/units';
+import { unitMaintenance } from '../src/game/units/units';
 
 describe('disband command', () => {
   function setup(money: number): Simulator {

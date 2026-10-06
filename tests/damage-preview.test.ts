@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { GameMap, MapTile } from '../src/game/map-gen';
-import { TileType } from '../src/game/tile-types';
-import { Selection } from '../src/game/selection';
-import { Unit, UNIT_TYPES } from '../src/game/units';
+import { type GameMap, type MapTile } from '../src/game/map/map-gen';
+import { TileType } from '../src/game/map/tile-types';
+import { type Selection } from '../src/game/units/selection';
+import { type Unit, UNIT_TYPES } from '../src/game/units/units';
 import { damagePreviewVictim } from '../src/controller/damage-preview';
 import { SelectionKind, UnitType } from '@enums';
 

@@ -1,7 +1,7 @@
-import { isExploredFor } from './explore';
-import { GameMap } from './map-gen';
-import { Player } from './players';
-import { Tribe, TribeInfo } from './tribes';
+import { isExploredFor } from './map/explore';
+import { type GameMap } from './map/map-gen';
+import { type Player } from './players';
+import { Tribe, type TribeInfo } from './tribes';
 
 export const UNKNOWN_TRIBE_COLOR = 0x888888;
 

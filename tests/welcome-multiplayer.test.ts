@@ -1,6 +1,6 @@
 import { gameController } from '@/controller/game-controller';
-import { initialExplorationFor } from '@/game/explore';
-import { generateMap } from '@/game/map-gen';
+import { initialExplorationFor } from '@/game/map/explore';
+import { generateMap } from '@/game/map/map-gen';
 import { buildMultiplayerPlayers } from '@/game/players';
 import { Simulator } from '@/game/simulator';
 import { Tribe } from '@/game/tribes';

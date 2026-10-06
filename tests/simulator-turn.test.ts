@@ -1,9 +1,9 @@
 import { CommandType, GameEventType, GameMode, UnitType } from '@enums';
 import { describe, expect, it } from 'vitest';
-import { hexNeighbors } from '../src/game/hex';
+import { hexNeighbors } from '../src/game/map/hex';
 import { buildMultiplayerPlayers, buildPlayers } from '../src/game/players';
 import { Simulator } from '../src/game/simulator';
-import { TileType } from '../src/game/tile-types';
+import { TileType } from '../src/game/map/tile-types';
 import { Tribe } from '../src/game/tribes';
 import { SeededRandom } from '../src/util/random';
 import { makeTestMap, makeUnit, tileAt } from './helpers/test-map';

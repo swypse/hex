@@ -1,8 +1,8 @@
 import { NetworkController, type NetworkHost } from '@/controller/network-controller';
-import { initialExplorationFor } from '@/game/explore';
-import { generateMap } from '@/game/map-gen';
+import { initialExplorationFor } from '@/game/map/explore';
+import { generateMap } from '@/game/map/map-gen';
 import { buildMultiplayerPlayers } from '@/game/players';
-import { reachableTargets } from '@/game/selection';
+import { reachableTargets } from '@/game/units/selection';
 import { PREDICTABLE_COMMAND_TYPES, Simulator } from '@/game/simulator';
 import { Tribe } from '@/game/tribes';
 import type { HostMessage } from '@/net/peer-session';

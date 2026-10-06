@@ -1,19 +1,19 @@
 import { BuildingKind, CommandType, FoodPressure, GameEventType, GameMode, Season, SiegeTargetKind, SkillId, UnitType } from '@enums';
 import { describe, it, expect } from 'vitest';
 import { makeTestMap, tileAt, makeUnit } from './helpers/test-map';
-import type { GameMap, MapTile } from '../src/game/map-gen';
+import type { GameMap, MapTile } from '../src/game/map/map-gen';
 import type { Player } from '../src/game/players';
 import { buildPlayers } from '../src/game/players';
 import { Tribe } from '../src/game/tribes';
-import { TileType } from '../src/game/tile-types';
+import { TileType } from '../src/game/map/tile-types';
 import { SeededRandom } from '../src/util/random';
-import { isEnemySiegeTarget, performSiege } from '../src/game/combat';
-import { planFoodFixes } from '../src/game/ai-food';
+import { isEnemySiegeTarget, performSiege } from '../src/game/units/combat';
+import { planFoodFixes } from '../src/game/ai/ai-food';
 import { Simulator } from '../src/game/simulator';
-import { START_RESOURCES, START_STOCK } from '../src/game/resources';
-import { generateMap } from '../src/game/map-gen';
-import { unitFoodUpkeep } from '../src/game/units';
-import { buildingsInVillage } from '../src/game/village';
+import { START_RESOURCES, START_STOCK } from '../src/game/economy/resources';
+import { generateMap } from '../src/game/map/map-gen';
+import { unitFoodUpkeep } from '../src/game/units/units';
+import { buildingsInVillage } from '../src/game/economy/village';
 import { SKILLS } from '../src/game/skills';
 import {
   BUILDING_COSTS,
@@ -24,7 +24,7 @@ import {
   canBurnBuilding,
   canBurnRoad,
   burnRoad,
-} from '../src/game/buildings';
+} from '../src/game/economy/buildings';
 import {
   FARM_FOOD,
   GRANARY_CAPACITY,
@@ -37,7 +37,7 @@ import {
   canSustainUnit,
   foodNetworkStates,
   foodPressure,
-} from '../src/game/food';
+} from '../src/game/economy/food';
 
 /** Two-player test map: player 0 owns a village at (0,0) claiming radius 1. */
 function setup(): { map: GameMap; p: Player; village: MapTile } {

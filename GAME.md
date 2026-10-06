@@ -127,6 +127,8 @@ its own artwork and its own spawn-popup icon (`action-spawn-<type>`).
   players it simply switches to the other tribe. A pirate also switches when its tribe has no units left or has a deal
   with it. A pirate adjacent to a ship tries to **capture** it with a 25% success chance: on success
   the ship becomes a pirate ship (keeping its HP and damage); on failure the pirate loses 2 HP and the ship loses 1 HP.
+  A pirate that survives an attack from a tribe hunts that tribe for its next **3** turns, whatever it was hunting.
+  A deal with a pirate (50 money) is only possible while it is on water you own.
   Killing a pirate gives 30 points.
 - **Bottles:** floating message-in-a-bottle treasures. Every third turn there is a 10% chance a bottle floats onto a
   random free (non-owned) water hex; several bottles can be on the map at once, and each lives 5 turns before
@@ -138,7 +140,7 @@ its own artwork and its own spawn-popup icon (`action-spawn-<type>`).
 ## Unit actions
 
 - **Move** — spend up to the unit's move points. Leaving a tile costs that tile's move points: land and water 10, forest
-  14, mountain 20 (entering a tile is free — the cost is paid when the unit leaves it). A unit may always make a 1-tile
+  14 (10 in winter, except in the desert biome), mountain 20 (entering a tile is free — the cost is paid when the unit leaves it). A unit may always make a 1-tile
   move even without move points left. Mountains block movement until *Climbing* is learned, and water blocks movement
   (except for ships with *Navigation*). A rider that already attacked this turn can still move up to its full move
   points. Leaving the unit's own road tile, a road on its own territory, its own village linked to its road network, or
@@ -248,9 +250,9 @@ whole game.
 | Geology       | 2     | Science  | Mines produce +1 stone and +1 ore per round                                             |
 | Water         | 1     | —        | Allows building ports on owned water tiles                                              |
 | Navigation    | 2     | Water    | Naval abilities: units on ports become ships, ships can travel water and land on coasts |
-| Water temples | 2     | Water    | Future water temple features                                                            |
+| Water temples | 2     | Water    | Own units/buildings near a water temple are immune to storm damage (radius 1-3 by temple level)                       |
 | Forestry      | 1     | —        | Allows building factories on owned land near forests                                    |
-| Forest temple | 2     | Forestry | Future forest temple features                                                           |
+| Forest temple | 2     | Forestry | Own units/buildings near a forest temple are immune to earthquake damage (radius 1-3 by temple level)                |
 | Science       | 1     | —        | Allows advanced research; cuts the owner's attack miss chance to 5%; farms yield 3 food (0 in winter) |
 | Catapult      | 2     | Science  | Allows spawning catapult units (15 money + 10 wood + 3 ore)                             |
 | Roads         | 2     | Forestry | Allows building roads between villages                                                  |
@@ -302,7 +304,8 @@ Income is collected at the end of each round, after all players have taken their
 
 - **Money** — each owned village produces `max(0, 3 + level × 2 − upkeep)`, where upkeep is the maintenance of the units
   the village raised: warrior 1, archer/shield/rider 2, swordsman 3, knight 4, catapult 5 per turn; ships cost 2 / 3 / 4
-  per turn by level. Income never goes below 0.
+  per turn by level. Every road tile, sawmill, farm, granary and mine also costs **1 money** per turn, paid by the village that claims it
+  (else the nearest own one). Income never goes below 0.
 - **Wood** — from factories (see Buildings); also from the *Extract forest* action. Each building adds to the village
   claiming its tile.
 - **Stone** — from mines (+1 with Geology).
@@ -376,19 +379,19 @@ plays the selected-hex bounce on it. Everyone is told when an event starts ("Sto
 southeast": the direction is one of eight compass points from the middle of the map, or "in the center") and when it
 ends ("Storm is over"); the one-turn earthquake has no end message. Selecting a tile shows what the active weather does to it (a storm on water, a drought on land, an earthquake on
 anything in its scope). Weather is part of the saved game and of the
-multiplayer state. Tuning values live in `WEATHER_RULES` (`src/game/weather.ts`).
+multiplayer state. Tuning values live in `WEATHER_RULES` (`src/game/weather/weather.ts`).
 
 - **Storm** — 6 turns, appears on a random water tile, radius 2-4. At the end of each turn every ship and pirate ship in
   scope takes **10 damage**, and every port in scope takes **1 damage** on every second turn of the storm. Leaving a
   water tile in scope costs **2x** move points. At the end of each turn the center drifts one tile onto another water
-  tile with 50% chance, never onto a tile that was already a center of the same storm. Water in scope is covered with
+  tile with 50% chance, never onto a tile that was already a center of the same storm. Own ships and ports near an own water temple (radius 1 for levels 1-2, 2 for level 3, 3 for level 4) take no damage. Water in scope is covered with
   the storm texture (`terrain/storm.png`).
 - **Drought** — 5 turns, appears on a random land tile, radius 2-4. Farms in scope produce half the food and mines half
   the stone and ore (rounded up, never below 1, so only a mine boosted by Geology actually loses output). Land tiles in
   scope are covered with the drought texture (`terrain/drought.png`); water is not marked.
-- **Earthquake** — 1 turn, appears on a random mountain tile, radius 1-3. When it appears each building in scope takes
-  1 damage with 60% probability and each unit in scope takes **20 damage** with 60% probability. Villages and walls are
-  not affected. Before it strikes the map centers on its center tile (when the player has explored it); then the tiles in scope shake (up,
+- **Earthquake** — 1 turn, appears on a random mountain tile, radius 1-3. When it appears each building in scope is
+  destroyed outright with 60% probability and each unit in scope takes **20 damage** with 60% probability. Villages and walls are
+  not affected. Own buildings and units near an own forest temple (radius 1 for levels 1-2, 2 for level 3, 3 for level 4) are spared. Before it strikes the map centers on its center tile (when the player has explored it); then the tiles in scope shake (up,
   down and back, 5 times, each tile starting after a random 0-100 ms delay).
 
 ## Map

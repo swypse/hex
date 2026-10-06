@@ -7,9 +7,9 @@ import {
   Biome,
   biomeFor,
   generateTerrain,
-} from '../src/game/biomes';
-import { isForestType, isLandType, isMountainType, TileType } from '../src/game/tile-types';
-import { TerrainTile } from '../src/game/biomes';
+} from '../src/game/map/biomes';
+import { isForestType, isLandType, isMountainType, TileType } from '../src/game/map/tile-types';
+import { type TerrainTile } from '../src/game/map/biomes';
 
 describe('biomes', () => {
   it('classifies temperature and rain into all five biomes', () => {

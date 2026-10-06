@@ -1,5 +1,5 @@
-import type { Axial } from './hex';
-import type { WeatherBuildingHit, WeatherEvent, WeatherUnitHit } from './weather';
+import type { Axial } from './map/hex';
+import type { WeatherBuildingHit, WeatherEvent, WeatherUnitHit } from './weather/weather';
 import { AchievementId, BonusKind, BottleEffect, BuildingKind, GameEventType, Season, SiegeTargetKind, SkillId, UnitType } from '@enums';
 
 

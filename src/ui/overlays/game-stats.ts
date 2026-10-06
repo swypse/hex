@@ -9,7 +9,6 @@ import { Popup } from '../kit/popup';
 import { drawPlayerStatsBlock } from './player-stats-block';
 
 export class GameStats {
-  private el: Container | null = null;
   private popup: Popup | null = null;
   private host: UIHost | null = null;
   private unsub: (() => void) | null = null;
@@ -25,7 +24,6 @@ export class GameStats {
       onClose: () => useGameStore.getState().setOverlay(null),
     });
     root.addChild(popup.el);
-    this.el = popup.el;
     this.popup = popup;
     this.render();
     popup.finish();
@@ -74,7 +72,6 @@ export class GameStats {
     this.onResize = null;
     this.popup?.destroy();
     this.popup = null;
-    this.el = null;
     this.host = null;
   }
 }

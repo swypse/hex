@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { GameMap, MapTile } from '../src/game/map-gen';
-import { TileType } from '../src/game/tile-types';
-import { portWaterClusterJumps, waterRouteEdges } from '../src/game/water-roads';
+import { type GameMap, type MapTile } from '../src/game/map/map-gen';
+import { TileType } from '../src/game/map/tile-types';
+import { portWaterClusterJumps, waterRouteEdges } from '../src/game/economy/water-roads';
 import { BridgeDir, BuildingKind } from '@enums';
 
 function tile(q: number, r: number, terrain: TileType, ownedBy: number | null = null, opts: { port?: boolean; bridge?: boolean } = {}): MapTile {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createPerlin } from '../src/game/perlin';
+import { createPerlin } from '../src/game/map/perlin';
 
 describe('perlin noise', () => {
   it('is deterministic for the same seed', () => {

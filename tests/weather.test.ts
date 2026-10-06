@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { BuildingKind, CompassDirection, UnitType, WeatherType } from '@enums';
-import { axialKey, hexDistance } from '../src/game/hex';
-import { TileType } from '../src/game/tile-types';
-import { tileMoveCost, TILE_MOVE_COST } from '../src/game/movement-cost';
+import { axialKey, hexDistance } from '../src/game/map/hex';
+import { TileType } from '../src/game/map/tile-types';
+import { tileMoveCost, TILE_MOVE_COST } from '../src/game/units/movement-cost';
 import {
   advanceWeather,
   compassDirection,
@@ -15,8 +15,8 @@ import {
   weatherOverlayAt,
   WEATHER_RULES,
   type WeatherEvent,
-} from '../src/game/weather';
-import { applyEarthquake, applyStormTurn } from '../src/game/weather-effects';
+} from '../src/game/weather/weather';
+import { applyEarthquake, applyStormTurn } from '../src/game/weather/weather-effects';
 import { makeTestMap, makeUnit, tileAt } from './helpers/test-map';
 
 function storm(q: number, r: number, over: Partial<WeatherEvent> = {}): WeatherEvent {
@@ -260,9 +260,9 @@ describe('earthquake effects', () => {
   it('hits buildings and units in scope when the 60% roll succeeds', () => {
     const { map, farm, unit, quake } = quakeScene();
     const report = applyEarthquake(map, quake, () => 0.1);
-    expect(farm.building!.hp).toBe(1);
+    expect(farm.building).toBeNull();
     expect(unit.hp).toBe(30);
-    expect(report.buildings).toEqual([{ q: -2, r: 0, destroyed: false }]);
+    expect(report.buildings).toEqual([{ q: -2, r: 0, destroyed: true }]);
     expect(report.units).toEqual([{ unitId: 'u', owner: 0, q: -2, r: 1, damage: 20, died: false }]);
   });
 

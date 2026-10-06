@@ -46,23 +46,23 @@ export class GameScreen implements ScreenController {
     const cheat = triggeredCheat(this.cheatBuffer);
     if (!cheat) return;
     this.cheatBuffer = '';
-    if (cheat === RESOURCE_CHEAT_WORD && gameController.cheatResources()) {
+    if (cheat === RESOURCE_CHEAT_WORD && gameController.cheats.cheatResources()) {
       useGameStore.getState().setCenterMessage(t('msg.cheatResources'));
-    } else if (cheat === SKILLS_CHEAT_WORD && gameController.cheatOpenAllSkills()) {
+    } else if (cheat === SKILLS_CHEAT_WORD && gameController.cheats.cheatOpenAllSkills()) {
       useGameStore.getState().setCenterMessage(t('msg.cheatSkills'));
-    } else if (cheat === FOG_CHEAT_WORD && gameController.cheatRemoveFog()) {
+    } else if (cheat === FOG_CHEAT_WORD && gameController.cheats.cheatRemoveFog()) {
       useGameStore.getState().setCenterMessage(t('msg.cheatFog'));
-    } else if (cheat === PIRATES_CHEAT_WORD && gameController.cheatSpawnPirates()) {
+    } else if (cheat === PIRATES_CHEAT_WORD && gameController.cheats.cheatSpawnPirates()) {
       useGameStore.getState().setCenterMessage(t('msg.cheatPirates'));
     } else if (cheat === AI_LOGS_CHEAT_WORD) {
-      const on = gameController.cheatToggleAiLogs();
+      const on = gameController.cheats.cheatToggleAiLogs();
       useGameStore.getState().setCenterMessage(on ? t('msg.aiLogsOn') : t('msg.aiLogsOff'));
-    } else if (cheat === WIN_CHEAT_WORD && gameController.cheatWin()) {
+    } else if (cheat === WIN_CHEAT_WORD && gameController.cheats.cheatWin()) {
       useGameStore.getState().setCenterMessage(t('msg.cheatWin'));
     } else if ((SEASON_CHEAT_WORDS as readonly string[]).includes(cheat)) {
-      void gameController.cheatSetSeason(cheat as Season);
+      void gameController.cheats.cheatSetSeason(cheat as Season);
     } else if (WEATHER_CHEAT_WORDS.includes(cheat)) {
-      void gameController.cheatStartWeather(cheat as WeatherType);
+      void gameController.cheats.cheatStartWeather(cheat as WeatherType);
     }
   };
 

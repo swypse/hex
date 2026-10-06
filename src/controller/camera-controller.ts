@@ -1,5 +1,5 @@
 import { Application, Rectangle, type Ticker } from 'pixi.js';
-import { HEX_TILT } from '../game/hex';
+import { HEX_TILT } from '../game/map/hex';
 import {
   cameraPanStep,
   clampPan,
@@ -13,7 +13,8 @@ import {
   zoomAroundCursor,
   zoomInertiaStep,
   ZOOM_EPSILON,
-} from '../game/zoom';
+} from './zoom';
+import { clamp } from '../util/math';
 
 const DRAG_THRESHOLD = 5;
 const CAMERA_DURATION_MS = 600;
@@ -123,7 +124,7 @@ export class CameraController {
     // size on screen (avoids blurry art at high zoom on ultra-wide / low-DPR
     // displays, where qualityFactor is clamped by QUALITY_CAP). Floored at 1 so
     // the default fit view always stays reachable.
-    this.maxZoom = Math.max(1, Math.min(designMaxZoom, this.qualityFactor / this.baseScale));
+    this.maxZoom = clamp(this.qualityFactor / this.baseScale, 1, designMaxZoom);
     this.pan = { x: this.ctx.screenWidth() / 2, y: this.ctx.mapHeight() / 2 };
     this.ctx.onCameraChange();
   }
@@ -209,7 +210,7 @@ export class CameraController {
     if (this.zoomAnimRemove || !this.ctx.app) return;
     const ticker = this.ctx.app.ticker;
     const fn = (t: Ticker): void => {
-      const dt = Math.max(0.0001, Math.min(0.1, t.deltaMS / 1000));
+      const dt = clamp(t.deltaMS / 1000, 0.0001, 0.1);
       const step = zoomInertiaStep(this.zoom, this.zoomTarget, dt);
       const nextScale = this.baseScale * step.zoom;
       this.pan = zoomAroundCursor(this.zoomCursor, this.pan, this.scale, nextScale);
@@ -392,7 +393,7 @@ export class CameraController {
     if (this.dragLerpRemove || !this.ctx.app) return;
     const ticker = this.ctx.app.ticker;
     const fn = (t: Ticker): void => {
-      const dt = Math.max(0.0001, Math.min(0.1, t.deltaMS / 1000));
+      const dt = clamp(t.deltaMS / 1000, 0.0001, 0.1);
       const step = dragLerpStep(this.pan, this.dragTarget, dt);
       this.pan = step.pan;
       this.ctx.onCameraChange();

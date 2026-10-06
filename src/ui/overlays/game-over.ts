@@ -7,11 +7,12 @@ import { quickCaptureScore, quickCaptureTurnsCount, rankPlayers, starRating } fr
 import { useGameStore } from '../../store/game-store';
 import { type UIHost } from '../host';
 import { Button } from '../kit/button';
-import { makeActionButtonIcon } from '../kit/action-button-icons';
-import { makeLabel } from '../kit/label';
+import { makeActionButtonIcon } from '../../gfx/action-button-icons';
+import { makeLabel } from '../../gfx/label';
 import { Popup } from '../kit/popup';
 import { drawPlayerStatsBlock, placeColor } from './player-stats-block';
 import { FontSize, GameMode, Screen } from '@enums';
+import { easeOutBack } from '../../util/easing';
 
 export { placeColor };
 
@@ -22,7 +23,6 @@ const STAR_DELAY_STEP = 160;
 const STAR_BOUNCE_MS = 380;
 
 export class GameOver {
-  private el: Container | null = null;
   private popup: Popup | null = null;
   private host: UIHost | null = null;
   private disposed = false;
@@ -119,7 +119,6 @@ export class GameOver {
     });
 
     root.addChild(popup.el);
-    this.el = popup.el;
     this.popup = popup;
     popup.finish();
     this.animateStars(starRow);
@@ -149,9 +148,7 @@ export class GameOver {
         elapsed += Math.min(t.deltaMS, 50);
         if (elapsed < delay) return;
         const p = Math.min(1, (elapsed - delay) / STAR_BOUNCE_MS);
-        const c1 = 1.70158;
-        const c3 = c1 + 1;
-        const eased = 1 + c3 * Math.pow(p - 1, 3) + c1 * Math.pow(p - 1, 2);
+        const eased = easeOutBack(p);
         wrap.scale.set(eased, eased);
         if (p >= 1) {
           wrap.scale.set(1, 1);
@@ -174,7 +171,6 @@ export class GameOver {
     this.tickerFns = [];
     this.popup?.destroy();
     this.popup = null;
-    this.el = null;
     this.host = null;
   }
 }

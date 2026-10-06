@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { RenderGate } from '../src/render/render-gate';
-import type { RenderGateApp } from '../src/render/render-gate';
+import { RenderGate } from '../src/gfx/render-gate';
+import type { RenderGateApp } from '../src/gfx/render-gate';
 
 type TickCb = (t: { deltaMS: number }) => void;
 

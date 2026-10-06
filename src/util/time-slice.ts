@@ -1,3 +1,5 @@
+import { sleep } from './sleep';
+
 /** Lets the browser run pending input, rendering and other tasks. */
 export function yieldToMain(): Promise<void> {
   const sched = (globalThis as { scheduler?: { yield?: () => Promise<void> } }).scheduler;
@@ -41,7 +43,7 @@ export async function runSliced<T>(
 export function whenIdle(timeoutMs = 500): Promise<void> {
   const ric = (globalThis as { requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number }).requestIdleCallback;
   if (typeof ric === 'function') return new Promise((resolve) => ric(() => resolve(), { timeout: timeoutMs }));
-  return new Promise((resolve) => setTimeout(resolve, 50));
+  return sleep(50);
 }
 
 /** Runs `work` for each item, one per idle period, so a long list of small jobs

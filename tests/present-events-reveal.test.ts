@@ -3,13 +3,13 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { Application, Container, Graphics, ImageSource, Text, Texture } from 'pixi.js';
 import { gameController } from '../src/controller/game-controller';
 import { Simulator } from '../src/game/simulator';
-import { GameMap, MapTile } from '../src/game/map-gen';
-import { TileType } from '../src/game/tile-types';
-import { Player } from '../src/game/players';
-import { START_RESOURCES } from '../src/game/resources';
+import { type GameMap, type MapTile } from '../src/game/map/map-gen';
+import { TileType } from '../src/game/map/tile-types';
+import { type Player } from '../src/game/players';
+import { START_RESOURCES } from '../src/game/economy/resources';
 import { Tribe } from '../src/game/tribes';
-import { UNIT_TYPES, type Unit } from '../src/game/units';
-import { axialKey } from '../src/game/hex';
+import { UNIT_TYPES, type Unit } from '../src/game/units/units';
+import { axialKey } from '../src/game/map/hex';
 import { type GameEvent } from '../src/game/events';
 import { MapView } from '../src/render/map-renderer';
 import { useGameStore } from '../src/store/game-store';
@@ -97,7 +97,7 @@ describe('presentEvents reveals units even when a step throws', () => {
 
     const app = { screen: { width: 800, height: 600 }, ticker: { add: (): void => {}, remove: (): void => {} } } as unknown as Application;
     const textures = buildTextures(map);
-    const mapView = new MapView(app, textures, 40, 0.5, 2);
+    const mapView = new MapView(app, textures, 40, 0.5);
 
     Object.defineProperty(Text.prototype, 'width', { configurable: true, get: () => 40 });
     Object.defineProperty(Text.prototype, 'height', { configurable: true, get: () => 14 });

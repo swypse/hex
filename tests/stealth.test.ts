@@ -1,7 +1,7 @@
 import { buildPlayers } from '@/game/players';
 import { Simulator } from '@/game/simulator';
 import { Tribe } from '@/game/tribes';
-import { Unit } from '@/game/units';
+import { type Unit } from '@/game/units/units';
 import { SeededRandom } from '@/util';
 import { CommandType, GameEventType, GameMode, UnitType } from '@enums';
 import { beforeEach, describe, expect, it } from 'vitest';

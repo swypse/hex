@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { contrastTextColor, relativeLuminance } from '../src/ui/kit/theme';
+import { contrastTextColor, relativeLuminance } from '../src/gfx/theme';
 import { TRIBES } from '../src/game/tribes';
 
 describe('contrastTextColor', () => {

@@ -1,8 +1,8 @@
 import { buildPlayers } from '@/game/players';
 import { Simulator } from '@/game/simulator';
-import { TileType } from '@/game/tile-types';
+import { TileType } from '@/game/map/tile-types';
 import { Tribe } from '@/game/tribes';
-import { Unit } from '@/game/units';
+import { type Unit } from '@/game/units/units';
 import { SeededRandom } from '@/util';
 import { BuilderExtraKind, BuildingKind, CommandType, GameMode, UnitType } from '@enums';
 import { beforeEach, describe, expect, it } from 'vitest';

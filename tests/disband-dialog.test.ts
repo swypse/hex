@@ -2,15 +2,15 @@ import { GameMode, OverlayKind, UnitType } from '@enums';
 import { describe, expect, it, beforeEach, afterEach } from 'vitest';
 import { Container, BitmapText } from 'pixi.js';
 import { Simulator } from '../src/game/simulator';
-import { generateMap } from '../src/game/map-gen';
+import { generateMap } from '../src/game/map/map-gen';
 import { buildPlayers } from '../src/game/players';
 import { SeededRandom } from '../src/util/random';
 import { gameController } from '../src/controller/game-controller';
 import { useGameStore } from '../src/store/game-store';
 import { DisbandDialog } from '../src/ui/overlays/disband-dialog';
 import { makeUnit } from './helpers/test-map';
-import { TileType } from '../src/game/tile-types';
-import type { MapTile } from '../src/game/map-gen';
+import { TileType } from '../src/game/map/tile-types';
+import type { MapTile } from '../src/game/map/map-gen';
 
 function fakeCanvasContext() {
   return {

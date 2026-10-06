@@ -9,16 +9,17 @@ import { BitmapText, Container, FillGradient, Graphics, RendererType } from 'pix
 import { type ScreenController, type UIHost } from '../host';
 import { Button } from '../kit/button';
 import { ButtonGroup } from '../kit/button-group';
-import { makeLabel } from '../kit/label';
+import { makeLabel } from '../../gfx/label';
 import { BLOCK_GAP, TITLE_TO_CONTENT } from '../kit/screen-layout';
-import { THEME } from '../kit/theme';
+import { THEME } from '../../gfx/theme';
 import { TRIBE_GAP, TRIBE_ROW_STEP, tribeSlots } from '../kit/tribe-layout';
 import { makeTribeOption, type TribeOption } from '../kit/tribe-option';
-import { isTouchDevice } from '../touch';
-import { ScreenScroll } from '../vertical-scroll';
+import { isTouchDevice } from '../kit/touch';
+import { ScreenScroll } from '../kit/vertical-scroll';
 import {
   BG_FADE_MS, makeTribeBackgroundShader, TRIBE_BG_DEPTH, type TribeBackgroundShader, tribeBackgroundTexture
 } from './tribe-bg-shader';
+import { clamp } from '../../util/math';
 
 const ENEMY_OPTIONS = [1, 2, 3, 4, 5, 6];
 const MODE_OPTIONS: GameMode[] = [GameMode.CAPTURE, GameMode.TURNS30];
@@ -328,7 +329,7 @@ export class SetupScreen implements ScreenController {
       this.tribeDesc.destroy();
       this.tribeDesc = null;
     }
-    const wrapW = Math.max(120, Math.min(720, w - SIDE_MARGIN * 2));
+    const wrapW = clamp(w - SIDE_MARGIN * 2, 120, 720);
     const opts = {
       fontSize: FontSize.NORMAL,
       fill: 0xcccccc,
@@ -415,7 +416,7 @@ export class SetupScreen implements ScreenController {
     const glyphTop = cy0 - titleHalf;
     const end = this.hint?.visible ? hintCentre + hintH / 2 : backTop + backH;
     const contentH = end - glyphTop;
-    const screenGlyphTop = Math.max(16, Math.min((h - contentH) / 2, h - contentH - 16));
+    const screenGlyphTop = clamp((h - contentH) / 2, 16, h - contentH - 16);
     const y = (rel: number): number => rel - glyphTop + screenGlyphTop;
 
     this.tribeTitle!.position.set(cx, y(cy0));

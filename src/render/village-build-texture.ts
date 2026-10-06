@@ -1,7 +1,7 @@
 import { Application, Container, Sprite } from 'pixi.js';
 import type { Texture } from 'pixi.js';
-import type { Settlement, SettlementBuild } from '../game/map-gen';
-import { villageColumnBlocks } from '../game/village-build';
+import type { Settlement, SettlementBuild } from '../game/map/map-gen';
+import { villageColumnBlocks } from '../game/economy/village-build';
 import {
   ensureVillageAquaAtlas,
   ensureVillageBarbariansAtlas,
@@ -21,11 +21,11 @@ import {
 import type { TileTexture } from './texture-factory';
 import { VillageBlockVariant, VillageBuildSide } from '@enums';
 
-export const VILLAGE_BUILD_BLOCK_W = 90;
-export const VILLAGE_BUILD_BLOCK_H = 90;
+const VILLAGE_BUILD_BLOCK_W = 90;
+const VILLAGE_BUILD_BLOCK_H = 90;
 /** Vertical step between stacked blocks: an upper block overlaps the block
  *  below it by 62px (90 - 28). */
-export const VILLAGE_BUILD_BLOCK_STEP = 28;
+const VILLAGE_BUILD_BLOCK_STEP = 28;
 /** Composite width: leftmost column foot at x 0 and the rightmost at x 100
  *  (100 + a 90-wide block) → 190. */
 export const VILLAGE_BUILD_WIDTH = 190;
@@ -231,6 +231,22 @@ export function releaseVillageBuildTexture(texture: Texture): void {
   if (owner) owner.service.cache.release(texture);
 }
 
+interface VillageAtlas {
+  ensureLoaded: () => Promise<void>;
+  frameTexture: (frameKey: string) => Texture | null;
+}
+
+/** Village art per tribe prefix; unknown prefixes use the villagers art. */
+const VILLAGE_ATLASES: Record<string, VillageAtlas> = {
+  villagers: { ensureLoaded: ensureVillageVillagersAtlas, frameTexture: villageVillagerFrameTexture },
+  warriors: { ensureLoaded: ensureVillageWarriorsAtlas, frameTexture: villageWarriorFrameTexture },
+  cats: { ensureLoaded: ensureVillageCatsAtlas, frameTexture: villageCatsFrameTexture },
+  aqua: { ensureLoaded: ensureVillageAquaAtlas, frameTexture: villageAquaFrameTexture },
+  forest: { ensureLoaded: ensureVillageForestAtlas, frameTexture: villageForestFrameTexture },
+  sand: { ensureLoaded: ensureVillageSandAtlas, frameTexture: villageSandFrameTexture },
+  barbarians: { ensureLoaded: ensureVillageBarbariansAtlas, frameTexture: villageBarbarianFrameTexture },
+};
+
 /** Bakes and caches one composite village texture per distinct look. The map
  *  renderer keeps its single `villageSprite`; this only supplies the texture.
  *  Cached by `villageBuildSignature`, so a village re-bakes only when its
@@ -245,30 +261,11 @@ export class VillageBuildTextureService {
   constructor(
     private readonly app: Application,
     private readonly hexSize: number,
-    private readonly prefix: string = 'villagers',
+    prefix: string = 'villagers',
   ) {
-    if (prefix === 'warriors') {
-      this.ensureLoadedPromise = ensureVillageWarriorsAtlas();
-      this.frameTexture = villageWarriorFrameTexture;
-    } else if (prefix === 'cats') {
-      this.ensureLoadedPromise = ensureVillageCatsAtlas();
-      this.frameTexture = villageCatsFrameTexture;
-    } else if (prefix === 'aqua') {
-      this.ensureLoadedPromise = ensureVillageAquaAtlas();
-      this.frameTexture = villageAquaFrameTexture;
-    } else if (prefix === 'forest') {
-      this.ensureLoadedPromise = ensureVillageForestAtlas();
-      this.frameTexture = villageForestFrameTexture;
-    } else if (prefix === 'sand') {
-      this.ensureLoadedPromise = ensureVillageSandAtlas();
-      this.frameTexture = villageSandFrameTexture;
-    } else if (prefix === 'barbarians') {
-      this.ensureLoadedPromise = ensureVillageBarbariansAtlas();
-      this.frameTexture = villageBarbarianFrameTexture;
-    } else {
-      this.ensureLoadedPromise = ensureVillageVillagersAtlas();
-      this.frameTexture = villageVillagerFrameTexture;
-    }
+    const atlas = VILLAGE_ATLASES[prefix] ?? VILLAGE_ATLASES.villagers!;
+    this.ensureLoadedPromise = atlas.ensureLoaded();
+    this.frameTexture = atlas.frameTexture;
   }
 
   ensureLoaded(): Promise<void> {

@@ -1,5 +1,5 @@
-import { GameMap } from './map-gen';
-import { Player } from './players';
+import { type GameMap } from './map/map-gen';
+import { type Player } from './players';
 import { GameMode } from '@enums';
 
 export interface GameStateSnapshot {

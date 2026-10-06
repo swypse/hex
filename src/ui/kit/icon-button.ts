@@ -1,6 +1,6 @@
 import { Circle, Container, Graphics, Sprite } from 'pixi.js';
 import { makeIcon } from './icon';
-import { THEME } from './theme';
+import { THEME } from '../../gfx/theme';
 import { sfx } from '../../sound/sfx';
 
 interface IconButtonOpts {

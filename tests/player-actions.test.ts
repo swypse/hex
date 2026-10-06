@@ -4,7 +4,7 @@ import { buildPlayers } from '../src/game/players';
 import { SeededRandom } from '../src/util/random';
 import { hasAnyAvailableAction } from '../src/game/player-actions';
 import { Tribe } from '../src/game/tribes';
-import { TileType } from '../src/game/tile-types';
+import { TileType } from '../src/game/map/tile-types';
 import { SKILLS } from '../src/game/skills';
 import { BonusKind, UnitType } from '@enums';
 
@@ -69,7 +69,7 @@ describe('hasAnyAvailableAction', () => {
     broke(p);
     const t = tileAt(map, 1, 0)!;
     t.terrain = TileType.Water;
-    const u: import('../src/game/units').Unit = { ...makeUnit('s', 0, UnitType.WARRIOR, 1, 0), shipLevel: 2, hasMoved: true, hasAttacked: true, hasHealed: true };
+    const u: import('../src/game/units/units').Unit = { ...makeUnit('s', 0, UnitType.WARRIOR, 1, 0), shipLevel: 2, hasMoved: true, hasAttacked: true, hasHealed: true };
     t.unit = u;
     t.bottle = { bornTurn: 1, arrivalTurn: 5 };
     expect(hasAnyAvailableAction(map, human(p), 5)).toBe(false);

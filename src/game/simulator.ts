@@ -1,50 +1,49 @@
 import { SeededRandom } from '@/util';
-import { AchievementId, AiActionType, AiEngine, BonusKind, BottleEffect, BuilderExtraKind, BuildingKind, CommandType, GameEventType, GameMode, Season, SkillId, UnitType, WeatherType } from '@enums';
+import { AchievementId, AiActionType, AiEngine, BuilderExtraKind, BuildingKind, CommandType, GameEventType, GameMode, Season, SkillId, UnitType, WeatherType } from '@enums';
 import { awardAchievementScores, currentlyMetIds, evaluateAchievements } from './achievements';
-import { type AiActionMarker, aiLoggingEnabled, formatAiAction, logAiTurnStart, planAiActions, planAiActionsSteps } from './ai';
-import type { AiAction } from './ai-types';
-import { bonusEligibleFor, explorerPath, findClosestVillage, revealExplorerPath } from './bonus';
-import {
-  BOTTLE_HEAL, BOTTLE_MONEY, bottleCollectableFor, collectExpiredBottles, randomBottleEffectKind, touchBottle,
-  trySpawnBottle
-} from './bottles';
-import { buildBridge, buildBridgeIgnoringSkill } from './bridges';
+import { type AiActionMarker, aiLoggingEnabled, formatAiAction, logAiTurnStart, planAiActions, planAiActionsSteps } from './ai/ai';
+import type { AiAction } from './ai/ai-types';
+import { touchBottle } from './map/bottles';
+import { buildBridge, buildBridgeIgnoringSkill } from './economy/bridges';
 import {
   buildBuilding, buildBuildingIgnoringSkill, builderBuildable, type BuilderBuildKind, buildingIncomeByVillage,
   burnBuilding, burnRoad, canUsePort, destroyBuilding, repairBuilding
-} from './buildings';
-import { captureVillage, villageIncomeTotal } from './capture';
-import { attackableTargets, missChanceFor, performAttack, performSiege } from './combat';
+} from './economy/buildings';
+import { captureVillage, villageIncomeTotal } from './economy/capture';
+import { attackableTargets, missChanceFor, performAttack, performSiege } from './units/combat';
 import { knownTribesFor } from './discovery';
-import { GameEvent } from './events';
-import { exploreUnitPath } from './explore';
-import { applyFood, refreshStarving } from './food';
+import { type GameEvent } from './events';
+import { exploreUnitPath } from './map/explore';
+import { applyFood, refreshStarving } from './economy/food';
 import { captureWinnerIndex, computeWinner, quickCaptureScore, quickCaptureTurnsCount } from './game-mode';
-import { hexDistance, hexNeighbors } from './hex';
-import { freezeCoast, thawIce } from './ice';
-import type { GameMap, MapTile } from './map-gen';
+import { hexDistance, hexNeighbors } from './map/hex';
+import type { GameMap, MapTile } from './map/map-gen';
 import type { Player } from './players';
-import { START_RESOURCES, villageUpgradeCost } from './resources';
-import { buildRoad } from './roads';
+import { START_RESOURCES, villageUpgradeCost } from './economy/resources';
+import { buildRoad } from './economy/roads';
 import {
-  awardScore, awardTempleScores, CAPTURE_SCORE, COMBO_SCORE, EMPTY_STATS, KILL_SCORE, PIRATE_KILL_SCORE, PlayerStats,
+  awardScore, awardTempleScores, CAPTURE_SCORE, COMBO_SCORE, EMPTY_STATS, KILL_SCORE, PIRATE_KILL_SCORE, type PlayerStats,
   SKILL_SCORE, UPGRADE_SCORE
 } from './score';
 import { SEASON_LENGTH, seasonForTurn, SEASONS } from './season';
-import { moveUnit, pathBetween, reachableTargets, tileAt } from './selection';
-import { gainShipAbility, revertShip, upgradeShip } from './ship';
-import { hasSkill, openSkill as applySkill, randomUnopenedSkill } from './skills';
-import { spawnUnit } from './spawn';
-import { adjacentEnemyVillages } from './stalker';
+import { moveUnit, pathBetween, reachableTargets } from './units/selection';
+import { gainShipAbility, revertShip, upgradeShip } from './units/ship';
+import { hasSkill, openSkill as applySkill } from './skills';
+import { spawnUnit } from './units/spawn';
+import { adjacentEnemyVillages } from './units/stalker';
 import type { GameStateSnapshot } from './state';
-import { addStock, migrateLegacyResources, payAt } from './stock';
-import { stormDamage, stormEligible, stormTargetShips } from './storm';
-import { isWaterType, TileType } from './tile-types';
-import { canPlaceTrapOn, TRAP_COST, trapAlive, trapDamage } from './traps';
-import { canAttack, canDisband, canHeal, canMove, disbandCost, hasPirateDeal, healUnit, makeUnit, movePoints, PIRATE_DEAL_COST, PIRATE_OWNER, Unit, UNIT_MOVE_POINTS, UNIT_TYPES } from './units';
-import { buildWall as applyWall, canBuildWall, upgradeVillage } from './village';
-import { activeWeather, advanceWeather, createWeather, spawnWeather, WEATHER_RULES, type WeatherEvent } from './weather';
-import { applyEarthquake, applyStormTurn } from './weather-effects';
+import { addStock, migrateLegacyResources, payAt } from './economy/stock';
+import { stormDamage, stormEligible, stormTargetShips } from './units/storm';
+import { TileType } from './map/tile-types';
+import { canPlaceTrapOn, TRAP_COST, trapAlive, trapDamage } from './units/traps';
+import { canAttack, canDisband, canHeal, canMove, disbandCost, canDealWithPirate, hasPirateDeal, healUnit, movePoints, PIRATE_DEAL_COST, PIRATE_OWNER, type Unit } from './units/units';
+import { buildWall as applyWall, canBuildWall, upgradeVillage } from './economy/village';
+import { randomSeed } from '../util/random';
+import { Bonuses } from './bonuses';
+import { Environment } from './environment';
+import { Pirates, provokePirate } from './pirates';
+import type { SimContext } from './sim-context';
+import { tileAt } from './map/tile-index';
 
 export type Command =
   | { type: CommandType.MOVE; unitId: string; q: number; r: number }
@@ -102,11 +101,6 @@ export const PREDICTABLE_COMMAND_TYPES: ReadonlySet<Command['type']> = new Set<C
   CommandType.STORM,
 ]);
 
-/** Attacks a pirate makes on one tribe before it turns to another. */
-const PIRATE_ATTACKS_PER_TRIBE = 3;
-/** How many of its latest target tribes a pirate remembers (never re-picked). */
-const PIRATE_TRIBE_MEMORY = 2;
-
 export class Simulator {
   readonly map: GameMap;
   players: Player[];
@@ -120,7 +114,10 @@ export class Simulator {
 
   private rng: () => number;
   private aiRng: () => SeededRandom;
-  private disablePirates: boolean;
+  private readonly disablePirates: boolean;
+  private readonly pirates: Pirates;
+  private readonly bonuses: Bonuses;
+  private readonly environment: Environment;
   private events: GameEvent[] = [];
   private achievementBaseline = new Map<number, Set<AchievementId>>();
 
@@ -130,12 +127,26 @@ export class Simulator {
     mode: GameMode,
     opts: { rng?: () => number; aiRng?: () => SeededRandom; disablePirates?: boolean } = {},
   ) {
+    const sim = this;
     this.map = map;
     this.players = players;
     this.mode = mode;
     this.rng = opts.rng ?? Math.random;
-    this.aiRng = opts.aiRng ?? (() => new SeededRandom(Math.floor(Math.random() * 100000)));
+    this.aiRng = opts.aiRng ?? (() => new SeededRandom(randomSeed()));
     this.disablePirates = opts.disablePirates ?? false;
+    const ctx: SimContext = {
+      map,
+      get players() { return sim.players; },
+      get turn() { return sim.turn; },
+      get currentPlayer() { return sim.currentPlayer; },
+      rng: () => this.rng(),
+      emit: (e) => this.emit(e),
+      statsOf: (p) => this.statsOf(p),
+      emitScoreFly: (i, n, tile) => this.emitScoreFly(i, n, tile),
+    };
+    this.pirates = new Pirates(ctx);
+    this.bonuses = new Bonuses(ctx);
+    this.environment = new Environment(ctx);
     this.turn = 1;
     this.currentPlayerIndex = 0;
     this.gameOver = false;
@@ -277,10 +288,10 @@ export class Simulator {
         ok = this.doShipLanding(cmd.unitId, cmd.q, cmd.r);
         break;
       case CommandType.CLAIM_BONUS:
-        ok = this.doClaimBonus();
+        ok = this.bonuses.doClaimBonus();
         break;
       case CommandType.GET_BOTTLE:
-        ok = this.doGetBottle();
+        ok = this.bonuses.doGetBottle();
         break;
       case CommandType.ENABLE_STEALTH:
         ok = this.doEnableStealth(cmd.unitId);
@@ -467,7 +478,7 @@ export class Simulator {
     moveUnit(this.map, unit, resolveTarget);
     exploreUnitPath(this.map, emitPath, unit, unit.owner);
     this.clearAbandonedReady(fromTile, unit.owner);
-    this.touchBonus(resolveTarget, unit);
+    this.bonuses.touchBonus(resolveTarget, unit);
     touchBottle(resolveTarget, this.turn);
     const docked = !bump && !trap && canUsePort(resolveTarget, player) && unit.shipLevel === undefined;
     if (docked) {
@@ -645,7 +656,6 @@ export class Simulator {
       });
       return true;
     }
-    const alreadyActed = targetUnit.hasMoved || targetUnit.hasAttacked || targetUnit.hasHealed;
     // Not yet acted => blocked this round (=2, decremented to 1 at that turn's
     // start -> stunned through it). Already acted => blocked next round.
     targetUnit.stunTurns = 2;
@@ -709,6 +719,7 @@ export class Simulator {
     const targetPlayer = target.unit.owner >= 0 ? this.players[target.unit.owner] : null;
     const targetId = target.unit.id;
     const targetWasPirate = target.unit.type === UnitType.PIRATE;
+    const targetUnit = target.unit;
     // Attacking a pirate you had a deal with breaks the deal: it is free to
     // hunt your tribe again (and may retaliate now or next turn).
     if (targetWasPirate && hasPirateDeal(target.unit, attacker.owner)) {
@@ -740,6 +751,8 @@ export class Simulator {
     // was a capture-ready enemy/free village, leaving it resets readiness.
     const originTile = tileAt(this.map, attackerTilePos.q, attackerTilePos.r);
     if (originTile && originTile.unit !== attacker) this.clearAbandonedReady(originTile, attacker.owner);
+    // A surviving pirate hunts its attacker's tribe for the next few turns.
+    if (targetWasPirate && !result.targetDied) provokePirate(targetUnit, attacker.owner);
     if (result.targetDied) {
       attackerPlayer.kills += 1;
       const pts = targetWasPirate ? PIRATE_KILL_SCORE : KILL_SCORE;
@@ -1047,6 +1060,8 @@ export class Simulator {
     const unit = this.findUnit(unitId);
     if (!unit || unit.type !== UnitType.PIRATE) return false;
     const player = this.currentPlayer;
+    const tile = tileAt(this.map, unit.q, unit.r);
+    if (!tile || !canDealWithPirate(tile, player.index)) return false;
     if (hasPirateDeal(unit, player.index)) return false;
     if (player.resources.money < PIRATE_DEAL_COST) return false;
     player.resources.money -= PIRATE_DEAL_COST;
@@ -1070,7 +1085,7 @@ export class Simulator {
     const shipLevel = unit.shipLevel;
     moveUnit(this.map, unit, target);
     exploreUnitPath(this.map, path, unit, unit.owner);
-    this.touchBonus(target, unit);
+    this.bonuses.touchBonus(target, unit);
     touchBottle(target, this.turn);
     revertShip(unit);
     // Landing consumes the whole turn: the unit may not move, attack, or heal
@@ -1082,136 +1097,6 @@ export class Simulator {
     this.emit({ type: GameEventType.UNIT_MOVED, unitId, from, path, to: { q, r }, shipLevel });
     this.emit({ type: GameEventType.SHIP_REVERTED, unitId });
     return true;
-  }
-
-  private doClaimBonus(): boolean {
-    const player = this.currentPlayer;
-    const tiles = bonusEligibleFor(this.map, player.index, this.turn);
-    if (tiles.length === 0) return false;
-    for (const t of tiles) {
-      const bonus = t.bonus;
-      if (!bonus) continue;
-      const kind = bonus.kind;
-      t.bonus = null;
-      if (t.unit) {
-        t.unit.hasMoved = true;
-        t.unit.hasAttacked = true;
-        t.unit.hasHealed = true;
-      }
-      const result = this.applyBonus(t, kind, player);
-      this.statsOf(player).bonusesCollected += 1;
-      this.emit({
-        type: GameEventType.BONUS_CLAIMED,
-        q: t.q,
-        r: t.r,
-        kind: result.kind,
-        playerIndex: player.index,
-        skill: result.skill,
-      });
-    }
-    return true;
-  }
-
-  private applyBonus(tile: MapTile, kind: BonusKind, player: Player): { kind: BonusKind; skill?: SkillId } {
-    switch (kind) {
-      case BonusKind.MONEY:
-        player.resources.money += 15;
-        this.emitScoreFly(player.index, 15, tile);
-        return { kind: BonusKind.MONEY };
-      case BonusKind.RESOURCES:
-        // The materials go to the village nearest to the bonus.
-        const nearest = findClosestVillage(this.map, tile, player.index);
-        if (nearest) addStock(nearest, { wood: 10, stone: 5, ore: 5 });
-        return { kind: BonusKind.RESOURCES };
-      case BonusKind.VILLAGE_UPGRADE: {
-        const village = findClosestVillage(this.map, tile, player.index);
-        if (village) {
-          upgradeVillage(this.map, village, this.rng);
-          this.statsOf(player).villageUpgrades += 1;
-          this.emit({
-            type: GameEventType.VILLAGE_UPGRADED,
-            q: village.q,
-            r: village.r,
-            level: village.settlement!.level,
-            playerIndex: player.index,
-          });
-          return { kind: BonusKind.VILLAGE_UPGRADE };
-        }
-        player.resources.money += 15;
-        this.emitScoreFly(player.index, 15, tile);
-        return { kind: BonusKind.MONEY };
-      }
-      case BonusKind.SKILL: {
-        const skill = randomUnopenedSkill(player, this.rng);
-        if (skill) {
-          player.skills.push(skill);
-          return { kind: BonusKind.SKILL, skill };
-        }
-        player.resources.money += 15;
-        this.emitScoreFly(player.index, 15, tile);
-        return { kind: BonusKind.MONEY };
-      }
-      case BonusKind.EXPLORER: {
-        const path = explorerPath(this.map, tile, this.rng, player.index);
-        revealExplorerPath(this.map, tile, path, player.index);
-        this.emit({ type: GameEventType.EXPLORER, q: tile.q, r: tile.r, path, playerIndex: player.index });
-        return { kind: BonusKind.EXPLORER };
-      }
-    }
-  }
-
-  /** Collects a bottle the current player's ship has reached. Consumes the
-   *  ship's whole turn and applies a random effect. */
-  private doGetBottle(): boolean {
-    const player = this.currentPlayer;
-    const tile = bottleCollectableFor(this.map, player.index, this.turn)[0];
-    if (!tile?.bottle || !tile.unit) return false;
-    const unit = tile.unit;
-    const kind = randomBottleEffectKind(this.rng);
-    let skill: SkillId | undefined;
-    if (kind === BottleEffect.MONEY) {
-      player.resources.money += BOTTLE_MONEY;
-      this.emitScoreFly(player.index, BOTTLE_MONEY, tile);
-    } else if (kind === BottleEffect.SKILL) {
-      const s = randomUnopenedSkill(player, this.rng);
-      if (s) {
-        player.skills.push(s);
-        skill = s;
-      } else {
-        player.resources.money += BOTTLE_MONEY;
-        this.emitScoreFly(player.index, BOTTLE_MONEY, tile);
-      }
-    } else {
-      unit.hp = Math.min(UNIT_TYPES[unit.type].maxHp, unit.hp + BOTTLE_HEAL);
-    }
-    unit.hasMoved = true;
-    unit.hasAttacked = true;
-    unit.hasHealed = true;
-    delete (tile as { bottle?: unknown }).bottle;
-    this.emit({
-      type: GameEventType.BOTTLE_COLLECTED,
-      q: tile.q,
-      r: tile.r,
-      kind: skill !== undefined ? BottleEffect.SKILL : kind,
-      playerIndex: player.index,
-      skill,
-    });
-    return true;
-  }
-
-  /** AI ships fish out any bottle they are standing on at the start of their
-   *  turn, before planning other actions. */
-  private collectAiBottles(playerIndex: number): void {
-    while (bottleCollectableFor(this.map, playerIndex, this.turn).length > 0) {
-      this.doGetBottle();
-    }
-  }
-
-  private touchBonus(tile: MapTile, unit: Unit): void {
-    if (tile.bonus) {
-      tile.bonus.claimer = unit.owner;
-      tile.bonus.arrivalTurn = this.turn;
-    }
   }
 
   /** Host-only: hand a disconnected human's seat to the AI. */
@@ -1282,13 +1167,13 @@ export class Simulator {
       if (guard++ > 64) break;
       const next = (this.currentPlayerIndex + 1) % this.players.length;
       if (next === 0) {
-        this.runPirateTurn();
-        this.applyWeatherEffects();
+        if (!this.disablePirates) this.pirates.run();
+        this.environment.applyWeatherEffects();
         this.applyIncome();
         this.turn += 1;
-        this.applySeasonChange();
-        this.advanceWeatherEvents();
-        this.runBottleTurn();
+        this.environment.applySeasonChange();
+        this.environment.advanceWeatherEvents();
+        this.bonuses.runBottleTurn();
         this.growTemples();
         this.sweepTraps();
         this.resetUnitFlags();
@@ -1314,82 +1199,11 @@ export class Simulator {
     }
   }
 
-  /** Round-end damage of the storms active during the turn that is ending. */
-  private applyWeatherEffects(): void {
-    for (const storm of activeWeather(this.map)) {
-      if (storm.type !== WeatherType.STORM) continue;
-      const report = applyStormTurn(this.map, storm);
-      if (report.units.length > 0 || report.buildings.length > 0) {
-        this.emit({ type: GameEventType.WEATHER_DAMAGE, weather: { ...storm }, ...report });
-      }
-    }
-  }
-
   /** Cheat: starts a `type` event right now, ignoring the schedule and the
    *  chance; with the maximum already active the oldest one is ended first.
    *  Returns false when the map has no valid place for it. */
   forceWeather(type: WeatherType): boolean {
-    const active = activeWeather(this.map);
-    if (active.length >= WEATHER_RULES.maxActive) {
-      const [oldest] = active.splice(0, 1);
-      this.emit({ type: GameEventType.WEATHER_ENDED, weather: { ...oldest! } });
-    }
-    const born = createWeather(this.map, type, this.turn, this.rng);
-    if (!born) return false;
-    this.announceWeather(born);
-    return true;
-  }
-
-  private announceWeather(born: WeatherEvent): void {
-    this.emit({ type: GameEventType.WEATHER_STARTED, weather: { ...born } });
-    if (born.type !== WeatherType.EARTHQUAKE) return;
-    const report = applyEarthquake(this.map, born, this.rng);
-    if (report.units.length > 0 || report.buildings.length > 0) {
-      this.emit({ type: GameEventType.WEATHER_DAMAGE, weather: { ...born }, ...report });
-    }
-  }
-
-  /** Once the turn counter has advanced: events age and expire, storms drift,
-   *  and the periodic spawn attempt may bring a new event (an earthquake strikes
-   *  at once). */
-  private advanceWeatherEvents(): void {
-    const { ended, moved } = advanceWeather(this.map, this.rng);
-    for (const weather of ended) this.emit({ type: GameEventType.WEATHER_ENDED, weather: { ...weather } });
-    for (const weather of moved) this.emit({ type: GameEventType.WEATHER_MOVED, weather: { ...weather } });
-    const born = spawnWeather(this.map, this.turn, this.rng);
-    if (born) this.announceWeather(born);
-  }
-
-  /** On entering winter coast water freezes; on leaving it the ice melts. */
-  private applySeasonChange(prev: Season = seasonForTurn(this.turn - 1)): void {
-    const season = seasonForTurn(this.turn);
-    this.map.season = season;
-    if (season === prev) return;
-    if (season === Season.WINTER) {
-      const r = freezeCoast(this.map);
-      this.emit({
-        type: GameEventType.SEASON_CHANGED,
-        season,
-        frozen: r.frozen,
-        thawed: [],
-        landed: r.landed,
-        removed: r.removed,
-        killed: []
-      });
-    } else if (prev === Season.WINTER) {
-      const r = thawIce(this.map);
-      this.emit({
-        type: GameEventType.SEASON_CHANGED,
-        season,
-        frozen: [],
-        thawed: r.thawed,
-        landed: [],
-        removed: [],
-        killed: r.killed
-      });
-    } else {
-      this.emit({ type: GameEventType.SEASON_CHANGED, season, frozen: [], thawed: [], landed: [], removed: [], killed: [] });
-    }
+    return this.environment.forceWeather(type);
   }
 
   /** Cheat: jumps the turn counter forward to the first turn of the next
@@ -1403,7 +1217,7 @@ export class Simulator {
     let turn = this.turn - ((this.turn - 1) % cycle) + start - 1;
     if (turn <= this.turn) turn += cycle;
     this.turn = turn;
-    this.applySeasonChange(prev);
+    this.environment.applySeasonChange(prev);
     return true;
   }
 
@@ -1415,8 +1229,8 @@ export class Simulator {
   private *runAiTurnSteps(playerIndex: number): Generator<void, void, void> {
     const ai = this.players[playerIndex]!;
     logAiTurnStart(ai, this.turn);
-    this.doClaimBonus();
-    this.collectAiBottles(playerIndex);
+    this.bonuses.doClaimBonus();
+    this.bonuses.collectAiBottles(playerIndex);
     this.markCaptureReadyFor(playerIndex);
     this.decrementStunsFor(playerIndex);
     this.emit({ type: GameEventType.AI_TURN, playerIndex });
@@ -1500,304 +1314,6 @@ export class Simulator {
         break;
     }
     return ok;
-  }
-
-  private runPirateTurn(): void {
-    if (this.disablePirates) return;
-    this.trySpawnPirate();
-    const pirates = this.map.tiles.filter((t) => t.unit && t.unit.type === UnitType.PIRATE).map((t) => t.unit!);
-    const acted = new Set<string>();
-    for (const u of pirates) {
-      if (acted.has(u.id)) continue;
-      acted.add(u.id);
-      this.pirateAct(u);
-    }
-  }
-
-  /** Age out old bottles and maybe float a new one in each third turn. */
-  private runBottleTurn(): void {
-    collectExpiredBottles(this.map, this.turn);
-    trySpawnBottle(this.map, this.turn, this.rng);
-  }
-
-  private trySpawnPirate(): void {
-    if (this.turn <= 5 || this.turn % 2 !== 1) return;
-    if (this.rng() >= 0.15) return;
-    const edge = this.map.tiles.filter(
-      (t) => hexDistance({ q: 0, r: 0 }, t) === this.map.radius && isWaterType(t.terrain) && !t.unit,
-    );
-    if (edge.length === 0) return;
-    const spot = edge[Math.floor(this.rng() * edge.length)]!;
-    const used = new Set<string>();
-    for (const t of this.map.tiles) if (t.unit && t.unit.type === UnitType.PIRATE) used.add(t.unit.id);
-    let n = 1;
-    while (used.has(`pirate-${n}`)) n++;
-    spot.unit = makeUnit(PIRATE_OWNER, UnitType.PIRATE, spot.q, spot.r, { id: `pirate-${n}` });
-    this.emit({ type: GameEventType.PIRATE_SPAWNED, q: spot.q, r: spot.r });
-  }
-
-  /** Whether the pirate may hunt this tribe: it is alive, has a unit on the map
-   *  and no pirate deal. */
-  private pirateCanHunt(pirate: Unit, owner: number): boolean {
-    const player = this.players[owner];
-    if (!player || !player.isActive || hasPirateDeal(pirate, owner)) return false;
-    return this.map.tiles.some((t) => t.unit && t.unit.owner === owner);
-  }
-
-  /** Picks the tribe a pirate hunts next: the nearest one that is not among its
-   *  last two targets. When every candidate is on that list (two players, or
-   *  few tribes left) it takes any other tribe. */
-  private pickPirateTribe(pirate: Unit): number | undefined {
-    const recent = pirate.pirateTribes ?? [];
-    const eligible = this.players.map((p) => p.index).filter((i) => i !== pirate.pirateTarget && this.pirateCanHunt(pirate, i));
-    const fresh = eligible.filter((i) => !recent.includes(i));
-    const pool = fresh.length > 0 ? fresh : eligible;
-    let best: number | undefined;
-    let bestDist = Infinity;
-    for (const i of pool) {
-      const tile = this.nearestPlayerUnitTo(pirate, i);
-      const d = tile ? hexDistance(pirate, tile) : Infinity;
-      if (d < bestDist) {
-        bestDist = d;
-        best = i;
-      }
-    }
-    if (best === undefined && pirate.pirateTarget !== undefined && this.pirateCanHunt(pirate, pirate.pirateTarget)) {
-      return pirate.pirateTarget; // the only tribe left: keep hunting it
-    }
-    return best;
-  }
-
-  /** The tile of the unit a pirate goes for. A pirate hunts one tribe at a time
-   *  and switches to another after PIRATE_ATTACKS_PER_TRIBE attacks (or when
-   *  its tribe is gone). */
-  private pirateTargetTile(pirate: Unit): MapTile | null {
-    const spent = (pirate.pirateAttacks ?? 0) >= PIRATE_ATTACKS_PER_TRIBE;
-    if (pirate.pirateTarget === undefined || spent || !this.pirateCanHunt(pirate, pirate.pirateTarget)) {
-      const next = this.pickPirateTribe(pirate);
-      if (next === undefined) return null;
-      if (next !== pirate.pirateTarget) pirate.pirateTribes = [...(pirate.pirateTribes ?? []), next].slice(-PIRATE_TRIBE_MEMORY);
-      pirate.pirateTarget = next;
-      pirate.pirateAttacks = 0;
-    }
-    return this.nearestPlayerUnitTo(pirate, pirate.pirateTarget);
-  }
-
-  private pirateAct(unit: Unit): void {
-    const target = this.pirateTargetTile(unit);
-    if (!target) {
-      this.pirateMoveRandom(unit);
-      return;
-    }
-    const dist = hexDistance(unit, target);
-    if (dist <= unit.attackDistance) {
-      unit.pirateAttacks = (unit.pirateAttacks ?? 0) + 1;
-      const isShip = target.unit && target.unit.shipLevel !== undefined && target.unit.owner >= 0;
-      // Ships can only be captured from an adjacent hex.
-      if (isShip && dist === 1) {
-        this.pirateTryCapture(unit, target);
-      } else {
-        this.pirateAttack(unit, target);
-      }
-    } else {
-      this.pirateMoveToward(unit, target);
-    }
-  }
-
-  private pirateTryCapture(pirate: Unit, targetTile: MapTile): void {
-    const ship = targetTile.unit;
-    if (!ship || ship.shipLevel === undefined || ship.owner < 0) return;
-    const targetOwner = ship.owner;
-    const success = this.rng() < 0.25;
-    if (success) {
-      ship.type = UnitType.PIRATE;
-      ship.owner = PIRATE_OWNER;
-      ship.hasMoved = false;
-      ship.hasAttacked = false;
-      ship.hasHealed = false;
-      const victim = this.players[targetOwner];
-      if (victim) this.statsOf(victim).shipsCapturedByPirates += 1;
-    } else {
-      pirate.hp = Math.max(0, pirate.hp - 20);
-      ship.hp = Math.max(0, ship.hp - 10);
-      const victim = this.players[targetOwner];
-      if (ship.hp <= 0) {
-        targetTile.unit = null;
-        if (victim) this.statsOf(victim).killedUnits += 1;
-      }
-      if (pirate.hp <= 0) {
-        const pirateTile = tileAt(this.map, pirate.q, pirate.r);
-        if (pirateTile && pirateTile.unit === pirate) pirateTile.unit = null;
-        if (victim) {
-          victim.kills += 1;
-          this.statsOf(victim).pirateKills += 1;
-          awardScore(victim, PIRATE_KILL_SCORE);
-          if (pirateTile) this.emitScoreFly(victim.index, PIRATE_KILL_SCORE, pirateTile);
-        }
-      }
-    }
-    this.emit({ type: GameEventType.PIRATE_CAPTURE, q: targetTile.q, r: targetTile.r, playerIndex: targetOwner, success });
-  }
-
-  private pirateMoveRandom(unit: Unit): void {
-    const DIRS = [
-      { q: 1, r: 0 },
-      { q: 1, r: -1 },
-      { q: 0, r: -1 },
-      { q: -1, r: 0 },
-      { q: -1, r: 1 },
-      { q: 0, r: 1 },
-    ];
-    const start = Math.floor(this.rng() * DIRS.length);
-    const steps: { q: number; r: number }[] = [];
-    let pos = { q: unit.q, r: unit.r };
-    for (let i = 0; i < DIRS.length; i++) {
-      const d = DIRS[(start + i) % DIRS.length]!;
-      const first = tileAt(this.map, pos.q + d.q, pos.r + d.r);
-      if (!first || !isWaterType(first.terrain) || first.unit) continue;
-      for (let k = 0; k < Math.floor(UNIT_MOVE_POINTS.pirate / 10); k++) {
-        const next = tileAt(this.map, pos.q + d.q, pos.r + d.r);
-        if (!next || !isWaterType(next.terrain) || next.unit) break;
-        steps.push({ q: next.q, r: next.r });
-        pos = { q: next.q, r: next.r };
-      }
-      break;
-    }
-    if (steps.length === 0) return;
-    const from = { q: unit.q, r: unit.r };
-    const to = steps[steps.length - 1]!;
-    moveUnit(this.map, unit, tileAt(this.map, to.q, to.r)!);
-    this.emit({ type: GameEventType.UNIT_MOVED, unitId: unit.id, from, path: steps, to });
-  }
-
-  private nearestPlayerUnitTo(unit: Unit, owner?: number): MapTile | null {
-    let best: MapTile | null = null;
-    let bestDist = Infinity;
-    for (const t of this.map.tiles) {
-      if (!t.unit || t.unit.owner < 0) continue;
-      if (owner !== undefined && t.unit.owner !== owner) continue;
-      if (hasPirateDeal(unit, t.unit.owner)) continue;
-      const d = hexDistance(unit, t);
-      if (d < bestDist) {
-        bestDist = d;
-        best = t;
-      }
-    }
-    return best;
-  }
-
-  private pirateAttack(attacker: Unit, targetTile: MapTile): void {
-    const targetUnit = targetTile.unit;
-    if (!targetUnit || targetUnit.owner < 0) return;
-    const targetOwner = targetUnit.owner;
-    const targetId = targetUnit.id;
-    const attackerTilePos = { q: attacker.q, r: attacker.r };
-    const targetTilePos = { q: targetTile.q, r: targetTile.r };
-    const attackerPre = { type: attacker.type, owner: attacker.owner, shipLevel: attacker.shipLevel, hp: attacker.hp };
-    const targetPre = {
-      type: targetUnit.type,
-      owner: targetUnit.owner,
-      shipLevel: targetUnit.shipLevel,
-      hp: targetUnit.hp
-    };
-    const result = performAttack(this.map, attacker, targetTile, this.rng);
-    if (!result.missed && targetUnit.shipLevel !== undefined && targetOwner >= 0) {
-      const victim = this.players[targetOwner];
-      if (victim) {
-        const stolen = Math.floor(victim.resources.money * 0.25);
-        victim.resources.money = Math.max(0, victim.resources.money - stolen);
-      }
-    }
-    if (result.targetDied && targetOwner >= 0) {
-      const victim = this.players[targetOwner];
-      if (victim) this.statsOf(victim).killedUnits += 1;
-    }
-    if (result.attackerDied && targetOwner >= 0) {
-      const owner = this.players[targetOwner];
-      if (owner) {
-        owner.kills += 1;
-        this.statsOf(owner).pirateKills += 1;
-        awardScore(owner, PIRATE_KILL_SCORE);
-        const tile = tileAt(this.map, attackerTilePos.q, attackerTilePos.r);
-        if (tile) this.emitScoreFly(owner.index, PIRATE_KILL_SCORE, tile);
-      }
-    }
-    this.emit({
-      type: GameEventType.ATTACK,
-      attackerId: attacker.id,
-      targetId,
-      attackerIndex: PIRATE_OWNER,
-      targetIndex: targetOwner,
-      attackerTile: attackerTilePos,
-      targetTile: targetTilePos,
-      attackerDamage: result.attackerDamage,
-      targetDamage: result.targetDamage,
-      missed: result.missed,
-      attackerDied: result.attackerDied,
-      targetDied: result.targetDied,
-      attackerPre,
-      targetPre,
-    });
-  }
-
-  private pirateMoveToward(unit: Unit, target: MapTile): void {
-    // Path over water toward the closest water cell from which the pirate can
-    // hit the target (its own hex when the target is a ship). Greedy straight
-    // line chases stall against land barriers, so navigate instead.
-    const path = this.pirateWaterPath(unit, target);
-    if (path.length === 0) {
-      // No reachable firing position: patrol instead of idling at the coast.
-      this.pirateMoveRandom(unit);
-      return;
-    }
-    const steps = path.slice(0, Math.floor(UNIT_MOVE_POINTS.pirate / 10));
-    const from = { q: unit.q, r: unit.r };
-    const to = steps[steps.length - 1]!;
-    moveUnit(this.map, unit, tileAt(this.map, to.q, to.r)!);
-    this.emit({ type: GameEventType.UNIT_MOVED, unitId: unit.id, from, path: steps, to });
-  }
-
-  /** BFS over unoccupied water tiles from the pirate toward any water cell
-   *  within its attack range of `target`. Returns the step cells to reach the
-   *  nearest such cell (empty when already in range or unreachable). */
-  private pirateWaterPath(unit: Unit, target: MapTile): { q: number; r: number }[] {
-    const key = (q: number, r: number): string => `${q},${r}`;
-    const from = { q: unit.q, r: unit.r };
-    const fromKey = key(from.q, from.r);
-    const goal = new Set<string>();
-    for (const t of this.map.tiles) {
-      if (!isWaterType(t.terrain)) continue;
-      if (hexDistance(t, target) > unit.attackDistance) continue;
-      goal.add(key(t.q, t.r));
-    }
-    if (goal.has(fromKey)) return [];
-    const prev = new Map<string, string>();
-    const seen = new Set<string>([fromKey]);
-    const queue: { q: number; r: number }[] = [from];
-    while (queue.length > 0) {
-      const cur = queue.shift()!;
-      for (const n of hexNeighbors(cur)) {
-        const k = key(n.q, n.r);
-        if (seen.has(k)) continue;
-        const tile = tileAt(this.map, n.q, n.r);
-        if (!tile || !isWaterType(tile.terrain) || tile.unit) continue;
-        seen.add(k);
-        prev.set(k, key(cur.q, cur.r));
-        if (goal.has(k)) {
-          const path: { q: number; r: number }[] = [];
-          let c = { q: n.q, r: n.r };
-          while (key(c.q, c.r) !== fromKey) {
-            path.unshift({ q: c.q, r: c.r });
-            const p = prev.get(key(c.q, c.r))!;
-            const [pq, pr] = p.split(',').map(Number);
-            c = { q: pq!, r: pr! };
-          }
-          return path;
-        }
-        queue.push(n);
-      }
-    }
-    return [];
   }
 
   private applyIncome(): void {

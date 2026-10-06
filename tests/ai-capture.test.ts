@@ -1,7 +1,7 @@
 import { CommandType, GameMode, UnitType } from '@enums';
 import { describe, expect, it } from 'vitest';
-import { hexNeighbors } from '../src/game/hex';
-import { GameMap, MapTile } from '../src/game/map-gen';
+import { hexNeighbors } from '../src/game/map/hex';
+import { type GameMap, type MapTile } from '../src/game/map/map-gen';
 import { buildPlayers } from '../src/game/players';
 import { Simulator } from '../src/game/simulator';
 import { Tribe } from '../src/game/tribes';

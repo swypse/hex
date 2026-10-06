@@ -3,7 +3,7 @@ import { Container, Text } from 'pixi.js';
 import { SkillTree } from '../src/ui/overlays/skill-tree';
 import { useGameStore } from '../src/store/game-store';
 import { TRIBES } from '../src/game/tribes';
-import { START_RESOURCES } from '../src/game/resources';
+import { START_RESOURCES } from '../src/game/economy/resources';
 import { type UIHost } from '../src/ui/host';
 import { Screen } from '@enums';
 

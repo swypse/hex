@@ -1,8 +1,8 @@
 import { Container } from 'pixi.js';
-import { markDirty } from '../../render/render-gate';
-import { perfStatsFor } from '../../render/perf-stats';
+import { markDirty } from '../../gfx/render-gate';
+import { perfStatsFor } from '../../gfx/perf-stats';
 import { type UIHost, type Widget } from '../host';
-import { makeLabel } from '../kit/label';
+import { makeLabel } from '../../gfx/label';
 import { makePanel } from '../kit/panel';
 import { FontSize } from '@enums';
 

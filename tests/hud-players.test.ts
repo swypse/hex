@@ -3,7 +3,7 @@ import { Container, Graphics, BitmapText } from 'pixi.js';
 import { HudPlayers, PLAYER_ONLINE_COLOR, PLAYER_OFFLINE_COLOR } from '../src/ui/hud/hud-players';
 import { useGameStore } from '../src/store/game-store';
 import { Tribe } from '../src/game/tribes';
-import { SKILLS_BUTTON_SIZE, scoreButtonsPosition } from '../src/ui/layout';
+import { SKILLS_BUTTON_SIZE, scoreButtonsPosition } from '../src/ui/hud/layout';
 import { type UIHost } from '../src/ui/host';
 import { type Player } from '../src/game/players';
 import { NetMode, Screen } from '@enums';

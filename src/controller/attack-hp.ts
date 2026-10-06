@@ -1,4 +1,4 @@
-import { GameEvent } from '../game/events';
+import { type GameEvent } from '../game/events';
 import { GameEventType } from '@enums';
 
 /** HP the given unit has just before `e` resolves (as recorded by the sim). */

@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { axialKey, hexDistance } from '../src/game/hex';
-import { isLandType, isMountainType, isWaterType, TileType } from '../src/game/tile-types';
-import { tileAt } from '../src/game/selection';
-import { upgradeVillage } from '../src/game/village';
+import { axialKey, hexDistance } from '../src/game/map/hex';
+import { isLandType, isMountainType, isWaterType, TileType } from '../src/game/map/tile-types';
+import { upgradeVillage } from '../src/game/economy/village';
 import {
   TUTORIAL_CAPITAL, TUTORIAL_RADIUS, TUTORIAL_START_WARRIOR_ID,
   TUTORIAL_HUMAN, TUTORIAL_ENEMY_PLAYER, TUTORIAL_PORT_TILE,
   TUTORIAL_WATER_TILES, buildTutorialMap, buildTutorialPlayers,
 } from '../src/game/tutorial/tutorial-map';
+import { tileAt } from '../src/game/map/tile-index';
 
 describe('tutorial map', () => {
   it('is a radius-5 disc of unique tiles', () => {

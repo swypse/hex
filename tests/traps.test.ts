@@ -1,10 +1,10 @@
 import { buildPlayers } from '@/game/players';
 import { Simulator } from '@/game/simulator';
-import { totalStock } from '@/game/stock';
-import { TileType } from '@/game/tile-types';
-import { TRAP_COST, trapDamage } from '@/game/traps';
+import { totalStock } from '@/game/economy/stock';
+import { TileType } from '@/game/map/tile-types';
+import { TRAP_COST, trapDamage } from '@/game/units/traps';
 import { Tribe } from '@/game/tribes';
-import { Unit } from '@/game/units';
+import { type Unit } from '@/game/units/units';
 import { SeededRandom } from '@/util';
 import { CommandType, GameEventType, GameMode, UnitType } from '@enums';
 import { beforeEach, describe, expect, it } from 'vitest';

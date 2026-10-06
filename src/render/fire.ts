@@ -1,4 +1,5 @@
 import { Application, Container, Graphics, type Ticker } from 'pixi.js';
+import { pickRandom } from '../util/random';
 
 const FIRE_PARTICLE_COUNT = 12;
 const FIRE_COLORS = [0xff5500, 0xff3300, 0xff2200, 0xff7700, 0xffaa00, 0xff8800];
@@ -25,7 +26,7 @@ interface FireEffect {
 
 /** A world-anchored overlay registration: `el` sits in the screen-space
  *  overlay and the host repositions `el` each frame at `world * scale`. */
-export interface FireOverlayItem {
+interface FireOverlayItem {
   el: Container;
   world: { x: number; y: number };
 }
@@ -111,7 +112,7 @@ export class FireEffects {
             p.x = (Math.random() - 0.5) * 2 * FIRE_SPREAD_X;
             p.vy = 24 + Math.random() * 24;
             p.size = FIRE_SIZE_MIN + Math.random() * (FIRE_SIZE_MAX - FIRE_SIZE_MIN);
-            p.color = FIRE_COLORS[Math.floor(Math.random() * FIRE_COLORS.length)]!;
+            p.color = pickRandom(FIRE_COLORS)!;
           }
           this.place(p);
         }

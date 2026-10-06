@@ -3,14 +3,14 @@ import { BitmapText, Container } from 'pixi.js';
 import { WeatherType } from '@enums';
 import { HudWeather } from '../src/ui/hud/hud-weather';
 import { useGameStore } from '../src/store/game-store';
-import type { WeatherEvent } from '../src/game/weather';
+import type { WeatherEvent } from '../src/game/weather/weather';
 
 function w(type: WeatherType, age: number, lifetime: number): WeatherEvent {
   return { id: `${type}@9`, type, q: 0, r: 0, radius: 2, startTurn: 9, age, lifetime };
 }
 
 const visibleTexts = (root: Container): string[] =>
-  (root.children as BitmapText[]).filter((c) => c.visible).map((c) => c.text);
+  (root.children.filter((c) => c instanceof BitmapText) as BitmapText[]).filter((c) => c.visible).map((c) => c.text);
 
 describe('HudWeather', () => {
   beforeEach(() => {
@@ -51,7 +51,7 @@ describe('HudWeather', () => {
     useGameStore.setState({
       weather: [{ ...w(WeatherType.STORM, 2, 6), q: 4, r: 1 }, { ...w(WeatherType.DROUGHT, 1, 5), q: -3, r: 2 }],
     });
-    const [first, second] = root.children as BitmapText[];
+    const [first, second] = root.children.filter((c) => c instanceof BitmapText) as BitmapText[];
     expect(first!.eventMode).toBe('static');
     first!.emit('pointertap', {} as never);
     second!.emit('pointertap', {} as never);

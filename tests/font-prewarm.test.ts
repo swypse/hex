@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BitmapFontManager } from 'pixi.js';
-import { enableSizedFonts, FONT_BLACK, FONT_REGULAR, prewarmSizedFonts, sizedFontFamily } from '../src/ui/kit/bitmap-fonts';
+import { enableSizedFonts, FONT_BLACK, FONT_REGULAR, prewarmSizedFonts, sizedFontFamily } from '../src/gfx/bitmap-fonts';
 import { storageService } from '../src/storage/storage-service';
 import { FontSize } from '@enums';
 

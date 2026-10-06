@@ -1,4 +1,3 @@
-import { t } from '../../i18n';
 import { TUTORIAL_CAPITAL, TUTORIAL_PORT_TILE } from './tutorial-map';
 import { SkillId, TutorialStepId } from '@enums';
 

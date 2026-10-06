@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { Tribe } from '../src/game/tribes';
-import { UNIT_TYPES, UNIT_IMAGE_FILES, UNIT_MOVE_POINTS, UNIT_ATTACK, UNIT_ATTACK_DISTANCE, UNIT_TYPE_NAMES, canAttack, canHeal, PIRATE_HP, canMove, healUnit, movePoints, makeUnit, HEAL_AMOUNT, unitMaintenance } from '../src/game/units';
+import { UNIT_TYPES, UNIT_IMAGE_FILES, UNIT_MOVE_POINTS, UNIT_ATTACK, UNIT_ATTACK_DISTANCE, UNIT_TYPE_NAMES, canAttack, canHeal, PIRATE_HP, canMove, healUnit, movePoints, makeUnit, HEAL_AMOUNT, unitMaintenance } from '../src/game/units/units';
 import { UnitType } from '@enums';
 
 describe('UNIT_TYPES', () => {
@@ -56,7 +56,7 @@ describe('UNIT_IMAGE_FILES', () => {
   });
 });
 
-function mkUnit(overrides: Partial<import('../src/game/units').Unit> = {}): import('../src/game/units').Unit {
+function mkUnit(overrides: Partial<import('../src/game/units/units').Unit> = {}): import('../src/game/units/units').Unit {
   return {
     id: 'u',
     owner: 0,
@@ -75,7 +75,7 @@ function mkUnit(overrides: Partial<import('../src/game/units').Unit> = {}): impo
   };
 }
 
-function makeShield(overrides: Partial<import('../src/game/units').Unit> = {}): import('../src/game/units').Unit {
+function makeShield(overrides: Partial<import('../src/game/units/units').Unit> = {}): import('../src/game/units/units').Unit {
   return {
     id: 's',
     owner: 0,
@@ -94,7 +94,7 @@ function makeShield(overrides: Partial<import('../src/game/units').Unit> = {}): 
   };
 }
 
-function makeCatapult(overrides: Partial<import('../src/game/units').Unit> = {}): import('../src/game/units').Unit {
+function makeCatapult(overrides: Partial<import('../src/game/units/units').Unit> = {}): import('../src/game/units/units').Unit {
   return {
     id: 'c',
     owner: 0,

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { pointInPolygon } from '../src/game/hex';
-import { MapTile } from '../src/game/map-gen';
-import { TileType } from '../src/game/tile-types';
+import { pointInPolygon } from '../src/game/map/hex';
+import { type MapTile } from '../src/game/map/map-gen';
+import { TileType } from '../src/game/map/tile-types';
 import { pickTileAt } from '../src/render/tile-pick';
 
 function tile(q: number, r: number, height: number): MapTile {

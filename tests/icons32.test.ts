@@ -1,6 +1,6 @@
 import { beforeEach, describe, it, expect, afterEach, vi } from 'vitest';
 import { Texture } from 'pixi.js';
-import { ICONS32_ATLAS_FRAMES, ICONS32_ATLAS_CELL } from '../src/game/icons32-atlas-data.gen';
+import { ICONS32_ATLAS_FRAMES, ICONS32_ATLAS_CELL } from '../src/atlas-data/icons32-atlas-data.gen';
 
 class FakeImage {
   src = '';
@@ -26,7 +26,7 @@ describe('icons-32 atlas loader', () => {
     (globalThis as { Image?: unknown }).Image = FakeImage;
     vi.spyOn(Texture, 'from').mockReturnValue(Texture.EMPTY);
     vi.resetModules();
-    icons = await import('../src/ui/kit/icons32');
+    icons = await import('../src/gfx/icons32');
   });
 
   afterEach(() => {

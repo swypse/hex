@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { MapTile } from '../src/game/map-gen';
-import { TileType } from '../src/game/tile-types';
-import { claimTileForVillage } from '../src/game/claim';
+import { type MapTile } from '../src/game/map/map-gen';
+import { TileType } from '../src/game/map/tile-types';
+import { claimTileForVillage } from '../src/game/economy/claim';
 
 function tile(q: number, r: number, ownedBy: number | null, claimedByVillage: { q: number; r: number } | null): MapTile {
   return { q, r, terrain: TileType.GrasslandLand, settlement: null, unit: null, ownedBy, claimedByVillage, building: null };

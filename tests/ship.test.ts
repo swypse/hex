@@ -1,11 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { Tribe } from '../src/game/tribes';
-import { Player } from '../src/game/players';
-import { Unit } from '../src/game/units';
-import { makeUnit } from '../src/game/units';
-import { GameMap, MapTile } from '../src/game/map-gen';
-import { migrateLegacyResources, totalStock } from '../src/game/stock';
-import { TileType } from '../src/game/tile-types';
+import { type Player } from '../src/game/players';
+import { type Unit } from '../src/game/units/units';
+import { makeUnit } from '../src/game/units/units';
+import { type GameMap, type MapTile } from '../src/game/map/map-gen';
+import { migrateLegacyResources, totalStock } from '../src/game/economy/stock';
+import { TileType } from '../src/game/map/tile-types';
 import {
   canUpgradeShip,
   gainShipAbility,
@@ -19,7 +19,7 @@ import {
   shipAttackDistance,
   shipMovePoints,
   upgradeShip,
-} from '../src/game/ship';
+} from '../src/game/units/ship';
 import { UnitType } from '@enums';
 
 function unit(overrides: Partial<Unit> = {}): Unit {

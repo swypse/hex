@@ -1,5 +1,5 @@
 import { WeatherType } from '@enums';
-import type { WeatherEvent } from '../src/game/weather';
+import type { WeatherEvent } from '../src/game/weather/weather';
 import { afterEach, describe, expect, it } from 'vitest';
 import { Circle, Rectangle, Container, Graphics, Sprite, BitmapText } from 'pixi.js';
 import { HudSelected } from '../src/ui/hud/hud-selected';
@@ -11,12 +11,12 @@ import { buildPlayers } from '../src/game/players';
 import { Tribe } from '../src/game/tribes';
 import { SeededRandom } from '../src/util/random';
 import { Simulator } from '../src/game/simulator';
-import { TileType } from '../src/game/tile-types';
-import { UNIT_TYPES } from '../src/game/units';
-import { TRAP_TURNS } from '../src/game/traps';
-import { hexNeighbors } from '../src/game/hex';
+import { TileType } from '../src/game/map/tile-types';
+import { UNIT_TYPES } from '../src/game/units/units';
+import { TRAP_TURNS } from '../src/game/units/traps';
+import { hexNeighbors } from '../src/game/map/hex';
 import { t } from '../src/i18n';
-import type { GameMap, MapTile } from '../src/game/map-gen';
+import type { GameMap, MapTile } from '../src/game/map/map-gen';
 import { BonusKind, BridgeDir, BuildingKind, GameMode, NetMode, Screen, SelectionKind, SkillId, TutorialStepId, UnitType } from '@enums';
 
 function fakeCanvasContext() {
@@ -117,7 +117,7 @@ describe('HudSelected village building constraints', () => {
 
   it('shows the food balance of an own village and a red starvation line when it starves', () => {
     mount(1, 0, 0);
-    expect(texts().some((s) => s.startsWith('Food: farms 0'))).toBe(true);
+    expect(texts().some((s) => s.includes('(0 - 0)'))).toBe(true);
     expect(texts().some((s) => s.startsWith('Starving!'))).toBe(false);
     const village = tileAt(gameController.getMap()!, 0, 0)!;
     village.settlement!.starving = true;
@@ -171,24 +171,28 @@ describe('HudSelected village building constraints', () => {
     expect(el.children.indexOf(shadow)).toBeLessThan(el.children.indexOf(bg));
   });
 
-  it('shows the building count and an upgrade hint when the village is full', () => {
+  it('shows a circle per slot and an upgrade hint when the village is full', () => {
     mount(2, 2, 0);
     const all = texts().join('\n');
-    expect(all).toContain('Buildings: 2/2');
+    // Two buildings of the same kind share one circle with a count badge 2; no free slots remain.
+    expect(slotCircles((hud as unknown as { el: Container }).el!)).toHaveLength(1);
+    expect(texts()).toContain('2');
     expect(all).toContain('Full — upgrade to level 3 for more building slots');
   });
 
-  it('shows the building count without a hint when the village has free slots', () => {
+  it('shows a circle per slot without a hint when the village has free slots', () => {
     mount(3, 1, 0);
     const all = texts().join('\n');
-    expect(all).toContain('Buildings: 1/3');
+    // One built circle plus a single collapsed circle for the free slots.
+    expect(slotCircles((hud as unknown as { el: Container }).el!)).toHaveLength(2);
+    expect(texts()).toContain('+1');
     expect(all).not.toContain('Full');
   });
 
-  it('shows 1/1 at level 1 when full and hints at upgrading', () => {
+  it('shows 1 circle at level 1 when full and hints at upgrading', () => {
     mount(1, 1, 0);
     const all = texts().join('\n');
-    expect(all).toContain('Buildings: 1/1');
+    expect(slotCircles((hud as unknown as { el: Container }).el!)).toHaveLength(1);
     expect(all).toContain('upgrade to level 2');
   });
 
@@ -231,8 +235,8 @@ describe('HudSelected village building constraints', () => {
     const widths = findSprites((hud as unknown as { el: Container }).el!)
       .map((s) => s.width)
       .filter((w) => w === 16);
-    // 3 unit stats (attack/defense/gold, hp removed) + the gold village income
-    // and food balance icons on the settlement line, plus the three 16px help
+    // 3 unit stats (attack/defense/gold, hp removed) + the money and food icons
+    // on the income line, plus the three 16px help
     // buttons (unit / settlement / building limit) and the 16px close icon.
     expect(widths).toEqual([16, 16, 16, 16, 16, 16, 16, 16, 16]);
   });
@@ -253,8 +257,7 @@ describe('HudSelected village building constraints', () => {
 
   it('shows one help button on the Buildings line of an owned village', () => {
     mount(1, 1, 0);
-    const all = texts().join('\n');
-    expect(all).toContain('Buildings: 1/1');
+    expect(slotCircles((hud as unknown as { el: Container }).el!)).toHaveLength(1);
     // settlement line + Buildings line each carry a help button.
     expect(helpButtons()).toBe(2);
   });
@@ -269,9 +272,9 @@ describe('HudSelected village building constraints', () => {
     const st = useGameStore.getState();
     st.setTutorial(true);
     st.setTutorialStep(TutorialStepId.UPGRADE_VILLAGE3);
-    const gold = findText((hud as unknown as { el: Container }).el!, 'Buildings:');
-    expect(gold).toBeDefined();
-    expect(gold!.style.fill).toBe(0xffd700);
+    const circles = slotCircles((hud as unknown as { el: Container }).el!);
+    expect(circles.length).toBeGreaterThan(0);
+    expect(strokeColors(circles[0]!)).toContain(0xffd700);
   });
 
   it('does not highlight the Buildings line during other tutorial steps', () => {
@@ -279,9 +282,9 @@ describe('HudSelected village building constraints', () => {
     const st = useGameStore.getState();
     st.setTutorial(true);
     st.setTutorialStep(TutorialStepId.BUILD_PORT);
-    const text = findText((hud as unknown as { el: Container }).el!, 'Buildings:');
-    expect(text).toBeDefined();
-    expect(text!.style.fill).not.toBe(0xffd700);
+    const circles = slotCircles((hud as unknown as { el: Container }).el!);
+    expect(circles.length).toBeGreaterThan(0);
+    expect(strokeColors(circles[0]!)).not.toContain(0xffd700);
   });
 });
 
@@ -482,25 +485,20 @@ describe('HudSelected connected village income bonus', () => {
     (gameController as unknown as { sim: unknown }).sim = originalSim;
   });
 
-  it('shows income as a gold icon + number on the village line when connected', () => {
+  it('shows the income line as result (raw - upkeep) when connected', () => {
     boot(true);
     const all = texts().join('\n');
-    // The income now lives on the village line as an icon + value pair.
-    expect(all).not.toContain('Income:');
-    expect(texts()).toContain('6');
-    expect(all).toContain('Connected: +1 income');
+    expect(all).toContain('6 (5 - 0)');
     const width16 = findSprites((hud as unknown as { el: Container }).el!)
       .map((s) => s.width)
       .filter((w) => w === 16);
     expect(width16).not.toHaveLength(0);
   });
 
-  it('omits the bonus line and shows base income on the village line when not connected', () => {
+  it('shows base income with no connection bonus when not connected', () => {
     boot(false);
     const all = texts().join('\n');
-    expect(all).not.toContain('Income:');
-    expect(texts()).toContain('5');
-    expect(all).not.toContain('Connected');
+    expect(all).toContain('5 (5 - 0)');
   });
 });
 
@@ -1015,6 +1013,27 @@ describe('HudSelected close button and collapsed state', () => {
     expect(closeButton()).toBeDefined();
   });
 });
+
+/** The building-slot circles drawn on the Buildings line, in order. */
+function slotCircles(root: Container): Graphics[] {
+  const out: Graphics[] = [];
+  const walk = (c: Container): void => {
+    for (const ch of c.children) {
+      if (ch instanceof Graphics) {
+        const b = ch.getLocalBounds();
+        const w = b.maxX - b.minX;
+        // Slot circles are the only roughly square shapes above 30px (count badges are smaller).
+        if (w > 30 && w < 46 && Math.abs(w - (b.maxY - b.minY)) < 3) out.push(ch);
+      } else if (ch instanceof Container) walk(ch);
+    }
+  };
+  walk(root);
+  return out;
+}
+
+function strokeColors(g: Graphics): number[] {
+  return g.context.instructions.map((i) => (i.data as { style?: { color?: number } }).style?.color).filter((c): c is number => typeof c === 'number');
+}
 
 function findText(root: Container, prefix: string): BitmapText | undefined {
   for (const ch of root.children) {

@@ -2,9 +2,10 @@ import { Container } from 'pixi.js';
 import { useGameStore } from '../../store/game-store';
 import { t } from '../../i18n';
 import { type UIHost } from '../host';
-import { makeLabel } from '../kit/label';
+import { makeLabel } from '../../gfx/label';
 import { makeIconChip } from '../kit/tribe-chip';
-import { makeAchievementChip, ACHIEVEMENT_ATLAS_KEYS } from '../kit/achievement-icons';
+import { ACHIEVEMENT_ATLAS_KEYS } from '../../gfx/achievement-icons';
+import { makeAchievementChip } from '../kit/tribe-chip';
 import { Popup, POPUP_BODY_SIZE } from '../kit/popup';
 
 const MESSAGE_MS = 1400;

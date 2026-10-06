@@ -1,13 +1,13 @@
 import { BridgeDir, BuildingKind, CommandType, GameEventType, GameMode, SkillId, UnitType } from '@enums';
 import { describe, it, expect } from 'vitest';
-import { GameMap, MapTile, Settlement } from '../src/game/map-gen';
-import { TileType } from '../src/game/tile-types';
-import { Player } from '../src/game/players';
+import { type GameMap, type MapTile, type Settlement } from '../src/game/map/map-gen';
+import { TileType } from '../src/game/map/tile-types';
+import { type Player } from '../src/game/players';
 import { Tribe } from '../src/game/tribes';
-import { Unit } from '../src/game/units';
-import { buildRoad, canBuildRoad, ROAD_COST, isVillageRoadConnected } from '../src/game/roads';
+import { type Unit } from '../src/game/units/units';
+import { buildRoad, canBuildRoad, ROAD_COST, isVillageRoadConnected } from '../src/game/economy/roads';
 import { Simulator } from '../src/game/simulator';
-import { migrateLegacyResources, totalStock } from '../src/game/stock';
+import { migrateLegacyResources, totalStock } from '../src/game/economy/stock';
 import { buildPlayers } from '../src/game/players';
 import { SeededRandom } from '../src/util/random';
 

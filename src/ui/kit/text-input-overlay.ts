@@ -1,5 +1,5 @@
 import { Container, BitmapText } from 'pixi.js';
-import { makeLabel } from './label';
+import { makeLabel } from '../../gfx/label';
 import { makePanel } from './panel';
 import { FontSize } from '@enums';
 

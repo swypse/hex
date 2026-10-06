@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { BitmapText } from 'pixi.js';
-import { makeLabel } from '../src/ui/kit/label';
+import { makeLabel } from '../src/gfx/label';
 
 describe('makeLabel', () => {
   it('returns a BitmapText', () => {

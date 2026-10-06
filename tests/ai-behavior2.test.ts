@@ -1,17 +1,17 @@
-import { planAiActions } from '@/game/ai';
+import { planAiActions } from '@/game/ai/ai';
 import { buildPlayers } from '@/game/players';
 import { Simulator } from '@/game/simulator';
-import { migrateLegacyResources } from '@/game/stock';
-import { TileType } from '@/game/tile-types';
+import { migrateLegacyResources } from '@/game/economy/stock';
+import { TileType } from '@/game/map/tile-types';
 import { Tribe } from '@/game/tribes';
-import { PIRATE_OWNER, type Unit } from '@/game/units';
+import { PIRATE_OWNER, type Unit } from '@/game/units/units';
 import { SeededRandom } from '@/util';
 import { AiActionType, AiDifficulty, CommandType, GameEventType, GameMode, SkillId, UnitType } from '@enums';
 import { describe, expect, it } from 'vitest';
 import { makeTestMap, makeUnit, tileAt } from './helpers/test-map';
 
 /** Moves the legacy-literal materials of a test player into its capital before planning. */
-function fund<T extends import('../src/game/players').Player>(map: import('../src/game/map-gen').GameMap, player: T): T {
+function fund<T extends import('../src/game/players').Player>(map: import('../src/game/map/map-gen').GameMap, player: T): T {
   migrateLegacyResources(map, [player]);
   return player;
 }

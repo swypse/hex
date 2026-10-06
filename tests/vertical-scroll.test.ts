@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { Application, Container, Graphics, Text } from 'pixi.js';
-import { ScreenScroll } from '../src/ui/vertical-scroll';
+import { ScreenScroll } from '../src/ui/kit/vertical-scroll';
 
 type Handler = (e: { pointerId: number; clientY: number; button?: number }) => void;
 

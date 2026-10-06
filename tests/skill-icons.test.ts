@@ -1,6 +1,6 @@
 import { beforeEach, describe, it, expect, afterEach, vi } from 'vitest';
 import { Texture } from 'pixi.js';
-import { SKILL_ATLAS_FRAMES, SKILL_ATLAS_CELL } from '../src/game/skill-atlas-data.gen';
+import { SKILL_ATLAS_FRAMES, SKILL_ATLAS_CELL } from '../src/atlas-data/skill-atlas-data.gen';
 import { SKILLS } from '../src/game/skills';
 import { SkillId } from '@enums';
 
@@ -27,7 +27,7 @@ describe('makeSkillIcon', () => {
     (globalThis as { Image?: unknown }).Image = FakeImage;
     vi.spyOn(Texture, 'from').mockReturnValue(Texture.EMPTY);
     vi.resetModules();
-    icons = await import('../src/ui/kit/skill-icons');
+    icons = await import('../src/gfx/skill-icons');
   });
 
   afterEach(() => {

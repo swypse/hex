@@ -6,7 +6,7 @@ import {
   runDuels,
   symWin,
   UNIT_SKILL,
-} from '../src/game/balance';
+} from '../src/game/balance/balance';
 import { SkillId, UnitType } from '@enums';
 
 const duels = runDuels();

@@ -1,66 +1,39 @@
 import { t } from '../../i18n';
 import { Container } from 'pixi.js';
 import { gameController } from '../../controller/game-controller';
-import { disbandCost, UNIT_TYPE_NAMES } from '../../game/units';
+import { disbandCost, UNIT_TYPE_NAMES } from '../../game/units/units';
 import { useGameStore } from '../../store/game-store';
 import { type UIHost } from '../host';
 import { Button } from '../kit/button';
-import { makeLabel } from '../kit/label';
 import { Popup } from '../kit/popup';
-import { FontSize, OverlayKind } from '@enums';
+import { addPopupHint, PopupDialog } from './popup-dialog';
+import { OverlayKind } from '@enums';
 
-export class DisbandDialog {
-  private el: Container | null = null;
-  private popup: Popup | null = null;
-  private host: UIHost | null = null;
-
+export class DisbandDialog extends PopupDialog {
   mount(host: UIHost, root: Container): void {
-    this.host = host;
     const s = useGameStore.getState();
     if (s.overlay?.kind !== OverlayKind.DISBAND) return;
     const unitId = s.overlay.unitId;
     const map = gameController.getMap();
     const unit = map ? map.tiles.find((t) => t.unit?.id === unitId)?.unit : null;
     if (!unit) {
-      gameController.cancelDisband();
+      gameController.actions.cancelDisband();
       return;
     }
     const cost = disbandCost(unit);
 
-    const confirm = new Button({ label: t('common.confirm'), onClick: () => gameController.confirmDisband() });
-    const cancel = new Button({ label: t('common.cancel'), onClick: () => gameController.cancelDisband() });
+    const confirm = new Button({ label: t('common.confirm'), onClick: () => gameController.actions.confirmDisband() });
+    const cancel = new Button({ label: t('common.cancel'), onClick: () => gameController.actions.cancelDisband() });
     const popup = new Popup({
       app: host.app,
       title: t('action.disbandTitle', { name: UNIT_TYPE_NAMES[unit.type] }),
       buttons: [confirm, cancel],
-      onClose: () => gameController.cancelDisband(),
+      onClose: () => gameController.actions.cancelDisband(),
       closeOnBackdrop: false,
     });
 
-    const hint = makeLabel(t('action.disbandConfirm', { cost }), {
-      fontSize: FontSize.SMALL,
-      fill: 0xcccccc,
-      wordWrap: true,
-      wordWrapWidth: popup.contentWidth,
-    });
-    hint.position.set(0, 0);
-    popup.content.addChild(hint);
+    addPopupHint(popup, t('action.disbandConfirm', { cost }));
 
-    root.addChild(popup.el);
-    this.el = popup.el;
-    this.popup = popup;
-    popup.finish();
-  }
-
-  hide(onDone: () => void): void {
-    if (this.popup) this.popup.animateOut(onDone);
-    else onDone();
-  }
-
-  destroy(): void {
-    this.popup?.destroy();
-    this.popup = null;
-    this.el = null;
-    this.host = null;
+    this.present(root, popup);
   }
 }

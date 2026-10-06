@@ -1,11 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { makeTestMap, tileAt, makeUnit, giveResources } from './helpers/test-map';
-import { GameMap } from '../src/game/map-gen';
-import { TileType } from '../src/game/tile-types';
-import { Player } from '../src/game/players';
+import { type GameMap } from '../src/game/map/map-gen';
+import { TileType } from '../src/game/map/tile-types';
+import { type Player } from '../src/game/players';
 import { Tribe } from '../src/game/tribes';
-import { BRIDGE_COST, bridgeDirFor, buildBridge, canBuildBridge } from '../src/game/bridges';
-import { canBuildPort, canBuildTemple } from '../src/game/buildings';
+import { BRIDGE_COST, bridgeDirFor, buildBridge, canBuildBridge } from '../src/game/economy/bridges';
+import { canBuildPort, canBuildTemple } from '../src/game/economy/buildings';
 import { BridgeDir, BuildingKind, SkillId, UnitType } from '@enums';
 
 function player(skills: Player['skills'] = [], money = 100): Player {

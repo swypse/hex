@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ENEMY_GLOW_COLOR, OWN_GLOW_COLOR, unitGlowColor } from '../src/render/unit-glow-color';
-import { PIRATE_OWNER } from '../src/game/units';
+import { PIRATE_OWNER } from '../src/game/units/units';
 import { UnitType } from '@enums';
 
 describe('unitGlowColor', () => {

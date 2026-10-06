@@ -1,12 +1,12 @@
 import type { Application } from 'pixi.js';
-import { allTiles } from '../../src/game/hex';
-import { Biome } from '../../src/game/biomes';
-import { GameMap, MapTile } from '../../src/game/map-gen';
-import { TileType } from '../../src/game/tile-types';
-import { Unit, UNIT_TYPES, UNIT_ATTACK, UNIT_ATTACK_DISTANCE } from '../../src/game/units';
+import { allTiles } from '../../src/game/map/hex';
+import { Biome } from '../../src/game/map/biomes';
+import { type GameMap, type MapTile } from '../../src/game/map/map-gen';
+import { TileType } from '../../src/game/map/tile-types';
+import { type Unit, UNIT_TYPES, UNIT_ATTACK, UNIT_ATTACK_DISTANCE } from '../../src/game/units/units';
 import { CameraController } from '../../src/controller/camera-controller';
 import type { Player } from '../../src/game/players';
-import { capitalOf, stockOf } from '../../src/game/stock';
+import { capitalOf, stockOf } from '../../src/game/economy/stock';
 import { UnitType } from '@enums';
 
 export function makeTestMap(radius = 2): GameMap {

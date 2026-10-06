@@ -4,8 +4,8 @@ import { ACHIEVEMENTS, type AchievementInfo } from '../../game/achievements';
 import { useGameStore } from '../../store/game-store';
 import { type UIHost } from '../host';
 import { Button } from '../kit/button';
-import { makeLabel } from '../kit/label';
-import { makeAchievementChip } from '../kit/achievement-icons';
+import { makeLabel } from '../../gfx/label';
+import { makeAchievementChip } from '../kit/tribe-chip';
 import { Popup } from '../kit/popup';
 import { FontSize } from '@enums';
 
@@ -19,7 +19,6 @@ const OPENED_BORDER_WIDTH = 4;
 const CHIP_BG = 0x373748;
 
 export class AchievementsDialog {
-  private el: Container | null = null;
   private popup: Popup | null = null;
   private detail: Popup | null = null;
   private host: UIHost | null = null;
@@ -91,7 +90,6 @@ export class AchievementsDialog {
     popup.content.addChild(list);
 
     root.addChild(popup.el);
-    this.el = popup.el;
     this.popup = popup;
     popup.finish();
   }
@@ -152,7 +150,6 @@ export class AchievementsDialog {
     this.closeDetail();
     this.popup?.destroy();
     this.popup = null;
-    this.el = null;
     this.root = null;
     this.host = null;
   }

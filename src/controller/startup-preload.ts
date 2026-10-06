@@ -3,12 +3,12 @@ import { ensureTerrainAtlas } from '../render/terrain-atlas';
 import { ensureTribeAtlas } from '../render/tribe-atlas';
 import { saveRepository } from '../storage/save-game';
 import { TRIBES } from '../game/tribes';
-import { prewarmSizedFonts } from '../ui/kit/bitmap-fonts';
+import { prewarmSizedFonts } from '../gfx/bitmap-fonts';
 import { forEachIdle, whenIdle } from '../util/time-slice';
 
 /** Tribe atlas codes of the saved game, if any: "Resume" is the common way into
  *  a game, and it needs exactly these. */
-export function savedGameTribeCodes(): string[] {
+function savedGameTribeCodes(): string[] {
   const snap = saveRepository.load();
   if (!snap) return [];
   const codes = new Set<string>();

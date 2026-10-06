@@ -5,7 +5,7 @@ import {
   START_RESOURCES,
   UPGRADE_COST,
   villageUpgradeCost,
-} from '../src/game/resources';
+} from '../src/game/economy/resources';
 
 describe('resources', () => {
   it('starts with 3 wood, 2 stone, 8 money, 0 ore, 25 food', () => {

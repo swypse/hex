@@ -3,8 +3,8 @@ import { tribeById } from '../../game/tribes';
 import { useGameStore } from '../../store/game-store';
 import { type UIHost, type Widget } from '../host';
 import { makeIcon } from '../kit/icon';
-import { makeLabel } from '../kit/label';
-import { SKILLS_BUTTON_SIZE, scoreButtonsPosition } from '../layout';
+import { makeLabel } from '../../gfx/label';
+import { SKILLS_BUTTON_SIZE, scoreButtonsPosition } from './layout';
 import { FontSize, NetMode, Screen } from '@enums';
 
 export const PLAYER_ONLINE_COLOR = 0x2ecc71;

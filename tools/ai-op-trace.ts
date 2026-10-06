@@ -6,14 +6,14 @@
  *
  *   npx vite-node tools/ai-op-trace.ts -- [seed=1000] [dumpFrom=0] [dumpTo=0]
  */
-import { generateMap } from '../src/game/map-gen';
+import { generateMap } from '../src/game/map/map-gen';
 import { buildPlayers } from '../src/game/players';
 import { Simulator } from '../src/game/simulator';
 import { Tribe, TRIBES } from '../src/game/tribes';
 import { SeededRandom } from '../src/util/random';
-import { initialExplorationFor } from '../src/game/explore';
-import { hexDistance } from '../src/game/hex';
-import { exploreVillageSights } from '../src/game/village';
+import { initialExplorationFor } from '../src/game/map/explore';
+import { hexDistance } from '../src/game/map/hex';
+import { exploreVillageSights } from '../src/game/economy/village';
 
 const args = process.argv.slice(2).filter((a) => a !== '--');
 const seed = Number(args[0] ?? 1000);

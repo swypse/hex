@@ -9,13 +9,13 @@ import { Container } from 'pixi.js';
 import { type ScreenController, type UIHost } from '../host';
 import { Button } from '../kit/button';
 import { ButtonGroup } from '../kit/button-group';
-import { makeLabel } from '../kit/label';
+import { makeLabel } from '../../gfx/label';
 import { BLOCK_GAP, TITLE_TO_CONTENT } from '../kit/screen-layout';
 import { TextInputOverlay } from '../kit/text-input-overlay';
 import { positionTribes, TRIBE_GAP, TRIBE_ROW_STEP } from '../kit/tribe-layout';
 import { makeTribeOption } from '../kit/tribe-option';
-import { isTouchDevice } from '../touch';
-import { ScreenScroll } from '../vertical-scroll';
+import { isTouchDevice } from '../kit/touch';
+import { ScreenScroll } from '../kit/vertical-scroll';
 
 
 

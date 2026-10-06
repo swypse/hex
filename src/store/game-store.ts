@@ -1,15 +1,11 @@
-import { Player } from '@/game/players';
-import { Selection } from '@/game/selection';
-import { GameStateSnapshot } from '@/game/state';
+import { type Player } from '@/game/players';
+import { type Selection } from '@/game/units/selection';
+import { type GameStateSnapshot } from '@/game/state';
 import type { LobbyPlayer } from '@/net/peer-session';
 import { activeMatchStore } from '@/storage/active-match';
 import { ConnectionState, GameMode, LobbyRole, NetMode, OverlayKind, PauseReason, Screen, SkillId, TutorialStepId } from '@enums';
 import { create } from 'zustand';
-import type { WeatherEvent } from '@/game/weather';
-
-
-
-export type { LobbyPlayer };
+import type { WeatherEvent } from '@/game/weather/weather';
 
 /** Optional styling for the icon chip shown above a center message. */
 interface IconChipStyle {
@@ -300,4 +296,21 @@ export function confirmLeaveGame(): void {
 
 export function cancelLeaveGame(): void {
   useGameStore.getState().setOverlay(null);
+}
+
+/** Puts the store in the state of a fresh match: turn 1, player 0 local and to move, nothing selected. */
+export function beginMatchState(match: { players: Player[]; mode: GameMode; expectedTurns: number; netMode: NetMode }): void {
+  const store = useGameStore.getState();
+  store.setPlayers(match.players);
+  store.setMode(match.mode);
+  store.setExpectedTurns(match.expectedTurns);
+  store.setGameOver(false);
+  store.setWinnerIndex(null);
+  store.setBonusAwarded(false);
+  store.setLocalPlayerIndex(0);
+  store.setNetMode(match.netMode);
+  store.setTurn(1);
+  store.setCurrentPlayerIndex(0);
+  store.setAiActive(false);
+  store.setSelection(null);
 }

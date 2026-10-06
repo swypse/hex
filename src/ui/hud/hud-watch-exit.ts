@@ -4,7 +4,7 @@ import { gameController } from '../../controller/game-controller';
 import { useGameStore } from '../../store/game-store';
 import { type UIHost, type Widget } from '../host';
 import { Button } from '../kit/button';
-import { TOOLBAR_HEIGHT, TURN_BAR_HEIGHT, TURN_BAR_GAP, isWideScreen, ACTION_TOOLBAR_MAX_WIDTH } from '../layout';
+import { TOOLBAR_HEIGHT, TURN_BAR_HEIGHT, TURN_BAR_GAP, isWideScreen, ACTION_TOOLBAR_MAX_WIDTH } from './layout';
 import { Screen } from '@enums';
 
 export class HudWatchExit implements Widget {

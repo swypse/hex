@@ -1,6 +1,6 @@
 import { afterEach, describe, it, expect } from 'vitest';
 import { TRIBE_BG_DEPTH, makeTribeBackgroundShader, tribeBackgroundTexture } from '../src/ui/screens/tribe-bg-shader';
-import { THEME } from '../src/ui/kit/theme';
+import { THEME } from '../src/gfx/theme';
 
 describe('tribe background shader', () => {
   let built: ReturnType<typeof makeTribeBackgroundShader> | null = null;

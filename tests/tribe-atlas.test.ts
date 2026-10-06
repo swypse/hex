@@ -1,6 +1,6 @@
 import { beforeEach, describe, it, expect, afterEach, vi } from 'vitest';
 import { Texture, type Container } from 'pixi.js';
-import { TRIBE_ATLAS_FRAMES, TRIBE_ATLAS_FILES, TRIBE_ATLAS_CELL_W, TRIBE_ATLAS_CELL_H } from '../src/game/tribe-atlas-data.gen';
+import { TRIBE_ATLAS_FRAMES, TRIBE_ATLAS_FILES, TRIBE_ATLAS_CELL_W, TRIBE_ATLAS_CELL_H } from '../src/atlas-data/tribe-atlas-data.gen';
 import { ensureTribeAtlas, tribeTileTexture } from '../src/render/tribe-atlas';
 import { TRIBES } from '../src/game/tribes';
 

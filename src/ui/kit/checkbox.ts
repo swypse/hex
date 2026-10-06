@@ -1,5 +1,5 @@
 import { Container, Graphics, type BitmapText } from 'pixi.js';
-import { makeLabel } from './label';
+import { makeLabel } from '../../gfx/label';
 import { sfx } from '../../sound/sfx';
 import { FontSize } from '@enums';
 
@@ -62,7 +62,11 @@ export function makeCheckbox(
     label.position.set(size + labelGap, Math.max(0, (size - label.height) / 2));
     label.eventMode = 'static';
     label.cursor = 'pointer';
-    label.on('pointertap', tap);
+    // The label sits inside `el`, whose own tap handler would toggle a second time.
+    label.on('pointertap', (e?: { stopPropagation?: () => void }) => {
+      e?.stopPropagation?.();
+      tap();
+    });
     el.addChild(label);
   }
 

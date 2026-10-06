@@ -1,18 +1,18 @@
 import { describe, it, expect } from 'vitest';
-import { GameMap, MapTile, Settlement } from '../src/game/map-gen';
-import { planAiActions } from '../src/game/ai';
-import { AiAction } from '../src/game/ai-types';
-import { reachableTargets } from '../src/game/selection';
-import { TileType } from '../src/game/tile-types';
+import { type GameMap, type MapTile, type Settlement } from '../src/game/map/map-gen';
+import { planAiActions } from '../src/game/ai/ai';
+import { type AiAction } from '../src/game/ai/ai-types';
+import { reachableTargets } from '../src/game/units/selection';
+import { TileType } from '../src/game/map/tile-types';
 import { Tribe } from '../src/game/tribes';
-import { Unit } from '../src/game/units';
+import { type Unit } from '../src/game/units/units';
 import { SeededRandom } from '../src/util/random';
 import { SKILLS } from '../src/game/skills';
-import { migrateLegacyResources } from '../src/game/stock';
+import { migrateLegacyResources } from '../src/game/economy/stock';
 import { AiActionType, AiDifficulty, GameMode, SkillId, UnitType } from '@enums';
 
 /** Moves the legacy-literal materials of a test player into its capital before planning. */
-function fund<T extends import('../src/game/players').Player>(map: import('../src/game/map-gen').GameMap, player: T): T {
+function fund<T extends import('../src/game/players').Player>(map: import('../src/game/map/map-gen').GameMap, player: T): T {
   migrateLegacyResources(map, [player]);
   return player;
 }

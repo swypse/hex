@@ -2,8 +2,8 @@ import { Container } from 'pixi.js';
 import { useGameStore } from '../../store/game-store';
 import { type UIHost, type Widget } from '../host';
 import { IconButton } from '../kit/icon-button';
-import { ACTION_BUTTON_ICON_FILES, makeActionButtonIcon } from '../kit/action-button-icons';
-import { SKILLS_BUTTON_SIZE, scoreButtonsPosition, SCORE_ACTION_BG, SCORE_ACTION_BG_ACTIVE } from '../layout';
+import { ACTION_BUTTON_ICON_FILES, makeActionButtonIcon } from '../../gfx/action-button-icons';
+import { SKILLS_BUTTON_SIZE, scoreButtonsPosition, SCORE_ACTION_BG, SCORE_ACTION_BG_ACTIVE } from './layout';
 import { OverlayKind } from '@enums';
 
 export class HudAchievements implements Widget {

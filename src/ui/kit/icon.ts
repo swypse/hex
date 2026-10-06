@@ -1,10 +1,10 @@
 import { Sprite, Texture } from 'pixi.js';
-import { TRIBE_ICONS_ATLAS_FRAMES } from '../../game/tribe-icons-atlas-data.gen';
-import { ICONS32_ATLAS_FRAMES } from '../../game/icons32-atlas-data.gen';
-import { ensureCanvasResource } from '../../render/image-texture';
-import { makeTribeIcon } from './tribe-icons';
-import { makeIcon32 } from './icons32';
-import { markDirty } from '../../render/render-gate';
+import { TRIBE_ICONS_ATLAS_FRAMES } from '../../atlas-data/tribe-icons-atlas-data.gen';
+import { ICONS32_ATLAS_FRAMES } from '../../atlas-data/icons32-atlas-data.gen';
+import { ensureCanvasResource } from '../../gfx/image-texture';
+import { makeTribeIcon } from '../../gfx/tribe-icons';
+import { makeIcon32 } from '../../gfx/icons32';
+import { markDirty } from '../../gfx/render-gate';
 
 const TEXTURE_BASE = `${import.meta.env.BASE_URL}textures/`;
 const cache = new Map<string, Texture>();

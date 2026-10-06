@@ -1,8 +1,8 @@
 import { BottleEffect, BridgeDir, BuildingKind, CommandType, GameEventType, GameMode, UnitType } from '@enums';
 import { describe, it, expect } from 'vitest';
-import { GameMap, MapTile } from '../src/game/map-gen';
-import { TileType } from '../src/game/tile-types';
-import { makeUnit } from '../src/game/units';
+import { type GameMap, type MapTile } from '../src/game/map/map-gen';
+import { TileType } from '../src/game/map/tile-types';
+import { makeUnit } from '../src/game/units/units';
 import { buildPlayers } from '../src/game/players';
 import { Simulator } from '../src/game/simulator';
 import { SeededRandom } from '../src/util/random';
@@ -15,7 +15,7 @@ import {
   spawnCandidates,
   touchBottle,
   trySpawnBottle,
-} from '../src/game/bottles';
+} from '../src/game/map/bottles';
 
 function tile(q: number, r: number, terrain: TileType, ownedBy: number | null = null, opts: { building?: MapTile['building']; bridge?: boolean; unit?: MapTile['unit'] } = {}): MapTile {
   const t: MapTile = {

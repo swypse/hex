@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { GameEvent } from '../src/game/events';
+import { type GameEvent } from '../src/game/events';
 import { initialAttackHpOverrides, hpOverrideAfterAttack } from '../src/controller/attack-hp';
 import { GameEventType, UnitType } from '@enums';
 

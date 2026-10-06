@@ -3,7 +3,7 @@ import { Container, BitmapText } from 'pixi.js';
 import { AchievementsDialog } from '../src/ui/overlays/achievements-dialog';
 import { useGameStore } from '../src/store/game-store';
 import { type UIHost } from '../src/ui/host';
-import { START_RESOURCES } from '../src/game/resources';
+import { START_RESOURCES } from '../src/game/economy/resources';
 import { Tribe } from '../src/game/tribes';
 import { t } from '../src/i18n';
 import type { Player } from '../src/game/players';

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { Tribe } from '../src/game/tribes';
-import { Player } from '../src/game/players';
+import { type Player } from '../src/game/players';
 import { canOpenSkill, hasSkill, openSkill, randomUnopenedSkill, skillCost, SKILLS } from '../src/game/skills';
 import { SkillId } from '@enums';
 

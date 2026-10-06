@@ -4,7 +4,7 @@ import {
   isVillageTallColumn,
   villageColumnBlocks,
   villageColumnMiddleCount,
-} from '../src/game/village-build';
+} from '../src/game/economy/village-build';
 import { VillageBuildSide } from '@enums';
 
 describe('village column block counts', () => {

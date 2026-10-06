@@ -1,11 +1,11 @@
 import { CommandType, GameEventType, GameMode, UnitType } from '@enums';
 import { describe, expect, it } from 'vitest';
-import { hexDistance, hexNeighbors } from '@/game/hex';
+import { hexDistance, hexNeighbors } from '@/game/map/hex';
 import { buildPlayers } from '@/game/players';
 import { Simulator } from '@/game/simulator';
-import { isWaterType, TileType } from '@/game/tile-types';
+import { isWaterType, TileType } from '@/game/map/tile-types';
 import { Tribe } from '@/game/tribes';
-import { PIRATE_HP, PIRATE_OWNER, type Unit } from '@/game/units';
+import { PIRATE_HP, PIRATE_OWNER, type Unit } from '@/game/units/units';
 import { SeededRandom } from '@/util';
 import { makeTestMap, makeUnit, tileAt } from './helpers/test-map';
 
@@ -311,6 +311,7 @@ describe('Pirates', () => {
   it('accepts a deal for 50 money and the pirate stops attacking the player', () => {
     const map = makeTestMap();
     tileAt(map, 0, 0)!.terrain = TileType.Water;
+    tileAt(map, 0, 0)!.ownedBy = 0;
     const pirate = makePirate('pirate-1', 0, 0);
     tileAt(map, 0, 0)!.unit = pirate;
     const ship = makeShip('ship-1', 0, 0, 1);
@@ -339,6 +340,7 @@ describe('Pirates', () => {
   it('does not charge twice for a deal with the same pirate', () => {
     const map = makeTestMap();
     tileAt(map, 0, 0)!.terrain = TileType.Water;
+    tileAt(map, 0, 0)!.ownedBy = 0;
     const pirate = makePirate('pirate-1', 0, 0);
     tileAt(map, 0, 0)!.unit = pirate;
 
@@ -389,6 +391,7 @@ describe('Pirates', () => {
   it('cancels the deal when the player attacks the pirate, which then attacks again', () => {
     const map = makeTestMap();
     tileAt(map, 0, 0)!.terrain = TileType.Water;
+    tileAt(map, 0, 0)!.ownedBy = 0;
     const pirate = makePirate('pirate-1', 0, 0);
     tileAt(map, 0, 0)!.unit = pirate;
     const ship = makeShip('ship-1', 0, 0, 1);
@@ -432,7 +435,7 @@ describe('Pirate target tribes', () => {
     tileAt(map, 5, 0)!.unit = pirate;
     const sim = new Simulator(map, players, GameMode.TURNS30, { rng: () => 0.5 });
     sim.startGame();
-    return { sim, pirate, internals: sim as unknown as PirateInternals };
+    return { sim, pirate, internals: (sim as unknown as { pirates: PirateInternals }).pirates };
   }
 
   const targetOwner = (internals: PirateInternals, pirate: Unit): number | undefined => {
@@ -492,7 +495,8 @@ describe('Pirate target tribes', () => {
 
   it('counts every attack and then turns to the new tribe, moving toward it', () => {
     const { sim, pirate } = setup(4);
-    const act = (sim as unknown as { pirateAct(u: Unit): void }).pirateAct.bind(sim);
+    const pirates = (sim as unknown as { pirates: { pirateAct(u: Unit): void } }).pirates;
+    const act = pirates.pirateAct.bind(pirates);
     // in range of tribe 3's unit: three attacks on it
     const map = sim.map;
     tileAt(map, 5, 0)!.unit = null;

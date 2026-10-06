@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Graphics, Text } from 'pixi.js';
 import { Button } from '../src/ui/kit/button';
-import { THEME } from '../src/ui/kit/theme';
+import { THEME } from '../src/gfx/theme';
 
 class FakeImage {
   src = '';

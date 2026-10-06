@@ -6,7 +6,7 @@ export default defineConfig(({ command }) => ({
     alias: {
       '@enums': new URL('./src/enums/index.ts', import.meta.url).pathname,
       '@': new URL('./src', import.meta.url).pathname,
-      'zustand/react': new URL('./src/ui/zustand-react-stub', import.meta.url).pathname,
+      'zustand/react': new URL('./src/util/zustand-react-stub', import.meta.url).pathname,
     },
   },
   test: {

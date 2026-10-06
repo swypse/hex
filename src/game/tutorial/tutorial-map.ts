@@ -1,12 +1,12 @@
-import { allTiles, axialKey, hexDistance } from '../hex';
-import { Biome } from '../biomes';
-import { GameMap, MapTile } from '../map-gen';
-import { TileType } from '../tile-types';
-import { claimTileForVillage } from '../claim';
+import { allTiles, axialKey, hexDistance } from '../map/hex';
+import { Biome } from '../map/biomes';
+import { type GameMap, type MapTile } from '../map/map-gen';
+import { TileType } from '../map/tile-types';
+import { claimTileForVillage } from '../economy/claim';
 import { t } from '../../i18n';
-import { Player } from '../players';
+import { type Player } from '../players';
 import { EMPTY_STATS } from '../score';
-import { makeUnit } from '../units';
+import { makeUnit } from '../units/units';
 import { Tribe } from '../tribes';
 import { UnitType } from '@enums';
 

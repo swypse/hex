@@ -1,5 +1,5 @@
 import { Graphics, GraphicsPath } from 'pixi.js';
-import { THEME } from './theme';
+import { THEME } from '../../gfx/theme';
 
 export function makePanel(
   width: number,
@@ -39,13 +39,3 @@ export function makePanel(
   return g;
 }
 
-function makeCircle(
-  radius: number,
-  fill: number,
-  stroke?: { width: number; color: number },
-): Graphics {
-  const g = new Graphics();
-  g.circle(0, 0, radius).fill(fill);
-  if (stroke) g.stroke({ width: stroke.width, color: stroke.color });
-  return g;
-}

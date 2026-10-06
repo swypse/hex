@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { GameMap, MapTile, Settlement } from '../src/game/map-gen';
-import { attackDamage, attackableTargets, chooseBestAttack, resolveCombat, defenseBonusFor, MISS_CHANCE, missChanceFor, performAttack, performSiege, isEnemySiegeTarget, tradeIsFavorable, canCounterAttack, COMBAT_SCALE, COUNTER_SCALE } from '../src/game/combat';
+import { type GameMap, type MapTile, type Settlement } from '../src/game/map/map-gen';
+import { attackDamage, attackableTargets, chooseBestAttack, resolveCombat, defenseBonusFor, MISS_CHANCE, missChanceFor, performAttack, performSiege, isEnemySiegeTarget, tradeIsFavorable, canCounterAttack, COMBAT_SCALE, COUNTER_SCALE } from '../src/game/units/combat';
 import type { Player } from '../src/game/players';
-import { TileType } from '../src/game/tile-types';
-import { Unit, UNIT_TYPES, MAX_HP } from '../src/game/units';
+import { TileType } from '../src/game/map/tile-types';
+import { type Unit, UNIT_TYPES, MAX_HP } from '../src/game/units/units';
 import { BridgeDir, BuildingKind, SiegeTargetKind, UnitType } from '@enums';
 
 function makeTile(

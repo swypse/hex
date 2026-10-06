@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { generateMap } from '../src/game/map-gen';
-import { axialKey, hexNeighbors } from '../src/game/hex';
-import { TileType } from '../src/game/tile-types';
+import { generateMap } from '../src/game/map/map-gen';
+import { axialKey, hexNeighbors } from '../src/game/map/hex';
+import { TileType } from '../src/game/map/tile-types';
 import { tileSignature, tileInView } from '../src/render/tile-signature';
-import { Viewport } from '../src/render/tile-signature';
+import { type Viewport } from '../src/render/tile-signature';
 import { BridgeDir, UnitType } from '@enums';
 
 describe('tileSignature', () => {

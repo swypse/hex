@@ -7,7 +7,7 @@ const ACTIVE_MATCH_KEY = 'hex-active-match-v1';
  *  before it is treated as a dead room and dropped. */
 export const ACTIVE_MATCH_TTL_MS = 45 * 60 * 1000;
 
-export interface ActiveClientMatch {
+interface ActiveClientMatch {
   role: LobbyRole.CLIENT;
   code: string;
   name: string;

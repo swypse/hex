@@ -2,11 +2,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Container } from 'pixi.js';
 import { EventPresenter, type EventHost } from '../src/controller/event-presenter';
 import { useGameStore } from '../src/store/game-store';
-import { TileType } from '../src/game/tile-types';
-import { START_RESOURCES } from '../src/game/resources';
+import { TileType } from '../src/game/map/tile-types';
+import { START_RESOURCES } from '../src/game/economy/resources';
 import { Tribe } from '../src/game/tribes';
 import type { Player } from '../src/game/players';
-import type { MapTile } from '../src/game/map-gen';
+import type { MapTile } from '../src/game/map/map-gen';
 import { GameEventType } from '@enums';
 
 describe('capture messages', () => {

@@ -46,7 +46,3 @@ export const TRIBE_SPECIAL_UNIT: Record<Tribe, UnitType> = {
   [Tribe.Aqua]: UnitType.STORMCALLER,
   [Tribe.Sand]: UnitType.STUNNER,
 };
-
-export function specialUnitFor(tribe: Tribe): UnitType {
-  return TRIBE_SPECIAL_UNIT[tribe];
-}

@@ -9,8 +9,8 @@ import { buildPlayers } from '../src/game/players';
 import { Tribe } from '../src/game/tribes';
 import { SeededRandom } from '../src/util/random';
 import { Simulator } from '../src/game/simulator';
-import { TileType } from '../src/game/tile-types';
-import { type GameMap, type MapTile } from '../src/game/map-gen';
+import { TileType } from '../src/game/map/tile-types';
+import { type GameMap, type MapTile } from '../src/game/map/map-gen';
 import { GameMode, Screen, SelectionKind, SkillId } from '@enums';
 
 function fakeCanvasContext() {

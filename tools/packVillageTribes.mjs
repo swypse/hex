@@ -25,7 +25,7 @@ export function tribeAtlasUrl(tribe) {
 }
 
 export function tribeManifestUrl(tribe) {
-  return new URL(`../src/game/village-${tribe}-atlas-data.gen.ts`, import.meta.url);
+  return new URL(`../src/atlas-data/village-${tribe}-atlas-data.gen.ts`, import.meta.url);
 }
 
 export function tribeAtlasFileName(tribe) {

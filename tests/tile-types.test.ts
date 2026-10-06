@@ -8,7 +8,7 @@ import {
   TILE_TYPE_COLORS,
   TILE_TYPE_NAMES,
   TileType,
-} from '../src/game/tile-types';
+} from '../src/game/map/tile-types';
 
 describe('tile types', () => {
   it('defines all 18 tile types', () => {

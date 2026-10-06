@@ -3,9 +3,9 @@ import { Container, BitmapText } from 'pixi.js';
 import { tribeById } from '../../game/tribes';
 import { useGameStore } from '../../store/game-store';
 import { type UIHost, type Widget } from '../host';
-import { makeLabel } from '../kit/label';
+import { makeLabel } from '../../gfx/label';
 import { t } from '../../i18n';
-import { TURN_BAR_HEIGHT } from '../layout';
+import { TURN_BAR_HEIGHT } from './layout';
 import { FontSize, GameMode, Screen } from '@enums';
 
 export class HudTurn implements Widget {

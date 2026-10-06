@@ -2,8 +2,8 @@ import { t } from '../../i18n';
 import { Container } from 'pixi.js';
 import { useGameStore } from '../../store/game-store';
 import { type UIHost, type Widget } from '../host';
-import { makeLabel } from '../kit/label';
-import { TOOLBAR_HEIGHT } from '../layout';
+import { makeLabel } from '../../gfx/label';
+import { TOOLBAR_HEIGHT } from './layout';
 import { FontSize, Screen } from '@enums';
 
 export class HudLoading implements Widget {

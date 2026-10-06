@@ -1,8 +1,10 @@
 import { Application, Container, Graphics, BitmapText, type FederatedPointerEvent, type FederatedWheelEvent } from 'pixi.js';
 import { Button } from './button';
-import { makeLabel } from './label';
-import { THEME } from './theme';
+import { makeLabel } from '../../gfx/label';
+import { THEME } from '../../gfx/theme';
 import { FontSize, PopupPosition } from '@enums';
+import { clamp } from '../../util/math';
+import { easeOutCubic } from '../../util/easing';
 
 const PAD_H = 20;
 const PAD_TOP = 16;
@@ -134,7 +136,7 @@ export class Popup {
     const maxH = Math.floor(screenH * 0.6);
     // In fit-content mode start at the width cap so text can wrap; the card
     // shrinks down to the actual content width during layout.
-    this.cardWidth = this.fitContent ? maxW : Math.max(0, Math.min(opts.width ?? DEFAULT_WIDTH, maxW));
+    this.cardWidth = this.fitContent ? maxW : clamp(opts.width ?? DEFAULT_WIDTH, 0, maxW);
     this._contentWidth = Math.max(0, this.cardWidth - PAD_H * 2);
 
     this.el = new Container();
@@ -183,7 +185,7 @@ export class Popup {
 
     this.isFixedHeight = opts.height !== undefined;
     if (this.isFixedHeight) {
-      this.cardHeight = Math.max(MIN_CARD_HEIGHT, Math.min(opts.height!, maxH));
+      this.cardHeight = clamp(opts.height!, MIN_CARD_HEIGHT, maxH);
       this.contentHeight = Math.max(0, this.cardHeight - this.overhead());
     }
 
@@ -290,7 +292,7 @@ export class Popup {
     if (this.fitContent) {
       const maxW = Math.floor(this.app.screen.width * 0.9);
       const naturalW = this.measureContentWidth();
-      const newW = Math.max(0, Math.min(maxW, Math.ceil(naturalW) + PAD_H * 2));
+      const newW = clamp(Math.ceil(naturalW) + PAD_H * 2, 0, maxW);
       if (newW !== this.cardWidth) {
         this.cardWidth = newW;
         this._contentWidth = Math.max(0, newW - PAD_H * 2);
@@ -306,7 +308,7 @@ export class Popup {
       // A message card hugs its text (equal padding top and bottom); other
       // popups keep a minimum height so short dialogs do not look squashed.
       const minH = this.fitContent ? 0 : MIN_CARD_HEIGHT;
-      this.cardHeight = Math.max(minH, Math.min(natural, maxH));
+      this.cardHeight = clamp(natural, minH, maxH);
       this.contentHeight = Math.max(0, this.cardHeight - overhead);
     }
 
@@ -349,7 +351,7 @@ export class Popup {
     this.content.position.set(0, -this.scrollOffset);
 
     this.scrollMax = this.contentNaturalHeight > this.contentHeight ? this.contentNaturalHeight - this.contentHeight : 0;
-    this.scrollOffset = Math.max(0, Math.min(this.scrollOffset, this.scrollMax));
+    this.scrollOffset = clamp(this.scrollOffset, 0, this.scrollMax);
     this.content.position.y = -this.scrollOffset;
     this.content.mask = this.clip;
 
@@ -395,7 +397,7 @@ export class Popup {
 
   private onWheel = (e: FederatedWheelEvent): void => {
     if (this.scrollMax <= 0 || e.deltaY === 0) return;
-    this.scrollOffset = Math.max(0, Math.min(this.scrollOffset + e.deltaY, this.scrollMax));
+    this.scrollOffset = clamp(this.scrollOffset + e.deltaY, 0, this.scrollMax);
     this.content.position.y = -this.scrollOffset;
   };
 
@@ -413,7 +415,7 @@ export class Popup {
     const dy = e.clientY - this.lastClientY;
     this.lastClientY = e.clientY;
     if (dy === 0) return;
-    this.scrollOffset = Math.max(0, Math.min(this.scrollOffset - dy, this.scrollMax));
+    this.scrollOffset = clamp(this.scrollOffset - dy, 0, this.scrollMax);
     this.content.position.y = -this.scrollOffset;
   };
 
@@ -469,8 +471,7 @@ export class Popup {
       }
       elapsed += t.deltaMS;
       const p = Math.min(1, elapsed / durationMs);
-      const eased = 1 - Math.pow(1 - p, 3);
-      step(eased);
+      step(easeOutCubic(p));
       if (p >= 1) {
         ticker.remove(fn);
         this.tickerFn = null;

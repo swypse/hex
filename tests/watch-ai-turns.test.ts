@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { generateMap } from '@/game/map-gen';
+import { generateMap } from '@/game/map/map-gen';
 import { buildPlayers } from '@/game/players';
 import { Simulator } from '@/game/simulator';
 import { Tribe } from '@/game/tribes';

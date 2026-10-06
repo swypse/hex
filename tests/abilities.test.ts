@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { GameMap, MapTile } from '../src/game/map-gen';
-import { makeUnit } from '../src/game/units';
-import { isWaterType, TileType } from '../src/game/tile-types';
-import { bannerAttackBonus, berserkerRage, effectiveAttack, isStunned } from '../src/game/abilities';
+import { type GameMap, type MapTile } from '../src/game/map/map-gen';
+import { makeUnit } from '../src/game/units/units';
+import { isWaterType, TileType } from '../src/game/map/tile-types';
+import { bannerAttackBonus, berserkerRage, effectiveAttack, isStunned } from '../src/game/units/abilities';
 import { UnitType } from '@enums';
 
 function tile(q: number, r: number, terrain: TileType = TileType.GrasslandLand): MapTile {

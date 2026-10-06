@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { Container, Sprite } from 'pixi.js';
-import { countRenderObjects, summarizeFrameTimes, summarizeSpikes, wrapGlDrawCalls, type GlDrawCallContext } from '../src/render/perf-stats';
+import { countRenderObjects, summarizeFrameTimes, summarizeSpikes, wrapGlDrawCalls, type GlDrawCallContext } from '../src/gfx/perf-stats';
 
 describe('countRenderObjects', () => {
   it('counts visible renderables including the root and containers', () => {

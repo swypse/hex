@@ -1,13 +1,12 @@
 import type { Simulator } from '../game/simulator';
 import type { GameEvent } from '../game/events';
 import { t } from '../i18n';
-import { hexDistance, hexNeighbors } from '../game/hex';
-import { tileAt } from '../game/selection';
-import type { MapTile } from '../game/map-gen';
-import { isLandType, isWaterType } from '../game/tile-types';
-import { isExploredFor } from '../game/explore';
+import { hexDistance, hexNeighbors } from '../game/map/hex';
+import type { MapTile } from '../game/map/map-gen';
+import { isLandType, isWaterType } from '../game/map/tile-types';
+import { isExploredFor } from '../game/map/explore';
 import { hasSkill } from '../game/skills';
-import { makeUnit } from '../game/units';
+import { makeUnit } from '../game/units/units';
 import { STEP_ORDER } from '../game/tutorial/tutorial-steps';
 import {
   TUTORIAL_CAPITAL, TUTORIAL_ENEMY_PLAYER, TUTORIAL_ARCHER_ENEMY_PREFERRED,
@@ -15,6 +14,7 @@ import {
   TUTORIAL_HUMAN, TUTORIAL_PORT_TILE, TUTORIAL_START_WARRIOR_ID,
 } from '../game/tutorial/tutorial-map';
 import { BonusKind, BuildingKind, GameEventType, SkillId, TutorialStepId, UnitType } from '@enums';
+import { tileAt } from '../game/map/tile-index';
 
 export interface TutorialHost {
   sim(): Simulator | null;

@@ -1,14 +1,14 @@
 import { describe, it, expect } from 'vitest';
-import { GameMap, MapTile } from '../src/game/map-gen';
-import { TileType } from '../src/game/tile-types';
-import { Unit } from '../src/game/units';
+import { type GameMap, type MapTile } from '../src/game/map/map-gen';
+import { TileType } from '../src/game/map/tile-types';
+import { type Unit } from '../src/game/units/units';
 import {
   exploreAround,
   exploreUnitPath,
   initialExplorationFor,
   isExploredFor,
-} from '../src/game/explore';
-import { villageSightRadius, exploreVillageSight, exploreVillageSights } from '../src/game/village';
+} from '../src/game/map/explore';
+import { villageSightRadius, exploreVillageSight, exploreVillageSights } from '../src/game/economy/village';
 import { UnitType } from '@enums';
 
 function makeTile(q: number, r: number, ownedBy: number | null = null): MapTile {

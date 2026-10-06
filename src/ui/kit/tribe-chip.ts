@@ -1,4 +1,5 @@
 import { Container, Graphics } from 'pixi.js';
+import { makeAchievementIcon } from '../../gfx/achievement-icons';
 import { makeIcon } from './icon';
 
 export interface IconChipOpts {
@@ -7,7 +8,7 @@ export interface IconChipOpts {
 }
 
 /** A round chip clipping an arbitrary icon container inside it. */
-export function makeCircleChip(child: Container, size: number, opts: IconChipOpts = {}): Container {
+function makeCircleChip(child: Container, size: number, opts: IconChipOpts = {}): Container {
   const chip = new Container();
   const radius = size / 2;
   const bgColor = opts.bgColor ?? 0xffffff;
@@ -25,4 +26,9 @@ export function makeCircleChip(child: Container, size: number, opts: IconChipOpt
 /** A round chip with the given icon texture clipped inside it. */
 export function makeIconChip(iconFile: string, size: number, opts: IconChipOpts = {}): Container {
   return makeCircleChip(makeIcon(iconFile, size), size, opts);
+}
+
+/** A round chip with the given achievement atlas icon clipped inside it. */
+export function makeAchievementChip(key: string, size: number, opts: IconChipOpts = {}): Container {
+  return makeCircleChip(makeAchievementIcon(key, size), size, opts);
 }

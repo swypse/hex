@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { gameController } from '../src/controller/game-controller';
 import { NetworkController } from '../src/controller/network-controller';
-import { totalStock } from '../src/game/stock';
+import { totalStock } from '../src/game/economy/stock';
 import { TRIBES } from '../src/game/tribes';
 import { useGameStore } from '../src/store/game-store';
 import { CommandType, GameMode, NetMode, Screen, SelectionKind } from '@enums';
@@ -53,7 +53,7 @@ describe('GameController lifecycle', () => {
     const sim = gameController.getSim()!;
     const before = { money: sim.players[0]!.resources.money, ...totalStock(sim.map, 0) };
     const villages = sim.map.tiles.filter((t) => t.settlement?.owner === 0).length;
-    expect(gameController.cheatResources()).toBe(true);
+    expect(gameController.cheats.cheatResources()).toBe(true);
     const after = { money: sim.players[0]!.resources.money, ...totalStock(sim.map, 0) };
     expect(after.money).toBe(before.money + 1000);
     // every own village gets the materials
@@ -67,7 +67,7 @@ describe('GameController lifecycle', () => {
     const sim = gameController.getSim()!;
     const before = { ...sim.players[0]!.resources };
     useGameStore.setState({ netMode: NetMode.HOST });
-    expect(gameController.cheatResources()).toBe(false);
+    expect(gameController.cheats.cheatResources()).toBe(false);
     expect(sim.players[0]!.resources).toEqual(before);
   });
 
@@ -75,7 +75,7 @@ describe('GameController lifecycle', () => {
     await gameController.startGame(TRIBES[0]!.id, 1, GameMode.CAPTURE);
     const sim = gameController.getSim()!;
     expect(sim.gameOver).toBe(false);
-    expect(gameController.cheatWin()).toBe(true);
+    expect(gameController.cheats.cheatWin()).toBe(true);
     expect(sim.players[1]!.isActive).toBe(false);
     // The game is not over until the local player ends their turn.
     expect(sim.gameOver).toBe(false);
@@ -87,7 +87,7 @@ describe('GameController lifecycle', () => {
   it('does not clear the selected cell when ending the turn', async () => {
     await gameController.startGame(TRIBES[0]!.id, 1, GameMode.CAPTURE);
     const store = useGameStore.getState();
-    const selection: import('../src/game/selection').Selection = { kind: SelectionKind.TILE, q: 2, r: 1 };
+    const selection: import('../src/game/units/selection').Selection = { kind: SelectionKind.TILE, q: 2, r: 1 };
     store.setSelection(selection);
     gameController.endTurn();
     // The AI turn runs asynchronously; the important regression is that

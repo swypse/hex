@@ -1,7 +1,7 @@
 import { t } from '../i18n';
-import { isExploredFor } from './explore';
-import { GameMap } from './map-gen';
-import { Player } from './players';
+import { isExploredFor } from './map/explore';
+import { type GameMap } from './map/map-gen';
+import { type Player } from './players';
 import { BuildingKind, UnitType } from '@enums';
 
 export const VILLAGE_SCORE = 50;

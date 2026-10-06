@@ -2,11 +2,11 @@ import {
   captureWinnerIndex, computeWinner, countUnits, GAME_MODE_NAMES, quickCaptureScore, quickCaptureTurnsCount,
   rankPlayers, shouldPromptWatch, starRating,
 } from '@/game/game-mode';
-import { GameMap, MapTile, Settlement } from '@/game/map-gen';
-import { Player } from '@/game/players';
-import { TileType } from '@/game/tile-types';
+import { type GameMap, type MapTile, type Settlement } from '@/game/map/map-gen';
+import { type Player } from '@/game/players';
+import { TileType } from '@/game/map/tile-types';
 import { Tribe } from '@/game/tribes';
-import { Unit } from '@/game/units';
+import { type Unit } from '@/game/units/units';
 import { GameMode, NetMode, OverlayKind, UnitType } from '@enums';
 import { describe, expect, it } from 'vitest';
 

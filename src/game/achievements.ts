@@ -1,10 +1,11 @@
-import { isExploredFor } from './explore';
-import { tileMapByKey, type GameMap, type MapTile } from './map-gen';
+import { isExploredFor } from './map/explore';
+import { type GameMap } from './map/map-gen';
 import type { Player } from './players';
 import { awardScore, EMPTY_STATS, type PlayerStats } from './score';
 import { SKILLS } from './skills';
-import { roadNetworkComponents } from './roads';
 import { AchievementId } from '@enums';
+import { tileMapByKey } from './map/tile-index';
+import { roadNetworkComponents } from './economy/road-network';
 
 
 
@@ -32,10 +33,6 @@ const ACHIEVEMENT_ICON: Record<AchievementId, string> = {
 function statsOf(player: Player): PlayerStats {
   player.stats ??= { ...EMPTY_STATS };
   return player.stats;
-}
-
-function ownedVillages(map: GameMap, player: Player): MapTile[] {
-  return map.tiles.filter((t) => t.settlement !== null && t.settlement.owner === player.index);
 }
 
 /** Largest number of the player's villages reachable over its own roads,
@@ -145,20 +142,12 @@ export function achievementNameKey(id: AchievementId): string {
   return achievementInfo(id).nameKey;
 }
 
-export function achievementPoints(id: AchievementId): number {
-  return achievementInfo(id).points;
-}
-
 export function achievementIcon(id: AchievementId): string {
   return achievementInfo(id).icon;
 }
 
 export function unlockedAchievements(player: Player): AchievementId[] {
   return player.achievements ?? [];
-}
-
-function hasAchievement(player: Player, id: AchievementId): boolean {
-  return (player.achievements ?? []).includes(id);
 }
 
 export function achievementTotalScore(player: Player): number {

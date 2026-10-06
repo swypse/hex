@@ -1,8 +1,9 @@
 import { Container, Graphics, BitmapText } from 'pixi.js';
-import { makeLabel } from './label';
-import { TEXT_BUTTON, THEME } from './theme';
+import { makeLabel } from '../../gfx/label';
+import { TEXT_BUTTON, THEME } from '../../gfx/theme';
 import { sfx } from '../../sound/sfx';
 import { FontSize } from '@enums';
+import { clamp } from '../../util/math';
 
 const SHADOW_OFFSET_X = 4;
 const SHADOW_OFFSET_Y = 4;
@@ -36,7 +37,7 @@ function traceRoundedRect(
   corners: ButtonCorners,
 ): void {
   const maxR = Math.max(0, Math.min(w, h) / 2);
-  const c = corners.map((r) => Math.max(0, Math.min(r, maxR))) as [number, number, number, number];
+  const c = corners.map((r) => clamp(r, 0, maxR)) as [number, number, number, number];
   const [tl, tr, br, bl] = c;
   const arc = (x1: number, y1: number, x2: number, y2: number, r: number): void => {
     if (r > 0) g.arcTo(x1, y1, x2, y2, r);

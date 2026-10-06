@@ -3,14 +3,14 @@ import { Application, BitmapText, Container, Graphics, ImageSource, Sprite, Text
 import { MapView } from '../src/render/map-renderer';
 import { captureMarkerPoints } from '../src/render/capture-marker';
 import { FIRE_SIZE_MIN, FIRE_SIZE_MAX } from '../src/render/fire';
-import { GameMap, MapTile } from '../src/game/map-gen';
-import { type Selection } from '../src/game/selection';
-import { TileType } from '../src/game/tile-types';
-import { Player } from '../src/game/players';
-import { START_RESOURCES } from '../src/game/resources';
+import { type GameMap, type MapTile } from '../src/game/map/map-gen';
+import { type Selection } from '../src/game/units/selection';
+import { TileType } from '../src/game/map/tile-types';
+import { type Player } from '../src/game/players';
+import { START_RESOURCES } from '../src/game/economy/resources';
 import { Tribe, TRIBES } from '../src/game/tribes';
-import { Unit, UNIT_TYPES } from '../src/game/units';
-import { axialKey, hexToPixel } from '../src/game/hex';
+import { type Unit, UNIT_TYPES } from '../src/game/units/units';
+import { axialKey, hexToPixel } from '../src/game/map/hex';
 import { tileElevation } from '../src/render/elevation';
 import { type TextureSet, type TileTexture } from '../src/render/texture-factory';
 import { WeatherType } from '@enums';
@@ -156,7 +156,7 @@ describe('MapView hp bar anchoring', () => {
       ticker: { add: (): void => {}, remove: (): void => {} },
     } as unknown as Application;
 
-    view = new MapView(app, textures, HEX, SPRITE_SCALE, 2);
+    view = new MapView(app, textures, HEX, SPRITE_SCALE);
     view.update(map, players, null, new Set(), new Set(), 0, new Set(), {
       x: 400,
       y: 300,
@@ -338,7 +338,7 @@ describe('MapView hp bar anchoring', () => {
     const v = new MapView({
       screen: { width: 800, height: 600 },
       ticker: { add: (): void => {}, remove: (): void => {} },
-    } as unknown as Application, textures, HEX, SPRITE_SCALE, 2);
+    } as unknown as Application, textures, HEX, SPRITE_SCALE);
     const tile: MapTile = {
       q: 0, r: 0, terrain: TileType.GrasslandLand, height: 0, settlement: null,
       building: null, roadOwner: null, unit: null, ownedBy: 0, claimedByVillage: null, exploredBy: [0],
@@ -370,7 +370,7 @@ describe('MapView hp bar anchoring', () => {
       screen: { width: 800, height: 600 },
       ticker: { add: (fn: () => void) => callbacks.push(fn), remove: (): void => {} },
     } as unknown as Application;
-    const v = new MapView(app, textures, HEX, SPRITE_SCALE, 2);
+    const v = new MapView(app, textures, HEX, SPRITE_SCALE);
     const shipTile: MapTile = {
       q: 0, r: 0, terrain: TileType.Water, height: 0.1, settlement: null,
       building: null, roadOwner: null, unit: null, ownedBy: 0, claimedByVillage: null, exploredBy: [0],
@@ -412,7 +412,7 @@ describe('MapView hp bar anchoring', () => {
       screen: { width: 800, height: 600 },
       ticker: { add: (fn: () => void) => callbacks.push(fn), remove: (): void => {} },
     } as unknown as Application;
-    const v = new MapView(app, textures, HEX, SPRITE_SCALE, 2);
+    const v = new MapView(app, textures, HEX, SPRITE_SCALE);
     const shipTile: MapTile = {
       q: 0, r: 0, terrain: TileType.Water, height: 0.1, settlement: null,
       building: null, roadOwner: null, unit: null, ownedBy: 0, claimedByVillage: null, exploredBy: [0],
@@ -470,7 +470,7 @@ describe('MapView hp bar anchoring', () => {
       screen: { width: 800, height: 600 },
       ticker: { add: (fn: () => void) => callbacks.push(fn), remove: (): void => {} },
     } as unknown as Application;
-    const v = new MapView(app, textures, HEX, SPRITE_SCALE, 2);
+    const v = new MapView(app, textures, HEX, SPRITE_SCALE);
     v.update(map, players, null, new Set(), new Set(), 0, new Set(), {
       x: 400, y: 300, scale: 1, width: 800, height: 600,
     });
@@ -559,7 +559,7 @@ describe('MapView hp bar anchoring', () => {
       screen: { width: 800, height: 600 },
       ticker: { add: (): void => {}, remove: (): void => {} },
     } as unknown as Application;
-    const v = new MapView(app, connectedTextures, HEX, SPRITE_SCALE, 2);
+    const v = new MapView(app, connectedTextures, HEX, SPRITE_SCALE);
     v.update(m, players, null, new Set(), new Set(), 0, new Set(), {
       x: 400, y: 300, scale: 1, width: 800, height: 600,
     });
@@ -596,11 +596,11 @@ describe('MapView hp bar anchoring', () => {
       index: 1, tribe: Tribe.Warriors, isHuman: false, name: 'E',
       resources: { ...START_RESOURCES }, score: 0, kills: 0, skills: [], isActive: true,
     };
-    const v = new MapView(app, markerTextures, HEX, SPRITE_SCALE, 2);
+    const v = new MapView(app, markerTextures, HEX, SPRITE_SCALE);
     v.update(m, [players[0]!, enemy], null, new Set(), new Set(), 0, new Set(), {
       x: 0, y: 0, scale: 1, width: 120, height: 120,
     });
-    const edge = (v as unknown as { edgeMarkers: Container }).edgeMarkers;
+    const edge = (v as unknown as { edgeLayer: { container: Container } }).edgeLayer.container;
     v.repositionEdgeMarkers({ x: 0, y: 0, scale: 1, width: 120, height: 120 });
     expect(edge.children.length).toBe(1);
     v.repositionEdgeMarkers({ x: -400, y: 200, scale: 1, width: 800, height: 600 });
@@ -630,12 +630,12 @@ describe('MapView hp bar anchoring', () => {
       index: 1, tribe: Tribe.Warriors, isHuman: false, name: 'E',
       resources: { ...START_RESOURCES }, score: 0, kills: 0, skills: [], isActive: true,
     };
-    const v = new MapView(app, markerTextures, HEX, SPRITE_SCALE, 2);
+    const v = new MapView(app, markerTextures, HEX, SPRITE_SCALE);
     const viewport = { x: 0, y: 0, scale: 1, width: 120, height: 120 };
     v.update(m, [players[0]!, enemy], null, new Set(), new Set(), 0, new Set(), viewport);
     v.repositionEdgeMarkers(viewport);
     const edgePulseRunning = (): boolean =>
-      (v as unknown as { stopEdgePulseFn: (() => void) | null }).stopEdgePulseFn !== null;
+      (v as unknown as { edgeLayer: { stopPulseFn: (() => void) | null } }).edgeLayer.stopPulseFn !== null;
     expect(edgePulseRunning()).toBe(true);
 
     // An unrelated map/action update triggers a marker rebuild. The animation
@@ -670,7 +670,7 @@ describe('MapView hp bar anchoring', () => {
       index: 1, tribe: Tribe.Warriors, isHuman: false, name: 'E',
       resources: { ...START_RESOURCES }, score: 0, kills: 0, skills: [], isActive: true,
     };
-    const view = new MapView(app, markerTextures, HEX, SPRITE_SCALE, 2);
+    const view = new MapView(app, markerTextures, HEX, SPRITE_SCALE);
     const W = 800;
     const H = 600;
     const p = hexToPixel(v, HEX);
@@ -681,7 +681,7 @@ describe('MapView hp bar anchoring', () => {
     expect(p.x).toBeGreaterThanOrEqual(0);
     expect(p.x).toBeLessThanOrEqual(W);
     view.repositionEdgeMarkers({ x: 0, y: 0, scale: 1, width: W, height: H });
-    const parts = (view as unknown as { edgeMarkerParts: { side: CaptureMarkerSide; along: number; W: number; H: number }[] }).edgeMarkerParts;
+    const parts = (view as unknown as { edgeLayer: { parts: { side: CaptureMarkerSide; along: number; W: number; H: number }[] } }).edgeLayer.parts;
     expect(parts.length).toBe(1);
     expect(parts[0]!.side).toBe(CaptureMarkerSide.TOP);
     expect(parts[0]!.along).toBe(p.x);
@@ -710,7 +710,7 @@ describe('MapView hp bar anchoring', () => {
       index: 1, tribe: Tribe.Warriors, isHuman: false, name: 'E',
       resources: { ...START_RESOURCES }, score: 0, kills: 0, skills: [], isActive: true,
     };
-    const view = new MapView(app, markerTextures, HEX, SPRITE_SCALE, 2);
+    const view = new MapView(app, markerTextures, HEX, SPRITE_SCALE);
     const W = 800;
     const H = 600;
     const p = hexToPixel(v, HEX);
@@ -721,7 +721,7 @@ describe('MapView hp bar anchoring', () => {
     expect(p.y).toBeGreaterThanOrEqual(0);
     expect(p.y).toBeLessThanOrEqual(H);
     view.repositionEdgeMarkers({ x: 0, y: 0, scale: 1, width: W, height: H });
-    const parts = (view as unknown as { edgeMarkerParts: { side: CaptureMarkerSide; along: number; W: number; H: number }[] }).edgeMarkerParts;
+    const parts = (view as unknown as { edgeLayer: { parts: { side: CaptureMarkerSide; along: number; W: number; H: number }[] } }).edgeLayer.parts;
     expect(parts.length).toBe(1);
     expect(parts[0]!.side).toBe(CaptureMarkerSide.LEFT);
     expect(parts[0]!.along).toBe(p.y);
@@ -838,7 +838,7 @@ describe('MapView hp bar anchoring', () => {
     };
     const m: GameMap = { radius: 1, spawns: [], tiles: [tile] };
     const texs = buildTextures(m);
-    const v = new MapView(app, texs, HEX, SPRITE_SCALE, 2);
+    const v = new MapView(app, texs, HEX, SPRITE_SCALE);
     const players: Player[] = [
       { index: 0, tribe: Tribe.Cats, isHuman: true, name: 'Cats', resources: { ...START_RESOURCES }, score: 0, kills: 0, skills: [], isActive: true },
     ];
@@ -913,7 +913,7 @@ describe('MapView hp bar anchoring', () => {
       { index: 1, tribe: Tribe.Warriors, isHuman: true, name: 'War', resources: { ...START_RESOURCES }, score: 0, kills: 0, skills: [], isActive: true },
     ];
     const texs = buildTextures(map);
-    const v = new MapView(app, texs, HEX, SPRITE_SCALE, 2);
+    const v = new MapView(app, texs, HEX, SPRITE_SCALE);
     const vp = { x: 400, y: 300, scale: 1, width: 800, height: 600 };
     const origNow = performance.now;
     let now = 0;
@@ -921,7 +921,7 @@ describe('MapView hp bar anchoring', () => {
     try {
       v.update(map, players, null, new Set(), new Set(), 0, new Set(), vp);
       const greenOf = (): number =>
-        ((v as unknown as { hpBars: Map<string, { greenW: number }> }).hpBars.get('d')!).greenW;
+        ((v as unknown as { hpLayer: { bars: Map<string, { greenW: number }> } }).hpLayer.bars.get('d')!).greenW;
       const widths: number[] = [greenOf()];
 
       const sync = (hp: number, id = 'd'): void => {
@@ -1013,7 +1013,7 @@ describe('MapView hp bar anchoring', () => {
       screen: { width: 800, height: 600 },
       ticker: { add: (): void => {}, remove: (): void => {} },
     } as unknown as Application;
-    const v = new MapView(app, textures, HEX, SPRITE_SCALE, 2);
+    const v = new MapView(app, textures, HEX, SPRITE_SCALE);
     const selection = { kind: SelectionKind.UNIT, q: 0, r: 0 };
     v.update(m, players, selection, new Set(['1,0']), new Set(['0,1']), 0, new Set(), {
       x: 400, y: 300, scale: 1, width: 800, height: 600,
@@ -1045,7 +1045,7 @@ describe('MapView hp bar anchoring', () => {
       screen: { width: 800, height: 600 },
       ticker: { add: (): void => {}, remove: (): void => {} },
     } as unknown as Application;
-    const v = new MapView(app, textures, HEX, SPRITE_SCALE, 2);
+    const v = new MapView(app, textures, HEX, SPRITE_SCALE);
     const selection = { kind: SelectionKind.UNIT, q: 0, r: 0 };
     v.update(m, players, selection, new Set(['1,0']), new Set(), 0, new Set(), {
       x: 400, y: 300, scale: 1, width: 800, height: 600,
@@ -1088,7 +1088,7 @@ describe('MapView hp bar anchoring', () => {
       roadOwner: null, unit: null, ownedBy: null, claimedByVillage: null, exploredBy: [0],
     });
     const m: GameMap = { radius: 2, spawns: [], tiles: [tile(0, 0), tile(1, 0), tile(2, 0)] };
-    const v = new MapView(app, buildTextures(m), HEX, SPRITE_SCALE, 2);
+    const v = new MapView(app, buildTextures(m), HEX, SPRITE_SCALE);
     const selection = { kind: SelectionKind.UNIT, q: 0, r: 0 };
     const origNow = performance.now;
     let now = 0;
@@ -1202,7 +1202,7 @@ describe('MapView hp bar anchoring', () => {
       screen: { width: 800, height: 600 },
       ticker: { add: (fn: () => void) => callbacks.push(fn), remove: (): void => {} },
     } as unknown as Application;
-    const v = new MapView(app, textures, HEX, SPRITE_SCALE, 2);
+    const v = new MapView(app, textures, HEX, SPRITE_SCALE);
     v.update(map, players, null, new Set(), new Set(), 0, new Set(), { x: 400, y: 300, scale: 1, width: 800, height: 600 });
     const sprite = (v as unknown as { tileViews: Map<string, { terrainSprite: Sprite }> }).tileViews.get('0,0')!.terrainSprite;
     const baseY = sprite.position.y;
@@ -1254,8 +1254,8 @@ describe('MapView hp bar anchoring', () => {
       screen: { width: 800, height: 600 },
       ticker: { add: (): void => {}, remove: (): void => {} },
     } as unknown as Application;
-    const v = new MapView(app, textures, HEX, SPRITE_SCALE, 2);
-    const selection: import('../src/game/selection').Selection = { kind: SelectionKind.TILE, q: 0, r: 0 };
+    const v = new MapView(app, textures, HEX, SPRITE_SCALE);
+    const selection: import('../src/game/units/selection').Selection = { kind: SelectionKind.TILE, q: 0, r: 0 };
     v.update(m, players, selection, new Set(), new Set(), 0, new Set(), {
       x: 400,
       y: 300,
@@ -1271,7 +1271,7 @@ describe('MapView hp bar anchoring', () => {
   });
 
   it('splits the selected border: top part layered in the tile, bottom part above everything', () => {
-    const selection: import('../src/game/selection').Selection = { kind: SelectionKind.TILE, q: 0, r: 0 };
+    const selection: import('../src/game/units/selection').Selection = { kind: SelectionKind.TILE, q: 0, r: 0 };
     view.update(map, players, selection, new Set(), new Set(), 0, new Set(), {
       x: 400,
       y: 300,
@@ -1294,7 +1294,7 @@ describe('MapView hp bar anchoring', () => {
   });
 
   it('draws the split selected border as open polylines without a closing segment', () => {
-    const selection: import('../src/game/selection').Selection = { kind: SelectionKind.TILE, q: 0, r: 0 };
+    const selection: import('../src/game/units/selection').Selection = { kind: SelectionKind.TILE, q: 0, r: 0 };
     view.update(map, players, selection, new Set(), new Set(), 0, new Set(), {
       x: 400,
       y: 300,
@@ -1332,7 +1332,7 @@ describe('MapView hp bar anchoring', () => {
       screen: { width: 800, height: 600 },
       ticker: { add: (): void => {}, remove: (): void => {} },
     } as unknown as Application;
-    const v = new MapView(app, textures, HEX, SPRITE_SCALE, 2);
+    const v = new MapView(app, textures, HEX, SPRITE_SCALE);
     v.update(portMap, players, null, new Set(), new Set(), 0, new Set(), {
       x: 400, y: 300, scale: 1, width: 800, height: 600,
     });
@@ -1352,7 +1352,7 @@ describe('MapView hp bar anchoring', () => {
       screen: { width: 800, height: 600 },
       ticker: { add: (): void => {}, remove: (): void => {} },
     } as unknown as Application;
-    const v = new MapView(app, textures, HEX, SPRITE_SCALE, 2);
+    const v = new MapView(app, textures, HEX, SPRITE_SCALE);
     v.update(portMap, players, null, new Set(), new Set(), 0, new Set(), {
       x: 400, y: 300, scale: 1, width: 800, height: 600,
     });
@@ -1372,7 +1372,7 @@ describe('MapView hp bar anchoring', () => {
       screen: { width: 800, height: 600 },
       ticker: { add: (): void => {}, remove: (): void => {} },
     } as unknown as Application;
-    const v = new MapView(app, textures, HEX, SPRITE_SCALE, 2);
+    const v = new MapView(app, textures, HEX, SPRITE_SCALE);
     v.update(m, players, null, new Set(), new Set(), 0, new Set(), {
       x: 400, y: 300, scale: 1, width: 800, height: 600,
     });
@@ -1397,7 +1397,7 @@ describe('MapView hp bar anchoring', () => {
       screen: { width: 800, height: 600 },
       ticker: { add: (): void => {}, remove: (): void => {} },
     } as unknown as Application;
-    const v = new MapView(app, textures, HEX, SPRITE_SCALE, 2);
+    const v = new MapView(app, textures, HEX, SPRITE_SCALE);
     v.update(m, players, null, new Set(), new Set(), 0, new Set(), {
       x: 400, y: 300, scale: 1, width: 800, height: 600,
     });
@@ -1428,7 +1428,7 @@ describe('MapView hp bar anchoring', () => {
       screen: { width: 800, height: 600 },
       ticker: { add: (): void => {}, remove: (): void => {} },
     } as unknown as Application;
-    const v = new MapView(app, textures, HEX, SPRITE_SCALE, 2);
+    const v = new MapView(app, textures, HEX, SPRITE_SCALE);
     v.update(m, players, null, new Set(), new Set(), 0, new Set(), {
       x: 400, y: 300, scale: 1, width: 800, height: 600,
     });
@@ -1450,7 +1450,7 @@ describe('MapView hp bar anchoring', () => {
       screen: { width: 800, height: 600 },
       ticker: { add: (): void => {}, remove: (): void => {} },
     } as unknown as Application;
-    const v = new MapView(app, textures, HEX, SPRITE_SCALE, 2);
+    const v = new MapView(app, textures, HEX, SPRITE_SCALE);
     v.update(m, players, null, new Set(), new Set(), 0, new Set(), {
       x: 400, y: 300, scale: 1, width: 800, height: 600,
     });
@@ -1470,7 +1470,7 @@ describe('MapView hp bar anchoring', () => {
       screen: { width: 800, height: 600 },
       ticker: { add: (): void => {}, remove: (): void => {} },
     } as unknown as Application;
-    const v = new MapView(app, textures, HEX, SPRITE_SCALE, 2);
+    const v = new MapView(app, textures, HEX, SPRITE_SCALE);
     v.update(m, players, null, new Set(), new Set(), 0, new Set(), {
       x: 400, y: 300, scale: 1, width: 800, height: 600,
     });
@@ -1612,7 +1612,7 @@ describe('MapView hp bar anchoring', () => {
       screen: { width: 800, height: 600 },
       ticker: { add: (): void => {}, remove: (): void => {} },
     } as unknown as Application;
-    const v = new MapView(app, textures, HEX, SPRITE_SCALE, 2);
+    const v = new MapView(app, textures, HEX, SPRITE_SCALE);
     const viewport = { x: 400, y: 300, scale: 1, width: 800, height: 600 };
     v.update(m, players, null, new Set(), new Set(), 0, new Set(), viewport);
     const tvs = (v as unknown as { tileViews: Map<string, { unitSprite: Sprite | null }> }).tileViews;
@@ -1646,7 +1646,7 @@ describe('MapView hp bar anchoring', () => {
       screen: { width: 800, height: 600 },
       ticker: { add: (): void => {}, remove: (): void => {} },
     } as unknown as Application;
-    const v = new MapView(app, textures, HEX, SPRITE_SCALE, 2);
+    const v = new MapView(app, textures, HEX, SPRITE_SCALE);
     const viewport = { x: 400, y: 300, scale: 1, width: 800, height: 600 };
     v.update(m, players, null, new Set(), new Set(), 0, new Set(), viewport);
     const tvs = (v as unknown as { tileViews: Map<string, { unitSprite: Sprite | null }> }).tileViews;
@@ -1664,7 +1664,7 @@ describe('MapView hp bar anchoring', () => {
       screen: { width: 800, height: 600 },
       ticker: { add: (fn: () => void) => callbacks.push(fn), remove: (): void => {} },
     } as unknown as Application;
-    const v = new MapView(app, textures, HEX, SPRITE_SCALE, 2);
+    const v = new MapView(app, textures, HEX, SPRITE_SCALE);
     const tile: MapTile = {
       q: 0, r: 0, terrain: TileType.Water, height: 0.1, settlement: null,
       building: null, roadOwner: null, unit: null, ownedBy: null, claimedByVillage: null, exploredBy: [0],
@@ -1712,7 +1712,7 @@ describe('MapView hp bar anchoring', () => {
       screen: { width: 800, height: 600 },
       ticker: { add: (): void => {}, remove: (): void => {} },
     } as unknown as Application;
-    const v = new MapView(app, textures, HEX, SPRITE_SCALE, 2);
+    const v = new MapView(app, textures, HEX, SPRITE_SCALE);
     const viewport = { x: 400, y: 300, scale: 1, width: 800, height: 600 };
     v.update(m, players, null, new Set(), new Set(), 0, new Set(), viewport);
     const tvs = (v as unknown as { tileViews: Map<string, { wallSprite: Sprite | null }> }).tileViews;
@@ -1779,7 +1779,7 @@ describe('MapView hp bar anchoring', () => {
     };
     const m: GameMap = { radius: 1, spawns: [], tiles: [villageTile] };
     const texs = buildTextures(m);
-    const v = new MapView(app, texs, HEX, SPRITE_SCALE, 2);
+    const v = new MapView(app, texs, HEX, SPRITE_SCALE);
     const origNow = performance.now;
     let now = 0;
     (performance as { now: () => number }).now = () => now;
@@ -1830,7 +1830,7 @@ describe('MapView storm water pulse', () => {
       { index: 0, tribe: Tribe.Cats, isHuman: true, name: 'Cats', resources: { ...START_RESOURCES }, score: 0, kills: 0, skills: [], isActive: true },
     ];
     const texs = buildTextures(m);
-    const v = new MapView(app, texs, HEX, SPRITE_SCALE, 4);
+    const v = new MapView(app, texs, HEX, SPRITE_SCALE);
     const origNow = performance.now;
     let now = 0;
     (performance as { now: () => number }).now = () => now;
@@ -1893,7 +1893,7 @@ describe('MapView season ice wave', () => {
     ];
     const oldTexs = buildTextures(m);
     const newTexs = buildTextures(m);
-    const v = new MapView(app, oldTexs, HEX, SPRITE_SCALE, 4);
+    const v = new MapView(app, oldTexs, HEX, SPRITE_SCALE);
     try {
       v.update(m, players, null, new Set(), new Set(), 0, new Set(), { x: 400, y: 300, scale: 1, width: 800, height: 600 });
       const views = (v as unknown as { tileViews: Map<string, { terrainSprite: Sprite }> }).tileViews;
@@ -1928,7 +1928,7 @@ describe('MapView season ice wave', () => {
   it('resolves at once with no tiles', async () => {
     const app = { screen: { width: 800, height: 600 }, ticker: { add: (): void => {}, remove: (): void => {} } } as unknown as Application;
     const m: GameMap = { radius: 4, spawns: [], tiles: [] };
-    const v = new MapView(app, buildTextures(m), HEX, SPRITE_SCALE, 4);
+    const v = new MapView(app, buildTextures(m), HEX, SPRITE_SCALE);
     await expect(v.seasonIceWave([])).resolves.toBeUndefined();
     v.destroy();
   });
@@ -1956,7 +1956,7 @@ describe('MapView road fog visibility', () => {
       screen: { width: 800, height: 600 },
       ticker: { add: (): void => {}, remove: (): void => {} },
     } as unknown as Application;
-    view = new MapView(app, textures, HEX, SPRITE_SCALE, 2);
+    view = new MapView(app, textures, HEX, SPRITE_SCALE);
   });
 
   afterEach(() => {
@@ -2029,7 +2029,7 @@ describe('MapView water roads', () => {
       screen: { width: 800, height: 600 },
       ticker: { add: (): void => {}, remove: (): void => {} },
     } as unknown as Application;
-    view = new MapView(app, textures, HEX, SPRITE_SCALE, 2);
+    view = new MapView(app, textures, HEX, SPRITE_SCALE);
   });
 
   afterEach(() => {
@@ -2067,7 +2067,7 @@ describe('MapView water roads', () => {
       screen: { width: 800, height: 600 },
       ticker: { add: (): void => {}, remove: (): void => {} },
     } as unknown as Application;
-    view = new MapView(app, textures, HEX, SPRITE_SCALE, 2);
+    view = new MapView(app, textures, HEX, SPRITE_SCALE);
     view.update(map, players, null, new Set(), new Set(), 0, new Set(), {
       x: 400, y: 300, scale: 1, width: 800, height: 600,
     });
@@ -2117,7 +2117,7 @@ describe('MapView bottles', () => {
       screen: { width: 800, height: 600 },
       ticker: { add: (): void => {}, remove: (): void => {} },
     } as unknown as Application;
-    view = new MapView(app, textures, HEX, SPRITE_SCALE, 2);
+    view = new MapView(app, textures, HEX, SPRITE_SCALE);
   });
 
   afterEach(() => {
@@ -2161,7 +2161,7 @@ describe('MapView bottles', () => {
       screen: { width: 800, height: 600 },
       ticker: { add: (fn: () => void) => callbacks.push(fn), remove: (): void => {} },
     } as unknown as Application;
-    const v = new MapView(app, textures, HEX, SPRITE_SCALE, 2);
+    const v = new MapView(app, textures, HEX, SPRITE_SCALE);
     const origNow = performance.now;
     let now = 0;
     (performance as { now: () => number }).now = () => now;
@@ -2281,7 +2281,7 @@ describe('pirate deal circles', () => {
       ticker: { add: (): void => {}, remove: (): void => {} },
       stage: new Container(),
     } as unknown as Application;
-    const v = new MapView(app, textures, HEX, SPRITE_SCALE, 2);
+    const v = new MapView(app, textures, HEX, SPRITE_SCALE);
     const players = twoTribes();
     v.update(pirateMap(pirate), players, null, new Set(), new Set(), 0, new Set(), viewport);
     expect(circlesOf(v)).toBeNull();
@@ -2301,7 +2301,7 @@ describe('pirate deal circles', () => {
       ticker: { add: (): void => {}, remove: (): void => {} },
       stage: new Container(),
     } as unknown as Application;
-    const v = new MapView(app, textures, HEX, SPRITE_SCALE, 2);
+    const v = new MapView(app, textures, HEX, SPRITE_SCALE);
     const players = twoTribes();
     v.update(pirateMap(pirate), players, null, new Set(), new Set(), 0, new Set(), viewport);
 
@@ -2331,7 +2331,7 @@ describe('pirate deal circles', () => {
       ticker: { add: (): void => {}, remove: (): void => {} },
       stage: new Container(),
     } as unknown as Application;
-    const v = new MapView(app, textures, HEX, SPRITE_SCALE, 2);
+    const v = new MapView(app, textures, HEX, SPRITE_SCALE);
     const players = twoTribes();
     v.update(pirateMap(pirate), players, null, new Set(), new Set(), 0, new Set(), viewport);
     v.setViewport({ ...viewport, scale: 2 });
@@ -2350,7 +2350,7 @@ describe('pirate deal circles', () => {
       ticker: { add: (): void => {}, remove: (): void => {} },
       stage: new Container(),
     } as unknown as Application;
-    const v = new MapView(app, textures, HEX, SPRITE_SCALE, 2);
+    const v = new MapView(app, textures, HEX, SPRITE_SCALE);
     const players = twoTribes();
     v.update(pirateMap(pirate), players, null, new Set(), new Set(), 0, new Set(), viewport);
     v.setViewport(viewport);
@@ -2372,7 +2372,7 @@ describe('pirate deal circles', () => {
       ticker: { add: (): void => {}, remove: (): void => {} },
       stage: new Container(),
     } as unknown as Application;
-    const v = new MapView(app, textures, HEX, SPRITE_SCALE, 2);
+    const v = new MapView(app, textures, HEX, SPRITE_SCALE);
     const players = twoTribes();
     v.update(pirateMap(pirate), players, null, new Set(), new Set(), 0, new Set(), viewport);
     v.setViewport({ ...viewport, scale: 2 });
@@ -2405,7 +2405,7 @@ describe('MapView road-port connection', () => {
 
   function render(tiles: MapTile[]): { map: GameMap; view: MapView } {
     const map: GameMap = { radius: 1, spawns: [], tiles };
-    const view = new MapView(makeApp(), buildTextures(map), HEX, SPRITE_SCALE, 2);
+    const view = new MapView(makeApp(), buildTextures(map), HEX, SPRITE_SCALE);
     view.update(map, players, null, new Set(), new Set(), 0, new Set(), viewport);
     return { map, view };
   }
@@ -2525,7 +2525,7 @@ describe('damage preview badges', () => {
       screen: { width: 800, height: 600 },
       ticker: { add: (): void => {}, remove: (): void => {} },
     } as unknown as Application;
-    const v = new MapView(app, buildTextures(m), HEX, SPRITE_SCALE, 2);
+    const v = new MapView(app, buildTextures(m), HEX, SPRITE_SCALE);
     const players = playersOf();
     v.update(m, players, { kind: SelectionKind.UNIT, q: 0, r: 0 }, new Set(['1,0']), new Set(), 0, new Set(), viewport);
     v.showDamagePreview(t00.unit!, t10);
@@ -2546,7 +2546,7 @@ describe('damage preview badges', () => {
       screen: { width: 800, height: 600 },
       ticker: { add: (): void => {}, remove: (): void => {} },
     } as unknown as Application;
-    const v = new MapView(app, buildTextures(m), HEX, SPRITE_SCALE, 2);
+    const v = new MapView(app, buildTextures(m), HEX, SPRITE_SCALE);
     const players = playersOf();
     v.update(m, players, { kind: SelectionKind.UNIT, q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
     const before = badgesOf(v);
@@ -2573,7 +2573,7 @@ describe('damage preview badges', () => {
     const t00 = tileOf(0, 0, unit('mine', 0, 0, 0), 0);
     const t10 = tileOf(1, 0, unit('them', 1, 1, 0), 1);
     const m: GameMap = { radius: 1, spawns: [], tiles: [t00, t10] };
-    const v = new MapView(app, buildTextures(m), HEX, SPRITE_SCALE, 2);
+    const v = new MapView(app, buildTextures(m), HEX, SPRITE_SCALE);
     const players = playersOf();
     const origNow = performance.now;
     let now = 0;
@@ -2620,7 +2620,7 @@ describe('damage preview badges', () => {
       screen: { width: 800, height: 600 },
       ticker: { add: (): void => {}, remove: (): void => {} },
     } as unknown as Application;
-    const v = new MapView(app, buildTextures(m), HEX, SPRITE_SCALE, 2);
+    const v = new MapView(app, buildTextures(m), HEX, SPRITE_SCALE);
     const players = playersOf();
     v.update(m, players, { kind: SelectionKind.UNIT, q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
     vi.useFakeTimers();
@@ -2646,7 +2646,7 @@ describe('damage preview badges', () => {
       screen: { width: 800, height: 600 },
       ticker: { add: (): void => {}, remove: (): void => {} },
     } as unknown as Application;
-    const v = new MapView(app, buildTextures(m), HEX, SPRITE_SCALE, 2);
+    const v = new MapView(app, buildTextures(m), HEX, SPRITE_SCALE);
     const players = playersOf();
     v.update(m, players, { kind: SelectionKind.UNIT, q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
     vi.useFakeTimers();
@@ -2668,7 +2668,7 @@ describe('damage preview badges', () => {
       screen: { width: 800, height: 600 },
       ticker: { add: (): void => {}, remove: (): void => {} },
     } as unknown as Application;
-    const v = new MapView(app, buildTextures(m), HEX, SPRITE_SCALE, 2);
+    const v = new MapView(app, buildTextures(m), HEX, SPRITE_SCALE);
     const players = playersOf();
     v.update(m, players, { kind: SelectionKind.UNIT, q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
     v.showDamagePreview(t00.unit!, t30);
@@ -2685,7 +2685,7 @@ describe('damage preview badges', () => {
       screen: { width: 800, height: 600 },
       ticker: { add: (): void => {}, remove: (): void => {} },
     } as unknown as Application;
-    const v = new MapView(app, buildTextures(m), HEX, SPRITE_SCALE, 2);
+    const v = new MapView(app, buildTextures(m), HEX, SPRITE_SCALE);
     const players = playersOf();
     v.update(m, players, { kind: SelectionKind.UNIT, q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
     v.showDamagePreview(t00.unit!, t10);
@@ -2722,7 +2722,7 @@ describe('damage preview badges', () => {
       screen: { width: 800, height: 600 },
       ticker: { add: (): void => {}, remove: (): void => {} },
     } as unknown as Application;
-    const v = new MapView(app, buildTextures(m), HEX, SPRITE_SCALE, 2);
+    const v = new MapView(app, buildTextures(m), HEX, SPRITE_SCALE);
     const players = playersOf();
     v.update(m, players, { kind: SelectionKind.UNIT, q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
     vi.useFakeTimers();
@@ -2747,7 +2747,7 @@ describe('damage preview badges', () => {
       screen: { width: 800, height: 600 },
       ticker: { add: (): void => {}, remove: (): void => {} },
     } as unknown as Application;
-    const v = new MapView(app, buildTextures(m), HEX, SPRITE_SCALE, 2);
+    const v = new MapView(app, buildTextures(m), HEX, SPRITE_SCALE);
     const players = playersOf();
     v.update(m, players, { kind: SelectionKind.UNIT, q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
     v.showDamagePreview(t00.unit!, t10);
@@ -2767,7 +2767,7 @@ describe('damage preview badges', () => {
       screen: { width: 800, height: 600 },
       ticker: { add: (): void => {}, remove: (): void => {} },
     } as unknown as Application;
-    const v = new MapView(app, buildTextures(m), HEX, SPRITE_SCALE, 2);
+    const v = new MapView(app, buildTextures(m), HEX, SPRITE_SCALE);
     const players = playersOf();
     v.update(m, players, { kind: SelectionKind.UNIT, q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
     v.showDamagePreview(t00.unit!, t10);
@@ -2805,7 +2805,7 @@ describe('damage preview badges', () => {
       screen: { width: 800, height: 600 },
       ticker: { add: (): void => {}, remove: (): void => {} },
     } as unknown as Application;
-    const v = new MapView(app, buildTextures(m), HEX, SPRITE_SCALE, 2);
+    const v = new MapView(app, buildTextures(m), HEX, SPRITE_SCALE);
     const players = playersOf();
     v.update(m, players, { kind: SelectionKind.UNIT, q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
     v.showDamagePreview(t00.unit!, t10);
@@ -2848,7 +2848,7 @@ describe('damage preview badges', () => {
     const t00 = tileOf(0, 0, unit('mine', 0, 0, 0), 0);
     const t10 = tileOf(1, 0, unit('them', 1, 1, 0), 1);
     const m: GameMap = { radius: 1, spawns: [], tiles: [t00, t10] };
-    const v = new MapView(app, buildTextures(m), HEX, SPRITE_SCALE, 2);
+    const v = new MapView(app, buildTextures(m), HEX, SPRITE_SCALE);
     const players = playersOf();
     const origNow = performance.now;
     let now = 0;
@@ -2904,7 +2904,7 @@ describe('damage preview badges', () => {
       screen: { width: 800, height: 600 },
       ticker: { add: (): void => {}, remove: (): void => {} },
     } as unknown as Application;
-    const v = new MapView(app, buildTextures(m), HEX, SPRITE_SCALE, 2);
+    const v = new MapView(app, buildTextures(m), HEX, SPRITE_SCALE);
     const players = playersOf();
     v.update(m, players, { kind: SelectionKind.UNIT, q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
     v.showDamagePreview(t00.unit!, t10);
@@ -2927,7 +2927,7 @@ describe('damage preview badges', () => {
       screen: { width: 800, height: 600 },
       ticker: { add: (): void => {}, remove: (): void => {} },
     } as unknown as Application;
-    const v = new MapView(app, buildTextures(m), HEX, SPRITE_SCALE, 2);
+    const v = new MapView(app, buildTextures(m), HEX, SPRITE_SCALE);
     const players = playersOf();
     v.update(m, players, { kind: SelectionKind.UNIT, q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
     v.showDamagePreview(t00.unit!, t10);
@@ -2989,7 +2989,7 @@ describe('MapView marker reveal deferral', () => {
       hp: 50, attack: 2, attackDistance: 1, spawnVillage: null,
     };
     const map: GameMap = { radius: 1, spawns: [], tiles: [own, enemy] };
-    const v = new MapView(app, buildTextures(map), HEX, SPRITE_SCALE, 2);
+    const v = new MapView(app, buildTextures(map), HEX, SPRITE_SCALE);
     const players = playersOf();
     const selected: Selection = { kind: SelectionKind.UNIT, q: 0, r: 0 };
     const attackKey = axialKey({ q: 1, r: 0 });

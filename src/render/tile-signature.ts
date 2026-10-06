@@ -1,10 +1,11 @@
-import { Axial, axialKey, hexNeighbors, hexToPixel } from '../game/hex';
-import { GameMap, MapTile } from '../game/map-gen';
-import { portDirection } from '../game/buildings';
-import { isExploredFor } from '../game/explore';
-import { adjacentFarmCount } from '../game/food';
+import { type Axial, axialKey, hexNeighbors, hexToPixel } from '../game/map/hex';
+import { type GameMap, type MapTile } from '../game/map/map-gen';
+import { portDirection } from '../game/economy/buildings';
+import { isExploredFor } from '../game/map/explore';
+import { adjacentFarmCount } from '../game/economy/food';
 import { BuildingKind } from '@enums';
-import { weatherOverlayAt } from '../game/weather';
+import { weatherOverlayAt } from '../game/weather/weather';
+import { clamp } from '../util/math';
 
 export interface Viewport {
   x: number;
@@ -19,7 +20,7 @@ export interface Viewport {
 /** Adjacent own farms of a granary, clamped to the available art (1..6). */
 export function granaryFarmCount(map: GameMap, tile: MapTile): number {
   if (tile.ownedBy === null) return 1;
-  return Math.min(6, Math.max(1, adjacentFarmCount(map, tile, tile.ownedBy)));
+  return clamp(adjacentFarmCount(map, tile, tile.ownedBy), 1, 6);
 }
 
 export function tileSignature(

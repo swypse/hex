@@ -1,15 +1,15 @@
-import { planAiActions } from '@/game/ai';
-import { AI_DIFFICULTY_PROFILES, profileFor } from '@/game/ai-difficulty';
-import { personalityFor } from '@/game/ai-personality';
-import { analyzeSituation } from '@/game/ai-situation';
+import { planAiActions } from '@/game/ai/ai';
+import { AI_DIFFICULTY_PROFILES, profileFor } from '@/game/ai/ai-difficulty';
+import { personalityFor } from '@/game/ai/ai-personality';
+import { analyzeSituation } from '@/game/ai/ai-situation';
 import {
   deriveDirectives, ensurePlayerStrategy, goalTargetKey, productionBuildings, updateStrategy
-} from '@/game/ai-strategy';
-import { AiStrategyState } from '@/game/ai-types';
-import { GameMap, MapTile, Settlement } from '@/game/map-gen';
-import { Player } from '@/game/players';
-import { TileType } from '@/game/tile-types';
-import { Unit } from '@/game/units';
+} from '@/game/ai/ai-strategy';
+import { type AiStrategyState } from '@/game/ai/ai-types';
+import { type GameMap, type MapTile, type Settlement } from '@/game/map/map-gen';
+import { type Player } from '@/game/players';
+import { TileType } from '@/game/map/tile-types';
+import { type Unit } from '@/game/units/units';
 import { SeededRandom } from '@/util';
 import { AiActionType, AiGoalId, AiPace, BuildingKind, GameMode, SpawnPreference, UnitType } from '@enums';
 import { describe, expect, it } from 'vitest';

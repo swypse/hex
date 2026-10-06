@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { GameMap, MapTile } from '../src/game/map-gen';
-import { TileType } from '../src/game/tile-types';
-import { TILE_MOVE_COST, tileMoveCost, waterRouteKeys } from '../src/game/movement-cost';
+import { type GameMap, type MapTile } from '../src/game/map/map-gen';
+import { TileType } from '../src/game/map/tile-types';
+import { TILE_MOVE_COST, tileMoveCost, waterRouteKeys } from '../src/game/units/movement-cost';
 import { BridgeDir, BuildingKind } from '@enums';
 
 function mk(q: number, r: number, terrain: TileType, opts: Partial<MapTile> = {}): MapTile {

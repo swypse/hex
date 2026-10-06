@@ -3,7 +3,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { createSaveRepository } from '../src/storage/save-game';
 import { type StorageService } from '../src/storage/storage-service';
 import { type GameStateSnapshot } from '../src/game/state';
-import { TileType } from '../src/game/tile-types';
+import { TileType } from '../src/game/map/tile-types';
 
 class FakeStorage implements StorageService {
   private data = new Map<string, string>();

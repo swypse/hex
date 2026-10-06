@@ -1,4 +1,4 @@
-import { planAiActions } from '@/game/ai';
+import { planAiActions } from '@/game/ai/ai';
 import { buildPlayers } from '@/game/players';
 import { Simulator } from '@/game/simulator';
 import { Tribe } from '@/game/tribes';

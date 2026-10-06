@@ -1,7 +1,7 @@
 import { beforeEach, describe, it, expect, afterEach, vi } from 'vitest';
 import { Texture } from 'pixi.js';
-import { ACTION_BUTTON_ATLAS_FRAMES, ACTION_BUTTON_ATLAS_CELL } from '../src/game/action-button-atlas-data.gen';
-import { ACTION_BUTTON_ICON_FILES } from '../src/ui/kit/action-button-icons';
+import { ACTION_BUTTON_ATLAS_FRAMES, ACTION_BUTTON_ATLAS_CELL } from '../src/atlas-data/action-button-atlas-data.gen';
+import { ACTION_BUTTON_ICON_FILES } from '../src/gfx/action-button-icons';
 
 class FakeImage {
   src = '';
@@ -28,7 +28,7 @@ describe('makeActionButtonIcon', () => {
     (globalThis as { Image?: unknown }).Image = FakeImage;
     vi.spyOn(Texture, 'from').mockReturnValue(Texture.EMPTY);
     vi.resetModules();
-    icons = await import('../src/ui/kit/action-button-icons');
+    icons = await import('../src/gfx/action-button-icons');
   });
 
   afterEach(() => {

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import type { Unit } from '../src/game/units';
-import { unitHelpLines, unitHelpTitle, unitHelpDescription, unitHelpStats } from '../src/game/unit-descriptions';
+import type { Unit } from '../src/game/units/units';
+import { unitHelpLines, unitHelpTitle, unitHelpDescription, unitHelpStats } from '../src/game/units/unit-descriptions';
 import { UnitType } from '@enums';
 
 const ALL_TYPES: UnitType[] = [UnitType.WARRIOR, UnitType.RIDER, UnitType.ARCHER, UnitType.SWORDSMAN, UnitType.SHIELD, UnitType.CATAPULT, UnitType.KNIGHT, UnitType.PIRATE, UnitType.STALKER, UnitType.BUILDER, UnitType.BANNER, UnitType.BERSERKER, UnitType.TRAPPER, UnitType.STORMCALLER, UnitType.STUNNER];
