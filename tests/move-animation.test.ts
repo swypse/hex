@@ -725,18 +725,23 @@ describe('move animation', () => {
     const p = h.gc.presentEvents(events, h.gc.exploredKeysFor(0));
     await p;
 
-    expect(mapRoot.children.length).toBe(1);
-    const deathEl = mapRoot.children[0] as Container;
+    // The burst lives in the camera-transformed map container, so it follows pan/zoom.
+    const deathEls = (): Container[] =>
+      h.mapView.container.children.filter(
+        (c): c is Container => c instanceof Container && c.children.length === 10 && c.children.every((g) => g instanceof Graphics),
+      );
+    expect(deathEls().length).toBe(1);
+    const deathEl = deathEls()[0]!;
     const circles = deathEl.children.filter((c) => c instanceof Graphics);
     expect(circles.length).toBe(10);
 
     const deathFn = callbacks[callbacks.length - 1]!;
     now = 2000;
     deathFn();
-    expect(mapRoot.children.length).toBe(1);
+    expect(deathEls().length).toBe(1);
     now = 4000;
     deathFn();
-    expect(mapRoot.children.length).toBe(0);
+    expect(deathEls().length).toBe(0);
   });
 
   it('does not spawn a death animation on an unexplored death tile', async () => {

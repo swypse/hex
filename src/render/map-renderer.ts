@@ -119,6 +119,8 @@ export class MapView {
   private waterRouteNeighbors = new Map<string, string[]>();
   /** Port keys reachable over own water (per cluster of two or more ports). */
   private waterJumps = new Map<string, Set<string>>();
+  /** Tile key -> position in `map.tiles`, to visit key subsets in scan order. */
+  private tileOrder = new Map<string, number>();
   /** Tile whose `glowSprite` is currently visible (selection highlight). */
   private glowKey = '';
   /** Repeat-wrapped `dots-32` texture used for village-border tiles, tinted
@@ -297,18 +299,28 @@ export class MapView {
     this.map = map;
     this.viewport = viewport;
     this.lastLocalIndex = localPlayerIndex;
-    if (this.unitOverrides.size > 0) {
-      const tiles = map.tiles.map((t) => {
-        if (!this.unitOverrides.has(axialKey(t))) return t;
-        const u = this.unitOverrides.get(axialKey(t)) ?? null;
-        if (!u) return { ...t, unit: null };
-        return { ...t, unit: { ...u, q: t.q, r: t.r } };
-      });
-      map = { ...map, tiles };
-    }
-    this.tileIndex = tileMapByKey(map);
+    // Water networks depend on the real map only (unit staging never changes
+    // them), so read them from it before swapping in the staged tiles.
     this.waterRouteNeighbors = waterRouteEdges(map);
     this.waterJumps = portWaterClusterJumps(map);
+    const baseIndex = tileMapByKey(map);
+    if (this.unitOverrides.size > 0) {
+      // Replace only the overridden tiles (a handful) instead of re-keying the
+      // whole map; the index is a copy of the cached one patched the same way.
+      const tiles = map.tiles.slice();
+      const index = new Map(baseIndex);
+      for (const [key, override] of this.unitOverrides) {
+        const base = baseIndex.get(key);
+        if (!base) continue;
+        const staged = override ? { ...base, unit: { ...override, q: base.q, r: base.r } } : { ...base, unit: null };
+        tiles[tiles.indexOf(base)] = staged;
+        index.set(key, staged);
+      }
+      map = { ...map, tiles };
+      this.tileIndex = index;
+    } else {
+      this.tileIndex = baseIndex;
+    }
     const local = players[localPlayerIndex];
     const known = new Set<number>(local ? [local.tribe, ...(local.knownTribes ?? [])] : []);
     this.knownOwners = new Set(players.filter((p) => known.has(p.tribe)).map((p) => p.index));
@@ -563,13 +575,26 @@ export class MapView {
     this.viewport = viewport;
     if (!this.map) return;
     for (const key of this.dealAnchors.keys()) this.layoutDealCircles(key, viewport);
-    for (const tile of this.map.tiles) {
-      const tv = this.tileViews.get(axialKey(tile));
-      if (tv) tv.el.visible = tileInView(tile, this.hexSize, viewport);
+    for (const [key, tv] of this.tileViews) {
+      const tile = this.tileIndex.get(key);
+      if (tile) tv.el.visible = tileInView(tile, this.hexSize, viewport);
     }
   }
 
+  /** Tiles for the given keys in map order (the order a full-map scan would
+   *  visit them), without touching the other tiles. Unknown keys are skipped. */
+  private tilesForKeys(keys: Set<string>): MapTile[] {
+    const out: MapTile[] = [];
+    for (const key of keys) {
+      const tile = this.tileIndex.get(key);
+      if (tile) out.push(tile);
+    }
+    if (out.length > 1) out.sort((a, b) => (this.tileOrder.get(axialKey(a)) ?? 0) - (this.tileOrder.get(axialKey(b)) ?? 0));
+    return out;
+  }
+
   private buildTiles(map: GameMap): void {
+    this.tileOrder = new Map(map.tiles.map((t, i) => [axialKey(t), i] as const));
     const sorted = [...map.tiles].sort((a, b) => compareTileY(a, b, this.hexSize));
     for (const tile of sorted) {
       const p = hexToPixel(tile, this.hexSize);
@@ -1091,8 +1116,7 @@ export class MapView {
     this.tutorialMarkerParts = [];
     this.attackPulseParts = [];
     this.movePulseParts = [];
-    for (const tile of map.tiles) {
-      if (!tutorialMarkerKeys.has(axialKey(tile))) continue;
+    for (const tile of this.tilesForKeys(tutorialMarkerKeys)) {
       const corners = hexCorners(tile, this.hexSize).map((c) => ({
         x: c.x,
         y: c.y - tileElevation(tile, this.hexSize),
@@ -1110,7 +1134,9 @@ export class MapView {
       this.markerRevealTimes.clear();
     }
     const dotRadius = this.hexSize * 0.16;
-    for (const tile of map.tiles) {
+    const markerTileKeys = new Set<string>([...reachableKeys, ...attackableKeys]);
+    if (selectedKey) markerTileKeys.add(selectedKey);
+    for (const tile of this.tilesForKeys(markerTileKeys)) {
       const key = axialKey(tile);
       const y = hexToPixel(tile, this.hexSize).y - tileElevation(tile, this.hexSize);
       if (reachableKeys.has(key) && key !== selectedKey) {
@@ -1154,9 +1180,7 @@ export class MapView {
     this.startMovePulse();
     this.ensureMarkerRevealTick();
     if (placementKeys) {
-      for (const tile of map.tiles) {
-        const key = axialKey(tile);
-        if (!placementKeys.has(key)) continue;
+      for (const tile of this.tilesForKeys(placementKeys)) {
         const p = hexToPixel(tile, this.hexSize);
         const y = p.y - tileElevation(tile, this.hexSize);
         const dot = this.pool.takeGraphics();

@@ -41,10 +41,14 @@ export function spawnMuzzleSmoke(
   mapRoot: Container,
   x: number,
   y: number,
+  /** Scale of the particle container: pass 1/cameraScale when `mapRoot` is the
+   *  camera-transformed map so the puff keeps its on-screen size at spawn. */
+  unitScale = 1,
 ): void {
   const el = new Container();
-  el.zIndex = 10;
+  el.zIndex = 12;
   el.position.set(x, y);
+  el.scale.set(unitScale);
   const particles: SmokeParticle[] = [];
   for (let i = 0; i < MUZZLE_COUNT; i++) {
     const params = muzzleParticleParams();

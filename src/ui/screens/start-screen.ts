@@ -175,7 +175,6 @@ export class StartScreen implements ScreenController {
   private scroll: ScreenScroll | null = null;
   private title: Sprite | null = null;
   private hint: BitmapText | null = null;
-  private version: BitmapText | null = null;
   private buttons: Button[] = [];
   private index = 0;
   private aboutBtn: Button | null = null;
@@ -245,10 +244,6 @@ export class StartScreen implements ScreenController {
     this.hint.alpha = 0.7;
     this.hint.anchor.set(0.5, 0.5);
 
-    this.version = makeLabel('alpha-version', { fontSize: FontSize.SMALL, fill: 0xffffff });
-    this.version.anchor.set(0.5, 0.5);
-    this.version.alpha = 0.9;
-
     this.aboutBtn = new Button({
       label: t('start.about'),
       width: 96,
@@ -263,9 +258,9 @@ export class StartScreen implements ScreenController {
     });
     this.root.addChild(this.aboutBtn, this.settingsBtn);
     if (this.scroll) {
-      this.scroll.content.addChild(this.title, ...this.buttons, this.hint, this.version);
+      this.scroll.content.addChild(this.title, ...this.buttons, this.hint);
     } else {
-      this.root.addChild(this.title, ...this.buttons, this.hint, this.version);
+      this.root.addChild(this.title, ...this.buttons, this.hint);
     }
 
     this.layout();
@@ -345,9 +340,8 @@ export class StartScreen implements ScreenController {
     const firstBtnTop = titleHalf + 90;
     const lastBtnTop = firstBtnTop + Math.max(0, n - 1) * 64;
     const hintCenter = lastBtnTop + 70;
-    const versionHeight = 14;
-    const versionCenter = lastBtnTop + 130;
-    const columnBottom = versionCenter + versionHeight / 2;
+    const hintHeight = 14;
+    const columnBottom = hintCenter + hintHeight / 2;
     let glyphTop = (h - columnBottom) / 2;
     glyphTop = clamp(glyphTop, topPad, h - columnBottom - bottomPad);
 
@@ -358,7 +352,6 @@ export class StartScreen implements ScreenController {
       y += 64;
     }
     if (this.hint) this.hint.position.set(w / 2, glyphTop + hintCenter);
-    if (this.version) this.version.position.set(w / 2, glyphTop + versionCenter);
     if (this.aboutBtn) this.aboutBtn.position.set(12, h - this.aboutBtn.height - 12);
     if (this.settingsBtn) this.settingsBtn.position.set(w - this.settingsBtn.width - 12, h - this.settingsBtn.height - 12);
     this.paintGradient();
@@ -421,7 +414,6 @@ export class StartScreen implements ScreenController {
     this.root = null;
     this.title = null;
     this.hint = null;
-    this.version = null;
     this.buttons = [];
     this.aboutBtn = null;
     this.settingsBtn = null;

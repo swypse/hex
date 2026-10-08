@@ -333,7 +333,7 @@ describe('combat animation ordering', () => {
 
     // A death burst must be spawned on the defender tile.
     await waitFor(() => {
-      const bursts = h.mapRoot.children.filter((c) =>
+      const bursts = h.mapView.container.children.filter((c) =>
         (c as Container).children.some((g) => g instanceof Graphics),
       );
       return bursts.length > 0;
@@ -925,7 +925,7 @@ h.advanceTicks(100);
     expect(launched).toBe(true);
 
     const smokeEl = (): Container | undefined =>
-      h.mapRoot.children.find(
+      h.mapView.container.children.find(
         (c) => c instanceof Container && c.children.length === 10 && c.children.every((ch) => ch instanceof Graphics),
       ) as Container | undefined;
     expect(smokeEl()).toBeDefined();
@@ -1022,7 +1022,7 @@ h.advanceTicks(100);
     expect(launched).toBe(true);
 
     const smokeEl = (): Container | undefined =>
-      h.mapRoot.children.find(
+      h.mapView.container.children.find(
         (c) => c instanceof Container && c.children.length === 10 && c.children.every((ch) => ch instanceof Graphics),
       ) as Container | undefined;
     expect(smokeEl()).toBeDefined();
@@ -1586,7 +1586,7 @@ h.advanceTicks(100);
     const pEnd = p.finally(() => { settled = true; });
     let sawSmoke = false;
     const smokeEl = (): Container | undefined =>
-      h.mapRoot.children.find(
+      h.mapView.container.children.find(
         (c) => c instanceof Container && c.children.length === 10 && c.children.every((ch) => ch instanceof Graphics),
       ) as Container | undefined;
     for (let i = 0; i < 200 && !settled; i++) {

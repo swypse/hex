@@ -17,6 +17,10 @@ export function yieldToMain(): Promise<void> {
 /** Default work budget per slice: well under Chrome's 50 ms long-task mark. */
 export const SLICE_BUDGET_MS = 8;
 
+/** Tighter budget for simulation turns: a slice can overshoot by one step, and
+ *  the page must still fit rendering into the same 16 ms frame. */
+export const SIM_SLICE_BUDGET_MS = 4;
+
 /** Drives a step generator to completion, handing control back to the browser
  *  whenever a slice has used `budgetMs`, so a long computation shows up as many
  *  short tasks instead of one long one. Resolves with the generator's result. */

@@ -3,6 +3,7 @@ import { type GameMap, type MapTile } from '../map/map-gen';
 import { isWaterType } from '../map/tile-types';
 import { BuildingKind } from '@enums';
 import { tileMapByKey } from '../map/tile-index';
+import { NetworkMemo } from './network-fingerprint';
 
 interface WaterComponent {
   owner: number;
@@ -57,9 +58,17 @@ function isOwnWater(t: MapTile, owner: number): boolean {
   return isWaterType(t.terrain) && t.ownedBy === owner;
 }
 
-/** Port keys reachable over own water within the same cluster — empty when
+/** Results are memoized per map state and shared: treat them as read-only.
+ *  Port keys reachable over own water within the same cluster — empty when
  *  the cluster holds a single port. Keyed by each own port tile. */
 export function portWaterClusterJumps(map: GameMap): Map<string, Set<string>> {
+  return jumpsMemo.get(map, () => computePortWaterClusterJumps(map));
+}
+
+const jumpsMemo = new NetworkMemo<Map<string, Set<string>>>();
+const routesMemo = new NetworkMemo<Map<string, string[]>>();
+
+function computePortWaterClusterJumps(map: GameMap): Map<string, Set<string>> {
   const jumps = new Map<string, Set<string>>();
   for (const comp of findWaterPortComponents(map)) {
     const keys = comp.ports.map((p) => axialKey(p));
@@ -110,6 +119,10 @@ function pathsBetweenPorts(ports: MapTile[], tiles: Set<string>): Map<string, Ma
  *  the nearest-neighbour shortest routes between connected own ports. Used to
  *  draw the light-blue water roads. */
 export function waterRouteEdges(map: GameMap): Map<string, string[]> {
+  return routesMemo.get(map, () => computeWaterRouteEdges(map));
+}
+
+function computeWaterRouteEdges(map: GameMap): Map<string, string[]> {
   const edges = new Map<string, Set<string>>();
   const addEdge = (a: string, b: string): void => {
     const ea = edges.get(a) ?? new Set<string>();

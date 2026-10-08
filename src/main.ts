@@ -11,7 +11,12 @@ import { preloadStartupWork } from './controller/startup-preload';
 import { ScreenManager } from './ui/screen-manager';
 import { preferredCanvasFormat, preventBrowserZoom } from './util';
 import { loadFonts } from './util/load-fonts';
+import { isTouchDevice } from './ui/kit/touch';
 import { Screen } from '@enums';
+
+/** Phones: cap the render resolution (dpr 3 = 9x the pixels) and the frame rate. */
+const MOBILE_MAX_RESOLUTION = 2;
+const MOBILE_MAX_FPS = 30;
 
 async function boot(): Promise<void> {
   preventBrowserZoom();
@@ -19,15 +24,18 @@ async function boot(): Promise<void> {
   sfx.preload();
   const app = new Application();
   const format = preferredCanvasFormat();
+  const mobile = isTouchDevice();
+  const dpr = window.devicePixelRatio || 1;
   await app.init({
     resizeTo: window,
     background: THEME.bg,
-    antialias: true,
-    resolution: window.devicePixelRatio || 1,
+    antialias: !mobile,
+    resolution: mobile ? Math.min(dpr, MOBILE_MAX_RESOLUTION) : dpr,
     autoDensity: true,
     preference: ['webgpu', 'webgl'],
     ...(format ? { format } : {}),
   });
+  if (mobile) app.ticker.maxFPS = MOBILE_MAX_FPS;
   document.getElementById('root')!.appendChild(app.canvas);
   // Global error/unhandled-rejection reporting + in-game notice.
   initErrorReporter(app);

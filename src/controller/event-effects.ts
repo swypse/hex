@@ -18,6 +18,8 @@ const DEATH_PARTICLE_COUNT = 10;
 const DEATH_RISE = 200;
 const DEATH_MS = 3000;
 const DEATH_STAGGER_MS = 700;
+/** Score points start this long after the damage number so the -N shows first. */
+const SCORE_FLY_DELAY_MS = 50;
 /** Arrow projectile flight time for the archer attack animation (ms). */
 const PROJECTILE_MS_PER_TILE = 150;
 
@@ -30,7 +32,8 @@ export class EventEffects {
   spawnScoreFly(tile: MapTile, playerIndex: number, amount: number): void {
     const local = useGameStore.getState().localPlayerIndex;
     if (playerIndex !== local && !isExploredFor(tile, local)) return;
-    this.spawnFloatText(tile, `+${amount}`, 0xffd700);
+    // Let the -N damage number appear first.
+    setTimeout(() => this.spawnFloatText(tile, `+${amount}`, 0xffd700), SCORE_FLY_DELAY_MS);
   }
 
   spawnHpText(tile: MapTile, text: string, color: number): void {
@@ -66,6 +69,11 @@ export class EventEffects {
     const tickStart = performance.now();
     const ticker = app.ticker;
     const fn = (): void => {
+      // The map was torn down (exit to menu) mid-animation.
+      if (el.destroyed) {
+        ticker.remove(fn);
+        return;
+      }
       const t = Math.min(1, (performance.now() - tickStart) / FLOAT_MS);
       el.position.set(start.x, start.y - FLOAT_RISE * t);
       el.alpha = t < 0.5 ? 1 : 1 - (t - 0.5) / 0.5;
@@ -132,6 +140,13 @@ export class EventEffects {
         resolve();
       };
       const fn = (): void => {
+        // The map was torn down (exit to menu) mid-flight: just unblock the awaiting presenter.
+        if (sprite.destroyed) {
+          finished = true;
+          ticker.remove(fn);
+          resolve();
+          return;
+        }
         const t = Math.min(1, (performance.now() - startTime) / flightMs);
         // Position follows a linear x/y path with an upward sine-bulge.
         const k = Math.sin(t * Math.PI);
@@ -177,28 +192,23 @@ export class EventEffects {
 
   spawnMuzzleSmokeAt(tile: MapTile): void {
     const app = this.host.app();
-    const mapRoot = this.host.mapRoot();
-    if (!app || !mapRoot) return;
-    const camera = this.host.camera();
-    const scale = camera.scale;
+    const mapView = this.host.mapView();
+    if (!app || !mapView) return;
     const world = hexToPixel(tile, HEX_SIZE);
-    spawnMuzzleSmoke(
-      app,
-      mapRoot,
-      camera.pan.x + world.x * scale,
-      camera.pan.y + (world.y - tileElevation(tile, HEX_SIZE)) * scale,
-    );
+    // Parented to the camera-transformed map container: the puff stays on its cell while panning/zooming.
+    spawnMuzzleSmoke(app, mapView.container, world.x, world.y - tileElevation(tile, HEX_SIZE), 1 / this.host.camera().scale);
   }
 
   spawnDeath(tile: MapTile): void {
     const app = this.host.app();
-    const mapRoot = this.host.mapRoot();
-    if (!app || !mapRoot) return;
-    const camera = this.host.camera();
-    const scale = camera.scale;
+    const mapView = this.host.mapView();
+    if (!app || !mapView) return;
+    const mapRoot = mapView.container;
     const world = hexToPixel(tile, HEX_SIZE);
     const el = new Container();
-    el.zIndex = 10;
+    el.zIndex = 12;
+    // World-anchored (follows pan/zoom); unit scale keeps the on-screen size at spawn.
+    el.scale.set(1 / this.host.camera().scale);
     const particles: { g: Graphics; x0: number; swing: number; phase: number; opacity: number; delay: number }[] = [];
     for (let i = 0; i < DEATH_PARTICLE_COUNT; i++) {
       const g = new Graphics();
@@ -216,15 +226,17 @@ export class EventEffects {
         delay: Math.random() * DEATH_STAGGER_MS,
       });
     }
-    el.position.set(
-      camera.pan.x + world.x * scale,
-      camera.pan.y + (world.y - tileElevation(tile, HEX_SIZE)) * scale,
-    );
+    el.position.set(world.x, world.y - tileElevation(tile, HEX_SIZE));
     mapRoot.addChild(el);
 
     const tickStart = performance.now();
     const ticker = app.ticker;
     const fn = (): void => {
+      // The map was torn down (exit to menu) mid-animation.
+      if (el.destroyed) {
+        ticker.remove(fn);
+        return;
+      }
       const age = performance.now() - tickStart;
       for (const p of particles) {
         const localAge = age - p.delay;
@@ -277,6 +289,11 @@ export class EventEffects {
     const tickStart = performance.now();
     const ticker = app.ticker;
     const fn = (): void => {
+      // The map was torn down (exit to menu) mid-animation.
+      if (el.destroyed) {
+        ticker.remove(fn);
+        return;
+      }
       const t = Math.min(1, (performance.now() - tickStart) / FOG_MS);
       el.position.set(0, -FOG_RISE * t);
       el.alpha = t < 0.6 ? 1 : 1 - (t - 0.6) / 0.4;
@@ -294,6 +311,11 @@ export class EventEffects {
       const from = { x: sprite.position.x, y: sprite.position.y };
       const start = performance.now();
       const tick = (): void => {
+        // Map torn down mid-tween (exit to menu): stop and unblock the caller.
+        if (sprite.destroyed) {
+          resolve();
+          return;
+        }
         const t = Math.min(1, (performance.now() - start) / ms);
         sprite.position.set(from.x + (to.x - from.x) * t, from.y + (to.y - from.y) * t);
         // The render gate skips frames while the scene is static; the walk

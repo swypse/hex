@@ -45,7 +45,9 @@ export class HudTurn implements Widget {
     const current = s.players[s.currentPlayerIndex];
     // On another player's (AI or human) turn show only the waiting line —
     // no game-mode / turn-number prefix.
-    if (current && local && current.index !== local.index) {
+    if (s.watching) {
+      this.text.text = t('hud.watchMode', { turn: s.turn });
+    } else if (current && local && current.index !== local.index) {
       const tribe = tribeById(current.tribe);
       const known = new Set<number>([local.tribe, ...(local.knownTribes ?? [])]);
       const name = tribe && known.has(current.tribe) ? tribe.name : t('ui.unknownTribe');

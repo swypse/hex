@@ -101,11 +101,10 @@ describe('StartScreen background images', () => {
     screen.destroy();
   });
 
-  it('shows a white 14px alpha-version text below the menu', () => {
+  it('does not show an alpha-version text', () => {
     const screen = new StartScreen();
     screen.mount(host);
     const root = (screen as unknown as { root: Container }).root!;
-    // The version label lives in the scroll content alongside the buttons.
     const walk = (c: Container): BitmapText | undefined => {
       for (const child of c.children) {
         if (child instanceof BitmapText && (child as unknown as { text: string }).text === 'alpha-version') return child as BitmapText;
@@ -116,12 +115,7 @@ describe('StartScreen background images', () => {
       }
       return undefined;
     };
-    const version = walk(root);
-    expect(version).toBeDefined();
-    expect(version!.style.fontSize).toBe(14);
-    expect(version!.style.fill).toBe(0xffffff);
-    version!.anchor.set(0.5, 0.5);
-    expect(version!.position.x).toBeCloseTo(640, 5);
+    expect(walk(root)).toBeUndefined();
     screen.destroy();
   });
 

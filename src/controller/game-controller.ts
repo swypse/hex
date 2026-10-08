@@ -49,7 +49,7 @@ import { EventPresenter } from './event-presenter';
 import { HoldTimer } from './hold-timer';
 import { NetworkController } from './network-controller';
 import { TutorialDirector, type TutorialHost } from './tutorial-director';
-import { runSliced } from '@/util/time-slice';
+import { runSliced, SIM_SLICE_BUDGET_MS } from '@/util/time-slice';
 import { weatherCopies } from '@/game/weather/weather';
 import { clamp01 } from '../util/math';
 import { sleep } from '../util/sleep';
@@ -581,7 +581,7 @@ class GameController {
       if (cmd.type === CommandType.END_TURN) {
         this.turnSliced = true;
         try {
-          ok = await runSliced(this.sim.applyCommandSteps(cmd));
+          ok = await runSliced(this.sim.applyCommandSteps(cmd), SIM_SLICE_BUDGET_MS);
         } finally {
           this.turnSliced = false;
         }

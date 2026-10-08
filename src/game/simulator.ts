@@ -15,6 +15,7 @@ import { knownTribesFor } from './discovery';
 import { type GameEvent } from './events';
 import { exploreUnitPath } from './map/explore';
 import { applyFood, refreshStarving } from './economy/food';
+import { trackNetworkEpoch, untrackedNetworks } from './economy/network-fingerprint';
 import { captureWinnerIndex, computeWinner, quickCaptureScore, quickCaptureTurnsCount } from './game-mode';
 import { hexDistance, hexNeighbors } from './map/hex';
 import type { GameMap, MapTile } from './map/map-gen';
@@ -366,8 +367,9 @@ export class Simulator {
     for (const p of this.players) {
       const visible = knownTribesFor(this.map, this.players, p.index);
       const known = new Set(p.knownTribes ?? []);
+      const before = known.size;
       for (const tribe of visible) known.add(tribe);
-      p.knownTribes = [...known];
+      if (known.size !== before || p.knownTribes === undefined) p.knownTribes = [...known];
     }
   }
 
@@ -1238,7 +1240,7 @@ export class Simulator {
     let actionNo = 0;
     const exec = (a: AiAction, marker?: AiActionMarker): boolean => {
       actionNo += 1;
-      const ok = this.execAiAction(a);
+      const ok = untrackedNetworks(() => this.execAiAction(a));
       if (aiLoggingEnabled()) {
         const m = marker ?? (actionNo - 1 < markers.length ? markers[actionNo - 1] : undefined);
         const tag = m ? `<${m.label}>${m.note}` : '<unknown>';
@@ -1247,7 +1249,14 @@ export class Simulator {
       return ok;
     };
     if (ai.aiEngine !== AiEngine.BATCH) {
-      yield* planAiActionsSteps(this.map, ai, this.aiRng(), this.mode, undefined, this.turn, exec);
+      // Planning only reads the map between actions: let the network memo skip
+      // its per-query fingerprint pass (actions bump the epoch, see exec).
+      trackNetworkEpoch(this.map);
+      try {
+        yield* planAiActionsSteps(this.map, ai, this.aiRng(), this.mode, undefined, this.turn, exec);
+      } finally {
+        trackNetworkEpoch(null);
+      }
     } else {
       const actions = planAiActions(this.map, ai, this.aiRng(), this.mode, markers, this.turn);
       for (const a of actions) exec(a);

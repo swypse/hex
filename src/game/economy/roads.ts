@@ -1,4 +1,5 @@
 import { roadNetworkComponents } from './road-network';
+import { untrackedNetworks } from './network-fingerprint';
 import { axialKey, hexNeighbors } from '../map/hex';
 import { type GameMap, type MapTile } from '../map/map-gen';
 import { type Player } from '../players';
@@ -38,11 +39,15 @@ export function roadCutSplits(map: GameMap, tile: MapTile): number {
   };
   const before = groups();
   const savedBridge = tile.bridge;
-  tile.roadOwner = null;
-  tile.bridge = null;
-  const after = groups();
-  tile.roadOwner = owner;
-  tile.bridge = savedBridge;
+  // What-if mutation: the network memo must not trust its epoch meanwhile.
+  const after = untrackedNetworks(() => {
+    tile.roadOwner = null;
+    tile.bridge = null;
+    const n = groups();
+    tile.roadOwner = owner;
+    tile.bridge = savedBridge;
+    return n;
+  });
   return Math.max(0, after - before);
 }
 

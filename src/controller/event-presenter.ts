@@ -171,7 +171,8 @@ export class EventPresenter {
   }
 
   private spawnFogRevealAt(q: number, r: number): void {
-    const tile = this.host.sim()?.map.tiles.find((t) => t.q === q && t.r === r);
+    const sim = this.host.sim();
+    const tile = sim && tileAt(sim.map, q, r);
     if (tile) this.effects.spawnFogReveal(tile);
   }
 
@@ -198,7 +199,8 @@ export class EventPresenter {
     if (!sim) return;
     const local = useGameStore.getState().localPlayerIndex;
     for (const k of keys) {
-      const t = sim.map.tiles.find((x) => axialKey(x) === k);
+      const [q, r] = k.split(',').map(Number);
+      const t = tileAt(sim.map, q!, r!);
       if (!t) continue;
       const arr = t.exploredBy ?? [];
       const has = arr.includes(local);
@@ -372,12 +374,6 @@ export class EventPresenter {
             for (const u of e.units) {
               const ut = tileAt(sim.map, u.q, u.r);
               if (ut && u.damage > 0 && isExploredFor(ut, local)) this.effects.spawnHpText(ut, `-${u.damage}`, 0xff4d4d);
-            }
-            if (e.playerIndex === local) {
-              const village = tileAt(sim.map, e.q, e.r);
-              useGameStore.getState().setCenterMessage(
-                t('msg.starving', { village: village?.settlement?.name ?? t('hud.selected.settlementDefault') }),
-              );
             }
             this.host.render();
             break;

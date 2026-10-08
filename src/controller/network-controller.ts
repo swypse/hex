@@ -10,7 +10,7 @@ import { buildMultiplayerPlayers } from '../game/players';
 import { generateMap } from '../game/map/map-gen';
 import { initialExplorationFor } from '../game/map/explore';
 import { exploreVillageSights } from '../game/economy/village';
-import { runSliced } from '../util/time-slice';
+import { runSliced, SIM_SLICE_BUDGET_MS } from '../util/time-slice';
 import { Tribe } from '../game/tribes';
 import { beginMatchState, useGameStore } from '../store/game-store';
 import { loadSettings, welcomeDismissed } from '../storage/settings';
@@ -201,7 +201,7 @@ export class NetworkController {
       if (sim.currentPlayerIndex !== playerIndex) return;
       if (!sim.players[playerIndex]!.isHuman) return;
       const preExplored = this.host.exploredKeysFor(useGameStore.getState().localPlayerIndex);
-      if (cmd.type === CommandType.END_TURN) await runSliced(sim.applyCommandSteps(cmd));
+      if (cmd.type === CommandType.END_TURN) await runSliced(sim.applyCommandSteps(cmd), SIM_SLICE_BUDGET_MS);
       else sim.applyCommand(cmd);
       this.host.syncStore();
       const events = sim.drainEvents();
@@ -357,7 +357,7 @@ export class NetworkController {
       const pre = this.host.exploredKeysFor(useGameStore.getState().localPlayerIndex);
       sim.applyCommand({ type: command, playerIndex });
       afterCommand?.();
-      if (sim.currentPlayerIndex === playerIndex && !sim.gameOver) await runSliced(sim.applyCommandSteps({ type: CommandType.END_TURN }));
+      if (sim.currentPlayerIndex === playerIndex && !sim.gameOver) await runSliced(sim.applyCommandSteps({ type: CommandType.END_TURN }), SIM_SLICE_BUDGET_MS);
       const events = sim.drainEvents();
       this.host.syncStore();
       this.broadcastBatch(events);

@@ -849,10 +849,14 @@ export function* planAiActionsSteps(
   const operation = updateOperation(map, player, situation, turn);
   const actions: AiAction[] = [];
   let stepNo = 0;
+  if (execute) yield;
   for (let i = 0; i < MAX_PLAN_STEPS; i++) {
     if (execute && i > 0) {
       situation = analyzeSituation(map, player, mode, difficulty);
       directives = deriveDirectives(map, player, situation, difficulty, strategy);
+      // Re-analysis and pattern search are each a few ms: pause between them
+      // so a step never holds the main thread for both.
+      yield;
     }
     const ctx: AiPatternContext = { map, player, rng, state, situation, difficulty, directives, operation };
     let next: AiAction[] | null = null;

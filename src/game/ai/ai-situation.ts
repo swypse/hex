@@ -3,6 +3,7 @@ import { type AiDifficultyProfile } from './ai-difficulty';
 import { attackDamage } from '../units/combat';
 import { isExploredFor } from '../map/explore';
 import { hexDistance, hexNeighbors } from '../map/hex';
+import { tileAt } from '../map/tile-index';
 import { type GameMap, type MapTile } from '../map/map-gen';
 import { type Player } from '../players';
 import { isShip, shipAttackDistance, shipMovePoints } from '../units/ship';
@@ -55,7 +56,7 @@ function navalCanStrikeTile(tile: MapTile, navalEnemies: NavalEnemy[]): boolean 
 export function coastExposedTile(map: GameMap, tile: MapTile, navalEnemies: NavalEnemy[]): boolean {
   if (isWaterType(tile.terrain)) return false;
   const isCoast = hexNeighbors(tile).some((n) => {
-    const nt = map.tiles.find((t) => t.q === n.q && t.r === n.r);
+    const nt = tileAt(map, n.q, n.r);
     return nt !== undefined && isWaterType(nt.terrain);
   });
   if (!isCoast) return false;
@@ -169,18 +170,25 @@ function ownVillageDangers(map: GameMap, playerIndex: number, enemies: EnemyUnit
   return dangers;
 }
 
+/** Tiles holding the player's units, collected once so per-village distance
+ *  scans loop over a handful of units instead of the whole map. */
+function ownUnitTiles(map: GameMap, playerIndex: number): MapTile[] {
+  const out: MapTile[] = [];
+  for (const t of map.tiles) if (t.unit && t.unit.owner === playerIndex) out.push(t);
+  return out;
+}
+
 function nearestEnemyVillage(map: GameMap, playerIndex: number): MapTile | null {
   let best: MapTile | null = null;
   let bestDist = Infinity;
+  const own = ownUnitTiles(map, playerIndex);
   for (const t of map.tiles) {
     if (!t.settlement || t.settlement.owner === playerIndex || t.settlement.owner === null) continue;
     if (!isExploredFor(t, playerIndex)) continue;
     let dist = hexDistance({ q: 0, r: 0 }, t);
-    for (const u of map.tiles) {
-      if (u.unit && u.unit.owner === playerIndex) {
-        const d = hexDistance(u, t);
-        if (d < dist) dist = d;
-      }
+    for (const u of own) {
+      const d = hexDistance(u, t);
+      if (d < dist) dist = d;
     }
     if (dist < bestDist) {
       bestDist = dist;
@@ -192,12 +200,12 @@ function nearestEnemyVillage(map: GameMap, playerIndex: number): MapTile | null 
 
 function freeVillages(map: GameMap, playerIndex: number): FreeVillageTarget[] {
   const out: FreeVillageTarget[] = [];
+  const own = ownUnitTiles(map, playerIndex);
   for (const t of map.tiles) {
     if (!t.settlement || t.settlement.owner !== null) continue;
     if (!isExploredFor(t, playerIndex)) continue;
     let minDist = Infinity;
-    for (const u of map.tiles) {
-      if (!u.unit || u.unit.owner !== playerIndex) continue;
+    for (const u of own) {
       const d = hexDistance(u, t);
       if (d < minDist) minDist = d;
     }
