@@ -11,10 +11,10 @@ import { reachableTargets } from '../units/selection';
 import { hasSkill } from '../skills';
 import { isMountainType, isWaterType } from '../map/tile-types';
 
-type WalkField = Map<string, number>;
 import { UNIT_TYPES, type Unit } from '../units/units';
 import { AiActionType, AiGoalId, AiOperationPhase, AiStance, SkillId, UnitType } from '@enums';
 import { tileAt } from '../map/tile-index';
+import { type WalkField, walkDistance, walkDistances } from './ai-walk';
 
 /** Fewest idle units for which the AI bothers running a squad operation. */
 const MIN_SQUAD = 3;
@@ -40,36 +40,12 @@ function key(q: number, r: number): string {
   return `${q},${r}`;
 }
 
-/** Walking distance (in steps) from `dest` to every land tile the player's units
- *  could ever walk to: explored land, bridges, and mountains once Climbing is
- *  known. Water-locked units are simply absent, so they never join a squad or
- *  stall it, and greedy hex-distance dead ends behind water or mountains are
- *  avoided. */
 function walkField(map: GameMap, player: Player, dest: { q: number; r: number }): WalkField {
-  const canClimb = hasSkill(player, SkillId.CLIMBING);
-  const field: WalkField = new Map([[key(dest.q, dest.r), 0]]);
-  let frontier: { q: number; r: number }[] = [dest];
-  for (let d = 1; frontier.length > 0; d++) {
-    const next: { q: number; r: number }[] = [];
-    for (const cur of frontier) {
-      for (const n of hexNeighbors(cur)) {
-        const nk = key(n.q, n.r);
-        if (field.has(nk)) continue;
-        const tile = tileAt(map, n.q, n.r);
-        if (!tile || !isExploredFor(tile, player.index)) continue;
-        if (isWaterType(tile.terrain) && !tile.bridge) continue;
-        if (!canClimb && isMountainType(tile.terrain)) continue;
-        field.set(nk, d);
-        next.push({ q: n.q, r: n.r });
-      }
-    }
-    frontier = next;
-  }
-  return field;
+  return walkDistances(map, player, [dest]);
 }
 
 function walk(field: WalkField, t: { q: number; r: number }): number {
-  return field.get(key(t.q, t.r)) ?? Infinity;
+  return walkDistance(field, t);
 }
 
 /** Land unit that can join a squad: fit, not support/stalker/ship, and not the

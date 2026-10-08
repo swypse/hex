@@ -27,6 +27,7 @@ import { isShip } from '../units/ship';
 import { updateStrategy, deriveDirectives } from './ai-strategy';
 import { flagsFor } from './ai-flags';
 import { OPERATION_PATTERN, updateOperation } from './ai-operations';
+import { MARCH_PATTERN } from './ai-march';
 import { AiActionType, AiPace, AiPickMode, AiStance, BuildingKind, FoodPressure, GameMode, GarrisonGuardKind, Season, SkillId, SpawnPreference, UnitType } from '@enums';
 import { tileAt } from '../map/tile-index';
 
@@ -43,7 +44,7 @@ const GEOLOGY_STONE_BELOW = 20;
  *  regressed the AI (44% win rate, fewer enemy villages captured) because it
  *  pulled units away from easy solo kills to wait for the group instead. */
 function buildPatterns() {
-  return AI_PATTERNS.flatMap((p) => (p.id === 'explore-frontier' ? [OPENING_PATTERN, OPERATION_PATTERN, p] : [p])).map(withStoneGate);
+  return AI_PATTERNS.flatMap((p) => (p.id === 'explore-frontier' ? [OPENING_PATTERN, OPERATION_PATTERN, p, MARCH_PATTERN] : [p])).map(withStoneGate);
 }
 
 /** A pattern whose step would spend money while a mine is still missing
