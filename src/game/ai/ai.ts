@@ -139,6 +139,10 @@ export function formatAiAction(a: AiAction): string {
       return `upgrade village (${a.q},${a.r})`;
     case AiActionType.UPGRADE_SHIP:
       return `upgradeShip ${a.unitId}`;
+    case AiActionType.REPAIR:
+      return `repair (${a.q},${a.r})`;
+    case AiActionType.EXTINGUISH:
+      return `extinguish ${a.unitId} (${a.q},${a.r})`;
     case AiActionType.BUILD:
       return `build ${a.kind} (${a.q},${a.r})`;
     case AiActionType.BUILD_ROAD:
@@ -754,6 +758,7 @@ function markUsed(state: AiPlannerState, action: AiAction): void {
     case AiActionType.ATTACK:
     case AiActionType.HEAL:
     case AiActionType.CAPTURE:
+    case AiActionType.EXTINGUISH:
       state.acted.add(action.unitId);
       break;
     case AiActionType.SPAWN:
@@ -775,6 +780,9 @@ function markUsed(state: AiPlannerState, action: AiAction): void {
     case AiActionType.BUILD_BRIDGE:
       state.built.add(key(action.q, action.r));
       state.occupied.add(key(action.q, action.r));
+      break;
+    case AiActionType.REPAIR:
+      state.built.add(key(action.q, action.r));
       break;
     case AiActionType.UPGRADE_SHIP:
       state.acted.add(action.unitId);

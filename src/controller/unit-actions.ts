@@ -19,6 +19,7 @@ export class UnitActions {
   placementKeys = new Set<string>();
   pendingPlacement: { unitId: string; kind: BuilderBuildKind } | null = null;
   pendingTrap: { unitId: string } | null = null;
+  pendingExtinguish: { unitId: string } | null = null;
 
   constructor(private readonly host: UnitActionsHost) {}
 
@@ -115,6 +116,7 @@ export class UnitActions {
     if (!unit || unit.owner !== store.localPlayerIndex || unit.type !== UnitType.BUILDER) return;
     this.pendingPlacement = { unitId: unit.id, kind };
     this.pendingTrap = null;
+    this.pendingExtinguish = null;
     store.setOverlay(null);
     this.render();
   }
@@ -130,6 +132,7 @@ export class UnitActions {
   cancelPlacement(): void {
     this.pendingPlacement = null;
     this.pendingTrap = null;
+    this.pendingExtinguish = null;
     this.placementKeys.clear();
     useGameStore.getState().setSelection(null);
     this.render();
@@ -145,7 +148,30 @@ export class UnitActions {
     if (!unit || unit.owner !== store.localPlayerIndex || unit.type !== UnitType.TRAPPER) return;
     this.pendingTrap = { unitId: unit.id };
     this.pendingPlacement = null;
+    this.pendingExtinguish = null;
     this.render();
+  }
+
+  /** Enter fire-extinguish mode: the burning tiles in reach are highlighted. */
+  beginExtinguish(): void {
+    const store = useGameStore.getState();
+    if (store.aiActive) return;
+    const selection = store.selection;
+    if (!selection || !this.sim) return;
+    const unit = tileAt(this.sim.map, selection.q, selection.r)?.unit;
+    if (!unit || unit.owner !== store.localPlayerIndex) return;
+    this.pendingExtinguish = { unitId: unit.id };
+    this.pendingPlacement = null;
+    this.pendingTrap = null;
+    this.render();
+  }
+
+  extinguishOn(q: number, r: number): void {
+    const pending = this.pendingExtinguish;
+    this.pendingExtinguish = null;
+    this.placementKeys.clear();
+    if (!pending || !this.sim) return;
+    this.sendCommand({ type: CommandType.EXTINGUISH, unitId: pending.unitId, q, r });
   }
 
   placeTrapOn(q: number, r: number): void {

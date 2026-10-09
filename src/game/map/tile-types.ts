@@ -64,6 +64,12 @@ const MOUNTAIN_TYPES = [
   TileType.RainforestMountain,
 ];
 
+/** The land tile of the same biome a burnt-out forest turns into. */
+export function forestToLand(t: TileType): TileType {
+  const i = FOREST_TYPES.indexOf(t);
+  return i < 0 ? t : LAND_TYPES[i]!;
+}
+
 export function isLandType(t: TileType): boolean {
   return LAND_TYPES.includes(t);
 }

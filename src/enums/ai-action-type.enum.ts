@@ -10,6 +10,8 @@ export enum AiActionType {
   BUILD_ROAD = 'buildRoad',
   BUILD_BRIDGE = 'buildBridge',
   UPGRADE_SHIP = 'upgradeShip',
+  REPAIR = 'repair',
+  EXTINGUISH = 'extinguish',
   ENABLE_STEALTH = 'enableStealth',
   STORM = 'storm',
   TRAP = 'trap',

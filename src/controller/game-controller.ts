@@ -18,6 +18,7 @@ import { adjacentEnemyVillages, isMoveStealthed } from '@/game/units/stalker';
 import { type GameStateSnapshot } from '@/game/state';
 import { TileType } from '@/game/map/tile-types';
 import { trapCells } from '@/game/units/traps';
+import { extinguishCells } from '@/game/weather/fire';
 import { Tribe, tribeById } from '@/game/tribes';
 import {
   buildTutorialMap, buildTutorialPlayers, TUTORIAL_CAPITAL, TUTORIAL_ENEMY_SHIP_ID, TUTORIAL_ENEMY_WARRIOR_ID,
@@ -914,9 +915,10 @@ class GameController {
     if (!tile) return;
     // Placement modes (builder / trapper): a tap on a highlighted cell commits
     // the build/trap; any other tap cancels the placement.
-    if (this.actions.pendingPlacement || this.actions.pendingTrap) {
+    if (this.actions.pendingPlacement || this.actions.pendingTrap || this.actions.pendingExtinguish) {
       if (this.actions.placementKeys.has(axialKey(tile))) {
         if (this.actions.pendingPlacement) this.actions.buildAsBuilder(this.actions.pendingPlacement.kind, q, r);
+        else if (this.actions.pendingExtinguish) this.actions.extinguishOn(q, r);
         else this.actions.placeTrapOn(q, r);
         store.setSelection(null);
       } else {
@@ -1330,6 +1332,11 @@ class GameController {
       if (unit && unit.owner === store.localPlayerIndex) {
         const p = store.players[store.localPlayerIndex]!;
         this.actions.placementKeys = new Set(builderBuildable(this.sim.map, tile!, this.actions.pendingPlacement.kind, p).map((t) => axialKey(t)));
+      }
+    } else if (this.actions.pendingExtinguish && store.selection) {
+      const unit = tileAt(this.sim.map, store.selection.q, store.selection.r)?.unit;
+      if (unit && unit.owner === store.localPlayerIndex) {
+        this.actions.placementKeys = new Set(extinguishCells(this.sim.map, unit).map((t) => axialKey(t)));
       }
     } else if (this.actions.pendingTrap && store.selection) {
       const tile = tileAt(this.sim.map, store.selection.q, store.selection.r);

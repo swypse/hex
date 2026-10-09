@@ -36,6 +36,19 @@ export const WEATHER_RULES = {
     hitChance: 0.6,
     unitDamage: 20,
   },
+  lightning: {
+    lifetime: 1,
+    minRadius: 0,
+    maxRadius: 0,
+    /** Own schedule: first attempt on `firstTurn`, then one every `interval` turns. */
+    firstTurn: 9,
+    interval: 2,
+    chance: 0.15,
+    /** Chance that a struck forest catches fire (a struck building always does). */
+    forestIgniteChance: 0.8,
+    minUnitDamage: 40,
+    maxUnitDamage: 60,
+  },
 } as const;
 
 /** Hexes from the map middle within which a position reads as "the center". */
@@ -144,6 +157,20 @@ export function isWeatherSpawnTurn(turn: number): boolean {
 
 const SPAWN_TYPES: readonly WeatherType[] = [WeatherType.STORM, WeatherType.DROUGHT, WeatherType.EARTHQUAKE];
 
+/** True on the turns where a lightning strike is attempted. */
+export function isLightningTurn(turn: number): boolean {
+  const rules = WEATHER_RULES.lightning;
+  return turn >= rules.firstTurn && (turn - rules.firstTurn) % rules.interval === 0;
+}
+
+/** The lightning's own spawn attempt: independent of the other events' schedule
+ *  and of `maxActive`; the strike target is any random tile of the map. */
+export function spawnLightning(map: GameMap, turn: number, rng: () => number): WeatherEvent | null {
+  if (!isLightningTurn(turn)) return null;
+  if (rng() >= WEATHER_RULES.lightning.chance) return null;
+  return createWeather(map, WeatherType.LIGHTNING, turn, rng);
+}
+
 function spawnCandidates(map: GameMap, type: WeatherType): MapTile[] {
   switch (type) {
     case WeatherType.STORM:
@@ -152,6 +179,8 @@ function spawnCandidates(map: GameMap, type: WeatherType): MapTile[] {
       return map.tiles.filter((t) => isSolidGround(t.terrain));
     case WeatherType.EARTHQUAKE:
       return map.tiles.filter((t) => isMountainType(t.terrain));
+    case WeatherType.LIGHTNING:
+      return map.tiles;
   }
 }
 

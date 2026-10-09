@@ -53,7 +53,7 @@ export class HudWeather implements Widget {
     if (key === this.lastKey) return;
     this.lastKey = key;
     // Keep one label per line; surplus labels are hidden rather than rebuilt.
-    while (this.lines.length < Math.min(texts.length, WEATHER_RULES.maxActive)) {
+    while (this.lines.length < Math.min(texts.length, WEATHER_RULES.maxActive + 1)) {
       const label = makeLabel('', { fontSize: FontSize.SMALL, fill: THEME.skillTree.openedSkillStroke });
       label.anchor.set(0, 0.5);
       label.position.set(SCORE_PAD, SCORE_TEXT_Y + FIRST_LINE_GAP + this.lines.length * LINE_HEIGHT);

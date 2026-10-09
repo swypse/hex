@@ -293,6 +293,11 @@ export class HudSelected implements Widget {
       bolds.push(false);
     }
 
+    if (tile.fire) {
+      lines.push(t('hud.selected.burning'));
+      bolds.push(false);
+    }
+
     // What the active weather does to this tile, if anything.
     const weatherMap = gameController.getMap();
     for (const event of weatherMap ? weatherEffectsAt(weatherMap, tile) : []) {

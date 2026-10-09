@@ -42,6 +42,7 @@ const ICON_ACTIONS: Record<string, string> = {
   stealth: 'stealth',
   build: 'build',
   'thorn-trap': 'thorn-trap',
+  extinguish: 'extinguish',
   storm: 'stormcaller',
 };
 

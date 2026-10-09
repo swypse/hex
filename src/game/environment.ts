@@ -3,7 +3,8 @@ import { type GameEvent } from './events';
 import { freezeCoast, thawIce } from './map/ice';
 import type { GameMap } from './map/map-gen';
 import { seasonForTurn } from './season';
-import { activeWeather, advanceWeather, createWeather, spawnWeather, WEATHER_RULES, type WeatherEvent } from './weather/weather';
+import { activeWeather, advanceWeather, createWeather, spawnLightning, spawnWeather, WEATHER_RULES, type WeatherEvent } from './weather/weather';
+import { applyFireTurn, applyLightning } from './weather/fire';
 import { applyEarthquake, applyStormTurn } from './weather/weather-effects';
 
 import type { SimContext } from './sim-context';
@@ -28,7 +29,7 @@ export class Environment {
     this.ctx.emit(e);
   }
 
-  /** Round-end damage of the storms active during the turn that is ending. */
+  /** Round-end damage of the storms active during the turn that is ending, then the fires. */
   applyWeatherEffects(): void {
     for (const storm of activeWeather(this.map)) {
       if (storm.type !== WeatherType.STORM) continue;
@@ -37,12 +38,16 @@ export class Environment {
         this.emit({ type: GameEventType.WEATHER_DAMAGE, weather: { ...storm }, ...report });
       }
     }
+    const fire = applyFireTurn(this.map, this.rng);
+    if (fire.units.length > 0 || fire.buildings.length > 0 || fire.ignited.length > 0 || fire.burnedOut.length > 0) {
+      this.emit({ type: GameEventType.FIRE_TURN, ...fire });
+    }
   }
 
   private announceWeather(born: WeatherEvent): void {
     this.emit({ type: GameEventType.WEATHER_STARTED, weather: { ...born } });
-    if (born.type !== WeatherType.EARTHQUAKE) return;
-    const report = applyEarthquake(this.map, born, this.rng);
+    if (born.type !== WeatherType.EARTHQUAKE && born.type !== WeatherType.LIGHTNING) return;
+    const report = born.type === WeatherType.LIGHTNING ? applyLightning(this.map, born, this.rng) : applyEarthquake(this.map, born, this.rng);
     if (report.units.length > 0 || report.buildings.length > 0) {
       this.emit({ type: GameEventType.WEATHER_DAMAGE, weather: { ...born }, ...report });
     }
@@ -57,6 +62,8 @@ export class Environment {
     for (const weather of moved) this.emit({ type: GameEventType.WEATHER_MOVED, weather: { ...weather } });
     const born = spawnWeather(this.map, this.turn, this.rng);
     if (born) this.announceWeather(born);
+    const strike = spawnLightning(this.map, this.turn, this.rng);
+    if (strike) this.announceWeather(strike);
   }
 
   /** On entering winter coast water freezes; on leaving it the ice melts. */

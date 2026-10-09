@@ -13,6 +13,7 @@ import { bonusEligibleFor } from '../../game/map/bonus';
 import { bottleCollectableFor } from '../../game/map/bottles';
 import { trapCells, TRAP_COST } from '../../game/units/traps';
 import { stormEligible } from '../../game/units/storm';
+import { extinguishCells } from '../../game/weather/fire';
 import { adjacentEnemyVillages } from '../../game/units/stalker';
 import { BuildingKind, OverlayKind, UnitType } from '@enums';
 import { tileAt } from '../../game/map/tile-index';
@@ -153,6 +154,9 @@ export function toolbarSpecs(): ToolbarSpec[] {
     }
     if (canBurnRoad(tile, unit)) {
       out.push({ key: 'burn-road', label: t('action.burnRoad'), disabled: false, onClick: () => gameController.actions.burnRoadSelected() });
+    }
+    if (extinguishCells(map, unit).length > 0) {
+      out.push({ key: 'extinguish', label: t('action.extinguish'), disabled: !idle, onClick: () => gameController.actions.beginExtinguish() });
     }
     if (unit.type === UnitType.STORMCALLER && stormEligible(map, unit)) {
       out.push({ key: 'storm', label: t('action.storm'), disabled: !idle, onClick: () => gameController.actions.stormSelected() });

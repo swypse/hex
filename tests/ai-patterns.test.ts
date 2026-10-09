@@ -12,7 +12,7 @@ import { analyzeSituation } from '../src/game/ai/ai-situation';
 import { AI_DIFFICULTY_PROFILES } from '../src/game/ai/ai-difficulty';
 import { TRIBE_SPECIAL_UNIT } from '../src/game/tribes';
 import { makeTestMap, tileAt } from './helpers/test-map';
-import { AiActionType, AiStance, BonusKind, GameMode, GarrisonGuardKind, SkillId, SpawnPreference, UnitType } from '@enums';
+import { AiActionType, AiStance, BonusKind, BuildingKind, GameMode, GarrisonGuardKind, SkillId, SpawnPreference, UnitType } from '@enums';
 
 function tile(
   q: number,
@@ -79,6 +79,53 @@ describe('AI patterns', () => {
     for (let i = 1; i < AI_PATTERNS.length; i++) {
       expect(AI_PATTERNS[i]!.priority).toBeLessThanOrEqual(AI_PATTERNS[i - 1]!.priority);
     }
+  });
+
+  it('upgrade-ship upgrades an affordable level-1 ship before it fights', () => {
+    const map: GameMap = { radius: 4, tiles: [], spawns: [] };
+    const ship: Unit = { ...warrior('ship', 1, 0, 0), shipLevel: 1 };
+    map.tiles.push(
+      tile(0, 0, null, ship, 1),
+      tile(1, 0, null, warrior('enemy', 0, 1, 0)),
+      tile(3, 0, { owner: 1, level: 1, captureReady: false, capital: true }, null, 1),
+    );
+    const actions = findPattern('upgrade-ship').evaluate(ctx(map, player(100), new SeededRandom(1)));
+    expect(actions![0]).toMatchObject({ type: AiActionType.UPGRADE_SHIP, unitId: 'ship' });
+  });
+
+  it('extinguish-fire puts out a burning own building but leaves an enemy one burning', () => {
+    const map: GameMap = { radius: 4, tiles: [], spawns: [] };
+    const own = tile(1, 0, null, null, 1);
+    own.building = { kind: BuildingKind.FARM, level: 1 };
+    own.fire = { age: 0 };
+    const enemy = tile(-1, 0, null, null, 0);
+    enemy.building = { kind: BuildingKind.FARM, level: 1 };
+    enemy.fire = { age: 0 };
+    map.tiles.push(tile(0, 0, null, warrior('w', 1, 0, 0), 1), own, enemy);
+    const actions = findPattern('extinguish-fire').evaluate(ctx(map, player(0), new SeededRandom(1)));
+    expect(actions![0]).toMatchObject({ type: AiActionType.EXTINGUISH, unitId: 'w', q: 1, r: 0 });
+    own.fire = null;
+    expect(findPattern('extinguish-fire').evaluate(ctx(map, player(0), new SeededRandom(1)))).toBeNull();
+  });
+
+  it('repair-building repairs a damaged affordable own building', () => {
+    const map: GameMap = { radius: 4, tiles: [], spawns: [] };
+    const village = tile(0, 0, { owner: 1, level: 1, captureReady: false, capital: true }, null, 1);
+    const farm = tile(1, 0, null, null, 1);
+    farm.building = { kind: BuildingKind.FARM, level: 1, hp: 1 };
+    farm.claimedByVillage = { q: 0, r: 0 };
+    map.tiles.push(village, farm);
+    const actions = findPattern('repair-building').evaluate(ctx(map, player(100), new SeededRandom(1)));
+    expect(actions![0]).toMatchObject({ type: AiActionType.REPAIR, q: 1, r: 0 });
+  });
+
+  it('repair-building does nothing when every building is intact', () => {
+    const map: GameMap = { radius: 4, tiles: [], spawns: [] };
+    const farm = tile(1, 0, null, null, 1);
+    farm.building = { kind: BuildingKind.FARM, level: 1 };
+    farm.claimedByVillage = { q: 0, r: 0 };
+    map.tiles.push(tile(0, 0, { owner: 1, level: 1, captureReady: false, capital: true }, null, 1), farm);
+    expect(findPattern('repair-building').evaluate(ctx(map, player(100), new SeededRandom(1)))).toBeNull();
   });
 
   it('defend-empty-village spawns a defensive shield on a threatened empty village', () => {
@@ -462,6 +509,24 @@ describe('AI patterns', () => {
     const broke = villageMap();
     broke.village.settlement!.stock = { wood: 0, stone: 0, ore: 0, food: 20 };
     expect(bestSpawnableUnitType(player(100, [SkillId.CATAPULT]), SpawnPreference.OFFENSE, broke.map, broke.village)).not.toBe(UnitType.CATAPULT);
+  });
+
+  it('bestSpawnableUnitType adds a finisher when ranged units outnumber them', () => {
+    const build = (): { map: GameMap; village: MapTile } => {
+      const village = tile(0, 0, { owner: 1, level: 1, captureReady: false, stock: { wood: 20, stone: 5, ore: 5, food: 20 } }, null, 1);
+      const map: GameMap = { radius: 4, tiles: [village], spawns: [] };
+      for (let i = 1; i <= 3; i++) map.tiles.push(tile(i, 0, null, archer(`a${i}`, 1, i, 0)));
+      return { map, village };
+    };
+    const skills = [SkillId.CATAPULT];
+    const balanced = build();
+    const finisher = bestSpawnableUnitType(player(100, skills), SpawnPreference.OFFENSE, balanced.map, balanced.village);
+    // Three archers and no melee unit: the next offensive spawn must be able to walk onto an emptied village.
+    expect([UnitType.KNIGHT, UnitType.SWORDSMAN, UnitType.WARRIOR, UnitType.RIDER, UnitType.SHIELD, UnitType.BERSERKER]).toContain(finisher);
+    // With the flag off the static order (catapult) is unchanged.
+    const off = build();
+    const noFinishers = { ...player(100, skills), aiFlags: { finishers: false } };
+    expect(bestSpawnableUnitType(noFinishers, SpawnPreference.OFFENSE, off.map, off.village)).toBe(UnitType.CATAPULT);
   });
 
   it('reinforce-endangered-village sends the closest unit to an endangered empty village', () => {

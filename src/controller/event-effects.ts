@@ -1,9 +1,11 @@
-import { BitmapText, Container, Graphics, Sprite, Texture } from 'pixi.js';
+import { BitmapText, ColorMatrixFilter, Container, Graphics, Sprite, Texture } from 'pixi.js';
 import { type MapTile } from '../game/map/map-gen';
 import { isExploredFor } from '../game/map/explore';
 import { hexDistance, hexToPixel } from '../game/map/hex';
 import { tileElevation } from '../render/elevation';
 import { spawnMuzzleSmoke } from '../render/smoke';
+import { drawLightning } from '../render/lightning';
+import { THEME } from '../gfx/theme';
 import { useGameStore } from '../store/game-store';
 import { EXPLORED_SCORE } from '../game/score';
 import { makeLabel } from '../gfx/label';
@@ -20,6 +22,12 @@ const DEATH_MS = 3000;
 const DEATH_STAGGER_MS = 700;
 /** Score points start this long after the damage number so the -N shows first. */
 const SCORE_FLY_DELAY_MS = 50;
+/** Lightning bolt visibility; the map and background flash inverted `LIGHTNING_FLASHES` times,
+ *  `LIGHTNING_INVERT_MS` each, one flash per `LIGHTNING_FLASH_PERIOD_MS`. */
+const LIGHTNING_MS = 200;
+const LIGHTNING_FLASHES = 3;
+const LIGHTNING_INVERT_MS = 20;
+const LIGHTNING_FLASH_PERIOD_MS = 50;
 /** Arrow projectile flight time for the archer attack animation (ms). */
 const PROJECTILE_MS_PER_TILE = 150;
 
@@ -304,6 +312,58 @@ export class EventEffects {
       }
     };
     ticker.add(fn);
+  }
+
+  /** A white lightning bolt from the top of the screen to `tile`, visible for
+   *  `LIGHTNING_MS`; the map and the background are color-inverted for the first
+   *  `LIGHTNING_INVERT_MS`. Resolves once everything is restored. */
+  playLightning(tile: MapTile): Promise<void> {
+    const app = this.host.app();
+    const mapRoot = this.host.mapRoot();
+    if (!app || !mapRoot) return Promise.resolve();
+    const camera = this.host.camera();
+    const world = hexToPixel(tile, HEX_SIZE);
+    const target = {
+      x: camera.pan.x + world.x * camera.scale,
+      y: camera.pan.y + (world.y - tileElevation(tile, HEX_SIZE)) * camera.scale,
+    };
+    const bolt = new Graphics();
+    drawLightning(bolt, { x: target.x + (Math.random() - 0.5) * 60, y: -10 }, target);
+    // Above the map but not inside it, so the inversion leaves the bolt white.
+    const parent = mapRoot.parent ?? app.stage;
+    parent.addChildAt(bolt, mapRoot.parent ? parent.getChildIndex(mapRoot) + 1 : parent.children.length);
+    const filter = new ColorMatrixFilter();
+    filter.negative(false);
+    const background = app.renderer.background;
+    const setInverted = (on: boolean): void => {
+      if (!mapRoot.destroyed) mapRoot.filters = on ? [filter] : [];
+      background.color = on ? 0xffffff - THEME.bg : THEME.bg;
+    };
+    return new Promise<void>((resolve) => {
+      const start = performance.now();
+      let inverted = false;
+      const finish = (): void => {
+        setInverted(false);
+        if (!bolt.destroyed) {
+          bolt.parent?.removeChild(bolt);
+          bolt.destroy();
+        }
+        markDirty();
+        resolve();
+      };
+      const tick = (): void => {
+        const elapsed = performance.now() - start;
+        const flashing = elapsed < LIGHTNING_FLASHES * LIGHTNING_FLASH_PERIOD_MS && elapsed % LIGHTNING_FLASH_PERIOD_MS < LIGHTNING_INVERT_MS;
+        if (flashing !== inverted) {
+          inverted = flashing;
+          setInverted(flashing);
+        }
+        markDirty();
+        if (elapsed >= LIGHTNING_MS) finish();
+        else requestAnimationFrame(tick);
+      };
+      tick();
+    });
   }
 
   tweenSpriteTo(sprite: Sprite, to: { x: number; y: number }, ms: number): Promise<void> {

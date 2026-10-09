@@ -230,6 +230,28 @@ const SPAWN_ORDER: Record<SpawnPreference, UnitType[]> = {
   naval: [UnitType.CATAPULT, UnitType.ARCHER, UnitType.SHIELD, UnitType.WARRIOR, UnitType.RIDER, UnitType.SWORDSMAN, UnitType.KNIGHT, UnitType.STALKER, UnitType.BUILDER, UnitType.BANNER, UnitType.BERSERKER, UnitType.TRAPPER, UnitType.STORMCALLER, UnitType.STUNNER],
 };
 
+/** Land units that can walk onto an emptied enemy village after the ranged
+ *  units shot its garrison down (a capture needs a unit standing on the tile). */
+const FINISHER_TYPES = new Set<UnitType>([UnitType.KNIGHT, UnitType.RIDER, UnitType.SWORDSMAN, UnitType.WARRIOR, UnitType.SHIELD, UnitType.BERSERKER]);
+const RANGED_TYPES = new Set<UnitType>([UnitType.ARCHER, UnitType.CATAPULT, UnitType.STUNNER]);
+/** Ranged units per finisher above which the army is out of balance. */
+const MAX_RANGED_PER_FINISHER = 2;
+
+/** True when the player's ranged units outnumber its finishers too heavily: they
+ *  kill garrisons that nobody is left to step in behind, so the village just
+ *  respawns a defender and the siege never ends. */
+function armyNeedsFinisher(map: GameMap, player: Player): boolean {
+  let ranged = 0;
+  let finishers = 0;
+  for (const t of map.tiles) {
+    const u = t.unit;
+    if (!u || u.owner !== player.index || u.shipLevel !== undefined) continue;
+    if (RANGED_TYPES.has(u.type)) ranged += 1;
+    else if (FINISHER_TYPES.has(u.type)) finishers += 1;
+  }
+  return ranged > finishers * MAX_RANGED_PER_FINISHER;
+}
+
 /** Count of each enemy unit type currently visible to `player`, for weighing
  *  a spawn choice against what the enemy is actually fielding. */
 function visibleEnemyComposition(map: GameMap, playerIndex: number): Map<UnitType, number> {
@@ -269,6 +291,10 @@ export function bestSpawnableUnitType(
     if (affordable) candidates.push(type);
   }
   if (candidates.length === 0) return null;
+  if (map && prefer === SpawnPreference.OFFENSE && flagsFor(player).finishers && armyNeedsFinisher(map, player)) {
+    const finisher = candidates.find((type) => FINISHER_TYPES.has(type));
+    if (finisher) return finisher;
+  }
   if (!map || (prefer !== SpawnPreference.OFFENSE && prefer !== SpawnPreference.DEFENSE) || !flagsFor(player).composition) return candidates[0]!;
   const enemies = visibleEnemyComposition(map, player.index);
   if (enemies.size === 0) return candidates[0]!;

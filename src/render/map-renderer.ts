@@ -74,7 +74,7 @@ const SELECTED_BORDER_WIDTH = 6;
  *  the ground plane like the hexes. */
 const MARKER_Y_SCALE = 0.72;
 /** `viewport.zoomOut` above which hp bars/text and village names are hidden. */
-export const ZOOM_DETAIL_HIDE = 0.4;
+export const ZOOM_DETAIL_HIDE = 0.7;
 
 interface TileView {
   el: Container;
@@ -448,6 +448,8 @@ export class MapView {
       ) {
         this.addFireEffect(p.x, y);
       }
+      // A forest, building or bridge set alight by lightning or spreading fire.
+      if (tile.fire && explored) this.addFireEffect(p.x, y);
     }
 
     for (const l of labels) {
@@ -705,13 +707,7 @@ export class MapView {
     this.drawRoad(tv, tile, explored);
 
     const bonusTex = tile.bonus ? this.textures.bonusTexture : null;
-    // A unit standing on the bonus would hide it: the bonus floats just above the unit's head instead.
-    let bonusY = y;
-    if (bonusTex && tile.unit) {
-      const bonusHeight = bonusTex.texture.height * this.spriteScale;
-      bonusY = y - this.unitTextureTop(tile.unit, players) - 2 - (1 - bonusTex.anchorY) * bonusHeight;
-    }
-    this.syncSprite(tv, 'bonusSprite', bonusTex ? bonusTex.texture : null, p.x, bonusY, bonusTex?.anchorY ?? 0.5);
+    this.syncSprite(tv, 'bonusSprite', bonusTex ? bonusTex.texture : null, p.x, y, bonusTex?.anchorY ?? 0.5);
     if (tv.bonusSprite) tv.bonusSprite.visible = explored;
 
     const bottleVisible = explored && !!tile.bottle;

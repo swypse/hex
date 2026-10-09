@@ -85,6 +85,8 @@ export interface MapTile {
   bonus?: Bonus | null;
   /** Trapper thorn trap: visible only to its owner. */
   trap?: { owner: number; placedTurn: number } | null;
+  /** Burning forest / building / bridge (lightning, spread); `age` = round ends survived. */
+  fire?: { age: number } | null;
 }
 
 export interface Spawn {

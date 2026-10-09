@@ -22,6 +22,7 @@ export enum CommandType {
   GET_BOTTLE = 'getBottle',
   ENABLE_STEALTH = 'enableStealth',
   TRAP = 'trap',
+  EXTINGUISH = 'extinguish',
   STORM = 'storm',
   STUN = 'stun',
   END_TURN = 'endTurn',

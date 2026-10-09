@@ -22,7 +22,12 @@ interface FireParticle {
 interface FireEffect {
   el: Container;
   particles: FireParticle[];
+  /** World position key of a persistent fire (null for one-shot bursts). */
+  key: string | null;
 }
+
+/** A particle's animation state without its graphics, carried over a rebuild. */
+type FireParticleState = Omit<FireParticle, 'g'>;
 
 /** A world-anchored overlay registration: `el` sits in the screen-space
  *  overlay and the host repositions `el` each frame at `world * scale`. */
@@ -54,6 +59,10 @@ export class FireEffects {
   /** While paused the particle animation freezes in place (the host pauses it
    *  while the camera is moved; the particles resume on the same phase). */
   private paused = false;
+  /** Particle states of the fires dropped by the last `clear`, by position: a fire
+   *  re-added at the same spot (every map update rebuilds them) continues its
+   *  animation instead of restarting with fresh random phases. */
+  private carried = new Map<string, FireParticleState[]>();
 
   constructor(private readonly opts: FireEffectsOptions) {}
 
@@ -70,7 +79,7 @@ export class FireEffects {
 
   /** Fire particles around a village occupied by an enemy unit. */
   add(x: number, y: number): void {
-    this.burst(x, y, FIRE_PARTICLE_COUNT, FIRE_COLORS);
+    this.burst(x, y, FIRE_PARTICLE_COUNT, FIRE_COLORS, `${x},${y}`);
   }
 
   /** Whether any fire effect is currently burning. */
@@ -84,6 +93,10 @@ export class FireEffects {
       const remover = this.animRemove;
       this.animRemove = null;
       remover();
+    }
+    this.carried.clear();
+    for (const fx of this.effects) {
+      if (fx.key) this.carried.set(fx.key, fx.particles.map(({ g: _g, ...state }) => state));
     }
     this.effects = [];
   }
@@ -122,12 +135,14 @@ export class FireEffects {
     this.animRemove = () => ticker.remove(fn);
   }
 
-  private burst(x: number, y: number, count: number, colors: number[]): void {
+  private burst(x: number, y: number, count: number, colors: number[], key: string | null = null): void {
     const el = new Container();
     const particles: FireParticle[] = [];
+    const carried = key ? this.carried.get(key) : undefined;
     for (let i = 0; i < count; i++) {
       const g = this.opts.takeGraphics();
-      const p: FireParticle = {
+      const old = carried?.[i];
+      const p: FireParticle = old ? { g, ...old } : {
         g,
         x: (Math.random() - 0.5) * 2 * FIRE_SPREAD_X,
         vy: 24 + Math.random() * 24,
@@ -140,7 +155,7 @@ export class FireEffects {
       particles.push(p);
       this.place(p);
     }
-    this.effects.push({ el, particles });
+    this.effects.push({ el, particles, key });
     this.opts.overlay.addChild(el);
     this.opts.overlayItems.push({ el, world: { x, y } });
   }

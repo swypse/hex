@@ -6,7 +6,7 @@ import { hasSkill } from '../../skills';
 import { reachableTargets } from '../../units/selection';
 import { unitSpawnCost, type Unit } from '../../units/units';
 import { hexDistance, hexNeighbors } from '../../map/hex';
-import { canBuildSawmill, canBuildMine, BUILDING_COSTS } from '../../economy/buildings';
+import { canBuildSawmill, canBuildMine, canRepairBuilding, buildingHp, BUILDING_COSTS, REPAIR_COST } from '../../economy/buildings';
 import { isExploredFor } from '../../map/explore';
 import { type AiAction } from '../ai-types';
 import { coastExposedTile } from '../ai-situation';
@@ -21,6 +21,26 @@ import { tileAt } from '../../map/tile-index';
 import { type AiPattern, enemyCanReach, friendlyUnitsWithin, isFrontierTile, isLikelyLethal, isSupportUnit, key, nearestEnemyDistanceFrom, specialUnitWanted } from '../ai-pattern-helpers';
 
 export const GROWTH_PATTERNS: AiPattern[] = [
+  {
+    id: 'repair-building',
+    priority: 71,
+    evaluate({ map, player, state }): AiAction[] | null {
+      let best: MapTile | null = null;
+      let bestHp = Infinity;
+      for (const tile of map.tiles) {
+        if (state.built.has(key(tile.q, tile.r))) continue;
+        if (!canRepairBuilding(map, tile, player)) continue;
+        if (!canAffordAt(map, player, tile, REPAIR_COST)) continue;
+        const hp = buildingHp(tile.building!);
+        if (hp < bestHp) {
+          bestHp = hp;
+          best = tile;
+        }
+      }
+      if (!best) return null;
+      return [{ type: AiActionType.REPAIR, q: best.q, r: best.r }];
+    },
+  },
   {
     id: 'explore-frontier',
     priority: 70,

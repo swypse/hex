@@ -57,6 +57,8 @@ export type GameEvent =
   | { type: GameEventType.WEATHER_ENDED; weather: WeatherEvent }
   | { type: GameEventType.WEATHER_MOVED; weather: WeatherEvent }
   | { type: GameEventType.WEATHER_DAMAGE; weather: WeatherEvent; units: WeatherUnitHit[]; buildings: WeatherBuildingHit[] }
+  | { type: GameEventType.FIRE_TURN; units: WeatherUnitHit[]; buildings: WeatherBuildingHit[]; ignited: { q: number; r: number }[]; burnedOut: { q: number; r: number }[] }
+  | { type: GameEventType.FIRE_EXTINGUISHED; unitId: string; q: number; r: number }
   | { type: GameEventType.TURN_STARTED; playerIndex: number; turn: number }
   | { type: GameEventType.AI_TURN; playerIndex: number }
   | { type: GameEventType.AI_TAKEOVER; playerIndex: number }

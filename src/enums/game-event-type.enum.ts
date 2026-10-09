@@ -42,6 +42,8 @@ export enum GameEventType {
   WEATHER_ENDED = 'weatherEnded',
   WEATHER_MOVED = 'weatherMoved',
   WEATHER_DAMAGE = 'weatherDamage',
+  FIRE_TURN = 'fireTurn',
+  FIRE_EXTINGUISHED = 'fireExtinguished',
   TURN_STARTED = 'turnStarted',
   AI_TURN = 'aiTurn',
   AI_TAKEOVER = 'aiTakeover',

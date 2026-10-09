@@ -394,6 +394,27 @@ multiplayer state. Tuning values live in `WEATHER_RULES` (`src/game/weather/weat
   not affected. Own buildings and units near an own forest temple (radius 1 for levels 1-2, 2 for level 3, 3 for level 4) are spared. Before it strikes the map centers on its center tile (when the player has explored it); then the tiles in scope shake (up,
   down and back, 5 times, each tile starting after a random 0-100 ms delay).
 
+## Lightning and fire
+
+**Lightning** is a weather event with its own schedule: from turn 9 on, every 2nd turn (9, 11, 13, …) it strikes with a
+**15%** chance, independently of the other events (it does not count towards the 2 active). It lasts 1 turn and hits one
+random tile of the map (radius 0). Before it hits, the map centers on the tile (when explored), a white bolt is drawn from the top
+of the screen to it for 200 ms while the map and background colors flash inverted 3 times (20 ms each, every 50 ms). Tuning values live in
+`WEATHER_RULES.lightning` and `FIRE_RULES` (`src/game/weather/fire.ts`).
+
+- A **forest** catches fire with 80% probability.
+- A **unit** on the tile takes 40-60 damage.
+- A **building** (sawmill, mine, port, farm, granary) or a **bridge** on the tile always catches fire.
+
+**Fire** works at the end of every round:
+
+- A burning forest burns for 3 rounds, then becomes the land tile of its biome. A unit standing on it takes **10 damage** per round.
+- A burning building takes **1 damage** per round (it has 2 hp) and is lost at 0; a burning bridge is lost after 2 rounds.
+- Every forest adjacent to a burning forest or building catches fire with 50% probability each round.
+- A unit on or next to a burning tile (own tile and the 6 neighbours) has **Extinguish fire**: it highlights the burning tiles
+  in reach, a tap on one puts the fire out and spends the unit's whole turn; a tap on any other tile cancels the action.
+- Burning tiles are shown with fire particles (visible on explored tiles) and a "On fire" line in the selected-cell panel.
+
 ## Map
 
 - Hex grid. Radius depends on player count: 2 players → 8, 3 → 9, 4 → 10, 5 → 11, 6 → 12, 7 → 13.

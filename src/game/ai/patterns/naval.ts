@@ -9,7 +9,7 @@ import { attackableTargets } from '../../units/combat';
 import { canBuildPort, BUILDING_COSTS } from '../../economy/buildings';
 import { type AiAction } from '../ai-types';
 import { coastExposedTile, isNavalEnemy } from '../ai-situation';
-import { shipAttackDistance, canUpgradeShip } from '../../units/ship';
+import { shipAttackDistance } from '../../units/ship';
 import { AiActionType, BuildingKind, SkillId, UnitType } from '@enums';
 
 import { type AiPattern, enemyCanReach, key, landEnemyCanReach } from '../ai-pattern-helpers';
@@ -148,22 +148,6 @@ export const NAVAL_PATTERNS: AiPattern[] = [
       }
       if (!best) return null;
       return best.action;
-    },
-  },
-  {
-    id: 'naval-upgrade-ship',
-    priority: 74,
-    evaluate({ map, player, state, situation }): AiAction[] | null {
-      if (!situation || !situation.navalThreat) return null;
-      for (const t of map.tiles) {
-        const unit = t.unit;
-        if (!unit || unit.owner !== player.index) continue;
-        if (unit.shipLevel === undefined || unit.shipLevel >= 3) continue;
-        if (state.acted.has(unit.id) || state.moved.has(unit.id)) continue;
-        if (!canUpgradeShip(map, unit, t, player)) continue;
-        return [{ type: AiActionType.UPGRADE_SHIP, unitId: unit.id }];
-      }
-      return null;
     },
   },
   {

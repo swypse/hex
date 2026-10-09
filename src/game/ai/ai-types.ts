@@ -38,6 +38,8 @@ export type AiAction =
   | { type: AiActionType.BUILD_ROAD; q: number; r: number }
   | { type: AiActionType.BUILD_BRIDGE; q: number; r: number }
   | { type: AiActionType.UPGRADE_SHIP; unitId: string }
+  | { type: AiActionType.REPAIR; q: number; r: number }
+  | { type: AiActionType.EXTINGUISH; unitId: string; q: number; r: number }
   | { type: AiActionType.ENABLE_STEALTH; unitId: string }
   | { type: AiActionType.STORM; unitId: string }
   | { type: AiActionType.TRAP; unitId: string; q: number; r: number }

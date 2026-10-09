@@ -40,6 +40,7 @@ describe('predictable command types', () => {
       CommandType.DESTROY_BUILDING,
       CommandType.DISBAND,
       CommandType.ENABLE_STEALTH,
+      CommandType.EXTINGUISH,
       CommandType.HEAL,
       CommandType.MOVE,
       CommandType.OPEN_SKILL,

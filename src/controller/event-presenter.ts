@@ -131,6 +131,26 @@ export interface EventHost {
   saveGame(): void;
 }
 
+/** The UNIT_MOVED events of a batch whose mover was stealthed while walking.
+ *  The sim holds the batch's final state, so a later reveal (spotted beside a
+ *  village, bumped, attacked) means it was stealthed during the move, and a
+ *  later stealth enable means it was not. Otherwise the final state decides. */
+function stealthedMoveEvents(events: GameEvent[], isStealthedNow: (unitId: string) => boolean): WeakSet<GameEvent> {
+  const out = new WeakSet<GameEvent>();
+  for (let i = 0; i < events.length; i++) {
+    const e = events[i]!;
+    if (e.type !== GameEventType.UNIT_MOVED) continue;
+    let stealthed = isStealthedNow(e.unitId);
+    for (let j = i + 1; j < events.length; j++) {
+      const n = events[j]!;
+      if (n.type === GameEventType.STEALTH_REVEALED && n.unitId === e.unitId) { stealthed = true; break; }
+      if (n.type === GameEventType.STEALTH_ENABLED && n.unitId === e.unitId) { stealthed = false; break; }
+    }
+    if (stealthed) out.add(e);
+  }
+  return out;
+}
+
 export class EventPresenter {
   private readonly effects: EventEffects;
 
@@ -141,6 +161,8 @@ export class EventPresenter {
   /** Static sprites that keep enemy units visible at their starting hex until
    * their own move animation begins (they are otherwise hidden up front). */
   private moveGhosts: { unitId: string; sprite: Sprite }[] = [];
+  /** Move events of the current batch made while the mover was stealthed. */
+  private stealthedMoves = new WeakSet<GameEvent>();
 
   private findUnitById(unitId: string): Unit | undefined {
     const sim = this.host.sim();
@@ -234,10 +256,13 @@ export class EventPresenter {
     // until its own animation starts (the hide-above would otherwise blank it
     // for the whole opening of the turn).
     this.moveGhosts = [];
+    this.stealthedMoves = stealthedMoveEvents(events, (id) => this.findUnitById(id)?.isStealthed === true);
     for (const e of events) {
       if (e.type !== GameEventType.UNIT_MOVED) continue;
       const unit = this.findUnitById(e.unitId);
       if (!unit || unit.owner === local) continue;
+      // A stealthed enemy stalker must not leave a ghost on its start hex.
+      if (this.stealthedMoves.has(e)) continue;
       const fromTile = tileAt(sim.map, e.from.q, e.from.r);
       if (!fromTile || !isExploredFor(fromTile, local)) continue;
       if (this.moveGhosts.some((g) => g.unitId === unit.id)) continue;
@@ -348,9 +373,16 @@ export class EventPresenter {
             this.host.render();
             break;
           case GameEventType.STALKER_SPOTTED:
-            this.presentStalkerSpotted(e);
+            await this.presentStalkerSpotted(e);
             break;
           case GameEventType.TRAP_PLACED:
+            this.host.render();
+            break;
+          case GameEventType.FIRE_TURN:
+            await this.presentWeatherDamage(e.units, e.buildings);
+            this.host.render();
+            break;
+          case GameEventType.FIRE_EXTINGUISHED:
             this.host.render();
             break;
           case GameEventType.ROAD_BURNED: {
@@ -950,8 +982,10 @@ export class EventPresenter {
     const map = sim.map;
     let steps = e.path;
     // A stealthed enemy stalker's move is never shown to anyone but its owner:
-    // hide it entirely and just let the fog reveal happen.
-    if (unit.owner !== local && unit.isStealthed) return;
+    // hide it entirely and just let the fog reveal happen. The sim already holds
+    // the batch's final state, so a stalker spotted at the end of its walk has
+    // `isStealthed` false here although it was hidden while moving.
+    if (unit.owner !== local && this.stealthedMoves.has(e)) return;
     if (unit.owner !== local && unit.owner !== PIRATE_OWNER) {
       steps = steps.filter((s) => {
         const t = tileAt(map, s.q, s.r);
@@ -1135,12 +1169,18 @@ export class EventPresenter {
     }
   }
 
-  private presentStalkerSpotted(e: Extract<GameEvent, { type: 'stalkerSpotted' }>): void {
+  private async presentStalkerSpotted(e: Extract<GameEvent, { type: 'stalkerSpotted' }>): Promise<void> {
     const sim = this.host.sim();
     const village = sim ? tileAt(sim.map, e.villageQ, e.villageR) : undefined;
-    const name = village?.settlement?.name ?? t('tile.Settlement');
-    useGameStore.getState().setCenterMessage(t('msg.stalkerSpotted', { village: name }));
+    const store = useGameStore.getState();
     this.host.render();
+    if (village?.settlement?.owner === store.localPlayerIndex) {
+      store.setCenterMessage(t('msg.stalkerInYourVillage'));
+      await this.host.centerOnCell(e.villageQ, e.villageR);
+      return;
+    }
+    const name = village?.settlement?.name ?? t('tile.Settlement');
+    store.setCenterMessage(t('msg.stalkerSpotted', { village: name }));
   }
 
   private showCaptureMessage(village: MapTile, capturer: Player): void {
@@ -1188,9 +1228,19 @@ export class EventPresenter {
     const sim = this.host.sim();
     if (!sim) return;
     this.syncWeatherStore();
-    this.host.render();
+    // The sim already holds the strike's outcome (fire, dead units): draw it
+    // only after the bolt has played.
+    if (weather.type !== WeatherType.LIGHTNING) this.host.render();
     const local = useGameStore.getState().localPlayerIndex;
     let shakeMs = 0;
+    if (weather.type === WeatherType.LIGHTNING) {
+      const strikeTile = tileAt(sim.map, weather.q, weather.r);
+      if (strikeTile && isExploredFor(strikeTile, local)) {
+        await this.host.centerOnCell(weather.q, weather.r);
+        await this.effects.playLightning(strikeTile);
+      }
+      this.host.render();
+    }
     if (weather.type === WeatherType.EARTHQUAKE) {
       // Bring the quake into view first, so the shake plays where the player looks.
       const centerTile = tileAt(sim.map, weather.q, weather.r);

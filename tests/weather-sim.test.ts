@@ -63,7 +63,8 @@ describe('drought economy', () => {
 
 describe('round-end weather in the simulator', () => {
   it('starts an event on turn 9 and announces it', () => {
-    const sim = simOn(seaMap(), () => 0.1);
+    // 0.2 passes the 30% roll but misses lightning's 15%.
+    const sim = simOn(seaMap(), () => 0.2);
     sim.turn = 9;
     advance(sim);
     const events = sim.drainEvents();
@@ -84,10 +85,10 @@ describe('round-end weather in the simulator', () => {
     const map = seaMap();
     const farm = tileAt(map, -2, 0)!;
     farm.building = { kind: BuildingKind.FARM, level: 1 };
-    // 0.1: passes the 30% roll; 0.9 -> the earthquake; mountain -3,0 is the only candidate; and 0.1 hits.
-    const values = [0.1, 0.9, 0, 0, ...Array(20).fill(0.1)];
+    // 0.2: passes the 30% roll, misses lightning's 15%; 0.9 -> the earthquake; mountain -3,0 is the only candidate; and 0.2 hits.
+    const values = [0.2, 0.9, 0, 0, ...Array(20).fill(0.2)];
     let i = 0;
-    const sim = simOn(map, () => values[i++] ?? 0.1);
+    const sim = simOn(map, () => values[i++] ?? 0.2);
     sim.turn = 9;
     i = 0;
     advance(sim);

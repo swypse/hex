@@ -8,6 +8,9 @@ import { isExploredFor } from '../../map/explore';
 import { type AiAction } from '../ai-types';
 import { coastExposedTile } from '../ai-situation';
 import { adjacentEnemyVillages } from '../../units/stalker';
+import { canUpgradeShip } from '../../units/ship';
+import { extinguishCells } from '../../weather/fire';
+import { isForestType } from '../../map/tile-types';
 import { flagsFor } from '../ai-flags';
 import { AiActionType, AiStance, GarrisonGuardKind, SkillId, UnitType } from '@enums';
 
@@ -26,6 +29,53 @@ export const OFFENSE_PATTERNS: AiPattern[] = [
           state.acted.add(unit.id);
           return [{ type: AiActionType.CAPTURE, q: t.q, r: t.r, unitId: unit.id }];
         }
+      }
+      return null;
+    },
+  },
+  {
+    // Fire on an own building, an own forest or under an own unit is put out
+    // before anything else; a unit that is fighting this turn keeps fighting.
+    id: 'extinguish-fire',
+    priority: 220,
+    evaluate({ map, player, state }): AiAction[] | null {
+      let best: { action: AiAction[]; score: number } | null = null;
+      for (const t of map.tiles) {
+        const unit = t.unit;
+        if (!unit || unit.owner !== player.index) continue;
+        if (state.acted.has(unit.id) || state.moved.has(unit.id)) continue;
+        if (unit.hasMoved || unit.hasAttacked || unit.hasHealed || (unit.stunTurns ?? 0) >= 1) continue;
+        const cells = extinguishCells(map, unit);
+        if (cells.length === 0) continue;
+        const fighting = attackableTargets(map, unit, player.index).length > 0;
+        for (const c of cells) {
+          // Standing in the flames of a forest costs 10 hp a round.
+          const underOwn = c.unit?.owner === player.index && isForestType(c.terrain);
+          let score = 0;
+          if ((c.building && c.ownedBy === player.index) || c.bridge?.owner === player.index) score = 300;
+          else if (underOwn) score = 250;
+          else if (isForestType(c.terrain) && c.ownedBy === player.index) score = 150;
+          if (score === 0) continue;
+          if (fighting && c.unit !== unit) continue;
+          if (c.q === unit.q && c.r === unit.r) score += 20;
+          if (!best || score > best.score) best = { action: [{ type: AiActionType.EXTINGUISH, unitId: unit.id, q: c.q, r: c.r }], score };
+        }
+      }
+      return best ? best.action : null;
+    },
+  },
+  {
+    // A ship is upgraded the moment it is affordable, before it fights as level 1.
+    id: 'upgrade-ship',
+    priority: 215,
+    evaluate({ map, player, state }): AiAction[] | null {
+      for (const t of map.tiles) {
+        const unit = t.unit;
+        if (!unit || unit.owner !== player.index) continue;
+        if (unit.shipLevel === undefined || unit.shipLevel >= 3) continue;
+        if (state.acted.has(unit.id) || state.moved.has(unit.id)) continue;
+        if (!canUpgradeShip(map, unit, t, player)) continue;
+        return [{ type: AiActionType.UPGRADE_SHIP, unitId: unit.id }];
       }
       return null;
     },

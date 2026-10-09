@@ -45,6 +45,7 @@ import { Environment } from './environment';
 import { Pirates, provokePirate } from './pirates';
 import type { SimContext } from './sim-context';
 import { tileAt } from './map/tile-index';
+import { extinguishCells } from './weather/fire';
 
 export type Command =
   | { type: CommandType.MOVE; unitId: string; q: number; r: number }
@@ -71,6 +72,7 @@ export type Command =
   | { type: CommandType.ENABLE_STEALTH; unitId: string }
   | { type: CommandType.TRAP; unitId: string; q: number; r: number }
   | { type: CommandType.STORM; unitId: string }
+  | { type: CommandType.EXTINGUISH; unitId: string; q: number; r: number }
   | { type: CommandType.STUN; unitId: string; q: number; r: number }
   | { type: CommandType.END_TURN }
   | { type: CommandType.GIVE_TO_AI; playerIndex: number }
@@ -100,6 +102,7 @@ export const PREDICTABLE_COMMAND_TYPES: ReadonlySet<Command['type']> = new Set<C
   CommandType.ENABLE_STEALTH,
   CommandType.TRAP,
   CommandType.STORM,
+  CommandType.EXTINGUISH,
 ]);
 
 export class Simulator {
@@ -302,6 +305,9 @@ export class Simulator {
         break;
       case CommandType.STORM:
         ok = this.doStorm(cmd.unitId);
+        break;
+      case CommandType.EXTINGUISH:
+        ok = this.doExtinguish(cmd.unitId, cmd.q, cmd.r);
         break;
       case CommandType.STUN:
         ok = this.doStun(cmd.unitId, cmd.q, cmd.r);
@@ -593,6 +599,20 @@ export class Simulator {
     target.trap = { owner: unit.owner, placedTurn: this.turn };
     this.consumeUnitTurn(unit);
     this.emit({ type: GameEventType.TRAP_PLACED, q, r, playerIndex: player.index });
+    return true;
+  }
+
+  /** A unit puts out the fire on its own or an adjacent tile. Consumes the whole turn. */
+  private doExtinguish(unitId: string, q: number, r: number): boolean {
+    const unit = this.findUnit(unitId);
+    if (!unit || unit.owner !== this.currentPlayerIndex) return false;
+    if (unit.hasMoved || unit.hasAttacked || unit.hasHealed) return false;
+    if ((unit.stunTurns ?? 0) >= 1) return false;
+    const target = extinguishCells(this.map, unit).find((t) => t.q === q && t.r === r);
+    if (!target) return false;
+    target.fire = null;
+    this.consumeUnitTurn(unit);
+    this.emit({ type: GameEventType.FIRE_EXTINGUISHED, unitId, q, r });
     return true;
   }
 
@@ -1296,6 +1316,12 @@ export class Simulator {
         break;
       case AiActionType.UPGRADE_SHIP:
         ok = this.doUpgradeShip(a.unitId);
+        break;
+      case AiActionType.REPAIR:
+        ok = this.doRepair(a.q, a.r);
+        break;
+      case AiActionType.EXTINGUISH:
+        ok = this.doExtinguish(a.unitId, a.q, a.r);
         break;
       case AiActionType.OPEN_SKILL:
         ok = this.doOpenSkill(a.skill);

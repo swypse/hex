@@ -16,7 +16,7 @@ import { Screen } from '@enums';
 
 /** Phones: cap the render resolution (dpr 3 = 9x the pixels) and the frame rate. */
 const MOBILE_MAX_RESOLUTION = 2;
-const MOBILE_MAX_FPS = 30;
+const MOBILE_MAX_FPS = 60;
 
 async function boot(): Promise<void> {
   preventBrowserZoom();

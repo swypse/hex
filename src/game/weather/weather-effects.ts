@@ -23,7 +23,7 @@ function tilesInScope(map: GameMap, event: WeatherEvent): MapTile[] {
 }
 
 /** Deals `damage` to the unit standing on `tile`; removes it at 0 hp. */
-function hurtUnit(tile: MapTile, damage: number): WeatherUnitHit {
+export function hurtUnit(tile: MapTile, damage: number): WeatherUnitHit {
   const unit = tile.unit!;
   unit.hp = Math.max(0, unit.hp - damage);
   const died = unit.hp <= 0;
@@ -33,7 +33,7 @@ function hurtUnit(tile: MapTile, damage: number): WeatherUnitHit {
 }
 
 /** Takes `damage` hp off the building on `tile`; removes it at 0 hp. */
-function hurtBuilding(tile: MapTile, damage: number): WeatherBuildingHit {
+export function hurtBuilding(tile: MapTile, damage: number): WeatherBuildingHit {
   const building = tile.building!;
   const hp = (building.hp ?? BUILDING_MAX_HP) - damage;
   const destroyed = hp <= 0;
