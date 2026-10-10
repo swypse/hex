@@ -2,7 +2,7 @@ import { t } from '../../i18n';
 import { shipMovePoints } from './ship';
 import type { Resources } from '../economy/resources';
 import { Tribe } from '../tribes';
-import { UnitType } from '@enums';
+import { UnitType, VeteranBonus } from '@enums';
 
 
 type PlayableUnitType = Exclude<UnitType, 'pirate'>;
@@ -99,6 +99,68 @@ export interface Unit {
   pirateTribes?: number[];
   /** Pirate: it was attacked by this tribe and hunts it for `turns` more pirate turns. */
   pirateRevenge?: { target: number; turns: number };
+  /** Kills scored by this unit over the game (counts up to `VETERAN_KILLS`). */
+  kills?: number;
+  /** Set on the unit's `VETERAN_KILLS`th kill. */
+  veteran?: boolean;
+  /** The veteran's chosen bonus; unset while a veteran is still waiting for its owner to pick. */
+  veteranBonus?: VeteranBonus;
+}
+
+/** Kills that make a unit a veteran. */
+export const VETERAN_KILLS = 3;
+export const VETERAN_ATTACK_BONUS = 5;
+export const VETERAN_HP_BONUS = 10;
+export const VETERAN_MOVE_BONUS = 20;
+
+/** The unit's max hp: its type's, plus a veteran's hp bonus. */
+export function unitMaxHp(unit: Pick<Unit, 'type' | 'veteranBonus'>): number {
+  return UNIT_TYPES[unit.type].maxHp + (unit.veteranBonus === VeteranBonus.HP ? VETERAN_HP_BONUS : 0);
+}
+
+/** A veteran's flat attack bonus (0 for anyone else). */
+export function veteranAttackBonus(unit: Pick<Unit, 'veteranBonus'>): number {
+  return unit.veteranBonus === VeteranBonus.ATTACK ? VETERAN_ATTACK_BONUS : 0;
+}
+
+/** Records a kill for a unit. Returns true when it just became a veteran: it is
+ *  fully healed at once and its owner must pick a bonus. Pirates never promote. */
+export function recordKill(unit: Unit): boolean {
+  if (unit.owner < 0) return false;
+  unit.kills = (unit.kills ?? 0) + 1;
+  if (unit.veteran || unit.kills < VETERAN_KILLS) return false;
+  unit.veteran = true;
+  unit.hp = unitMaxHp(unit);
+  return true;
+}
+
+/** The bonus an AI-controlled veteran takes: tough and support units more hp,
+ *  riders more reach, everything else more attack. */
+export function aiVeteranBonus(unit: Pick<Unit, 'type'>): VeteranBonus {
+  switch (unit.type) {
+    case UnitType.SHIELD:
+    case UnitType.BANNER:
+    case UnitType.BUILDER:
+    case UnitType.STALKER:
+      return VeteranBonus.HP;
+    case UnitType.RIDER:
+      return VeteranBonus.MOVE;
+    default:
+      return VeteranBonus.ATTACK;
+  }
+}
+
+/** Whether the unit is a veteran that has not picked its bonus yet. */
+export function needsVeteranBonus(unit: Unit): boolean {
+  return unit.veteran === true && unit.veteranBonus === undefined;
+}
+
+/** Gives a pending veteran its bonus; an hp bonus also refills it to the new maximum. */
+export function applyVeteranBonus(unit: Unit, bonus: VeteranBonus): boolean {
+  if (!needsVeteranBonus(unit)) return false;
+  unit.veteranBonus = bonus;
+  unit.hp = unitMaxHp(unit);
+  return true;
 }
 
 export const UNIT_MOVE_POINTS: Record<UnitType, number> = {
@@ -254,6 +316,8 @@ export const UNIT_TYPE_NAMES: Record<UnitType, string> = {
 };
 
 export const HEAL_AMOUNT = 15;
+/** Extra hp a unit heals on a tile of a village with a university once its owner has Medicine. */
+export const MEDICINE_HEAL_BONUS = 10;
 
 interface UnitOptions {
   id?: string;
@@ -309,7 +373,8 @@ export function canMove(unit: Unit): boolean {
 /** Move points a unit may spend this turn (road bonuses are handled per tile
  *  by the movement-cost model). */
 export function movePoints(unit: Unit): number {
-  return unit.shipLevel !== undefined ? shipMovePoints(unit) : UNIT_MOVE_POINTS[unit.type];
+  if (unit.shipLevel !== undefined) return shipMovePoints(unit);
+  return UNIT_MOVE_POINTS[unit.type] + (unit.veteranBonus === VeteranBonus.MOVE ? VETERAN_MOVE_BONUS : 0);
 }
 
 export function canAttack(unit: Unit): boolean {
@@ -328,7 +393,7 @@ export function canHeal(unit: Unit): boolean {
     !unit.hasMoved &&
     !unit.hasAttacked &&
     !unit.hasHealed &&
-    unit.hp < UNIT_TYPES[unit.type].maxHp
+    unit.hp < unitMaxHp(unit)
   );
 }
 
@@ -336,8 +401,9 @@ function isStunnedLocal(unit: Unit): boolean {
   return (unit.stunTurns ?? 0) >= 1;
 }
 
-export function healUnit(unit: Unit): void {
-  unit.hp = Math.min(UNIT_TYPES[unit.type].maxHp, unit.hp + HEAL_AMOUNT);
+/** Heals the unit by `amount` (a heal action or the end-of-turn auto heal). */
+export function healUnit(unit: Unit, amount: number = HEAL_AMOUNT): void {
+  unit.hp = Math.min(unitMaxHp(unit), unit.hp + amount);
   unit.hasHealed = true;
 }
 

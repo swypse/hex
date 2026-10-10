@@ -109,6 +109,8 @@ export interface TextureSet {
   pirateTexture: TileTexture;
   sawmillTexture: TileTexture;
   mineTexture: TileTexture;
+  /** Missing in hand-built texture sets: the renderer falls back to the mine texture. */
+  universityTexture?: TileTexture;
   farmTexture: TileTexture;
   /** Black-and-white farm, shown while the farm yields nothing (winter). Baked so no per-frame filter pass is needed. */
   farmIdleTexture: TileTexture;
@@ -542,6 +544,8 @@ export async function createTextures(
     makeUnitImageTexture(bakeApp, buildingTileTexture('sawmill'), hexSize) ?? blankTile(0.5);
   const mineTexture =
     makeUnitImageTexture(bakeApp, buildingTileTexture('mine'), hexSize) ?? blankTile(0.5);
+  const universityTexture =
+    makeUnitImageTexture(bakeApp, buildingTileTexture('university'), hexSize) ?? blankTile(0.5);
   const farmTexture =
     makeUnitImageTexture(bakeApp, buildingTileTexture('farm'), hexSize) ?? blankTile(0.5);
   const farmIdleTexture = makeDesaturatedTexture(bakeApp, farmTexture);
@@ -621,6 +625,7 @@ export async function createTextures(
     pirateTexture,
     sawmillTexture,
     mineTexture,
+    universityTexture,
     farmTexture,
     farmIdleTexture,
     weatherOverlays: weatherOverlayTextures(),

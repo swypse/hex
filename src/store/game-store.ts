@@ -34,6 +34,7 @@ type OverlayState =
   | { kind: OverlayKind.BUILDER_BUILD }
   | { kind: OverlayKind.THORN_TRAP }
   | { kind: OverlayKind.DISBAND; unitId: string }
+  | { kind: OverlayKind.VETERAN_BONUS; unitId: string }
   | { kind: OverlayKind.WATCHING_PROMPT };
 
 interface LobbyState {

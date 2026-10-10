@@ -85,7 +85,7 @@ export function openingAction(map: GameMap, player: Player, done: AiPlannerState
     return canAffordAt(map, player, v, villageUpgradeCost(v.settlement.level)) ? [{ type: AiActionType.UPGRADE, q: v.q, r: v.r }] : null;
   }
   const skill = STAGE_SKILLS[stage].find((s) => !hasSkill(player, s));
-  if (skill) return !done.opened.has(skill) && canOpenSkill(player, skill) ? [{ type: AiActionType.OPEN_SKILL, skill }] : null;
+  if (skill) return !done.opened.has(skill) && canOpenSkill(player, skill, map) ? [{ type: AiActionType.OPEN_SKILL, skill }] : null;
   const kind = STAGE_BUILDING[stage]!;
   const tiles = claimedBy(map, v).filter((t) => !done.built.has(`${t.q},${t.r}`) && CAN_BUILD[kind]!(map, t, player));
   const site = tiles[0];

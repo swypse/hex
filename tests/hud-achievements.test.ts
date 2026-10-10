@@ -45,11 +45,11 @@ describe('score-stack button placement', () => {
     ach.destroy();
   });
 
-  it('uses a button the size of the player chip with translucent black bg', () => {
+  it('uses a 40px button with translucent black bg', () => {
     const ach = new HudAchievements();
     ach.mount(host, root);
     const btn = (ach as unknown as { el: Container }).el!.children[0] as IconButton;
-    expect(btn.width).toBe(SCORE_CHIP_RADIUS * 2);
+    expect(btn.width).toBe(SKILLS_BUTTON_SIZE);
     ach.destroy();
   });
 });

@@ -24,6 +24,9 @@ export const SKILL_ICON_FILES: Partial<Record<SkillId, string>> = {
   knights: 'skill-knights',
   agriculture: 'skill-agriculture',
   granary: 'skill-granary',
+  agronomy: 'skill-agronomy',
+  engineering: 'skill-engineering',
+  medicine: 'skill-medicine',
 };
 
 const atlas = createIconAtlas({ file: SKILL_ATLAS_FILE, cell: SKILL_ATLAS_CELL, frames: SKILL_ATLAS_FRAMES, tag: 'skillIcons' });

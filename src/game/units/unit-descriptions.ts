@@ -1,4 +1,4 @@
-import { UNIT_TYPE_NAMES, UNIT_TYPES, type Unit, unitFoodEaten, unitMaintenance } from './units';
+import { movePoints, unitMaxHp, UNIT_TYPE_NAMES, UNIT_TYPES, type Unit, unitFoodEaten, unitMaintenance } from './units';
 import { SHIP_ATTACK, SHIP_ATTACK_DISTANCE, SHIP_MOVE_POINTS, SHIP_UPGRADE_COST, shipMovePoints } from './ship';
 import { t } from '../../i18n';
 import { UnitType } from '@enums';
@@ -62,9 +62,9 @@ interface UnitHelpStat {
 /** The stat rows (a sixth, food eaten, only for units that eat) shown in the unit info popup, using current ship-level
  *  values when the unit is a ship (movement/attack/upkeep by level). */
 export function unitHelpStats(unit: Unit): UnitHelpStat[] {
-  const movement = unit.shipLevel !== undefined ? shipMovePoints(unit) : UNIT_TYPES[unit.type].movePoints;
+  const movement = movePoints(unit);
   const attack = unit.shipLevel !== undefined ? SHIP_ATTACK[unit.shipLevel] : UNIT_TYPES[unit.type].attack;
-  const hp = UNIT_TYPES[unit.type].maxHp;
+  const hp = unitMaxHp(unit);
   const upkeep = unitMaintenance(unit);
   const defense = unit.defense ?? 0;
   const food = unitFoodEaten(unit);

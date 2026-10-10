@@ -1,4 +1,4 @@
-import { DESTROY_BUILDING_COST, networkBuildingIncome, canBuildFarm, canBuildGranary, canBurnBuilding, canBurnRoad, canBuildSawmill, canBuildForestTemple, canBuildMine, canBuildPort, canBuildTemple, BUILDING_COSTS } from '../economy/buildings';
+import { buildingCostAt, canBuildUniversity, DESTROY_BUILDING_COST, networkBuildingIncome, canBuildFarm, canBuildGranary, canBurnBuilding, canBurnRoad, canBuildSawmill, canBuildForestTemple, canBuildMine, canBuildPort, canBuildTemple, BUILDING_COSTS } from '../economy/buildings';
 import { hexDistance, hexNeighbors } from '../map/hex';
 import { canBuildBridge, bridgeCoastOffsets, bridgeDirFor, BRIDGE_COST } from '../economy/bridges';
 import { canBuildRoad, roadCutSplits, villageConnectedNodes, ROAD_COST } from '../economy/roads';
@@ -12,7 +12,7 @@ import { foodNetworkStates, networkStateOfTile, foodPressure, canSustainUnit, ea
 import { blockedByOpening, openingAction } from './ai-opening';
 import { blockedByStone, villagesNeedingMine } from './ai-stone';
 import { planFoodFixes, planGranarySpace, planWinterStorage } from './ai-food';
-import { canHeal, unitSpawnCost, UNIT_TYPES, type Unit } from '../units/units';
+import { unitMaxHp, canHeal, unitSpawnCost, UNIT_TYPES, type Unit } from '../units/units';
 import { SeededRandom } from '../../util/random';
 import { buildingsInVillage, villageBuildingLimit } from '../economy/village';
 import { isMountainType } from '../map/tile-types';
@@ -204,6 +204,9 @@ const MILITARY_SKILL_ORDER: SkillId[] = [
   SkillId.FOREST_TEMPLE,
   SkillId.BRIDGES,
   SkillId.GRANARY,
+  SkillId.MEDICINE,
+  SkillId.ENGINEERING,
+  SkillId.AGRONOMY,
 ];
 
 const AI_SKILL_ORDER: SkillId[] = [
@@ -225,6 +228,9 @@ const AI_SKILL_ORDER: SkillId[] = [
   SkillId.BRIDGES,
   SkillId.KNIGHTS,
   SkillId.GRANARY,
+  SkillId.AGRONOMY,
+  SkillId.ENGINEERING,
+  SkillId.MEDICINE,
 ];
 
 /** Whether a village's building slots are full but it still claims an unbuilt
@@ -394,7 +400,7 @@ function bestAvailableAction(
       // move/heal handling below instead of trading its life.
     }
     if (state.moved.has(unit.id)) continue;
-    if (canHeal(unit) && unit.hp < UNIT_TYPES[unit.type].maxHp && !enemyCanAttackNext(map, t, player.index)) {
+    if (canHeal(unit) && unit.hp < unitMaxHp(unit) && !enemyCanAttackNext(map, t, player.index)) {
       candidates.push({ score: 600 + jitter(), action: { type: AiActionType.HEAL, unitId: unit.id, q: t.q, r: t.r } });
       continue;
     }
@@ -560,6 +566,11 @@ function bestAvailableAction(
     if (canBuildGranary(map, tile, player) && canAffordAt(map, player, tile, BUILDING_COSTS.granary) && (needsStorage || (granaryNet?.balance ?? 0) > 0)) {
       candidates.push({ score: (needsStorage ? storageScore : 120) + jitter(), action: { type: AiActionType.BUILD, q: tile.q, r: tile.r, kind: BuildingKind.GRANARY } });
     }
+    if (canBuildUniversity(map, tile, player) && canAffordAt(map, player, tile, buildingCostAt(map, player, tile, BuildingKind.UNIVERSITY))) {
+      if (!reserveLastSlotForMine(map, player, tile)) {
+        candidates.push({ score: (220 * buildScale) + jitter(), action: { type: AiActionType.BUILD, q: tile.q, r: tile.r, kind: BuildingKind.UNIVERSITY } });
+      }
+    }
     if (canBuildPort(map, tile, player) && canAffordAt(map, player, tile, BUILDING_COSTS.port)) {
       if (!reserveLastSlotForMine(map, player, tile) || situation?.navalThreat) {
         candidates.push({ score: (200 * buildScale) + jitter(), action: { type: AiActionType.BUILD, q: tile.q, r: tile.r, kind: BuildingKind.PORT } });
@@ -611,11 +622,11 @@ function bestAvailableAction(
 
   // Without farms the army starves: learning Agriculture beats any skill plan
   // once the food stock is under pressure.
-  if (!hasSkill(player, SkillId.AGRICULTURE) && !state.opened.has(SkillId.AGRICULTURE) && canOpenSkill(player, SkillId.AGRICULTURE) && foodPressure(map, player) !== FoodPressure.NONE) {
+  if (!hasSkill(player, SkillId.AGRICULTURE) && !state.opened.has(SkillId.AGRICULTURE) && canOpenSkill(player, SkillId.AGRICULTURE, map) && foodPressure(map, player) !== FoodPressure.NONE) {
     candidates.push({ score: 550 + jitter(), action: { type: AiActionType.OPEN_SKILL, skill: SkillId.AGRICULTURE } });
   }
 
-  if (storage.needy.size > 0 && hasSkill(player, SkillId.AGRICULTURE) && !hasSkill(player, SkillId.GRANARY) && !state.opened.has(SkillId.GRANARY) && canOpenSkill(player, SkillId.GRANARY)) {
+  if (storage.needy.size > 0 && hasSkill(player, SkillId.AGRICULTURE) && !hasSkill(player, SkillId.GRANARY) && !state.opened.has(SkillId.GRANARY) && canOpenSkill(player, SkillId.GRANARY, map)) {
     candidates.push({ score: storageScore + 10 + jitter(), action: { type: AiActionType.OPEN_SKILL, skill: SkillId.GRANARY } });
   }
 
@@ -644,7 +655,7 @@ function bestAvailableAction(
     for (const id of wanted) {
       if (hasSkill(player, id) || state.opened.has(id)) continue;
       foodSkillReserve = skillCost(id, player.skills.length);
-      if (canOpenSkill(player, id)) candidates.push({ score: 540 + jitter(), action: { type: AiActionType.OPEN_SKILL, skill: id } });
+      if (canOpenSkill(player, id, map)) candidates.push({ score: 540 + jitter(), action: { type: AiActionType.OPEN_SKILL, skill: id } });
       break;
     }
   }
@@ -653,7 +664,7 @@ function bestAvailableAction(
   // but is still short of stone (Science first, its parent).
   if (hasSkill(player, SkillId.SMITHERY) && !hasSkill(player, SkillId.GEOLOGY) && totalStock(map, player.index).stone < GEOLOGY_STONE_BELOW && map.tiles.some((t) => t.ownedBy === player.index && t.building?.kind === BuildingKind.MINE)) {
     for (const id of [SkillId.GEOLOGY, SkillId.SCIENCE]) {
-      if (state.opened.has(id) || !canOpenSkill(player, id)) continue;
+      if (state.opened.has(id) || !canOpenSkill(player, id, map)) continue;
       candidates.push({ score: 450 + jitter(), action: { type: AiActionType.OPEN_SKILL, skill: id } });
       break;
     }
@@ -664,7 +675,7 @@ function bestAvailableAction(
   if (directives?.skillChain) {
     for (const id of directives.skillChain) {
       if (state.opened.has(id)) continue;
-      if (canOpenSkill(player, id)) {
+      if (canOpenSkill(player, id, map)) {
         candidates.push({ score: 300 + jitter(), action: { type: AiActionType.OPEN_SKILL, skill: id } });
         break;
       }
@@ -673,7 +684,7 @@ function bestAvailableAction(
     const order = flagsFor(player).militarySkills ? MILITARY_SKILL_ORDER : AI_SKILL_ORDER;
     for (const id of order) {
       if (state.opened.has(id)) continue;
-      if (canOpenSkill(player, id)) {
+      if (canOpenSkill(player, id, map)) {
         const rank = order.indexOf(id);
         candidates.push({ score: 240 - rank * 8 + jitter(), action: { type: AiActionType.OPEN_SKILL, skill: id } });
       }

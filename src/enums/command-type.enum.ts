@@ -25,6 +25,7 @@ export enum CommandType {
   EXTINGUISH = 'extinguish',
   STORM = 'storm',
   STUN = 'stun',
+  CHOOSE_VETERAN_BONUS = 'chooseVeteranBonus',
   END_TURN = 'endTurn',
   GIVE_TO_AI = 'giveToAI',
   FORFEIT = 'forfeit',

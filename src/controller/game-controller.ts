@@ -25,7 +25,7 @@ import {
   TUTORIAL_START_WARRIOR_ID,
 } from '@/game/tutorial/tutorial-map';
 import { skillPulseStep, STEP_CONFIG } from '@/game/tutorial/tutorial-steps';
-import { canAttack, canMove, movePoints } from '@/game/units/units';
+import { canAttack, canMove, movePoints, needsVeteranBonus } from '@/game/units/units';
 import { exploreVillageSights } from '@/game/economy/village';
 import { t } from '@/i18n';
 import { localizeVillageName } from '@/i18n/lists';
@@ -324,6 +324,18 @@ class GameController {
     store.setWinnerIndex(this.sim.winnerIndex);
     store.setExpectedTurns(this.sim.expectedTurns);
     store.setBonusAwarded(this.sim.bonusAwarded);
+    this.promptVeteranBonus();
+  }
+
+  /** Asks the local player to pick the bonus of a veteran of theirs that is waiting for one
+   *  (only on their own turn, and when no other dialog is open). */
+  private promptVeteranBonus(): void {
+    const store = useGameStore.getState();
+    const sim = this.sim;
+    if (!sim || sim.gameOver || store.overlay !== null || store.aiActive) return;
+    if (sim.currentPlayerIndex !== store.localPlayerIndex) return;
+    const tile = sim.map.tiles.find((t) => t.unit !== null && t.unit.owner === store.localPlayerIndex && needsVeteranBonus(t.unit));
+    if (tile?.unit) store.setOverlay({ kind: OverlayKind.VETERAN_BONUS, unitId: tile.unit.id });
   }
 
   private syncTutorialStore(): void {

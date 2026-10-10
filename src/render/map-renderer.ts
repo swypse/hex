@@ -10,7 +10,7 @@ import { portDirection, buildingHp, BUILDING_MAX_HP } from '../game/economy/buil
 import { type Player } from '../game/players';
 import { type Selection } from '../game/units/selection';
 import { TRIBES, tribeById } from '../game/tribes';
-import { UNIT_TYPES, PIRATE_COLOR, type Unit } from '../game/units/units';
+import { PIRATE_COLOR, unitMaxHp, type Unit } from '../game/units/units';
 import { unitCanAct } from '../game/units/unit-actions';
 import { attackBonus, berserkerRage } from '../game/units/abilities';
 import { isExploredFor } from '../game/map/explore';
@@ -357,7 +357,7 @@ export class MapView {
         const unit = tile.unit;
         if (!detailHidden) {
           const center = this.unitTextureTop(unit, players);
-          const maxHp = UNIT_TYPES[unit.type].maxHp;
+          const maxHp = unitMaxHp(unit);
           const hp = this.hpOverrides.get(unit.id) ?? unit.hp;
           const canAct = unit.type === UnitType.PIRATE ? false : unitCanAct(map, tile, unit, players[unit.owner]!);
           const stunned = (unit.stunTurns ?? 0) >= 1;
@@ -371,6 +371,7 @@ export class MapView {
             dim: unit.owner === localPlayerIndex && (!localTurn || !canAct),
             bonus: attackBonus(unit, map),
             starving: unit.starving === true,
+            veteran: unit.veteran === true,
           });
         }
         if (unit.type === UnitType.PIRATE || unit.shipLevel !== undefined) {
@@ -952,6 +953,8 @@ export class MapView {
         return tx.templeTextures[b.level as 1 | 2 | 3 | 4];
       case BuildingKind.FOREST_TEMPLE:
         return tx.forestTempleTextures[b.level as 1 | 2 | 3 | 4];
+      case BuildingKind.UNIVERSITY:
+        return tx.universityTexture ?? tx.mineTexture;
       default:
         return tx.mineTexture;
     }

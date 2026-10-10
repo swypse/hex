@@ -1,7 +1,7 @@
 import { type GameMap, type MapTile } from './map/map-gen';
 import { BUILDING_COSTS, BUILDING_NAMES, buildingYield } from './economy/buildings';
-import { villageIncome } from './economy/capture';
-import { FARM_FOOD, FARM_FOOD_SCIENCE, STARVATION_DAMAGE } from './economy/food';
+import { UNIVERSITY_UPKEEP, villageIncome } from './economy/capture';
+import { AGRONOMY_FOOD, FARM_FOOD, STARVATION_DAMAGE } from './economy/food';
 import { villageUpgradeCost } from './economy/resources';
 import { buildingsInVillage, claimRadius, villageBuildingLimit, unitsInVillage, villageCapacity } from './economy/village';
 import { SHIP_UPGRADE_COST } from './units/ship';
@@ -131,9 +131,16 @@ export function buildingHelpLines(map: GameMap, tile: MapTile): string[] {
     }
     case BuildingKind.FARM: {
       return [
-        t('help.building.farm.produce', { food: FARM_FOOD, science: FARM_FOOD_SCIENCE }),
+        t('help.building.farm.produce', { food: FARM_FOOD, agronomy: AGRONOMY_FOOD }),
         t('help.building.farm.skill', { money: BUILDING_COSTS.farm.money, wood: BUILDING_COSTS.farm.wood }),
         t('help.building.farm.place'),
+      ];
+    }
+    case BuildingKind.UNIVERSITY: {
+      return [
+        t('help.building.university.effect'),
+        t('help.building.university.skill', { money: BUILDING_COSTS.university.money, stone: BUILDING_COSTS.university.stone, ore: BUILDING_COSTS.university.ore, upkeep: UNIVERSITY_UPKEEP }),
+        t('help.building.university.place'),
       ];
     }
     case BuildingKind.GRANARY: {

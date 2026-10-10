@@ -28,12 +28,13 @@ export type GameEvent =
   | { type: GameEventType.TEMPLE_GROWN; q: number; r: number; level: number; playerIndex: number }
   | { type: GameEventType.ROAD_BUILT; q: number; r: number; playerIndex: number }
   | { type: GameEventType.SKILL_OPENED; playerIndex: number; skill: SkillId }
-  | { type: GameEventType.HEALED; unitId: string; playerIndex: number }
+  | { type: GameEventType.HEALED; unitId: string; playerIndex: number; amount?: number }
   | { type: GameEventType.SHIP_UPGRADED; unitId: string; level: 1 | 2 | 3; playerIndex: number }
   | { type: GameEventType.SHIP_REVERTED; unitId: string }
   | { type: GameEventType.UNIT_DISBANDED; unitId: string; q: number; r: number; playerIndex: number }
   | { type: GameEventType.SCORE_FLY; playerIndex: number; amount: number; q: number; r: number }
   | { type: GameEventType.KNIGHT_COMBO; unitId: string; q: number; r: number; playerIndex: number }
+  | { type: GameEventType.VETERAN_PROMOTED; unitId: string; q: number; r: number; playerIndex: number }
   | { type: GameEventType.BONUS_CLAIMED; q: number; r: number; kind: BonusKind; playerIndex: number; skill?: SkillId }
   | { type: GameEventType.BOTTLE_COLLECTED; q: number; r: number; kind: BottleEffect; playerIndex: number; skill?: SkillId }
   | { type: GameEventType.EXPLORER; q: number; r: number; path: Axial[]; playerIndex: number }

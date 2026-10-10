@@ -16,6 +16,7 @@ export const ACTION_BUTTON_ICON_FILES: Record<string, string> = {
   mine: 'action-build-mine',
   farm: 'action-build-farm',
   granary: 'action-build-granary',
+  university: 'action-build-university',
   'burn-farm': 'action-burn-farm',
   'burn-granary': 'action-burn-granary',
   'burn-road': 'action-burn-road',

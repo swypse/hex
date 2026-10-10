@@ -18,5 +18,6 @@ export enum OverlayKind {
   BUILDER_BUILD = 'builderBuild',
   THORN_TRAP = 'thornTrap',
   DISBAND = 'disband',
+  VETERAN_BONUS = 'veteranBonus',
   WATCHING_PROMPT = 'watchingPrompt',
 }

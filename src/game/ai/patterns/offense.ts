@@ -1,7 +1,7 @@
 import { type MapTile } from '../../map/map-gen';
 import { hasSkill } from '../../skills';
 import { reachableTargets } from '../../units/selection';
-import { UNIT_MOVE_POINTS, type Unit } from '../../units/units';
+import { movePoints, type Unit } from '../../units/units';
 import { hexDistance } from '../../map/hex';
 import { attackableTargets, attackDamage } from '../../units/combat';
 import { isExploredFor } from '../../map/explore';
@@ -493,7 +493,7 @@ export const OFFENSE_PATTERNS: AiPattern[] = [
           // do not strip it for garrison duty (that causes pointless retreat
           // loops when the unit is the only one left).
           if (attackableTargets(map, unit, player.index).length > 0) continue;
-          if (hexDistance(t, v) > (d.enemyTurns * UNIT_MOVE_POINTS[unit.type]) / 10) continue;
+          if (hexDistance(t, v) > (d.enemyTurns * movePoints(unit)) / 10) continue;
           const reach = reachableTargets(map, unit, undefined, canClimb, canDock, player.index).filter(
             (c) =>
               !state.occupied.has(key(c.q, c.r)) &&

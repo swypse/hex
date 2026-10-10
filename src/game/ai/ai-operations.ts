@@ -11,7 +11,7 @@ import { reachableTargets } from '../units/selection';
 import { hasSkill } from '../skills';
 import { isMountainType, isWaterType } from '../map/tile-types';
 
-import { UNIT_TYPES, type Unit } from '../units/units';
+import { unitMaxHp, type Unit } from '../units/units';
 import { AiActionType, AiGoalId, AiOperationPhase, AiStance, SkillId, UnitType } from '@enums';
 import { tileAt } from '../map/tile-index';
 import { type WalkField, walkDistance, walkDistances } from './ai-walk';
@@ -55,7 +55,7 @@ function squadEligible(map: GameMap, player: Player, tile: MapTile): Unit | null
   if (!unit || unit.owner !== player.index) return null;
   if (isSupportUnit(unit) || unit.type === UnitType.STALKER || unit.type === UnitType.PIRATE) return null;
   if (unit.shipLevel !== undefined) return null;
-  if (unit.hp * 2 < UNIT_TYPES[unit.type].maxHp) return null;
+  if (unit.hp * 2 < unitMaxHp(unit)) return null;
   if (tile.settlement && tile.settlement.owner === player.index && enemyCanReach(map, tile, player.index)) return null;
   return unit;
 }

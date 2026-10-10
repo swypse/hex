@@ -134,8 +134,17 @@ its own artwork and its own spawn-popup icon (`action-spawn-<type>`).
   random free (non-owned) water hex; several bottles can be on the map at once, and each lives 5 turns before
   disappearing. When a ship moves onto a bottle tile, the **Get bottle** action becomes available on the next turn
   (shown while selecting that water hex). Collecting consumes the ship's whole turn and randomly grants one effect:
-  **+50 money**, a **random unopened skill**, or **+20 ship HP**. AI ships collect bottles automatically at the start of
+  **+50 money**, a **random unopened skill** (never one that needs a university you do not own), or **+20 ship HP**. AI ships collect bottles automatically at the start of
   their turn.
+
+### Veterans
+
+A unit that scores its **3rd kill** (a counter-attack, a storm or a pirate kill count too) becomes a **veteran**: it is
+fully healed at once, a **star** shows before its hp text (`★ N/M`), and its owner picks one permanent bonus in a dialog
+that cannot be dismissed: **+5 attack**, **+10 max HP** (the unit is refilled to the new maximum) or **+20 move points**
+(not while aboard a ship). If the 3rd kill lands on an enemy's turn the dialog opens at the start of the owner's turn.
+AI players pick at once: shields, banners, builders and stalkers take hp, riders take move points, everyone else attack.
+Pirates never become veterans.
 
 ## Unit actions
 
@@ -247,14 +256,14 @@ whole game.
 | Climbing      | 1     | —        | Units can move onto mountain tiles                                                      |
 | Smithery      | 2     | Climbing | Allows building mines on owned mountain tiles                                           |
 | Swordsman     | 2     | Climbing | Allows spawning swordsman units                                                         |
-| Geology       | 2     | Science  | Mines produce +1 stone and +1 ore per round                                             |
+| Geology       | 2     | Science  | Mines produce +1 stone and +1 ore per round; needs one of your villages to have a university |
 | Water         | 1     | —        | Allows building ports on owned water tiles                                              |
 | Navigation    | 2     | Water    | Naval abilities: units on ports become ships, ships can travel water and land on coasts |
 | Water temples | 2     | Water    | Own units/buildings near a water temple are immune to storm damage (radius 1-3 by temple level)                       |
 | Forestry      | 1     | —        | Allows building factories on owned land near forests                                    |
 | Forest temple | 2     | Forestry | Own units/buildings near a forest temple are immune to earthquake damage (radius 1-3 by temple level)                |
-| Science       | 1     | —        | Allows advanced research; cuts the owner's attack miss chance to 5%; farms yield 3 food (0 in winter) |
-| Catapult      | 2     | Science  | Allows spawning catapult units (15 money + 10 wood + 3 ore)                             |
+| Science       | 1     | —        | Allows advanced research; cuts the owner's attack miss chance to 5%; allows building a university |
+| Catapult      | 2     | Shields  | Allows spawning catapult units (15 money + 10 wood + 3 ore)                             |
 | Roads         | 2     | Forestry | Allows building roads between villages                                                  |
 | Shields       | 1     | —        | Allows spawning shield units                                                            |
 | Defense       | 2     | Shields  | Unlocks the Build village walls action (coming soon)                                    |
@@ -263,6 +272,9 @@ whole game.
 | Knights       | 2     | Riding   | Allows spawning knight units (14 money + 5 ore)                                         |
 | Agriculture   | 1     | —        | Allows building farms (15 money + 5 wood)                                              |
 | Granary       | 2     | Agriculture | Allows building granaries next to farms (20 money + 10 wood + 10 stone)              |
+| Agronomy      | 2     | Agriculture | Farms in a village with a university give +1 food, and 1 food in winter; needs an own university |
+| Engineering   | 2     | Science  | Buildings in a village with a university cost about 10% less wood and stone; needs an own university |
+| Medicine      | 2     | Science  | Units on the tiles of a village with a university heal +10 hp more; needs an own university |
 
 ## Buildings
 
@@ -276,8 +288,9 @@ support only as many buildings as its level allows: level 1 → 1, level 2 → 2
 | Mine     | 15 money                   | Smithery     | mountain tile                              | +1 stone and +1 ore per level (+1 stone and +1 ore with Geology)                 |
 | Port     | 10 wood + 30 money + 2 ore | Water        | owned water tile adjacent to your own land | none; used to create and upgrade ships                                           |
 | Temple   | 10 stone + 30 money        | Water temple | water tile                                 | none; grows +1 level every 2 turns (max 4); awards 10/15/20/25 score at game end |
-| Farm     | 15 money + 5 wood | Agriculture | own empty land tile (no forest, mountain or water; a road is fine) with no enemy unit on it | +2 food per round (+3 with Science); 0 in winter |
+| Farm     | 15 money + 5 wood | Agriculture | own empty land tile (no forest, mountain or water; a road is fine) with no enemy unit on it | +2 food per round (+1 with Agronomy in a village with a university); 0 in winter (1 with Agronomy in such a village) |
 | Granary  | 20 money + 10 wood + 10 stone | Granary    | own empty land tile next to one of your farms, no enemy unit on it | stores up to 50 food that adjacent farms did not need; starts at 0 |
+| University | 40 money + 10 stone + 5 ore | Science  | own empty land tile (no forest, mountain or water) of a village of level 5+; one per village; uses a building slot | none; unlocks Geology, Agronomy, Engineering and Medicine; 2 money upkeep per turn |
 
 ## Resources
 
@@ -330,7 +343,7 @@ At the end of each round (after income), for every player and every food network
 
 1. Units are fed village by village, the most developed village first (highest level, then by name), and inside a
    village unit by unit, the hungriest first (3-food units, then shields, then 1-food units; equal units in a fixed
-   order). They eat from the network's farms (yield 2, 3 with Science; 0 in winter), farms **not** adjacent to a granary first, then
+   order). They eat from the network's farms (yield 2, 3 with Agronomy in a village with a university; 0 in winter, 1 with Agronomy there), farms **not** adjacent to a granary first, then
    farms adjacent to a granary.
 2. Food left on a farm adjacent to a granary is stored in that granary (the emptiest adjacent one first). A granary
    holds at most **50**; overflow is lost. Food left on a farm with no adjacent granary is lost: farms never accumulate.
@@ -438,8 +451,8 @@ of the screen to it for 200 ms while the map and background colors flash inverte
     - **Resources**: +10 wood, +5 stone, +5 ore
     - **Free village upgrade**: upgrades your closest village to the bonus at no cost (falls back to +15 money if you
       own no village)
-    - **Free skill**: opens one random skill you have not researched yet, of any level and without prerequisites (falls
-      back to +15 money if every skill is researched)
+    - **Free skill**: opens one random skill you have not researched yet, of any level and without parent prerequisites
+      (a skill that needs a university is only picked when you own one; falls back to +15 money if none is left)
     - **Explorer**: a semi-transparent warrior appears on the tile, makes up to 25 moves exploring the map by the
       regular rules (preferring unexplored cells, never re-stepping a cell it has already visited unless boxed in), then
       disappears

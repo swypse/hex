@@ -23,9 +23,9 @@ export const NAVAL_PATTERNS: AiPattern[] = [
       const chain: SkillId[] = [SkillId.WATER, SkillId.NAVIGATION, SkillId.CATAPULT];
       for (const skill of chain) {
         if (state.opened.has(skill)) continue;
-        if (skill === SkillId.CATAPULT && !hasSkill(player, SkillId.SCIENCE)) {
-          if (!state.opened.has(SkillId.SCIENCE) && canOpenSkill(player, SkillId.SCIENCE)) {
-            return [{ type: AiActionType.OPEN_SKILL, skill: SkillId.SCIENCE }];
+        if (skill === SkillId.CATAPULT && !hasSkill(player, SkillId.SHIELDS)) {
+          if (!state.opened.has(SkillId.SHIELDS) && canOpenSkill(player, SkillId.SHIELDS)) {
+            return [{ type: AiActionType.OPEN_SKILL, skill: SkillId.SHIELDS }];
           }
           continue;
         }

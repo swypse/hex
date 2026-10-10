@@ -28,7 +28,6 @@ import {
 import {
   FARM_FOOD,
   GRANARY_CAPACITY,
-  FARM_FOOD_SCIENCE,
   STARVATION_DAMAGE,
   applyFood,
   farmYield,
@@ -152,12 +151,12 @@ describe('farms', () => {
     expect(buildingsInVillage(map, v)).toBe(0);
   });
 
-  it('yield 2 food, 3 with Science', () => {
+  it('yield 2 food, and Science does not raise it', () => {
     const { p } = setup();
     expect(farmYield(p)).toBe(FARM_FOOD);
     p.skills.push(SkillId.SCIENCE);
-    expect(farmYield(p)).toBe(FARM_FOOD_SCIENCE);
-    expect([FARM_FOOD, FARM_FOOD_SCIENCE]).toEqual([2, 3]);
+    expect(farmYield(p)).toBe(FARM_FOOD);
+    expect(FARM_FOOD).toBe(2);
   });
 
   it('yield 0 food in winter, even with Science', () => {
@@ -167,7 +166,7 @@ describe('farms', () => {
     p.skills.push(SkillId.SCIENCE);
     expect(farmYield(p, map)).toBe(0);
     map.season = Season.SUMMER;
-    expect(farmYield(p, map)).toBe(FARM_FOOD_SCIENCE);
+    expect(farmYield(p, map)).toBe(FARM_FOOD);
   });
 
   it('give nothing to granaries in winter', () => {

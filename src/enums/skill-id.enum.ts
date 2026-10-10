@@ -18,4 +18,7 @@ export enum SkillId {
   AGRICULTURE = 'agriculture',
   GRANARY = 'granary',
   BRIDGES = 'bridges',
+  AGRONOMY = 'agronomy',
+  ENGINEERING = 'engineering',
+  MEDICINE = 'medicine',
 }

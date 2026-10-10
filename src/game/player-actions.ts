@@ -76,7 +76,7 @@ export function hasAnyAvailableAction(map: GameMap, player: Player, turn: number
   }
 
   for (const id of Object.keys(SKILLS) as (keyof typeof SKILLS)[]) {
-    if (canOpenSkill(player, id)) return true;
+    if (canOpenSkill(player, id, map)) return true;
   }
 
   if (bonusEligibleFor(map, player.index, turn).length > 0) return true;

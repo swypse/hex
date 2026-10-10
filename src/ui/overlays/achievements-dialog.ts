@@ -1,7 +1,8 @@
 import { t } from '../../i18n';
 import { Container } from 'pixi.js';
-import { ACHIEVEMENTS, type AchievementInfo } from '../../game/achievements';
+import { ACHIEVEMENTS, achievementProgress, type AchievementInfo } from '../../game/achievements';
 import { useGameStore } from '../../store/game-store';
+import { gameController } from '../../controller/game-controller';
 import { type UIHost } from '../host';
 import { Button } from '../kit/button';
 import { makeLabel } from '../../gfx/label';
@@ -14,6 +15,7 @@ const ICON_LABEL_GAP = 18;
 const ROW_GAP = 18;
 const DETAIL_ICON = 64;
 const DETAIL_GAP = 14;
+const PROGRESS_GAP = 2;
 const OPENED_BORDER_COLOR = 0xff8c00;
 const OPENED_BORDER_WIDTH = 4;
 const CHIP_BG = 0x373748;
@@ -68,8 +70,20 @@ export class AchievementsDialog {
         wordWrap: true,
         wordWrapWidth: labelW,
       });
-      const rowH = Math.max(ROW_ICON, name.height);
-      name.position.set(ROW_ICON + ICON_LABEL_GAP, (rowH - name.height) / 2);
+      // Unopened achievements show how far along the player is, under the name.
+      const prog = opened.has(a.id) ? null : achievementProgress(gameController.getMap(), local, a.id);
+      const progress = prog
+        ? makeLabel(t(a.progressKey, { current: prog.current, target: prog.target }), {
+          fontSize: FontSize.VERY_SMALL,
+          fill: 0xb0b0b0,
+          wordWrap: true,
+          wordWrapWidth: labelW,
+        })
+        : null;
+      const textH = name.height + (progress ? PROGRESS_GAP + progress.height : 0);
+      const rowH = Math.max(ROW_ICON, textH);
+      name.position.set(ROW_ICON + ICON_LABEL_GAP, (rowH - textH) / 2);
+      if (progress) progress.position.set(ROW_ICON + ICON_LABEL_GAP, (rowH - textH) / 2 + name.height + PROGRESS_GAP);
       chip.position.set(ROW_ICON / 2, rowH / 2);
       const score = makeLabel(`+${a.points}`, {
         fontSize: FontSize.SMALL,
@@ -79,6 +93,7 @@ export class AchievementsDialog {
       score.anchor.set(1, 0.5);
       score.position.set(listW, rowH / 2);
       row.addChild(chip, name, score);
+      if (progress) row.addChild(progress);
       row.eventMode = 'static';
       row.cursor = 'pointer';
       row.on('pointertap', () => this.openDetail(a));

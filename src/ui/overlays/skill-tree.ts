@@ -50,18 +50,28 @@ export function skillLayout(): Record<SkillId, SkillNodeLayout> {
   const angle = new Map<SkillId, number>();
   const depth = new Map<SkillId, number>();
   const rootSector = (2 * Math.PI) / roots.length;
-  const assign = (id: SkillId, start: number, end: number, d: number): void => {
+  // The roots sit evenly around the ring, but their children may spill into the
+  // neighbouring sectors: a root with 3 children needs more room than one with 2.
+  // All second-ring skills share one angular step, the widest that keeps the
+  // closest two (within a root, or across two neighbouring roots) that far apart.
+  const kidCount = (id: SkillId): number => (childrenOf.get(id) ?? []).length;
+  let rootStep = rootSector;
+  for (let i = 0; i < roots.length; i++) {
+    const pair = (kidCount(roots[i]!) + kidCount(roots[(i + 1) % roots.length]!)) / 2;
+    if (pair > 0) rootStep = Math.min(rootStep, rootSector / pair);
+  }
+  const assign = (id: SkillId, center: number, sector: number, d: number): void => {
     depth.set(id, d);
-    angle.set(id, (start + end) / 2);
+    angle.set(id, center);
     const kids = childrenOf.get(id) ?? [];
     if (kids.length === 0) return;
-    const width = (end - start) / kids.length;
+    const step = d === 1 ? rootStep : sector / kids.length;
     for (let i = 0; i < kids.length; i++) {
-      assign(kids[i]!, start + i * width, start + (i + 1) * width, d + 1);
+      assign(kids[i]!, center + (i - (kids.length - 1) / 2) * step, step, d + 1);
     }
   };
   for (let i = 0; i < roots.length; i++) {
-    assign(roots[i]!, i * rootSector, (i + 1) * rootSector, 1);
+    assign(roots[i]!, (i + 0.5) * rootSector, rootSector, 1);
   }
 
   const out = {} as Record<SkillId, SkillNodeLayout>;
@@ -435,7 +445,7 @@ export class SkillTree {
     if (!opened) {
       buttons.push(new Button({
         label: t('ui.open'),
-        disabled: !canOpenSkill(human, id),
+        disabled: !canOpenSkill(human, id, gameController.getMap()),
         onClick: () => {
           gameController.actions.openSkill(id);
           this.closeDetail();

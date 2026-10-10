@@ -19,6 +19,7 @@ export enum GameEventType {
   UNIT_DISBANDED = 'unitDisbanded',
   SCORE_FLY = 'scoreFly',
   KNIGHT_COMBO = 'knightCombo',
+  VETERAN_PROMOTED = 'veteranPromoted',
   BONUS_CLAIMED = 'bonusClaimed',
   BOTTLE_COLLECTED = 'bottleCollected',
   EXPLORER = 'explorer',

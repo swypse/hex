@@ -4,7 +4,7 @@ import { isShip, shipAttack, shipAttackDistance } from './ship';
 import { isExploredFor } from '../map/explore';
 import { hasSkill } from '../skills';
 import type { Player } from '../players';
-import { UNIT_TYPES, type Unit } from './units';
+import { unitMaxHp, type Unit } from './units';
 import { attackBonus, effectiveAttack, berserkerRage, isStunned } from './abilities';
 import { damageReduction } from './buffs';
 import { BUILDING_MAX_HP } from '../economy/buildings';
@@ -41,7 +41,7 @@ export function missChanceFor(player: Player): number {
 /** Raw attack force: attack × current hp ratio (no defense applied). The
  *  attack value includes banner-aura (+5) and berserker-rage (+20) bonuses. */
 export function attackDamage(attacker: Unit): number {
-  return Math.round((effectiveAttack(attacker) * attacker.hp) / UNIT_TYPES[attacker.type].maxHp);
+  return Math.round((effectiveAttack(attacker) * attacker.hp) / unitMaxHp(attacker));
 }
 
 /** Terrain/protection bonus applied to the defender's defense force.
@@ -73,9 +73,9 @@ export function resolveCombat(map: GameMap | null, attacker: Unit, target: MapTi
   // Banner aura / berserker rage raise the attack power. Ships receive no
   // bonuses (attackBonus returns 0 at sea), so their numbers stay unchanged.
   const bonus = attackBonus(attacker, map);
-  const attackForce = ((shipAttack(attacker) + bonus) * attacker.hp) / UNIT_TYPES[attacker.type].maxHp;
+  const attackForce = ((shipAttack(attacker) + bonus) * attacker.hp) / unitMaxHp(attacker);
   const defenseForce =
-    (def * defender.hp) / UNIT_TYPES[defender.type].maxHp *
+    (def * defender.hp) / unitMaxHp(defender) *
     defenseBonusFor(map, defender, target);
   const total = attackForce + defenseForce;
   if (total <= 0) return { attackerDamage: 0, counterDamage: 0 };
@@ -253,7 +253,7 @@ export function chooseBestAttack(map: GameMap, unit: Unit, playerIndex = 0): Map
     const dmg = attackDamage(unit);
     let s = 0;
     if (dmg >= target.hp) s += 500;
-    s += (UNIT_TYPES[target.type].maxHp - target.hp) * 3;
+    s += (unitMaxHp(target) - target.hp) * 3;
     if (target.type === UnitType.SWORDSMAN) s += 80;
     if (target.type === UnitType.ARCHER) s += 60;
     if (target.shipLevel !== undefined) s += 90;

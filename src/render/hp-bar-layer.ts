@@ -3,6 +3,7 @@ import type { ObjectPool } from './object-pool';
 import type { TextureSet } from './texture-factory';
 import { FONT_REGULAR } from '../gfx/bitmap-fonts';
 import { HP_BAR_BOX_TOP, HP_BAR_HEIGHT, HP_BAR_INNER_W, HP_BAR_OUTER_H, HP_BAR_OUTER_W, HP_BAR_PADDING, HP_LABEL_GAP, HP_LABEL_PAD_X, HP_LABEL_PLATE_GAP, HP_LABEL_RADIUS } from './hp-bar-layout';
+import { makeIcon32 } from '../gfx/icons32';
 import { FontSize } from '@enums';
 import { clamp, clamp01 } from '../util/math';
 
@@ -14,6 +15,9 @@ const HP_BAR_GHOST_MS = 300;
  *  hp within this window is combat re-hydration (the presenter re-stages units
  *  at their pre-attack hp), not a heal. */
 const HP_RESTAGE_WINDOW_MS = 1000;
+/** Veteran star icon size and its gap to the hp text. */
+const VETERAN_STAR_SIZE = 12;
+const VETERAN_STAR_GAP = 2;
 
 /** What the HP bar layer needs to draw one bar for a unit or a building. */
 export interface HpBarSpec {
@@ -26,6 +30,8 @@ export interface HpBarSpec {
   bonus: number;
   /** The unit gets too little food: show a red S before the hp text. */
   starving?: boolean;
+  /** A veteran: a star icon before the hp text. */
+  veteran?: boolean;
 }
 
 /** A persistent unit/building hp bar: a white 62x12 box holding an orange
@@ -43,6 +49,8 @@ interface HpBarEntry {
   bonusText: BitmapText | null;
   /** Red "S" on black before the hp text of a starving unit. */
   starveTag: { text: BitmapText; bg: Graphics } | null;
+  /** Star icon before the hp text of a veteran. */
+  star: Sprite | null;
   greenW: number;
   ghostW: number;
   greenAnim: { from: number; to: number; start: number } | null;
@@ -228,6 +236,7 @@ export class HpBarLayer {
       bonusIcon,
       bonusText,
       starveTag: null,
+      star: null,
       // A bar is born at the unit's actual hp, not full: a unit that already
       // shows damage (e.g. 20/40) must not render a 100% bar until something
       // else changes.
@@ -245,13 +254,39 @@ export class HpBarLayer {
   private updateHpBarLabel(bar: HpBarEntry, spec: HpBarSpec): void {
     bar.label.text = spec.label;
     const alpha = spec.dim ? 0.3 : 1;
-    drawHpPlate(bar.labelBg.clear(), bar.label.x - bar.label.width / 2, bar.label.y - bar.label.height, bar.label.width, bar.label.height, alpha);
+    const starW = this.updateStar(bar, spec);
+    // The plate grows to the left to hold the star inside it.
+    drawHpPlate(bar.labelBg.clear(), bar.label.x - bar.label.width / 2 - starW, bar.label.y - bar.label.height, bar.label.width + starW, bar.label.height, alpha);
     this.labelHeight = bar.label.height;
-    this.updateStarveTag(bar, spec, alpha);
+    this.updateStarveTag(bar, spec, alpha, starW);
+  }
+
+  /** Keeps the veteran star left of the hp text in sync with the unit. Returns the
+   *  width it takes (star + gap), 0 when the unit is not a veteran. */
+  private updateStar(bar: HpBarEntry, spec: HpBarSpec): number {
+    if (!spec.veteran) {
+      if (bar.star) {
+        bar.star.parent?.removeChild(bar.star);
+        bar.star.destroy();
+        bar.star = null;
+      }
+      return 0;
+    }
+    if (!bar.star) {
+      const star = makeIcon32('star-32', VETERAN_STAR_SIZE);
+      star.anchor.set(0, 1);
+      star.zIndex = 1;
+      bar.el.addChild(star);
+      bar.star = star;
+    }
+    const w = VETERAN_STAR_SIZE + VETERAN_STAR_GAP;
+    bar.star.alpha = spec.dim ? 0.3 : 1;
+    bar.star.position.set(bar.label.x - bar.label.width / 2 - w, bar.label.y - 1);
+    return w;
   }
 
   /** Keeps the red "S" starvation tag before the hp text in sync with the unit. */
-  private updateStarveTag(bar: HpBarEntry, spec: HpBarSpec, alpha: number): void {
+  private updateStarveTag(bar: HpBarEntry, spec: HpBarSpec, alpha: number, starW = 0): void {
     if (!spec.starving) {
       if (bar.starveTag) {
         bar.starveTag.text.parent?.removeChild(bar.starveTag.text);
@@ -274,7 +309,7 @@ export class HpBarLayer {
     }
     const { text, bg } = bar.starveTag;
     // The tag's plate ends HP_LABEL_PLATE_GAP before the hp plate.
-    const right = bar.label.x - bar.label.width / 2 - HP_LABEL_PAD_X - HP_LABEL_PLATE_GAP - HP_LABEL_PAD_X;
+    const right = bar.label.x - bar.label.width / 2 - starW - HP_LABEL_PAD_X - HP_LABEL_PLATE_GAP - HP_LABEL_PAD_X;
     text.position.set(right, bar.label.y);
     drawHpPlate(bg.clear(), right - text.width, bar.label.y - bar.label.height, text.width, bar.label.height, alpha);
   }

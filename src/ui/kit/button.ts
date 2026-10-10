@@ -1,4 +1,5 @@
-import { Container, Graphics, BitmapText } from 'pixi.js';
+import { Container, Graphics, BitmapText, type Sprite } from 'pixi.js';
+import { makeIcon32 } from '../../gfx/icons32';
 import { makeLabel } from '../../gfx/label';
 import { TEXT_BUTTON, THEME } from '../../gfx/theme';
 import { sfx } from '../../sound/sfx';
@@ -7,12 +8,16 @@ import { clamp } from '../../util/math';
 
 const SHADOW_OFFSET_X = 4;
 const SHADOW_OFFSET_Y = 4;
+/** Gap between a button's icon and its text. */
+const ICON_GAP = 6;
 
 /** Corner radii in order top-left, top-right, bottom-right, bottom-left. */
 export type ButtonCorners = readonly [number, number, number, number];
 
 interface ButtonOpts {
   label: string;
+  /** A 32px-atlas icon key (e.g. 'attack-32') drawn before the text, as tall as the text. */
+  icon?: string;
   onClick: () => void;
   disabled?: boolean;
   selected?: boolean;
@@ -58,6 +63,7 @@ function traceRoundedRect(
 export class Button extends Container {
   private readonly bg: Graphics;
   private readonly text: BitmapText;
+  private readonly icon: Sprite | null = null;
   private readonly w: number;
   private readonly h: number;
   private readonly onClick: () => void;
@@ -73,14 +79,19 @@ export class Button extends Container {
     const paddingX = opts.paddingX ?? TEXT_BUTTON.paddingX;
     const paddingY = opts.paddingY ?? TEXT_BUTTON.paddingY;
     this.text = makeLabel(opts.label.toUpperCase(), { fontSize: opts.fontSize ?? TEXT_BUTTON.fontSize });
-    this.w = opts.width ?? this.text.width + paddingX * 2;
+    if (opts.icon) {
+      this.icon = makeIcon32(opts.icon, this.text.height);
+      this.icon.anchor.set(0, 0.5);
+    }
+    this.w = opts.width ?? this.contentWidth() + paddingX * 2;
     this.h = Math.max(this.text.height + paddingY * 2, TEXT_BUTTON.minHeight);
     this.shadow = opts.shadow ?? true;
     this.corners = opts.corners ?? [THEME.radius, THEME.radius, THEME.radius, THEME.radius];
     this.bg = new Graphics();
     this.render(THEME.button);
-    this.text.position.set((this.w - this.text.width) / 2, (this.h - this.text.height) / 2);
     this.addChild(this.bg, this.text);
+    if (this.icon) this.addChild(this.icon);
+    this.layoutContent();
     this.eventMode = 'static';
     this.cursor = 'pointer';
     this.on('pointerover', this.onOver);
@@ -158,7 +169,20 @@ export class Button extends Container {
 
   setLabel(text: string): void {
     this.text.text = text.toUpperCase();
-    this.text.position.set((this.w - this.text.width) / 2, (this.h - this.text.height) / 2);
+    this.layoutContent();
+  }
+
+  /** Width of the icon (if any), its gap and the text. */
+  private contentWidth(): number {
+    return (this.icon ? this.icon.width + ICON_GAP : 0) + this.text.width;
+  }
+
+  /** Centres the icon + text group in the button. */
+  private layoutContent(): void {
+    const x = (this.w - this.contentWidth()) / 2;
+    const iconW = this.icon ? this.icon.width + ICON_GAP : 0;
+    if (this.icon) this.icon.position.set(x, this.h / 2);
+    this.text.position.set(x + iconW, (this.h - this.text.height) / 2);
   }
 
   get disabled(): boolean {

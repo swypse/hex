@@ -2,7 +2,7 @@ import { type MapTile } from '../../map/map-gen';
 import { canAffordAt } from '../../economy/stock';
 import { hasSkill } from '../../skills';
 import { reachableTargets } from '../../units/selection';
-import { UNIT_TYPES } from '../../units/units';
+import { unitMaxHp } from '../../units/units';
 import { hexDistance } from '../../map/hex';
 import { attackableTargets, attackDamage, tradeIsFavorable } from '../../units/combat';
 import { builderBuildable, BUILDING_COSTS, type BuilderBuildableKind } from '../../economy/buildings';
@@ -163,7 +163,7 @@ export const UNIT_PATTERNS: AiPattern[] = [
         const unit = t.unit;
         if (!unit || unit.owner !== player.index) continue;
         if (state.acted.has(unit.id) || state.moved.has(unit.id)) continue;
-        if (unit.hp > UNIT_TYPES[unit.type].maxHp / 2) continue;
+        if (unit.hp > unitMaxHp(unit) / 2) continue;
         if (berserkerShouldPress(map, player, unit)) continue;
         if (t.settlement && t.settlement.owner === player.index) continue;
         if (!enemyCanAttackNext(map, t, player.index)) continue;
@@ -260,7 +260,7 @@ export const UNIT_PATTERNS: AiPattern[] = [
           }
           if (!melee) continue;
           const canKill = attackDamage(unit) >= enemyTile.unit.hp;
-          const notTougher = UNIT_TYPES[enemyTile.unit.type].maxHp <= UNIT_TYPES[unit.type].maxHp;
+          const notTougher = unitMaxHp(enemyTile.unit) <= unitMaxHp(unit);
           if (!canKill && !notTougher) continue;
           const startDist = hexDistance(t, enemyTile);
           for (const c of reachableTargets(map, unit, undefined, canClimb, canDock, player.index)) {

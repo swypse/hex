@@ -55,6 +55,7 @@ export * from './tile-layer.enum';
 export * from './tutorial-step-id.enum';
 export * from './unit-facing.enum';
 export * from './unit-type.enum';
+export * from './veteran-bonus.enum';
 export * from './village-block-variant.enum';
 export * from './village-build-side.enum';
 export * from './weather-type.enum';

@@ -190,6 +190,7 @@ export class Pirates {
         if (pirateTile && pirateTile.unit === pirate) pirateTile.unit = null;
         if (victim) {
           victim.kills += 1;
+          this.host.creditKill(ship);
           this.statsOf(victim).pirateKills += 1;
           awardScore(victim, PIRATE_KILL_SCORE);
           if (pirateTile) this.emitScoreFly(victim.index, PIRATE_KILL_SCORE, pirateTile);
@@ -276,6 +277,7 @@ export class Pirates {
       const owner = this.players[targetOwner];
       if (owner) {
         owner.kills += 1;
+        this.host.creditKill(targetUnit);
         this.statsOf(owner).pirateKills += 1;
         awardScore(owner, PIRATE_KILL_SCORE);
         const tile = tileAt(this.map, attackerTilePos.q, attackerTilePos.r);

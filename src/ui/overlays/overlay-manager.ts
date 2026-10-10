@@ -18,6 +18,7 @@ import { TutorialOverlay } from './tutorial-overlay';
 import { DisconnectDialog } from './disconnect-dialog';
 import { WatchPromptDialog } from './watch-prompt-dialog';
 import { BonusLeaveDialog } from './bonus-leave-dialog';
+import { VeteranBonusDialog } from './veteran-bonus-dialog';
 import { StunChoiceDialog } from './stun-choice-dialog';
 import { BuilderBuildDialog } from './builder-build-dialog';
 import { OverlayKind, PauseReason, Screen } from '@enums';
@@ -44,6 +45,7 @@ export class OverlayManager {
     leave: { make: () => new LeaveGameDialog(), mounted: null, hiding: false },
     ship: { make: () => new ShipLandingDialog(), mounted: null, hiding: false },
     bonusleave: { make: () => new BonusLeaveDialog(), mounted: null, hiding: false },
+    veteranbonus: { make: () => new VeteranBonusDialog(), mounted: null, hiding: false },
     moveattack: { make: () => new MoveAttackDialog(), mounted: null, hiding: false },
     stalkerreveal: { make: () => new StalkerRevealDialog(), mounted: null, hiding: false },
     spawn: { make: () => new SpawnDialog(), mounted: null, hiding: false },
@@ -101,6 +103,9 @@ export class OverlayManager {
           break;
         case OverlayKind.BONUS_LEAVE:
           active.add('bonusleave');
+          break;
+        case OverlayKind.VETERAN_BONUS:
+          active.add('veteranbonus');
           break;
         case OverlayKind.SPAWN:
           active.add('spawn');

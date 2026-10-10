@@ -16,7 +16,7 @@ import { type TextureSet, type TileTexture } from '../src/render/texture-factory
 import { WeatherType } from '@enums';
 import { ENEMY_GLOW_COLOR, OWN_GLOW_COLOR } from '../src/render/unit-glow-color';
 import { HP_BAR_BOX_TOP, HP_BAR_HEIGHT, HP_BAR_ICON_GAP, HP_BAR_INNER_W, HP_BAR_OUTER_H, HP_BAR_OUTER_W, HP_LABEL_PAD_X, HP_LABEL_RADIUS, HP_LABEL_UP } from '../src/render/hp-bar-layout';
-import { BonusKind, BridgeDir, BuildingKind, CaptureMarkerSide, SelectionKind, UnitFacing, UnitType } from '@enums';
+import { BonusKind, BridgeDir, BuildingKind, CaptureMarkerSide, SelectionKind, UnitFacing, UnitType, VeteranBonus } from '@enums';
 
 const HEX = 40;
 const SPRITE_SCALE = 0.25;
@@ -260,6 +260,22 @@ describe('MapView hp bar anchoring', () => {
     expect(half.greenW).toBeCloseTo(full.greenW / 2, 1);
     expect(half.ghostW).toBeCloseTo(full.ghostW / 2, 1);
     expect(half.greenW).toBeGreaterThan(0);
+  });
+
+  it('shows a star before the hp text of a veteran and counts its hp bonus in the max', () => {
+    const tile = map.tiles.find((t) => t.q === 1 && t.r === 0)!;
+    tile.unit = {
+      id: 'vet', owner: 0, type: UnitType.WARRIOR, q: 1, r: 0,
+      hasMoved: true, hasAttacked: true, hasHealed: true,
+      hp: 60, attack: 20, attackDistance: 1, spawnVillage: { q: 0, r: 0 },
+      veteran: true, veteranBonus: VeteranBonus.HP,
+    };
+    view.update(map, players, null, new Set(), new Set(), 0, new Set(), { x: 400, y: 300, scale: 1, width: 800, height: 600 });
+    const bar = view.hpBarEntries().find((b) => b.el.children.some((c) => c instanceof BitmapText && (c as BitmapText).text.startsWith('60/60')))!;
+    expect(bar).toBeDefined();
+    expect(bar.el.children.some((c) => c instanceof Sprite)).toBe(true);
+    const plain = view.hpBarEntries().find((b) => b.el.children.some((c) => c instanceof BitmapText && (c as BitmapText).text.startsWith('50/50')))!;
+    expect(plain.el.children.some((c) => c instanceof Sprite)).toBe(false);
   });
 
   it('does not draw a dot on the starting (capital) village', () => {

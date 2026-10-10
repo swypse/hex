@@ -19,8 +19,8 @@ function player(money: number, skills: SkillId[] = []): Player {
 }
 
 describe('skills', () => {
-  it('defines the nineteen skills with base costs 3 and 6 and correct parents', () => {
-    expect(Object.keys(SKILLS)).toHaveLength(19);
+  it('defines the twenty-two skills with base costs 3 and 6 and correct parents', () => {
+    expect(Object.keys(SKILLS)).toHaveLength(22);
     expect(skillCost(SkillId.CLIMBING, 0)).toBe(3);
     expect(skillCost(SkillId.WATER, 0)).toBe(3);
     expect(skillCost(SkillId.FORESTRY, 0)).toBe(3);
@@ -41,7 +41,10 @@ describe('skills', () => {
     expect(SKILLS.smithery.parent).toBe(SkillId.CLIMBING);
     expect(SKILLS.swordsman.parent).toBe(SkillId.CLIMBING);
     expect(SKILLS.geology.parent).toBe(SkillId.SCIENCE);
-    expect(SKILLS.catapult.parent).toBe(SkillId.SCIENCE);
+    expect(SKILLS.catapult.parent).toBe(SkillId.SHIELDS);
+    expect(SKILLS.agronomy.parent).toBe(SkillId.AGRICULTURE);
+    expect(SKILLS.engineering.parent).toBe(SkillId.SCIENCE);
+    expect(SKILLS.medicine.parent).toBe(SkillId.SCIENCE);
     expect(SKILLS.navigation.parent).toBe(SkillId.WATER);
     expect(SKILLS.waterTemples.parent).toBe(SkillId.WATER);
     expect(SKILLS.forestTemple.parent).toBe(SkillId.FORESTRY);
@@ -115,9 +118,10 @@ describe('skills', () => {
     expect(hasSkill(player(0), SkillId.FORESTRY)).toBe(false);
   });
 
-  it('catapult requires the science parent and costs 8 right after science', () => {
+  it('catapult requires the shields parent and costs 8 right after shields', () => {
     expect(canOpenSkill(player(100), SkillId.CATAPULT)).toBe(false);
-    expect(canOpenSkill(player(100, [SkillId.SCIENCE]), SkillId.CATAPULT)).toBe(true);
+    expect(canOpenSkill(player(100, [SkillId.SCIENCE]), SkillId.CATAPULT)).toBe(false);
+    expect(canOpenSkill(player(100, [SkillId.SHIELDS]), SkillId.CATAPULT)).toBe(true);
     expect(skillCost(SkillId.CATAPULT, 1)).toBe(8);
   });
 

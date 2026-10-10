@@ -4,7 +4,7 @@ import { canAffordAt } from '../economy/stock';
 import { isMountainType } from '../map/tile-types';
 import { hasSkill } from '../skills';
 import { reachableTargets } from '../units/selection';
-import { UNIT_MOVE_POINTS, unitSpawnCost, UNIT_ATTACK_DISTANCE, type Unit } from '../units/units';
+import { movePoints, unitSpawnCost, UNIT_ATTACK_DISTANCE, type Unit } from '../units/units';
 import { SeededRandom } from '../../util/random';
 import { hexDistance, hexNeighbors } from '../map/hex';
 import { attackableTargets, attackDamage, counterDamageTo as counterDamageToFromCombat } from '../units/combat';
@@ -57,7 +57,7 @@ export const STUN_MIN_DAMAGE = 15;
  *  tile cost. */
 function enemyReach(unit: Unit): { move: number; attack: number } {
   if (isShip(unit)) return { move: shipMovePoints(unit) / 10, attack: shipAttackDistance(unit) };
-  return { move: UNIT_MOVE_POINTS[unit.type] / 10, attack: UNIT_ATTACK_DISTANCE[unit.type] };
+  return { move: movePoints(unit) / 10, attack: UNIT_ATTACK_DISTANCE[unit.type] };
 }
 
 /** Turns of enemy movement the garrison logic looks ahead. Taking a village

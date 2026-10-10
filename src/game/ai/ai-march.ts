@@ -6,7 +6,7 @@ import { hasSkill } from '../skills';
 import { reachableTargets } from '../units/selection';
 import { isShip } from '../units/ship';
 import { isMountainType, isWaterType } from '../map/tile-types';
-import { UNIT_TYPES } from '../units/units';
+import { unitMaxHp } from '../units/units';
 import { AiActionType, SkillId, UnitType } from '@enums';
 import { flagsFor } from './ai-flags';
 import { type AiAction } from './ai-types';
@@ -24,7 +24,7 @@ function marcher(map: GameMap, player: Player, tile: MapTile, ctx: AiPatternCont
   if (!unit || unit.owner !== player.index) return false;
   if (ctx.state.acted.has(unit.id) || ctx.state.moved.has(unit.id)) return false;
   if (isSupportUnit(unit) || unit.type === UnitType.STALKER || unit.type === UnitType.PIRATE || isShip(unit)) return false;
-  if (unit.hp < UNIT_TYPES[unit.type].maxHp * MIN_MARCH_HP) return false;
+  if (unit.hp < unitMaxHp(unit) * MIN_MARCH_HP) return false;
   if (tile.settlement && tile.settlement.owner !== player.index) return false;
   if (tile.settlement && enemyCanReach(map, tile, player.index)) return false;
   return true;

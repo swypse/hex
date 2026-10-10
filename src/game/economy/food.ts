@@ -1,5 +1,6 @@
 import { axialKey, hexNeighbors } from '../map/hex';
 import { BUILDING_COSTS, buildingIncome } from './buildings';
+import { tileHasUniversity } from './village';
 import { type GameMap, type MapTile } from '../map/map-gen';
 import type { Player } from '../players';
 import { foodNetworks, networkStock, readStock, stockOf, totalStock } from './stock';
@@ -13,8 +14,9 @@ import { tileMapByKey } from '../map/tile-index';
 
 /** Food a farm yields at the end of each round. */
 export const FARM_FOOD = 2;
-/** Farm yield once its owner has opened Science. */
-export const FARM_FOOD_SCIENCE = 3;
+/** Extra food Agronomy gives a farm in a village with a university, and what such a farm yields in winter. */
+export const AGRONOMY_FOOD = 1;
+export const AGRONOMY_WINTER_FOOD = 1;
 /** Most food one granary can hold. */
 export const GRANARY_CAPACITY = 50;
 /** Hp a unit loses when it gets none of the food it needs; a partly fed unit
@@ -27,11 +29,13 @@ const UNIT_FEED_PRIORITY: UnitType[] = [
   UnitType.SHIELD, UnitType.RIDER, UnitType.ARCHER, UnitType.WARRIOR, UnitType.PIRATE,
 ];
 
-/** Farm yield per round: nothing in winter, otherwise 2 (3 with Science), halved
- *  (rounded up) for a farm inside a drought. */
-export function farmYield(owner: Player | null | undefined, map?: Pick<GameMap, 'season' | 'weather'>, farm?: MapTile): number {
-  if (map?.season === Season.WINTER) return 0;
-  const normal = owner && hasSkill(owner, SkillId.SCIENCE) ? FARM_FOOD_SCIENCE : FARM_FOOD;
+/** Farm yield per round: nothing in winter, otherwise 2 (+1 with Agronomy in a
+ *  village with a university), halved (rounded up) for a farm inside a drought. */
+export function farmYield(owner: Player | null | undefined, map?: Pick<GameMap, 'season' | 'weather'> & Partial<Pick<GameMap, 'tiles'>>, farm?: MapTile): number {
+  // Agronomy: a farm in a village with a university yields 1 more, and 1 in winter.
+  const agronomy = !!owner && !!farm && !!map?.tiles && hasSkill(owner, SkillId.AGRONOMY) && tileHasUniversity({ tiles: map.tiles }, farm);
+  if (map?.season === Season.WINTER) return agronomy ? AGRONOMY_WINTER_FOOD : 0;
+  const normal = FARM_FOOD + (agronomy ? AGRONOMY_FOOD : 0);
   // A drought halves the farms inside it.
   return farm && map && droughtOverTile(map, farm) ? halvedYield(normal) : normal;
 }

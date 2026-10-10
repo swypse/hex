@@ -1,18 +1,18 @@
 export const TOOLBAR_HEIGHT = 64;
 export const TURN_BAR_HEIGHT = 18;
-/** Skills/achievements action buttons match the player score chip size. */
+/** Skills/achievements action buttons. */
 export const SKILLS_BUTTON_SIZE = 40;
 export const TURN_BAR_GAP = 6;
 export const ACTION_TOOLBAR_MAX_WIDTH = 600;
 
 /** Score chip (top-right) layout constants, shared with HudScore. */
 export const SCORE_PAD = 8;
-export const SCORE_TOP_OFFSET = 20;
-export const SCORE_CHIP_RADIUS = 20;
+export const SCORE_TOP_OFFSET = 6;
+export const SCORE_CHIP_RADIUS = 24;
 /** Vertical centre of the score text (and the season label), below the resource panel row. */
 export const SCORE_TEXT_Y = 48;
 /** Gap between the chip bottom and the achievements button below it. */
-export const SCORE_ACHIEVEMENTS_CHIP_GAP = 6;
+export const SCORE_ACHIEVEMENTS_CHIP_GAP = 2;
 /** Gap between the achievements button bottom and the first buff icon. */
 const SCORE_BUFF_BUTTON_GAP = 6;
 /** Size of each temple-buff icon under the score chip. */

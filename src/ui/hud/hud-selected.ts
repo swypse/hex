@@ -161,6 +161,8 @@ export class HudSelected implements Widget {
           t('hud.selected.unit', { name: UNIT_TYPE_NAMES[unit.type] }) +
           (statusBits.length > 0 ? ` (${statusBits.join(' ')})` : ''),
         pairs: [
+          // A veteran carries a star with its kill count.
+          ...(unit.veteran ? [{ icon: 'star-32', value: String(unit.kills ?? 0) }] : []),
           { icon: 'attack-32', value: rageBonus > 0 ? `${attackDamage(unit)} +${rageBonus}` : String(attackDamage(unit)) },
           { icon: 'def-32', value: bonusDefense > 0 ? `${unit.defense ?? 0} + ${bonusDefense}` : String(unit.defense ?? 0) },
           { icon: 'gold-32', value: String(unitMaintenance(unit)) },
@@ -169,6 +171,11 @@ export class HudSelected implements Widget {
       };
       lines.push(''); // placeholder — the unit line renders as a composite icon row
       bolds.push(true);
+      // The unit's own kill count, right below its characteristics.
+      if (unit.owner >= 0) {
+        lines.push(t('hud.selected.kills', { n: unit.kills ?? 0 }));
+        bolds.push(false);
+      }
       for (const buff of defenseBuffs) {
         extraRows.set(lines.length, { name: '', pairs: [{ icon: 'def-32', value: t(buff.key, { n: buff.amount }) }] });
         lines.push('');
@@ -258,7 +265,7 @@ export class HudSelected implements Widget {
       // pairs, like the unit characteristics row, so damage and production
       // read at a glance.
       buildingRow = {
-        name: b.kind === BuildingKind.SAWMILL || b.kind === BuildingKind.MINE || b.kind === BuildingKind.FARM || b.kind === BuildingKind.GRANARY
+        name: b.kind === BuildingKind.SAWMILL || b.kind === BuildingKind.MINE || b.kind === BuildingKind.FARM || b.kind === BuildingKind.GRANARY || b.kind === BuildingKind.UNIVERSITY
           ? BUILDING_NAMES[b.kind]
           : t('hud.selected.building', { name: BUILDING_NAMES[b.kind], level: b.level }),
         hp: buildingHp(b),
@@ -452,7 +459,7 @@ export class HudSelected implements Widget {
     // tap beside the icon or text still hits the row instead of the map below.
     const actionRows: { row: Container; top: number; h: number }[] = [];
     for (const a of actions) {
-      const disabled = s.aiActive || !canOpenSkill(human, a.id);
+      const disabled = s.aiActive || !canOpenSkill(human, a.id, map);
       const highlighted = !!s.tutorial && s.tutorialHighlightSkills.includes(a.id);
       const row = new Container();
       row.eventMode = 'static';

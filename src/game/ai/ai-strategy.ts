@@ -165,7 +165,7 @@ function economySkillChain(player: Player): SkillId[] | null {
 }
 
 function navalSkillChain(player: Player): SkillId[] | null {
-  const chain: SkillId[] = [SkillId.WATER, SkillId.NAVIGATION, SkillId.SCIENCE, SkillId.CATAPULT];
+  const chain: SkillId[] = [SkillId.WATER, SkillId.NAVIGATION, SkillId.SHIELDS, SkillId.CATAPULT];
   for (const s of chain) if (!hasSkill(player, s)) return chain.slice(chain.indexOf(s));
   return null;
 }

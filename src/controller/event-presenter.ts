@@ -336,7 +336,7 @@ export class EventPresenter {
             const unit = this.findUnitById(e.unitId);
             if (unit) {
               const t = tileAt(sim.map, unit.q, unit.r);
-              if (t) this.effects.spawnHpText(t, `+${HEAL_AMOUNT}`, 0x44ff44);
+              if (t) this.effects.spawnHpText(t, `+${e.amount ?? HEAL_AMOUNT}`, 0x44ff44);
             }
             break;
           }

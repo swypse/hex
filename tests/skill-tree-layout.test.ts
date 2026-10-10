@@ -46,9 +46,22 @@ describe('skill tree layout', () => {
     }
   });
 
-  it('places the catapult skill on the second ring as a child of science', () => {
+  it('places the catapult skill on the second ring as a child of shields', () => {
     expect(layout.catapult.depth).toBe(2);
-    expect(layout.catapult.radius).toBeGreaterThan(layout.science.radius);
+    expect(layout.catapult.radius).toBeGreaterThan(layout.shields.radius);
+  });
+
+  it('keeps every pair of second-ring skills at least 100px apart (science has three children)', () => {
+    const ring2 = (Object.keys(SKILLS) as SkillId[]).filter((id) => layout[id].depth === 2);
+    let closest = Infinity;
+    for (let i = 0; i < ring2.length; i++) {
+      for (let j = i + 1; j < ring2.length; j++) {
+        const a = layout[ring2[i]!];
+        const b = layout[ring2[j]!];
+        closest = Math.min(closest, Math.hypot(a.x - b.x, a.y - b.y));
+      }
+    }
+    expect(closest).toBeGreaterThanOrEqual(100);
   });
 
   it('does not intersect parent-child edges', () => {

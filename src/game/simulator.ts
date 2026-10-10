@@ -1,5 +1,5 @@
 import { SeededRandom } from '@/util';
-import { AchievementId, AiActionType, AiEngine, BuilderExtraKind, BuildingKind, CommandType, GameEventType, GameMode, Season, SkillId, UnitType, WeatherType } from '@enums';
+import { AchievementId, VeteranBonus, AiActionType, AiEngine, BuilderExtraKind, BuildingKind, CommandType, GameEventType, GameMode, Season, SkillId, UnitType, WeatherType } from '@enums';
 import { awardAchievementScores, currentlyMetIds, evaluateAchievements } from './achievements';
 import { type AiActionMarker, aiLoggingEnabled, formatAiAction, logAiTurnStart, planAiActions, planAiActionsSteps } from './ai/ai';
 import type { AiAction } from './ai/ai-types';
@@ -37,8 +37,8 @@ import { addStock, migrateLegacyResources, payAt } from './economy/stock';
 import { stormDamage, stormEligible, stormTargetShips } from './units/storm';
 import { TileType } from './map/tile-types';
 import { canPlaceTrapOn, TRAP_COST, trapAlive, trapDamage } from './units/traps';
-import { canAttack, canDisband, canHeal, canMove, disbandCost, canDealWithPirate, hasPirateDeal, healUnit, movePoints, PIRATE_DEAL_COST, PIRATE_OWNER, type Unit } from './units/units';
-import { buildWall as applyWall, canBuildWall, upgradeVillage } from './economy/village';
+import { applyVeteranBonus, canAttack, canDisband, canHeal, canMove, disbandCost, aiVeteranBonus, needsVeteranBonus, recordKill, canDealWithPirate, hasPirateDeal, healUnit, HEAL_AMOUNT, MEDICINE_HEAL_BONUS, movePoints, PIRATE_DEAL_COST, PIRATE_OWNER, type Unit } from './units/units';
+import { buildWall as applyWall, canBuildWall, tileHasUniversity, upgradeVillage } from './economy/village';
 import { randomSeed } from '../util/random';
 import { Bonuses } from './bonuses';
 import { Environment } from './environment';
@@ -74,6 +74,7 @@ export type Command =
   | { type: CommandType.STORM; unitId: string }
   | { type: CommandType.EXTINGUISH; unitId: string; q: number; r: number }
   | { type: CommandType.STUN; unitId: string; q: number; r: number }
+  | { type: CommandType.CHOOSE_VETERAN_BONUS; unitId: string; bonus: VeteranBonus }
   | { type: CommandType.END_TURN }
   | { type: CommandType.GIVE_TO_AI; playerIndex: number }
   | { type: CommandType.FORFEIT; playerIndex: number };
@@ -103,6 +104,7 @@ export const PREDICTABLE_COMMAND_TYPES: ReadonlySet<Command['type']> = new Set<C
   CommandType.TRAP,
   CommandType.STORM,
   CommandType.EXTINGUISH,
+  CommandType.CHOOSE_VETERAN_BONUS,
 ]);
 
 export class Simulator {
@@ -147,6 +149,7 @@ export class Simulator {
       emit: (e) => this.emit(e),
       statsOf: (p) => this.statsOf(p),
       emitScoreFly: (i, n, tile) => this.emitScoreFly(i, n, tile),
+      creditKill: (u) => this.creditKill(u),
     };
     this.pirates = new Pirates(ctx);
     this.bonuses = new Bonuses(ctx);
@@ -312,6 +315,9 @@ export class Simulator {
       case CommandType.STUN:
         ok = this.doStun(cmd.unitId, cmd.q, cmd.r);
         break;
+      case CommandType.CHOOSE_VETERAN_BONUS:
+        ok = this.doChooseVeteranBonus(cmd.unitId, cmd.bonus);
+        break;
       case CommandType.END_TURN:
         this.doEndTurn();
         ok = true;
@@ -383,6 +389,32 @@ export class Simulator {
     this.events.push(e);
   }
 
+  /** Counts a kill for `unit`. Its 3rd kill makes it a veteran: fully healed
+   *  now, and a human owner picks the bonus (AI owners get one at once). */
+  private creditKill(unit: Unit): void {
+    if (unit.hp <= 0 || !recordKill(unit)) return;
+    this.emit({ type: GameEventType.VETERAN_PROMOTED, unitId: unit.id, q: unit.q, r: unit.r, playerIndex: unit.owner });
+    if (!this.players[unit.owner]?.isHuman) this.pickVeteranBonusForAi(unit);
+  }
+
+  private pickVeteranBonusForAi(unit: Unit): void {
+    applyVeteranBonus(unit, aiVeteranBonus(unit));
+  }
+
+  /** Gives every veteran of an AI-controlled player that is still waiting for a bonus one. */
+  private resolveVeteransFor(playerIndex: number): void {
+    for (const t of this.map.tiles) {
+      if (t.unit && t.unit.owner === playerIndex && needsVeteranBonus(t.unit)) this.pickVeteranBonusForAi(t.unit);
+    }
+  }
+
+  private doChooseVeteranBonus(unitId: string, bonus: VeteranBonus): boolean {
+    const unit = this.findUnit(unitId);
+    if (!unit || unit.owner !== this.currentPlayerIndex) return false;
+    if (!Object.values(VeteranBonus).includes(bonus)) return false;
+    return applyVeteranBonus(unit, bonus);
+  }
+
   private emitScoreFly(playerIndex: number, amount: number, tile: MapTile): void {
     this.emit({ type: GameEventType.SCORE_FLY, playerIndex, amount, q: tile.q, r: tile.r });
   }
@@ -396,8 +428,9 @@ export class Simulator {
     for (const t of this.map.tiles) {
       const u = t.unit;
       if (u && u.owner === playerIndex && canHeal(u)) {
-        healUnit(u);
-        this.emit({ type: GameEventType.HEALED, unitId: u.id, playerIndex });
+        const amount = this.healAmountAt(u, t);
+        healUnit(u, amount);
+        this.emit({ type: GameEventType.HEALED, unitId: u.id, playerIndex, amount });
       }
     }
   }
@@ -642,6 +675,7 @@ export class Simulator {
         if (victim) this.statsOf(victim).killedUnits += 1;
         this.statsOf(killer).enemyShipsKilled += 1;
         t.unit = null;
+        this.creditKill(unit);
       }
     }
     this.consumeUnitTurn(unit);
@@ -777,6 +811,7 @@ export class Simulator {
     if (targetWasPirate && !result.targetDied) provokePirate(targetUnit, attacker.owner);
     if (result.targetDied) {
       attackerPlayer.kills += 1;
+      this.creditKill(attacker);
       const pts = targetWasPirate ? PIRATE_KILL_SCORE : KILL_SCORE;
       awardScore(attackerPlayer, pts);
       this.emitScoreFly(attackerPlayer.index, pts, target);
@@ -789,6 +824,7 @@ export class Simulator {
     }
     if (result.attackerDied && targetPlayer) {
       targetPlayer.kills += 1;
+      this.creditKill(targetUnit);
       awardScore(targetPlayer, KILL_SCORE);
       this.statsOf(attackerPlayer).killedUnits += 1;
       const attackerTile = tileAt(this.map, attacker.q, attacker.r);
@@ -1039,7 +1075,7 @@ export class Simulator {
 
   private doOpenSkill(skill: SkillId): boolean {
     const player = this.currentPlayer;
-    if (applySkill(player, skill)) {
+    if (applySkill(player, skill, this.map)) {
       awardScore(player, SKILL_SCORE);
       this.statsOf(player).skillsOpened += 1;
       this.emit({ type: GameEventType.SKILL_OPENED, playerIndex: player.index, skill });
@@ -1052,9 +1088,17 @@ export class Simulator {
   private doHeal(unitId: string): boolean {
     const unit = this.findUnit(unitId);
     if (!unit || unit.owner !== this.currentPlayerIndex || !canHeal(unit)) return false;
-    healUnit(unit);
-    this.emit({ type: GameEventType.HEALED, unitId, playerIndex: unit.owner });
+    const amount = this.healAmountAt(unit, tileAt(this.map, unit.q, unit.r));
+    healUnit(unit, amount);
+    this.emit({ type: GameEventType.HEALED, unitId, playerIndex: unit.owner, amount });
     return true;
+  }
+
+  /** Hp a heal gives `unit` standing on `tile`: Medicine adds 10 on the tiles of a village with a university. */
+  private healAmountAt(unit: Unit, tile: MapTile | undefined | null): number {
+    const owner = this.players[unit.owner];
+    if (!owner || !tile || !hasSkill(owner, SkillId.MEDICINE) || !tileHasUniversity(this.map, tile)) return HEAL_AMOUNT;
+    return HEAL_AMOUNT + MEDICINE_HEAL_BONUS;
   }
 
   private doDisband(unitId: string): boolean {
@@ -1251,6 +1295,7 @@ export class Simulator {
   private *runAiTurnSteps(playerIndex: number): Generator<void, void, void> {
     const ai = this.players[playerIndex]!;
     logAiTurnStart(ai, this.turn);
+    this.resolveVeteransFor(playerIndex);
     this.bonuses.doClaimBonus();
     this.bonuses.collectAiBottles(playerIndex);
     this.markCaptureReadyFor(playerIndex);

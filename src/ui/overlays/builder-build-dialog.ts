@@ -6,14 +6,17 @@ import { type UIHost } from '../host';
 import { Button } from '../kit/button';
 import { Popup } from '../kit/popup';
 import { addPopupHint, PopupDialog } from './popup-dialog';
-import type { BuilderBuildKind } from '../../game/economy/buildings';
+import { BUILDING_COSTS, type BuilderBuildKind } from '../../game/economy/buildings';
+import { BRIDGE_COST } from '../../game/economy/bridges';
+import { costLabel, type Resources } from '../../game/economy/resources';
 import { BuilderExtraKind, BuildingKind, OverlayKind } from '@enums';
 
-const BUILD_KINDS: Array<{ kind: BuilderBuildKind; labelKey: string }> = [
-  { kind: BuildingKind.SAWMILL, labelKey: 'ui.buildsawmill10' },
-  { kind: BuildingKind.MINE, labelKey: 'ui.buildmine15' },
-  { kind: BuildingKind.PORT, labelKey: 'ui.buildport10w302ore' },
-  { kind: BuilderExtraKind.BRIDGE, labelKey: 'ui.buildbridge10w5s15m' },
+/** What a builder offers, with the base price (a discount depends on the cell chosen next). */
+const BUILD_KINDS: Array<{ kind: BuilderBuildKind; labelKey: string; cost: Resources }> = [
+  { kind: BuildingKind.SAWMILL, labelKey: 'build.sawmill', cost: BUILDING_COSTS.sawmill },
+  { kind: BuildingKind.MINE, labelKey: 'build.mine', cost: BUILDING_COSTS.mine },
+  { kind: BuildingKind.PORT, labelKey: 'build.port', cost: BUILDING_COSTS.port },
+  { kind: BuilderExtraKind.BRIDGE, labelKey: 'build.bridge', cost: BRIDGE_COST },
 ];
 
 export class BuilderBuildDialog extends PopupDialog {
@@ -21,9 +24,9 @@ export class BuilderBuildDialog extends PopupDialog {
     const s = useGameStore.getState();
     if (s.overlay?.kind !== OverlayKind.BUILDER_BUILD) return;
 
-    const buttons: Button[] = BUILD_KINDS.map(({ kind, labelKey }) =>
+    const buttons: Button[] = BUILD_KINDS.map(({ kind, labelKey, cost }) =>
       new Button({
-        label: `${t(labelKey)}`,
+        label: t(labelKey, { cost: costLabel(cost) }),
         onClick: () => gameController.actions.beginBuilderPlacement(kind),
       }),
     );

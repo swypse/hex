@@ -36,6 +36,7 @@ describe('predictable command types', () => {
       CommandType.BURN,
       CommandType.BURN_ROAD,
       CommandType.CAPTURE,
+      CommandType.CHOOSE_VETERAN_BONUS,
       CommandType.DEAL,
       CommandType.DESTROY_BUILDING,
       CommandType.DISBAND,

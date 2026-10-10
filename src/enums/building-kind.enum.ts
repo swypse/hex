@@ -6,4 +6,5 @@ export enum BuildingKind {
   FOREST_TEMPLE = 'forestTemple',
   FARM = 'farm',
   GRANARY = 'granary',
+  UNIVERSITY = 'university',
 }

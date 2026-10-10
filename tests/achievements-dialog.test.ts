@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { Container, BitmapText } from 'pixi.js';
 import { AchievementsDialog } from '../src/ui/overlays/achievements-dialog';
 import { useGameStore } from '../src/store/game-store';
@@ -6,6 +6,7 @@ import { type UIHost } from '../src/ui/host';
 import { START_RESOURCES } from '../src/game/economy/resources';
 import { Tribe } from '../src/game/tribes';
 import { t } from '../src/i18n';
+import { gameController } from '../src/controller/game-controller';
 import type { Player } from '../src/game/players';
 
 function fakeCanvasContext() {
@@ -129,5 +130,19 @@ describe('AchievementsDialog', () => {
     (closeBtn as { emit: (e: string) => void }).emit('pointertap');
     expect(useGameStore.getState().overlay).toBeNull();
     dialog.destroy();
+  });
+  it('shows progress under unopened achievements only', () => {
+    const player = makePlayer(['bonusHunter']);
+    player.stats = { killedUnits: 0, pirateKills: 2, villagesCaptured: 0, villageUpgrades: 0, knightCombos: 0, enemyShipsKilled: 0, shipsCapturedByPirates: 0, bonusesCollected: 3, tribesEliminated: 0, skillsOpened: 0 };
+    useGameStore.setState({ players: [player] });
+    vi.spyOn(gameController, 'getMap').mockReturnValue({ radius: 1, spawns: [], tiles: [] });
+    const root = new Container();
+    const dialog = new AchievementsDialog();
+    dialog.mount(makeHost(), root);
+    const texts = allTexts(root.children[0] as Container);
+    expect(texts).toContain(t('ach.piratePurger.progress', { current: 2, target: 3 }));
+    expect(texts.some((x) => x === t('ach.bonusHunter.progress', { current: 3, target: 3 }))).toBe(false);
+    dialog.destroy();
+    vi.restoreAllMocks();
   });
 });

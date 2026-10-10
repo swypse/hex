@@ -1,7 +1,7 @@
 import { hexDistance } from '../map/hex';
 import { type GameMap } from '../map/map-gen';
 import { isShip, shipAttack } from './ship';
-import { UNIT_TYPES, type Unit } from './units';
+import { unitMaxHp, veteranAttackBonus, type Unit } from './units';
 import { UnitType } from '@enums';
 
 export const BANNER_BONUS = 5;
@@ -15,7 +15,7 @@ export function isStunned(unit: Unit): boolean {
 /** +10 atk while the unit has <= 35% max hp (berserker rage), else 0. */
 export function berserkerRage(unit: Unit): number {
   if (unit.type !== UnitType.BERSERKER) return 0;
-  return unit.hp <= UNIT_TYPES.berserker.maxHp * RAGE_THRESHOLD_PCT ? RAGE_BONUS : 0;
+  return unit.hp <= unitMaxHp(unit) * RAGE_THRESHOLD_PCT ? RAGE_BONUS : 0;
 }
 
 /** +5 atk for a unit within distance 2 of any friendly banner (never the
@@ -36,11 +36,11 @@ function baseAttack(unit: Unit): number {
   return shipAttack(unit);
 }
 
-/** Any current atk bonus (banner +5 / rage +10); ships get none. Used for the
- *  hp-bar icon and HUD. */
+/** Any current atk bonus (banner +5 / rage +10 / veteran +5); ships get none.
+ *  Used for the hp-bar icon and HUD. */
 export function attackBonus(unit: Unit, map: GameMap | null): number {
   if (isShip(unit)) return 0;
-  return bannerAttackBonus(map, unit) + berserkerRage(unit);
+  return bannerAttackBonus(map, unit) + berserkerRage(unit) + veteranAttackBonus(unit);
 }
 
 export function effectiveAttack(unit: Unit, map: GameMap | null = null): number {

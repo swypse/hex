@@ -1,3 +1,5 @@
+import { t } from '../../i18n';
+
 export interface Resources {
   wood: number;
   stone: number;
@@ -67,4 +69,14 @@ export function pay(have: Resources, cost: Resources): Resources {
     ore: have.ore - cost.ore,
     food: have.food - cost.food,
   };
+}
+
+/** A cost as short button text: `40m, 10s, 5o` (money, wood, stone, ore; zeros left out). */
+export function costLabel(cost: Resources): string {
+  const parts: string[] = [];
+  if (cost.money > 0) parts.push(`${cost.money}${t('cost.money')}`);
+  if (cost.wood > 0) parts.push(`${cost.wood}${t('cost.wood')}`);
+  if (cost.stone > 0) parts.push(`${cost.stone}${t('cost.stone')}`);
+  if (cost.ore > 0) parts.push(`${cost.ore}${t('cost.ore')}`);
+  return parts.join(', ');
 }

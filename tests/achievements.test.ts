@@ -6,7 +6,7 @@ import { Tribe } from '../src/game/tribes';
 import { SKILLS } from '../src/game/skills';
 import { EMPTY_STATS } from '../src/game/score';
 import { type Player } from '../src/game/players';
-import { ACHIEVEMENTS, achievementInfo, achievementTotalScore, awardAchievementScores, evaluateAchievements, currentlyMetIds, unlockedAchievements } from '../src/game/achievements';
+import { ACHIEVEMENTS, achievementInfo, achievementProgress, achievementTotalScore, awardAchievementScores, evaluateAchievements, currentlyMetIds, unlockedAchievements } from '../src/game/achievements';
 import { AchievementId, BuildingKind } from '@enums';
 
 function tile(q: number, r: number, over: Partial<MapTile> = {}): MapTile {
@@ -145,6 +145,18 @@ describe('achievements', () => {
       tile(1, 0, { exploredBy: [0] }),
     ]);
     expect(evaluateAchievements(full, p)).toContain(AchievementId.MASTER_CARTOGRAPHER);
+  });
+
+  it('reports progress toward each achievement, capped at its target', () => {
+    const p = player({ kills: 12 });
+    p.stats!.pirateKills = 2;
+    p.stats!.knightCombos = 1;
+    const map = mapOf([tile(0, 0, { exploredBy: [0] }), tile(1, 0)]);
+    expect(achievementProgress(map, p, AchievementId.PIRATE_PURGER)).toEqual({ current: 2, target: 3 });
+    expect(achievementProgress(map, p, AchievementId.PERFECT_CHAIN)).toEqual({ current: 1, target: 3 });
+    expect(achievementProgress(map, p, AchievementId.TEN_FOES_NO_SURVIVORS)).toEqual({ current: 10, target: 10 });
+    expect(achievementProgress(map, p, AchievementId.MASTER_CARTOGRAPHER)).toEqual({ current: 1, target: 2 });
+    expect(achievementProgress(null, p, AchievementId.PIRATE_PURGER)).toBeNull();
   });
 
   it('records an unlock only once', () => {

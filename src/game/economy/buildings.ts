@@ -5,7 +5,7 @@ import { moneyCost, type Resources } from './resources';
 import { canAffordAt, payAt, payerVillage, villagesJoinedBy, villageNetwork } from './stock';
 import { hasSkill } from '../skills';
 import { isForestType, isLandType, isMountainType, isSolidGround, isWaterType } from '../map/tile-types';
-import { buildingsInVillage, villageBuildingLimit } from './village';
+import { buildingsInVillage, tileHasUniversity, villageBuildingLimit } from './village';
 import { villageEnemyOccupied } from './capture';
 import type { Unit } from '../units/units';
 import { t } from '../../i18n';
@@ -58,6 +58,7 @@ export const BUILDING_NAMES: Record<BuildingKind, string> = {
   forestTemple: t('building.forestTemple'),
   farm: t('building.farm'),
   granary: t('building.granary'),
+  university: t('building.university'),
 };
 
 export const BUILDING_COSTS: Record<BuildingKind, Resources> = {
@@ -68,7 +69,23 @@ export const BUILDING_COSTS: Record<BuildingKind, Resources> = {
   forestTemple: { wood: 0, stone: 10, money: 30, ore: 0, food: 0 },
   farm: { wood: 5, stone: 0, money: 15, ore: 0, food: 0 },
   granary: { wood: 10, stone: 10, money: 20, ore: 0, food: 0 },
+  university: { wood: 0, stone: 10, money: 40, ore: 5, food: 0 },
 };
+
+/** Share of wood and stone an Engineering player saves on buildings in a village with a university. */
+const ENGINEERING_DISCOUNT = 0.1;
+
+/** The cost of `kind` on `tile` for `player`: Engineering makes buildings in a
+ *  village with a university about 10% cheaper in wood and stone. */
+export function buildingCostAt(map: GameMap, player: Player, tile: MapTile, kind: BuildingKind): Resources {
+  const base = BUILDING_COSTS[kind];
+  if (!hasSkill(player, SkillId.ENGINEERING) || !tileHasUniversity(map, tile)) return base;
+  const cut = (n: number): number => Math.round(n * (1 - ENGINEERING_DISCOUNT));
+  return { ...base, wood: cut(base.wood), stone: cut(base.stone) };
+}
+
+/** A village must be at least this level to build a university. */
+export const UNIVERSITY_MIN_VILLAGE_LEVEL = 5;
 
 /** Spawn costs for every kind a builder (Villagers special unit) may construct,
  *  keyed by that kind. */
@@ -165,6 +182,18 @@ export function canBuildGranary(map: GameMap, tile: MapTile, player: Player): bo
     const t = neighborTile(map, n);
     return t !== undefined && t.building?.kind === BuildingKind.FARM && t.ownedBy === player.index;
   });
+}
+
+/** A university stands on an own, empty land tile claimed by one of the
+ *  player's villages of level 5+ that has none yet, and uses a building slot. */
+export function canBuildUniversity(map: GameMap, tile: MapTile, player: Player): boolean {
+  if (!hasSkill(player, SkillId.SCIENCE)) return false;
+  if (!canPlaceFoodBuilding(tile, player)) return false;
+  const village = claimingVillageFor(map, tile);
+  if (!village?.settlement || village.settlement.owner !== player.index) return false;
+  if (village.settlement.level < UNIVERSITY_MIN_VILLAGE_LEVEL) return false;
+  if (!villageHasBuildingSlot(map, tile, player)) return false;
+  return !tileHasUniversity(map, tile);
 }
 
 function isFoodBuilding(building: { kind: BuildingKind } | null | undefined): boolean {
@@ -354,7 +383,9 @@ export function buildBuilding(
               ? canBuildFarm(map, tile, player)
               : kind === BuildingKind.GRANARY
                 ? canBuildGranary(map, tile, player)
-                : canBuildForestTemple(map, tile, player);
+                : kind === BuildingKind.UNIVERSITY
+                  ? canBuildUniversity(map, tile, player)
+                  : canBuildForestTemple(map, tile, player);
   if (!allowed) return false;
   return payAndPlaceBuilding(map, tile, kind, player);
 }
@@ -370,7 +401,7 @@ function payAndPlaceBuilding(map: GameMap, tile: MapTile, kind: BuildingKind, pl
   // A port is a road/water-cluster node: it may be paid by the networks it
   // would join, just like a road or bridge.
   const joined = kind === BuildingKind.PORT ? villagesJoinedBy(map, player.index, tile) : [];
-  if (!payAt(map, player, tile, BUILDING_COSTS[kind], joined)) return false;
+  if (!payAt(map, player, tile, buildingCostAt(map, player, tile, kind), joined)) return false;
   tile.building = kind === BuildingKind.GRANARY ? { kind, level: 1, food: 0 } : { kind, level: 1 };
   return true;
 }

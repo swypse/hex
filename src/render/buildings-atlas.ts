@@ -14,6 +14,7 @@ export const BUILDING_TILE_FILES: string[] = [
   'granary-4',
   'granary-5',
   'granary-6',
+  'university',
   'trap',
   'bridge-nw',
   'bridge-ne',

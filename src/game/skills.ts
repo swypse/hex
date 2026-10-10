@@ -1,6 +1,7 @@
 import { t } from '../i18n';
 import type { Player } from './players';
-import { SkillId } from '@enums';
+import type { GameMap } from './map/map-gen';
+import { BuildingKind, SkillId } from '@enums';
 import { pickRandom } from '../util/random';
 
 
@@ -11,6 +12,8 @@ interface SkillInfo {
   level: number;
   parent: SkillId | null;
   description: string;
+  /** A building the player must own for the skill to be opened (it stays open once bought). */
+  requiresBuilding?: BuildingKind;
 }
 
 export const SKILLS: Record<SkillId, SkillInfo> = {
@@ -41,6 +44,7 @@ export const SKILLS: Record<SkillId, SkillInfo> = {
     level: 2,
     parent: SkillId.SCIENCE,
     description: t('skill.geology.desc'),
+    requiresBuilding: BuildingKind.UNIVERSITY,
   },
   water: {
     id: SkillId.WATER,
@@ -109,7 +113,7 @@ export const SKILLS: Record<SkillId, SkillInfo> = {
     id: SkillId.CATAPULT,
     name: t('skill.catapult.name'),
     level: 2,
-    parent: SkillId.SCIENCE,
+    parent: SkillId.SHIELDS,
     description: t('skill.catapult.desc'),
   },
   riding: {
@@ -147,6 +151,30 @@ export const SKILLS: Record<SkillId, SkillInfo> = {
     parent: SkillId.AGRICULTURE,
     description: t('skill.granary.desc'),
   },
+  agronomy: {
+    id: SkillId.AGRONOMY,
+    name: t('skill.agronomy.name'),
+    level: 2,
+    parent: SkillId.AGRICULTURE,
+    description: t('skill.agronomy.desc'),
+    requiresBuilding: BuildingKind.UNIVERSITY,
+  },
+  engineering: {
+    id: SkillId.ENGINEERING,
+    name: t('skill.engineering.name'),
+    level: 2,
+    parent: SkillId.SCIENCE,
+    description: t('skill.engineering.desc'),
+    requiresBuilding: BuildingKind.UNIVERSITY,
+  },
+  medicine: {
+    id: SkillId.MEDICINE,
+    name: t('skill.medicine.name'),
+    level: 2,
+    parent: SkillId.SCIENCE,
+    description: t('skill.medicine.desc'),
+    requiresBuilding: BuildingKind.UNIVERSITY,
+  },
 };
 
 export function skillCost(id: SkillId, openedCount: number): number {
@@ -157,23 +185,39 @@ export function hasSkill(player: Player, id: SkillId): boolean {
   return player.skills.includes(id);
 }
 
-export function canOpenSkill(player: Player, id: SkillId): boolean {
+/** Whether the player owns a building of `kind`. */
+function ownsBuilding(map: Pick<GameMap, 'tiles'>, player: Player, kind: BuildingKind): boolean {
+  return map.tiles.some((t) => t.building?.kind === kind && t.ownedBy === player.index);
+}
+
+/** Whether the skill's building requirement is met; skills with one need the map to know. */
+export function skillBuildingMet(player: Player, id: SkillId, map?: Pick<GameMap, 'tiles'> | null): boolean {
+  const kind = SKILLS[id].requiresBuilding;
+  if (kind === undefined) return true;
+  return map ? ownsBuilding(map, player, kind) : false;
+}
+
+export function canOpenSkill(player: Player, id: SkillId, map?: Pick<GameMap, 'tiles'> | null): boolean {
   if (hasSkill(player, id)) return false;
   const info = SKILLS[id];
   if (info.parent && !hasSkill(player, info.parent)) return false;
+  if (!skillBuildingMet(player, id, map)) return false;
   return player.resources.money >= skillCost(id, player.skills.length);
 }
 
-export function openSkill(player: Player, id: SkillId): boolean {
-  if (!canOpenSkill(player, id)) return false;
+export function openSkill(player: Player, id: SkillId, map?: Pick<GameMap, 'tiles'> | null): boolean {
+  if (!canOpenSkill(player, id, map)) return false;
   player.resources.money -= skillCost(id, player.skills.length);
   player.skills.push(id);
   return true;
 }
 
-export function randomUnopenedSkill(player: Player, rng: () => number): SkillId | null {
+/** A random skill the player has not opened. Bonuses and bottles skip the parent
+ *  requirement but not a building one: a skill that needs a university the
+ *  player does not have is never picked. */
+export function randomUnopenedSkill(player: Player, rng: () => number, map?: Pick<GameMap, 'tiles'> | null): SkillId | null {
   const opened = new Set(player.skills);
-  const unopened = (Object.keys(SKILLS) as SkillId[]).filter((id) => !opened.has(id));
+  const unopened = (Object.keys(SKILLS) as SkillId[]).filter((id) => !opened.has(id) && skillBuildingMet(player, id, map));
   if (unopened.length === 0) return null;
   return pickRandom(unopened, rng)!;
 }

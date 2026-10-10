@@ -4,7 +4,7 @@ import { stormEligible } from '@/game/units/storm';
 import { canDisband, type Unit } from '@/game/units/units';
 import { sfx } from '@/sound/sfx';
 import { useGameStore } from '@/store/game-store';
-import { BuildingKind, CommandType, OverlayKind, SelectionKind, SkillId, UnitType } from '@enums';
+import { BuildingKind, CommandType, OverlayKind, SelectionKind, SkillId, UnitType, type VeteranBonus } from '@enums';
 import { tileAt } from '@/game/map/tile-index';
 
 export interface UnitActionsHost {
@@ -384,6 +384,13 @@ export class UnitActions {
   claimBonusFromDialog(): void {
     if (!this.takeDialogTarget(OverlayKind.BONUS_LEAVE)) return;
     this.sendCommand({ type: CommandType.CLAIM_BONUS });
+  }
+
+  /** Veteran dialog: the unit takes `bonus`; the next waiting veteran, if any, is asked right after. */
+  chooseVeteranBonus(unitId: string, bonus: VeteranBonus): void {
+    const store = useGameStore.getState();
+    if (store.overlay?.kind === OverlayKind.VETERAN_BONUS) store.setOverlay(null);
+    this.sendCommand({ type: CommandType.CHOOSE_VETERAN_BONUS, unitId, bonus });
   }
 
   cancelBonusLeave(): void {

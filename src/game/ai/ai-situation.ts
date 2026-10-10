@@ -8,7 +8,7 @@ import { type GameMap, type MapTile } from '../map/map-gen';
 import { type Player } from '../players';
 import { isShip, shipAttackDistance, shipMovePoints } from '../units/ship';
 import { isWaterType } from '../map/tile-types';
-import { type Unit, UNIT_ATTACK_DISTANCE, UNIT_MOVE_POINTS } from '../units/units';
+import { type Unit, UNIT_ATTACK_DISTANCE, movePoints } from '../units/units';
 
 
 
@@ -109,7 +109,7 @@ export function isMelee(unit: Unit): boolean {
 }
 
 function movementOf(unit: Unit): number {
-  return unit.shipLevel !== undefined ? shipMovePoints(unit) : UNIT_MOVE_POINTS[unit.type];
+  return movePoints(unit);
 }
 
 export function turnsToOccupy(from: MapTile, to: MapTile, mover: Unit): number {

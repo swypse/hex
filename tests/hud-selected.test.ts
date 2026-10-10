@@ -56,7 +56,7 @@ describe('HudSelected village building constraints', () => {
     return out;
   };
 
-  const mount = (level: number, buildingCount: number, owner: number | null, opts: { unitOnVillage?: boolean; wall?: boolean } = {}): void => {
+  const mount = (level: number, buildingCount: number, owner: number | null, opts: { unitOnVillage?: boolean; wall?: boolean; veteran?: boolean } = {}): void => {
     (globalThis as { CanvasRenderingContext2D?: unknown }).CanvasRenderingContext2D = class {};
     (globalThis as { document?: unknown }).document = {
       createElement: () => ({ getContext: () => fakeCanvasContext(), width: 0, height: 0 }),
@@ -66,6 +66,7 @@ describe('HudSelected village building constraints', () => {
     const village = tileAt(map, 0, 0)!;
     village.settlement = { owner, level, captureReady: false, name: 'Alpha', ...(opts.wall ? { wall: true } : {}) };
     if (opts.unitOnVillage) village.unit = makeUnit('u1', 0, UnitType.WARRIOR, 0, 0);
+    if (opts.unitOnVillage && opts.veteran) Object.assign(village.unit!, { veteran: true, kills: 4 });
     const buildingTiles = [
       [1, 0],
       [0, 1],
@@ -242,6 +243,24 @@ describe('HudSelected village building constraints', () => {
     // the village buff row, plus the three 16px help
     // buttons (unit / settlement / building limit) and the 16px close icon.
     expect(widths).toEqual([16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16]);
+  });
+
+  it('adds a star with the kill count to the unit line of a veteran only', () => {
+    mount(1, 1, 0, { unitOnVillage: true });
+    const plain = findSprites((hud as unknown as { el: Container }).el!).length;
+    hud.destroy();
+    mount(1, 1, 0, { unitOnVillage: true, veteran: true });
+    const withStar = findSprites((hud as unknown as { el: Container }).el!).length;
+    expect(withStar).toBe(plain + 1);
+    expect(texts()).toContain('4');
+  });
+
+  it('shows the unit kill count on its own line below the characteristics', () => {
+    mount(1, 1, 0, { unitOnVillage: true, veteran: true });
+    const all = texts();
+    expect(all).toContain(t('hud.selected.kills', { n: 4 }));
+    mount(1, 1, 0, { unitOnVillage: true });
+    expect(texts()).toContain(t('hud.selected.kills', { n: 0 }));
   });
 
   it('draws a button-style drop shadow behind the info panel', () => {

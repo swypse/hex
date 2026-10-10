@@ -123,3 +123,20 @@ export function unitsInVillage(map: GameMap, villageTile: MapTile): number {
   }
   return count;
 }
+
+/** Keys (`q,r`) of the villages that have a university on the tiles they claim. */
+export function universityVillageKeys(map: GameMap): Set<string> {
+  const keys = new Set<string>();
+  for (const t of map.tiles) {
+    if (t.building?.kind === BuildingKind.UNIVERSITY && t.claimedByVillage) keys.add(`${t.claimedByVillage.q},${t.claimedByVillage.r}`);
+  }
+  return keys;
+}
+
+/** Whether `tile` belongs to a village that has a university: it is claimed by
+ *  one, or is the village's own tile. */
+export function tileHasUniversity(map: Pick<GameMap, 'tiles'>, tile: Pick<MapTile, 'claimedByVillage' | 'q' | 'r' | 'settlement'>): boolean {
+  const c = tile.claimedByVillage ?? (tile.settlement ? { q: tile.q, r: tile.r } : null);
+  if (!c) return false;
+  return map.tiles.some((t) => t.building?.kind === BuildingKind.UNIVERSITY && t.claimedByVillage?.q === c.q && t.claimedByVillage.r === c.r);
+}

@@ -7,7 +7,7 @@ import type { Player } from './players';
 import { type PlayerStats } from './score';
 import { randomUnopenedSkill } from './skills';
 import { addStock } from './economy/stock';
-import { type Unit, UNIT_TYPES } from './units/units';
+import { unitMaxHp, type Unit } from './units/units';
 import { upgradeVillage } from './economy/village';
 
 import type { SimContext } from './sim-context';
@@ -102,7 +102,7 @@ export class Bonuses {
         return { kind: BonusKind.MONEY };
       }
       case BonusKind.SKILL: {
-        const skill = randomUnopenedSkill(player, this.rng);
+        const skill = randomUnopenedSkill(player, this.rng, this.map);
         if (skill) {
           player.skills.push(skill);
           return { kind: BonusKind.SKILL, skill };
@@ -133,7 +133,7 @@ export class Bonuses {
       player.resources.money += BOTTLE_MONEY;
       this.emitScoreFly(player.index, BOTTLE_MONEY, tile);
     } else if (kind === BottleEffect.SKILL) {
-      const s = randomUnopenedSkill(player, this.rng);
+      const s = randomUnopenedSkill(player, this.rng, this.map);
       if (s) {
         player.skills.push(s);
         skill = s;
@@ -142,7 +142,7 @@ export class Bonuses {
         this.emitScoreFly(player.index, BOTTLE_MONEY, tile);
       }
     } else {
-      unit.hp = Math.min(UNIT_TYPES[unit.type].maxHp, unit.hp + BOTTLE_HEAL);
+      unit.hp = Math.min(unitMaxHp(unit), unit.hp + BOTTLE_HEAL);
     }
     unit.hasMoved = true;
     unit.hasAttacked = true;

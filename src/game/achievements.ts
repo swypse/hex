@@ -15,7 +15,21 @@ export interface AchievementInfo {
   descKey: string;
   points: number;
   icon: string;
+  /** i18n key of the progress line; takes `{current}` and `{target}`. */
+  progressKey: string;
+  /** How far the player is: `current` of `target` (not clamped). */
+  progress: (map: GameMap, player: Player) => AchievementProgress;
   met: (map: GameMap, player: Player) => boolean;
+}
+
+export interface AchievementProgress {
+  current: number;
+  target: number;
+}
+
+/** An achievement's `progress` and the `met` that follows from it. */
+function counted(progress: AchievementInfo['progress']): Pick<AchievementInfo, 'progress' | 'met'> {
+  return { progress, met: (map, player) => { const p = progress(map, player); return p.current >= p.target; } };
 }
 
 const ACHIEVEMENT_ICON: Record<AchievementId, string> = {
@@ -51,12 +65,12 @@ function largestVillageCluster(map: GameMap, player: Player): number {
   return best;
 }
 
-function allSkillsOpened(player: Player): boolean {
-  return new Set(player.skills).size === Object.keys(SKILLS).length;
+function skillsProgress(player: Player): AchievementProgress {
+  return { current: new Set(player.skills).size, target: Object.keys(SKILLS).length };
 }
 
-function allExplored(map: GameMap, player: Player): boolean {
-  return map.tiles.every((t) => isExploredFor(t, player.index));
+function exploredProgress(map: GameMap, player: Player): AchievementProgress {
+  return { current: map.tiles.filter((t) => isExploredFor(t, player.index)).length, target: map.tiles.length };
 }
 
 export const ACHIEVEMENTS: readonly AchievementInfo[] = [
@@ -66,7 +80,8 @@ export const ACHIEVEMENTS: readonly AchievementInfo[] = [
     descKey: 'ach.greatConnector.desc',
     icon: ACHIEVEMENT_ICON.greatConnector,
     points: 100,
-    met: (map, player) => largestVillageCluster(map, player) >= 4,
+    progressKey: 'ach.greatConnector.progress',
+    ...counted((map, player) => ({ current: largestVillageCluster(map, player), target: 4 })),
   },
   {
     id: AchievementId.PERFECT_CHAIN,
@@ -74,7 +89,8 @@ export const ACHIEVEMENTS: readonly AchievementInfo[] = [
     descKey: 'ach.perfectChain.desc',
     icon: ACHIEVEMENT_ICON.perfectChain,
     points: 100,
-    met: (map, player) => statsOf(player).knightCombos >= 3,
+    progressKey: 'ach.perfectChain.progress',
+    ...counted((map, player) => ({ current: statsOf(player).knightCombos, target: 3 })),
   },
   {
     id: AchievementId.PIRATE_PURGER,
@@ -82,7 +98,8 @@ export const ACHIEVEMENTS: readonly AchievementInfo[] = [
     descKey: 'ach.piratePurger.desc',
     icon: ACHIEVEMENT_ICON.piratePurger,
     points: 100,
-    met: (map, player) => statsOf(player).pirateKills >= 3,
+    progressKey: 'ach.piratePurger.progress',
+    ...counted((map, player) => ({ current: statsOf(player).pirateKills, target: 3 })),
   },
   {
     id: AchievementId.PIRATE_LUCKY_DAY,
@@ -90,7 +107,8 @@ export const ACHIEVEMENTS: readonly AchievementInfo[] = [
     descKey: 'ach.pirateLuckyDay.desc',
     icon: ACHIEVEMENT_ICON.pirateLuckyDay,
     points: 150,
-    met: (map, player) => statsOf(player).shipsCapturedByPirates >= 3,
+    progressKey: 'ach.pirateLuckyDay.progress',
+    ...counted((map, player) => ({ current: statsOf(player).shipsCapturedByPirates, target: 3 })),
   },
   {
     id: AchievementId.NOTHING_LEFT_TO_LEARN,
@@ -98,7 +116,8 @@ export const ACHIEVEMENTS: readonly AchievementInfo[] = [
     descKey: 'ach.nothingLeftToLearn.desc',
     icon: ACHIEVEMENT_ICON.nothingLeftToLearn,
     points: 200,
-    met: (map, player) => allSkillsOpened(player),
+    progressKey: 'ach.nothingLeftToLearn.progress',
+    ...counted((map, player) => skillsProgress(player)),
   },
   {
     id: AchievementId.TEN_FOES_NO_SURVIVORS,
@@ -106,7 +125,8 @@ export const ACHIEVEMENTS: readonly AchievementInfo[] = [
     descKey: 'ach.tenFoesNoSurvivors.desc',
     icon: ACHIEVEMENT_ICON.tenFoesNoSurvivors,
     points: 100,
-    met: (map, player) => player.kills >= 10,
+    progressKey: 'ach.tenFoesNoSurvivors.progress',
+    ...counted((map, player) => ({ current: player.kills, target: 10 })),
   },
   {
     id: AchievementId.TRIPLE_SINK_JOB,
@@ -114,7 +134,8 @@ export const ACHIEVEMENTS: readonly AchievementInfo[] = [
     descKey: 'ach.tripleSinkJob.desc',
     icon: ACHIEVEMENT_ICON.tripleSinkJob,
     points: 100,
-    met: (map, player) => statsOf(player).enemyShipsKilled >= 3,
+    progressKey: 'ach.tripleSinkJob.progress',
+    ...counted((map, player) => ({ current: statsOf(player).enemyShipsKilled, target: 3 })),
   },
   {
     id: AchievementId.BONUS_HUNTER,
@@ -122,7 +143,8 @@ export const ACHIEVEMENTS: readonly AchievementInfo[] = [
     descKey: 'ach.bonusHunter.desc',
     icon: ACHIEVEMENT_ICON.bonusHunter,
     points: 200,
-    met: (map, player) => statsOf(player).bonusesCollected >= 3,
+    progressKey: 'ach.bonusHunter.progress',
+    ...counted((map, player) => ({ current: statsOf(player).bonusesCollected, target: 3 })),
   },
   {
     id: AchievementId.MASTER_CARTOGRAPHER,
@@ -130,9 +152,17 @@ export const ACHIEVEMENTS: readonly AchievementInfo[] = [
     descKey: 'ach.masterCartographer.desc',
     icon: ACHIEVEMENT_ICON.masterCartographer,
     points: 200,
-    met: (map, player) => allExplored(map, player),
+    progressKey: 'ach.masterCartographer.progress',
+    ...counted((map, player) => exploredProgress(map, player)),
   },
 ];
+
+/** `current/target` progress line of an achievement, with `current` capped at `target`. */
+export function achievementProgress(map: GameMap | null, player: Player, id: AchievementId): { current: number; target: number } | null {
+  if (!map) return null;
+  const { current, target } = achievementInfo(id).progress(map, player);
+  return { current: Math.min(current, target), target };
+}
 
 export function achievementInfo(id: AchievementId): AchievementInfo {
   return ACHIEVEMENTS.find((a) => a.id === id)!;

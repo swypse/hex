@@ -1,7 +1,7 @@
 import { type MapTile } from '../../map/map-gen';
 import { hasSkill } from '../../skills';
 import { reachableTargets } from '../../units/selection';
-import { UNIT_TYPES, canHeal, HEAL_AMOUNT, type Unit } from '../../units/units';
+import { unitMaxHp, canHeal, HEAL_AMOUNT, type Unit } from '../../units/units';
 import { hexDistance } from '../../map/hex';
 import { attackableTargets, attackDamage } from '../../units/combat';
 import { unitsInVillage, villageCapacity } from '../../economy/village';
@@ -164,7 +164,7 @@ export const DEFENSE_PATTERNS: AiPattern[] = [
         if (!unit || unit.owner !== player.index) continue;
         if (state.acted.has(unit.id) || state.moved.has(unit.id)) continue;
         if (!t.settlement || t.settlement.owner !== player.index) continue;
-        const maxHp = UNIT_TYPES[unit.type].maxHp;
+        const maxHp = unitMaxHp(unit);
         // A healthy garrison just holds — it must not leave the village.
         if (unit.hp >= maxHp) continue;
         const threatened = enemyCanReach(map, t, player.index) || enemyCanAttackNext(map, t, player.index);
