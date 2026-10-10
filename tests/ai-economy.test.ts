@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { planAiActions } from '../src/game/ai/ai';
+import { Simulator } from '../src/game/simulator';
 import { buildPlayers } from '../src/game/players';
 import { Tribe } from '../src/game/tribes';
 import { SeededRandom } from '../src/util/random';
 import { makeTestMap, tileAt, makeUnit, giveResources } from './helpers/test-map';
 import { TileType } from '../src/game/map/tile-types';
-import { AiActionType, AiDifficulty, BuildingKind, SkillId, UnitType } from '@enums';
+import { AiActionType, AiDifficulty, BuildingKind, CommandType, GameMode, SkillId, UnitType } from '@enums';
 
 function makeAI(): ReturnType<typeof buildPlayers>[number] {
   const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(11), AiDifficulty.NORMAL);
@@ -146,6 +147,117 @@ describe('AI prepares for winter food', () => {
     const actions = planAiActions(map, ai, new SeededRandom(3));
     expect(actions.some((a) => a.type === AiActionType.DESTROY_BUILDING)).toBe(true);
     expect(actions.some((a) => a.type === AiActionType.BUILD && a.kind === BuildingKind.SAWMILL)).toBe(false);
+  });
+});
+
+describe('AI and the university', () => {
+  /** A level-5 capital with own land around it and the materials for a university. */
+  function setup(skills: SkillId[]) {
+    const map = makeTestMap(6);
+    const ai = makeAI();
+    ai.skills = skills;
+    const village = tileAt(map, 0, 0)!;
+    village.settlement = { owner: 1, level: 5, captureReady: false, capital: true };
+    village.ownedBy = 1;
+    village.exploredBy = [1];
+    for (const [q, r] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, -1], [-1, 1]] as const) {
+      const t = tileAt(map, q, r)!;
+      t.ownedBy = 1;
+      t.claimedByVillage = { q: 0, r: 0 };
+    }
+    // The opening order (farm, granary) is done, so other buildings are not held back.
+    tileAt(map, -1, 0)!.building = { kind: BuildingKind.FARM, level: 1 };
+    tileAt(map, -1, 1)!.building = { kind: BuildingKind.GRANARY, level: 1, food: 0 };
+    giveResources(map, ai, { money: 300, wood: 40, stone: 40, ore: 20, food: 40 });
+    return { map, ai };
+  }
+
+  it('builds a university in a level-5 village once it has Science and the means', () => {
+    const { map, ai } = setup([SkillId.SCIENCE]);
+    const actions = planAiActions(map, ai, new SeededRandom(3));
+    expect(actions.some((a) => a.type === AiActionType.BUILD && a.kind === BuildingKind.UNIVERSITY)).toBe(true);
+  });
+
+  it('saves up for the university over a few turns instead of spending the money on skills and spawns', () => {
+    const map = makeTestMap(6);
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(11), AiDifficulty.NORMAL);
+    const ai = players[1]!;
+    ai.skills = [SkillId.SCIENCE, SkillId.AGRICULTURE];
+    const home = tileAt(map, -5, 0)!;
+    home.settlement = { owner: 0, level: 1, captureReady: false, capital: true };
+    home.ownedBy = 0;
+    home.exploredBy = [0];
+    home.unit = makeUnit('hu', 0, UnitType.WARRIOR, -5, 0);
+    const village = tileAt(map, 3, 0)!;
+    village.settlement = { owner: 1, level: 5, captureReady: false, capital: true };
+    village.ownedBy = 1;
+    village.exploredBy = [1];
+    for (const [q, r] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, -1], [-1, 1]] as const) {
+      const t = tileAt(map, 3 + q, r)!;
+      t.ownedBy = 1;
+      t.claimedByVillage = { q: 3, r: 0 };
+    }
+    giveResources(map, ai, { money: 100, wood: 40, stone: 40, ore: 20, food: 40 });
+    const sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5 });
+    sim.startGame();
+    let built = false;
+    for (let turn = 1; turn <= 15 && !built; turn++) {
+      sim.applyCommand({ type: CommandType.END_TURN });
+      built = map.tiles.some((t) => t.building?.kind === BuildingKind.UNIVERSITY && t.ownedBy === 1);
+    }
+    expect(built).toBe(true);
+  });
+
+  it('does not build a university in a village below level 5', () => {
+    const { map, ai } = setup([SkillId.SCIENCE]);
+    tileAt(map, 0, 0)!.settlement!.level = 4;
+    const actions = planAiActions(map, ai, new SeededRandom(3));
+    expect(actions.some((a) => a.type === AiActionType.BUILD && a.kind === BuildingKind.UNIVERSITY)).toBe(false);
+  });
+
+  it('opens the skills that need a university once it owns one', () => {
+    const { map, ai } = setup([SkillId.SCIENCE, SkillId.AGRICULTURE]);
+    const site = tileAt(map, 1, 0)!;
+    site.building = { kind: BuildingKind.UNIVERSITY, level: 1 };
+    const university = [SkillId.GEOLOGY, SkillId.ENGINEERING, SkillId.MEDICINE, SkillId.AGRONOMY];
+    const opened = new Set<SkillId>();
+    for (let seed = 1; seed <= 12 && opened.size < university.length; seed++) {
+      for (const a of planAiActions(map, { ...ai, skills: [...ai.skills, ...opened] }, new SeededRandom(seed))) {
+        if (a.type === AiActionType.OPEN_SKILL && university.includes(a.skill)) opened.add(a.skill);
+      }
+      if (opened.size > 0) break;
+    }
+    expect(opened.size).toBeGreaterThan(0);
+  });
+
+  describe('against hunger', () => {
+    /** The capital's farm feeds fewer mouths than it needs: the network is short of food. */
+    function hungry(skills: SkillId[], withUniversity: boolean) {
+      const { map, ai } = setup(skills);
+      ai.resources.money = 300;
+      const farm = tileAt(map, 1, 0)!;
+      farm.building = { kind: BuildingKind.FARM, level: 1 };
+      if (withUniversity) tileAt(map, 0, 1)!.building = { kind: BuildingKind.UNIVERSITY, level: 1 };
+      let n = 0;
+      for (const [q, r] of [[0, 0], [-1, 0], [0, -1], [1, -1], [-1, 1]] as const) {
+        const t = tileAt(map, q, r)!;
+        t.unit = makeUnit(`k${n++}`, 1, UnitType.KNIGHT, q, r);
+        t.unit.spawnVillage = { q: 0, r: 0 };
+      }
+      return { map, ai };
+    }
+
+    it('opens Agronomy when a university stands and the network is hungry', () => {
+      const { map, ai } = hungry([SkillId.SCIENCE, SkillId.AGRICULTURE], true);
+      const actions = planAiActions(map, ai, new SeededRandom(3));
+      expect(actions.some((a) => a.type === AiActionType.OPEN_SKILL && a.skill === SkillId.AGRONOMY)).toBe(true);
+    });
+
+    it('builds the university first when it has none', () => {
+      const { map, ai } = hungry([SkillId.SCIENCE, SkillId.AGRICULTURE], false);
+      const actions = planAiActions(map, ai, new SeededRandom(3));
+      expect(actions.some((a) => a.type === AiActionType.BUILD && a.kind === BuildingKind.UNIVERSITY)).toBe(true);
+    });
   });
 });
 

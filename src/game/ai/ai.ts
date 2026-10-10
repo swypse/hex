@@ -8,7 +8,7 @@ import { moneyCost, villageUpgradeCost, type Resources } from '../economy/resour
 import { canAffordAt, networkStock, payerVillage, totalStock } from '../economy/stock';
 import { canOpenSkill, hasSkill, skillCost } from '../skills';
 import { reachableTargets } from '../units/selection';
-import { foodNetworkStates, networkStateOfTile, foodPressure, canSustainUnit, eatsFarmMaterials } from '../economy/food';
+import { foodNetworkStates, networkStateOfTile, foodPressure, canSustainUnit, eatsFarmMaterials, needsWinterStorage } from '../economy/food';
 import { blockedByOpening, openingAction } from './ai-opening';
 import { blockedByStone, villagesNeedingMine } from './ai-stone';
 import { planFoodFixes, planGranarySpace, planWinterStorage } from './ai-food';
@@ -497,6 +497,19 @@ function bestAvailableAction(
   // cheaper per food gained.
   const foodStates = foodNetworkStates(map, player);
   const foodPlan = planFoodFixes(map, player, foodStates);
+  // Agronomy (it needs a university) adds food to the farms of a village that
+  // has one and keeps them producing in winter: a way out of hunger once the
+  // AI has farms, so it opens the skill, or builds the university it needs.
+  // A university the AI can place and pay for in materials: it saves up the
+  // money for it (skills and spawns would otherwise keep the purse below 40).
+  const universitySite = hasSkill(player, SkillId.SCIENCE)
+    ? map.tiles.find((t) => canBuildUniversity(map, t, player) && !reserveLastSlotForMine(map, player, t)
+      && canAffordAt(map, player, t, { ...buildingCostAt(map, player, t, BuildingKind.UNIVERSITY), money: 0 }))
+    : undefined;
+  const universityReserve = universitySite ? BUILDING_COSTS.university.money : 0;
+  const hasFarm = map.tiles.some((t) => t.ownedBy === player.index && t.building?.kind === BuildingKind.FARM);
+  const agronomyWanted = hasSkill(player, SkillId.AGRICULTURE) && !hasSkill(player, SkillId.AGRONOMY) && hasFarm
+    && (foodPressure(map, player) !== FoodPressure.NONE || foodStates.some((n) => needsWinterStorage(map, n)));
   // Farms give nothing in winter: a network with no granary eats from nothing
   // then, so it builds one (or is linked to a network that has one) before.
   const storage = planWinterStorage(map, player, foodStates);
@@ -568,7 +581,9 @@ function bestAvailableAction(
     }
     if (canBuildUniversity(map, tile, player) && canAffordAt(map, player, tile, buildingCostAt(map, player, tile, BuildingKind.UNIVERSITY))) {
       if (!reserveLastSlotForMine(map, player, tile)) {
-        candidates.push({ score: (220 * buildScale) + jitter(), action: { type: AiActionType.BUILD, q: tile.q, r: tile.r, kind: BuildingKind.UNIVERSITY } });
+        // Hunger makes the university worth more: it unlocks Agronomy.
+        const score = agronomyWanted ? 470 : universityReserve > 0 ? 320 : 220 * buildScale;
+        candidates.push({ score: score + jitter(), action: { type: AiActionType.BUILD, q: tile.q, r: tile.r, kind: BuildingKind.UNIVERSITY } });
       }
     }
     if (canBuildPort(map, tile, player) && canAffordAt(map, player, tile, BUILDING_COSTS.port)) {
@@ -624,6 +639,10 @@ function bestAvailableAction(
   // once the food stock is under pressure.
   if (!hasSkill(player, SkillId.AGRICULTURE) && !state.opened.has(SkillId.AGRICULTURE) && canOpenSkill(player, SkillId.AGRICULTURE, map) && foodPressure(map, player) !== FoodPressure.NONE) {
     candidates.push({ score: 550 + jitter(), action: { type: AiActionType.OPEN_SKILL, skill: SkillId.AGRICULTURE } });
+  }
+
+  if (agronomyWanted && !state.opened.has(SkillId.AGRONOMY) && canOpenSkill(player, SkillId.AGRONOMY, map)) {
+    candidates.push({ score: 535 + jitter(), action: { type: AiActionType.OPEN_SKILL, skill: SkillId.AGRONOMY } });
   }
 
   if (storage.needy.size > 0 && hasSkill(player, SkillId.AGRICULTURE) && !hasSkill(player, SkillId.GRANARY) && !state.opened.has(SkillId.GRANARY) && canOpenSkill(player, SkillId.GRANARY, map)) {
@@ -695,7 +714,7 @@ function bestAvailableAction(
   // discretionary spends of wood/stone, and of money once wood and stone are
   // ready, so the money for the farm is saved.
   const needFood = foodPressure(map, player) !== FoodPressure.NONE || !map.tiles.some((t) => t.ownedBy === player.index && t.building?.kind === BuildingKind.FARM);
-  if ((needFood && (!hasSkill(player, SkillId.AGRICULTURE) || map.tiles.some((t) => canBuildFarm(map, t, player)))) || storageReserve > 0) {
+  if ((needFood && (!hasSkill(player, SkillId.AGRICULTURE) || map.tiles.some((t) => canBuildFarm(map, t, player)))) || storageReserve > 0 || universityReserve > 0) {
     for (let i = candidates.length - 1; i >= 0; i--) {
       const action = candidates[i]!.action;
       const first: AiAction = Array.isArray(action) ? action[0]! : action;
@@ -712,7 +731,7 @@ function bestAvailableAction(
       const home = actionVillage(map, player, first);
       const have = home ? networkStock(map, home) : totalStock(map, player.index);
       const materialsReady = hasSkill(player, SkillId.AGRICULTURE) && have.wood >= BUILDING_COSTS.farm.wood && have.stone >= BUILDING_COSTS.farm.stone;
-      const reserve = Math.max(storageReserve, foodSkillReserve > 0 ? foodSkillReserve : needFood && materialsReady ? BUILDING_COSTS.farm.money : 0);
+      const reserve = Math.max(storageReserve, universityReserve, foodSkillReserve > 0 ? foodSkillReserve : needFood && materialsReady ? BUILDING_COSTS.farm.money : 0);
       if (reserve > 0 && !urgentSpawn && player.resources.money - cost.money < reserve) candidates.splice(i, 1);
     }
   }
@@ -758,7 +777,7 @@ function discretionaryCost(map: GameMap, player: Player, a: AiAction): Resources
       return level === undefined ? null : villageUpgradeCost(level);
     }
     case AiActionType.BUILD:
-      return a.kind === BuildingKind.MINE || a.kind === BuildingKind.FARM || a.kind === BuildingKind.GRANARY ? null : BUILDING_COSTS[a.kind];
+      return a.kind === BuildingKind.MINE || a.kind === BuildingKind.FARM || a.kind === BuildingKind.GRANARY || a.kind === BuildingKind.UNIVERSITY ? null : BUILDING_COSTS[a.kind];
     case AiActionType.SPAWN:
       return unitSpawnCost(a.unitType);
     case AiActionType.BUILD_ROAD:
