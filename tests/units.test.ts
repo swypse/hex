@@ -23,10 +23,10 @@ describe('UNIT_TYPES', () => {
     expect(UNIT_TYPE_NAMES.catapult).toBe('Catapult');
   });
 
-  it('defines the knight unit with 30 move points, 40 attack and an ore cost', () => {
-    expect(UNIT_TYPES.knight).toEqual({ movePoints: 30, attack: 40, attackDistance: 1, maxHp: 70, defense: 12, price: 14, priceWood: 0, priceOre: 5 });
+  it('defines the knight unit with 30 move points, 38 attack and an ore cost', () => {
+    expect(UNIT_TYPES.knight).toEqual({ movePoints: 30, attack: 38, attackDistance: 1, maxHp: 70, defense: 12, price: 14, priceWood: 0, priceOre: 5 });
     expect(UNIT_MOVE_POINTS.knight).toBe(30);
-    expect(UNIT_ATTACK.knight).toBe(40);
+    expect(UNIT_ATTACK.knight).toBe(38);
     expect(UNIT_ATTACK_DISTANCE.knight).toBe(1);
     expect(UNIT_TYPE_NAMES.knight).toBe('Knight');
   });

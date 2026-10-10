@@ -26,7 +26,7 @@ Effective cost = money + 1×wood + 2×ore + one-time skill-gate cost (skill pric
 - Swordsman: attack 40, defense 16, HP 80, range 1, move 10, skill swordsman — spawn cost **10 money + 2 ore**
 - Shield: attack 7, defense 20, HP 80, range 1, move 10, skill shields — spawn cost **8 money + 2 ore**
 - Catapult: attack 50, defense 0, HP 30, range 4, move 10, skill catapult — spawn cost **15 money + 10 wood + 3 ore**
-- Knight: attack 40, defense 12, HP 70, range 1, move 30, skill knights — spawn cost **14 money + 5 ore**
+- Knight: attack 38, defense 12, HP 70, range 1, move 30, skill knights — spawn cost **14 money + 5 ore**
 - Stalker: attack 10, defense 0, HP 20, range 1, move 20 — spawn cost **9 money + 2 ore**
 - Builder: attack 10, defense 0, HP 40, range 1, move 8 — spawn cost **15 money**
 - Banner: attack 10, defense 0, HP 30, range 1, move 8 — spawn cost **7 money + 2 ore**
@@ -44,14 +44,14 @@ Row unit attacks; cell shows attack-turns needed and the winner of that duel.
 | **Warrior** | — | 2(→warrior) | 2(→warrior) | 1(→swordsman) | 2(→shield) | 1(→catapult) | 1(→knight) | 1(→warrior) | 1(→warrior) | 1(→warrior) | 2(→warrior) | 2(→warrior) | 2(→warrior) | 2(→warrior) |
 | **Rider** | 2(→rider) | — | 2(→rider) | 1(→swordsman) | 2(→shield) | 1(→rider) | 1(→knight) | 1(→rider) | 1(→rider) | 1(→rider) | 2(→rider) | 2(→rider) | 2(→rider) | 2(→rider) |
 | **Archer** | 2(→archer) | 2(→archer) | — | 1(→swordsman) | 3(→archer) | 1(→catapult) | 1(→knight) | 1(→archer) | 1(→archer) | 1(→archer) | 2(→archer) | 2(→archer) | 2(→archer) | 2(→archer) |
-| **Swordsman** | 1(→swordsman) | 1(→swordsman) | 1(→swordsman) | — | 2(→swordsman) | 2(→catapult) | 1(→swordsman) | 1(→swordsman) | 1(→swordsman) | 1(→swordsman) | 1(→swordsman) | 1(→swordsman) | 1(→swordsman) | 1(→swordsman) |
-| **Shield** | 2(→shield) | 2(→shield) | 2(→shield) | 2(→swordsman) | — | 2(→catapult) | 2(→knight) | 2(→shield) | 1(→shield) | 1(→shield) | 2(→shield) | 2(→shield) | 2(→shield) | 2(→shield) |
+| **Swordsman** | 1(→swordsman) | 1(→swordsman) | 1(→swordsman) | — | 1(→swordsman) | 2(→catapult) | 1(→swordsman) | 1(→swordsman) | 1(→swordsman) | 1(→swordsman) | 1(→swordsman) | 1(→swordsman) | 1(→swordsman) | 1(→swordsman) |
+| **Shield** | 2(→shield) | 2(→shield) | 2(→shield) | 1(→swordsman) | — | 2(→catapult) | 2(→knight) | 2(→shield) | 1(→shield) | 1(→shield) | 2(→berserker) | 2(→shield) | 2(→shield) | 2(→shield) |
 | **Catapult** | 1(→catapult) | 1(→catapult) | 1(→catapult) | 2(→catapult) | 2(→catapult) | — | 1(→knight) | 1(→catapult) | 1(→catapult) | 1(→catapult) | 1(→catapult) | 1(→catapult) | 1(→catapult) | 1(→catapult) |
 | **Knight** | 1(→knight) | 1(→knight) | 1(→knight) | 2(→knight) | 2(→knight) | 1(→knight) | — | 1(→knight) | 1(→knight) | 1(→knight) | 1(→knight) | 1(→knight) | 1(→knight) | 1(→knight) |
 | **Stalker** | 1(→warrior) | 1(→rider) | 1(→archer) | 1(→swordsman) | 2(→shield) | 1(→catapult) | 1(→knight) | — | 2(→builder) | 2(→stalker) | 1(→berserker) | 1(→trapper) | 1(→stormcaller) | 1(→stunner) |
 | **Builder** | 1(→warrior) | 1(→rider) | 1(→archer) | 1(→swordsman) | 1(→shield) | 1(→catapult) | 1(→knight) | 2(→builder) | — | 2(→builder) | 1(→berserker) | 1(→trapper) | 1(→stormcaller) | 1(→stunner) |
 | **Banner** | 1(→warrior) | 1(→rider) | 1(→archer) | 1(→swordsman) | 1(→shield) | 1(→catapult) | 1(→knight) | 2(→banner) | 2(→builder) | — | 1(→berserker) | 1(→trapper) | 1(→stormcaller) | 1(→stunner) |
-| **Berserker** | 2(→berserker) | 2(→berserker) | 1(→berserker) | 1(→swordsman) | 2(→shield) | 1(→catapult) | 1(→knight) | 1(→berserker) | 1(→berserker) | 1(→berserker) | — | 2(→berserker) | 2(→berserker) | 1(→berserker) |
+| **Berserker** | 2(→berserker) | 2(→berserker) | 1(→berserker) | 1(→swordsman) | 2(→shield) | 1(→catapult) | 1(→knight) | 1(→berserker) | 1(→berserker) | 1(→berserker) | — | 1(→berserker) | 1(→berserker) | 1(→berserker) |
 | **Trapper** | 2(→warrior) | 2(→trapper) | 2(→trapper) | 1(→swordsman) | 2(→shield) | 1(→catapult) | 1(→knight) | 1(→trapper) | 1(→trapper) | 1(→trapper) | 2(→berserker) | — | 2(→trapper) | 2(→trapper) |
 | **Stormcaller** | 2(→warrior) | 2(→stormcaller) | 2(→stormcaller) | 1(→swordsman) | 2(→shield) | 1(→catapult) | 1(→knight) | 1(→stormcaller) | 1(→stormcaller) | 1(→stormcaller) | 2(→berserker) | 2(→stormcaller) | — | 2(→stormcaller) |
 | **Stunner** | 2(→stunner) | 2(→stunner) | 2(→stunner) | 1(→swordsman) | 3(→stunner) | 1(→catapult) | 1(→knight) | 1(→stunner) | 1(→stunner) | 1(→stunner) | 2(→stunner) | 2(→stunner) | 2(→stunner) | — |
@@ -62,39 +62,39 @@ Row unit attacks; cell shows attack-turns needed and the winner of that duel.
 
 | wins over →| Warrior | Rider | Archer | Swordsman | Shield | Catapult | Knight | Stalker | Builder | Banner | Berserker | Trapper | Stormcaller | Stunner |
 |---|----|----|----|----|----|----|----|----|----|----|----|----|----|----|
-| **Warrior** | — | ⚪ 54% | ⚪ 51% | 🔴 0% | 🔴 5% | 🔴 1% | 🔴 0% | 🟢 100% | 🟢 100% | 🟢 100% | ⚪ 45% | 🟢 93% | 🟢 91% | ⚪ 51% |
-| **Rider** | ⚪ 46% | — | ⚪ 46% | 🔴 0% | 🔴 0% | ⚪ 51% | 🔴 0% | 🟢 100% | 🟢 100% | 🟢 100% | ⚪ 46% | ⚪ 54% | ⚪ 55% | ⚪ 50% |
-| **Archer** | ⚪ 49% | ⚪ 54% | — | 🔴 0% | ⚪ 44% | 🔴 6% | 🔴 0% | 🟢 100% | 🟢 100% | 🟢 100% | ⚪ 45% | ⚪ 54% | ⚪ 54% | ⚪ 54% |
+| **Warrior** | — | ⚪ 54% | ⚪ 51% | 🔴 0% | 🔴 8% | 🔴 1% | 🔴 0% | 🟢 100% | 🟢 100% | 🟢 100% | ⚪ 45% | 🟢 96% | 🟢 95% | ⚪ 50% |
+| **Rider** | ⚪ 46% | — | ⚪ 45% | 🔴 0% | 🔴 0% | ⚪ 51% | 🔴 0% | 🟢 100% | 🟢 100% | 🟢 100% | ⚪ 46% | ⚪ 54% | ⚪ 55% | ⚪ 50% |
+| **Archer** | ⚪ 49% | ⚪ 55% | — | 🔴 0% | ⚪ 45% | 🔴 6% | 🔴 0% | 🟢 100% | 🟢 100% | 🟢 100% | ⚪ 45% | ⚪ 54% | ⚪ 54% | ⚪ 54% |
 | **Swordsman** | 🟢 100% | 🟢 100% | 🟢 100% | — | 🟢 100% | 🔴 10% | ⚪ 54% | 🟢 100% | 🟢 100% | 🟢 100% | 🟢 100% | 🟢 100% | 🟢 100% | 🟢 100% |
-| **Shield** | 🟢 95% | 🟢 100% | ⚪ 56% | 🔴 0% | — | 🔴 0% | 🔴 0% | 🟢 100% | 🟢 100% | 🟢 100% | 🟢 99% | 🟢 100% | 🟢 100% | ⚪ 58% |
+| **Shield** | 🟢 92% | 🟢 100% | ⚪ 55% | 🔴 0% | — | 🔴 0% | 🔴 0% | 🟢 100% | 🟢 100% | 🟢 100% | ⚪ 58% | 🟢 100% | 🟢 100% | ⚪ 59% |
 | **Catapult** | 🟢 100% | ⚪ 49% | 🟢 94% | 🟢 90% | 🟢 100% | — | 🔴 5% | 🟢 100% | 🟢 100% | 🟢 100% | 🟢 100% | 🟢 100% | 🟢 95% | 🟢 95% |
 | **Knight** | 🟢 100% | 🟢 100% | 🟢 100% | ⚪ 46% | 🟢 100% | 🟢 95% | — | 🟢 100% | 🟢 100% | 🟢 100% | 🟢 99% | 🟢 100% | 🟢 100% | 🟢 100% |
 | **Stalker** | 🔴 0% | 🔴 0% | 🔴 0% | 🔴 0% | 🔴 0% | 🔴 0% | 🔴 0% | — | 🔴 9% | ⚪ 50% | 🔴 0% | 🔴 0% | 🔴 0% | 🔴 0% |
 | **Builder** | 🔴 0% | 🔴 0% | 🔴 0% | 🔴 0% | 🔴 0% | 🔴 0% | 🔴 0% | 🟢 91% | — | 🟢 92% | 🔴 0% | 🔴 0% | 🔴 0% | 🔴 0% |
 | **Banner** | 🔴 0% | 🔴 0% | 🔴 0% | 🔴 0% | 🔴 0% | 🔴 0% | 🔴 0% | ⚪ 50% | 🔴 8% | — | 🔴 0% | 🔴 0% | 🔴 0% | 🔴 0% |
-| **Berserker** | ⚪ 55% | ⚪ 54% | ⚪ 55% | 🔴 0% | 🔴 1% | 🔴 0% | 🔴 1% | 🟢 100% | 🟢 100% | 🟢 100% | — | 🟢 96% | 🟢 95% | ⚪ 58% |
-| **Trapper** | 🔴 7% | ⚪ 46% | ⚪ 46% | 🔴 0% | 🔴 0% | 🔴 0% | 🔴 0% | 🟢 100% | 🟢 100% | 🟢 100% | 🔴 4% | — | ⚪ 51% | ⚪ 47% |
-| **Stormcaller** | 🔴 9% | ⚪ 45% | ⚪ 46% | 🔴 0% | 🔴 0% | 🔴 5% | 🔴 0% | 🟢 100% | 🟢 100% | 🟢 100% | 🔴 5% | ⚪ 49% | — | ⚪ 46% |
-| **Stunner** | ⚪ 49% | ⚪ 50% | ⚪ 46% | 🔴 0% | ⚪ 42% | 🔴 5% | 🔴 0% | 🟢 100% | 🟢 100% | 🟢 100% | ⚪ 42% | ⚪ 53% | ⚪ 54% | — |
+| **Berserker** | ⚪ 55% | ⚪ 54% | ⚪ 55% | 🔴 0% | ⚪ 42% | 🔴 0% | 🔴 1% | 🟢 100% | 🟢 100% | 🟢 100% | — | 🟢 95% | 🟢 96% | ⚪ 53% |
+| **Trapper** | 🔴 4% | ⚪ 46% | ⚪ 46% | 🔴 0% | 🔴 0% | 🔴 0% | 🔴 0% | 🟢 100% | 🟢 100% | 🟢 100% | 🔴 5% | — | ⚪ 51% | ⚪ 47% |
+| **Stormcaller** | 🔴 5% | ⚪ 45% | ⚪ 46% | 🔴 0% | 🔴 0% | 🔴 5% | 🔴 0% | 🟢 100% | 🟢 100% | 🟢 100% | 🔴 4% | ⚪ 49% | — | ⚪ 46% |
+| **Stunner** | ⚪ 50% | ⚪ 50% | ⚪ 46% | 🔴 0% | ⚪ 41% | 🔴 5% | 🔴 0% | 🟢 100% | 🟢 100% | 🟢 100% | ⚪ 47% | ⚪ 53% | ⚪ 54% | — |
 
 ## Cost efficiency (live)
 
 | Unit | Effective cost | Win-rate | Efficiency |
 |------|---------------:|---------:|-----------:|
-| Warrior | 4 | 0.53 | 19.55 🟢 |
+| Warrior | 4 | 0.54 | 19.86 🟢 |
 | Rider | 9 | 0.50 | 9.75 🟢 |
 | Archer | 6 | 0.51 | 13.04 🟢 |
 | Swordsman | 25 | 0.90 | 5.65 |
-| Shield | 15 | 0.70 | 6.38 |
+| Shield | 15 | 0.66 | 5.98 |
 | Catapult | 42 | 0.87 | 3.24 🔴 |
 | Knight | 35 | 0.95 | 4.84 |
 | Stalker | 13 | 0.05 | 0.54 🔴 |
 | Builder | 15 | 0.14 | 1.47 🔴 |
 | Banner | 11 | 0.04 | 0.70 🔴 |
-| Berserker | 14 | 0.55 | 5.38 |
-| Trapper | 10 | 0.39 | 5.72 |
-| Stormcaller | 10 | 0.39 | 5.88 |
-| Stunner | 11 | 0.49 | 6.64 |
+| Berserker | 14 | 0.58 | 5.79 |
+| Trapper | 10 | 0.38 | 5.72 |
+| Stormcaller | 10 | 0.38 | 5.86 |
+| Stunner | 11 | 0.50 | 6.69 |
 
 ## Dominance (core combat roster)
 
@@ -110,12 +110,12 @@ Super-weak = beats nothing and is beaten (≤40%) by ≥ ⅔ of the roster.
 | Knight 🟢 super-strong | 35 | 4 | 0.94 | 9 | 0 | — |
 | Swordsman | 25 | 3 | 0.86 | 8 | 1 | Catapult |
 | Catapult | 42 | 5 | 0.83 | 8 | 1 | Knight |
-| Shield | 15 | 2 | 0.61 | 5 | 3 | Swordsman, Catapult, Knight |
-| Berserker | 14 | 4 | 0.41 | 2 | 4 | Swordsman, Shield, Catapult, Knight |
-| Warrior | 4 | 1 | 0.39 | 2 | 4 | Swordsman, Shield, Catapult, Knight |
+| Shield | 15 | 2 | 0.56 | 4 | 3 | Swordsman, Catapult, Knight |
+| Berserker | 14 | 4 | 0.45 | 2 | 3 | Swordsman, Catapult, Knight |
+| Warrior | 4 | 1 | 0.40 | 2 | 4 | Swordsman, Shield, Catapult, Knight |
 | Archer | 6 | 2 | 0.36 | 0 | 3 | Swordsman, Catapult, Knight |
 | Rider | 9 | 2 | 0.35 | 0 | 3 | Swordsman, Shield, Knight |
-| Stunner | 11 | 2 | 0.34 | 0 | 3 | Swordsman, Catapult, Knight |
+| Stunner | 11 | 2 | 0.35 | 0 | 3 | Swordsman, Catapult, Knight |
 | Stormcaller | 10 | 4 | 0.20 | 0 | 6 | Warrior, Swordsman, Shield, Catapult, Knight, Berserker |
 | Trapper | 10 | 3 | 0.20 | 0 | 6 | Warrior, Swordsman, Shield, Catapult, Knight, Berserker |
 
@@ -123,14 +123,14 @@ Super-weak = beats nothing and is beaten (≤40%) by ≥ ⅔ of the roster.
 
 | Unit | Eff. cost | Mean win (core) | Win per 10 cost |
 |------|----------:|----------------:|----------------:|
-| Warrior | 4 | 0.39 | 0.98 |
+| Warrior | 4 | 0.40 | 1.00 |
 | Archer | 6 | 0.36 | 0.60 |
-| Rider | 9 | 0.35 | 0.39 |
+| Rider | 9 | 0.35 | 0.38 |
 | Trapper | 10 | 0.20 | 0.20 |
 | Stormcaller | 10 | 0.20 | 0.20 |
-| Stunner | 11 | 0.34 | 0.31 |
-| Berserker | 14 | 0.41 | 0.30 |
-| Shield | 15 | 0.61 | 0.41 |
+| Stunner | 11 | 0.35 | 0.31 |
+| Berserker | 14 | 0.45 | 0.32 |
+| Shield | 15 | 0.56 | 0.38 |
 | Swordsman | 25 | 0.86 | 0.35 |
 | Knight | 35 | 0.94 | 0.27 |
 | Catapult | 42 | 0.83 | 0.20 |
@@ -162,15 +162,15 @@ Mono-army vs mono-army with the same budget: focus fire, banner aura, knight ext
 |------|----------:|----------:|-------------------------:|
 | Warrior | 4 | 24 | 0.95 |
 | Archer | 6 | 16 | 0.95 |
+| Swordsman | 14 | 7 | 0.69 |
 | Rider | 6 | 16 | 0.69 |
-| Swordsman | 14 | 7 | 0.68 |
 | Stunner | 11 | 9 | 0.61 |
 | Knight | 24 | 4 | 0.57 |
-| Shield | 12 | 8 | 0.35 |
+| Shield | 12 | 8 | 0.36 |
 | Catapult | 31 | 3 | 0.27 |
-| Stormcaller | 10 | 10 | 0.22 |
-| Trapper | 10 | 10 | 0.17 |
-| Berserker | 14 | 7 | 0.02 |
+| Stormcaller | 10 | 10 | 0.21 |
+| Trapper | 10 | 10 | 0.18 |
+| Berserker | 14 | 7 | 0.03 |
 
 **Price + 5 turns of upkeep**
 
@@ -179,14 +179,14 @@ Mono-army vs mono-army with the same budget: focus fire, banner aura, knight ext
 | Warrior | 9 | 11 | 0.99 |
 | Archer | 16 | 6 | 0.87 |
 | Stunner | 21 | 5 | 0.76 |
-| Swordsman | 29 | 3 | 0.58 |
+| Swordsman | 29 | 3 | 0.60 |
 | Knight | 44 | 2 | 0.54 |
 | Catapult | 56 | 2 | 0.53 |
 | Rider | 16 | 6 | 0.52 |
-| Shield | 22 | 4 | 0.39 |
-| Trapper | 25 | 4 | 0.16 |
+| Shield | 22 | 4 | 0.37 |
+| Trapper | 25 | 4 | 0.17 |
 | Berserker | 34 | 3 | 0.14 |
-| Stormcaller | 30 | 3 | 0.02 |
+| Stormcaller | 30 | 3 | 0.01 |
 
 ## Balance flags
 
@@ -196,8 +196,8 @@ Mono-army vs mono-army with the same budget: focus fire, banner aura, knight ext
 - **After:** Warrior still beats Stalker at 100%.
 - **After:** Warrior still beats Builder at 100%.
 - **After:** Warrior still beats Banner at 100%.
-- **After:** Warrior still beats Trapper at 93%.
-- **After:** Warrior still beats Stormcaller at 91%.
+- **After:** Warrior still beats Trapper at 96%.
+- **After:** Warrior still beats Stormcaller at 95%.
 - **After:** Rider still beats Stalker at 100%.
 - **After:** Rider still beats Builder at 100%.
 - **After:** Rider still beats Banner at 100%.
@@ -224,6 +224,7 @@ Mono-army vs mono-army with the same budget: focus fire, banner aura, knight ext
 | Rider | HP | 40 | **45** |
 | Archer | attack | 20 | **26** |
 | Swordsman | defense | 20 | **16** |
+| Knight | attack | 40 | **38** |
 | Knight | defense | 7 | **12** |
 | Knight | HP | 60 | **70** |
 | Stalker | attack | 30 | **10** |

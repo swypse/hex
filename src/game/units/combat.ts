@@ -28,8 +28,8 @@ const SCIENCE_MISS_CHANCE = 0.05;
 export const COMBAT_SCALE = 1.5;
 /** Extra multiplier on a counter-attack. The counter is scaled by the defender's
  *  defense, which is small next to attack, so it was too weak next to the blow
- *  that provokes it; this doubles it for every unit but the shield. */
-export const COUNTER_SCALE = 2;
+ *  that provokes it; this more than doubles it for every unit but the shield. */
+export const COUNTER_SCALE = 2.25;
 /** A shield's counter-attack multiplier. Kept at its old strength: shields
  *  already retaliate hard, so they do not get COUNTER_SCALE on top. */
 export const SHIELD_COUNTER_SCALE = 2;

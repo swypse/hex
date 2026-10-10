@@ -2575,8 +2575,8 @@ describe('damage preview badges', () => {
     vi.useRealTimers();
     const badges = badgesOf(v);
     // warrior vs warrior: attackForce 20, defenseForce 10, total 30:
-    // round((20/30)*20*1.5) = 20 over target, round((10/30)*10*1.5*2) = 10 over attacker.
-    expect(badges.map((b) => b.text).sort()).toEqual(['-10', '-20']);
+    // round((20/30)*20*1.5) = 20 over target, round((10/30)*10*1.5*2.25) = 11 over attacker.
+    expect(badges.map((b) => b.text).sort()).toEqual(['-11', '-20']);
     v.destroy();
   });
 
@@ -2617,7 +2617,7 @@ describe('damage preview badges', () => {
       expect(targetEl.destroyed).toBe(false);
       expect(badgeEl(v, '-20')).toBe(targetEl);
       expect(targetEl.alpha).toBe(1);
-      const atkEl = badgeEl(v, '-10');
+      const atkEl = badgeEl(v, '-11');
       expect(atkEl).not.toBe(targetEl);
       expect(atkEl.alpha).toBe(0);
     } finally {
@@ -2747,9 +2747,9 @@ describe('damage preview badges', () => {
     v.update(m, players, { kind: SelectionKind.UNIT, q: 0, r: 0 }, new Set(), new Set(), 0, new Set(), viewport);
     vi.useRealTimers();
     const badges = badgesOf(v);
-    // The 0-damage target badge is skipped; only the 30 counter badge remains.
+    // The 0-damage target badge is skipped; only the counter badge (30 * 2.25 / 2, rounded) remains.
     expect(badges.some((b) => b.text === '-0')).toBe(false);
-    expect(badges.map((b) => b.text)).toEqual(['-30']);
+    expect(badges.map((b) => b.text)).toEqual(['-34']);
     v.destroy();
   });
 

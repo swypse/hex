@@ -34,7 +34,7 @@ export const UNIT_TYPES: Record<UnitType, UnitTypeInfo> = {
   swordsman: { movePoints: 10, attack: 40, attackDistance: 1, maxHp: 80, defense: 16, price: 10, priceWood: 0, priceOre: 2 },
   shield: { movePoints: 10, attack: 7, attackDistance: 1, maxHp: 80, defense: 20, price: 8, priceWood: 0, priceOre: 2 },
   catapult: { movePoints: 10, attack: 50, attackDistance: 4, maxHp: 30, defense: 0, price: 15, priceWood: 10, priceOre: 3 },
-  knight: { movePoints: 30, attack: 40, attackDistance: 1, maxHp: 70, defense: 12, price: 14, priceWood: 0, priceOre: 5 },
+  knight: { movePoints: 30, attack: 38, attackDistance: 1, maxHp: 70, defense: 12, price: 14, priceWood: 0, priceOre: 5 },
   pirate: { movePoints: 50, attack: 15, attackDistance: 3, maxHp: PIRATE_HP, defense: 5, price: 0, priceWood: 0, priceOre: 0 },
   stalker: { movePoints: 20, attack: 10, attackDistance: 1, maxHp: 20, defense: 0, price: 9, priceWood: 0, priceOre: 2 },
   builder: { movePoints: 8, attack: 10, attackDistance: 1, maxHp: 40, defense: 0, price: 15, priceWood: 0, priceOre: 0 },

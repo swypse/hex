@@ -47,7 +47,7 @@ freshly spawned unit must wait until the next turn.
 | Swordsman | 10          | 40     | 16      | 1            | 80 | 10 money + 2 ore           |
 | Shield    | 10          | 7      | 20      | 1            | 80 | 8 money + 2 ore            |
 | Catapult  | 10          | 50     | 0       | 4            | 30 | 15 money + 10 wood + 3 ore |
-| Knight    | 30          | 40     | 12      | 1            | 70 | 14 money + 5 ore           |
+| Knight    | 30          | 38     | 12      | 1            | 70 | 14 money + 5 ore           |
 
 ### Special units
 
@@ -160,14 +160,14 @@ Pirates never become veterans.
   constant of 1.5:
   `attackForce = attack × current hp / max hp`;
   `defenseForce = defense × current hp / max hp × defenseBonus`, where
-  `defenseBonus = 1 + tile reduction / 10` (own village ×1.5, walled village ×1.8, temple protections ×2.0); damage to
+  `defenseBonus = 1 + tile reduction / 10` (own village ×1.6, walled village ×1.9, temple protections ×2.0); damage to
   the target is
   `round(attackForce / (attackForce + defenseForce) × attack × 1.5)`. Each attack has a 10% chance to miss (5% if the
   attacker's owner has opened Science), dealing no damage (the attack still counts as used). If the target survives and
    is in range, it counter-attacks with
-   `round(defenseForce / (attackForce + defenseForce) × defense × 1.5 × 2)`, except a land catapult never
-   counter-attacks (aboard a ship the crew still fights back with the ship's cannon). Every counter-attack is doubled
-   (`COUNTER_SCALE` = 2, so a counter is no longer dwarfed by the blow that provoked it); a **shield** keeps the same
+   `round(defenseForce / (attackForce + defenseForce) × defense × 1.5 × 2.25)`, except a land catapult never
+   counter-attacks (aboard a ship the crew still fights back with the ship's cannon). Every counter-attack is multiplied by 2.25
+   (`COUNTER_SCALE` = 2.25, so a counter is no longer dwarfed by the blow that provoked it); a **shield** keeps the same
    ×2 (`SHIELD_COUNTER_SCALE`), so its counter-attack is as strong as before and attacking a shield head-on still
    hurts: it is dangerous to strike one without killing it. A shield cannot
    attack in a turn in which it has

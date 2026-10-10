@@ -10,7 +10,7 @@ import { BuffId, BuildingKind } from '@enums';
 const TEMPLE_BUFF_THRESHOLD = 3;
 
 /** Defense a unit gets while standing in its own village. */
-export const VILLAGE_DEFENSE = 5;
+export const VILLAGE_DEFENSE = 6;
 
 export const BUFF_INFO: Record<BuffId, { name: string; icon: string; tooltip: string; description: string }> = {
   waterProtection: {

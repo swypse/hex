@@ -70,11 +70,11 @@ describe('resolveCombat', () => {
     const target = map.tiles[1]!;
     const { attackerDamage, counterDamage } = resolveCombat(map, attacker, target);
     // attackForce 20, defenseForce 10, total 30:
-    // round((20/30) * 20 * 1.5) = 20, round((10/30) * 10 * 1.5 * COUNTER_SCALE) = 10
+    // round((20/30) * 20 * 1.5) = 20, round((10/30) * 10 * 1.5 * COUNTER_SCALE) = round(11.25) = 11
     expect(attackerDamage).toBe(20);
-    expect(counterDamage).toBe(10);
+    expect(counterDamage).toBe(11);
     expect(COMBAT_SCALE).toBe(1.5);
-    expect(COUNTER_SCALE).toBe(2);
+    expect(COUNTER_SCALE).toBe(2.25);
   });
 
   it('deals full attack * scale against a zero-defense target', () => {
@@ -121,8 +121,8 @@ describe('defenseBonusFor', () => {
     const tile = map.tiles[1]!;
     tile.settlement = { owner: 1, level: 1, captureReady: false };
     tile.settlement!.owner = 1;
-    // VILLAGE_DEFENSE 5 -> 1 + 5/10 = 1.5
-    expect(defenseBonusFor(map, tile.unit!, tile)).toBe(1.5);
+    // VILLAGE_DEFENSE 6 -> 1 + 6/10 = 1.6
+    expect(defenseBonusFor(map, tile.unit!, tile)).toBe(1.6);
   });
 
   it('returns 1 for a null map (no context)', () => {
@@ -328,14 +328,15 @@ describe('performAttack', () => {
     const attacker = map.tiles[0]!.unit!;
     const target = map.tiles[1]!;
     const result = performAttack(map, attacker, target, noMiss);
+    // The counter is round((10/30) * 10 * 1.5 * 2.25) = 11.
     expect(target.unit!.hp).toBe(30);
-    expect(attacker.hp).toBe(40);
+    expect(attacker.hp).toBe(39);
     expect(attacker.hasAttacked).toBe(true);
     expect(attacker.hasMoved).toBe(false);
     expect(target.unit!.hasMoved).toBe(false);
     expect(target.unit!.hasAttacked).toBe(false);
     expect(result.attackerDamage).toBe(20);
-    expect(result.targetDamage).toBe(10);
+    expect(result.targetDamage).toBe(11);
   });
 
   it('kills the target at zero hp and removes it from the tile', () => {
@@ -512,10 +513,10 @@ describe('performAttack', () => {
     const target = makeTile(1, 0, TileType.Water, shipWarrior);
     map.tiles.push(makeTile(0, 0, TileType.GrasslandLand, attacker), target);
     const result = performAttack(map, attacker, target, noMiss);
-    // attackForce 20, defenseForce 10, total 30: 20 / 10.
+    // attackForce 20, defenseForce 10, total 30: 20 / 11 (the counter is 11.25 rounded).
     expect(result.attackerDamage).toBe(20);
-    expect(result.targetDamage).toBe(10);
-    expect(attacker.hp).toBe(40);
+    expect(result.targetDamage).toBe(11);
+    expect(attacker.hp).toBe(39);
   });
 
   it('does not apply counter-damage when the attacker is beyond the target reach', () => {
@@ -683,9 +684,9 @@ describe('temple protection', () => {
     const target = map.tiles.find((t) => t.unit?.id === 'a')!;
     const result = performAttack(map, attacker, target, noMiss);
     // attacker(df?) is b a level-1 ship: attackForce = 10. target defenseForce 10,
-    // total 20: attack round((10/20)*20*1.5)=15, counter round((10/20)*10*1.5*2)=15
+    // total 20: attack round((10/20)*20*1.5)=15, counter round((10/20)*10*1.5*2.25)=round(16.875)=17
     expect(result.attackerDamage).toBe(15);
-    expect(result.targetDamage).toBe(15);
+    expect(result.targetDamage).toBe(17);
   });
 });
 
