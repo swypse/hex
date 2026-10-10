@@ -1314,6 +1314,9 @@ export class Simulator {
       case AiActionType.BUILD_BRIDGE:
         ok = this.doBuildBridge(a.q, a.r);
         break;
+      case AiActionType.DESTROY_BUILDING:
+        ok = this.doDestroyBuilding(a.q, a.r);
+        break;
       case AiActionType.UPGRADE_SHIP:
         ok = this.doUpgradeShip(a.unitId);
         break;

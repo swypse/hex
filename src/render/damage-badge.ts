@@ -12,7 +12,7 @@ import { BadgeAnimPhase, FontSize } from '@enums';
 import { HP_LABEL_UP } from './hp-bar-layout';
 
 /** Font size of the damage-preview `-N` label. */
-const DAMAGE_BADGE_FONT_SIZE = FontSize.SMALL;
+const DAMAGE_BADGE_FONT_SIZE = FontSize.VERY_SMALL;
 /** Corner radius of the damage-preview badge rect. */
 const DAMAGE_BADGE_RADIUS = 2;
 /** Vertical gap between the badge caret tip and the hp text (px). */

@@ -118,6 +118,35 @@ describe('AI prepares for winter food', () => {
     const actions = planAiActions(map, ai, new SeededRandom(3));
     expect(actions.some((a) => a.type === AiActionType.BUILD && a.kind === BuildingKind.GRANARY)).toBe(true);
   });
+
+  it('demolishes a sawmill that boxes in its farm to make room for a granary, and does not rebuild it', () => {
+    const map = makeTestMap(6);
+    const ai = makeAI();
+    ai.skills = [SkillId.AGRICULTURE, SkillId.GRANARY, SkillId.FORESTRY];
+    const village = tileAt(map, 0, 0)!;
+    village.settlement = { owner: 1, level: 3, captureReady: false, capital: true };
+    village.ownedBy = 1;
+    giveResources(map, ai, { money: 200, wood: 40, stone: 40, food: 0 });
+    village.unit = makeUnit('w', 1, UnitType.WARRIOR, 0, 0);
+    village.unit.spawnVillage = { q: 0, r: 0 };
+    const second = tileAt(map, -1, 0)!;
+    second.unit = makeUnit('w2', 1, UnitType.WARRIOR, -1, 0);
+    second.unit.spawnVillage = { q: 0, r: 0 };
+    const farm = tileAt(map, 1, 0)!;
+    farm.ownedBy = 1;
+    farm.claimedByVillage = { q: 0, r: 0 };
+    farm.building = { kind: BuildingKind.FARM, level: 1 };
+    // Every other tile next to the farm holds a sawmill.
+    for (const [q, r] of [[0, 1], [1, -1], [2, -1], [2, 0], [1, 1]] as const) {
+      const t = tileAt(map, q, r)!;
+      t.ownedBy = 1;
+      t.claimedByVillage = { q: 0, r: 0 };
+      t.building = { kind: BuildingKind.SAWMILL, level: 1 };
+    }
+    const actions = planAiActions(map, ai, new SeededRandom(3));
+    expect(actions.some((a) => a.type === AiActionType.DESTROY_BUILDING)).toBe(true);
+    expect(actions.some((a) => a.type === AiActionType.BUILD && a.kind === BuildingKind.SAWMILL)).toBe(false);
+  });
 });
 
 describe('AI stone focus', () => {

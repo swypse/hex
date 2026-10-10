@@ -37,6 +37,15 @@ export type EffectsHost = Pick<EventHost, 'app' | 'mapRoot' | 'mapView' | 'textu
 export class EventEffects {
   constructor(private readonly host: EffectsHost) {}
 
+  /** Current screen position of `tile`'s center under the live camera. */
+  private tileScreenPos(camera: ReturnType<EffectsHost['camera']>, tile: MapTile): { x: number; y: number } {
+    const world = hexToPixel(tile, HEX_SIZE);
+    return {
+      x: camera.pan.x + world.x * camera.scale,
+      y: camera.pan.y + (world.y - tileElevation(tile, HEX_SIZE)) * camera.scale,
+    };
+  }
+
   spawnScoreFly(tile: MapTile, playerIndex: number, amount: number): void {
     const local = useGameStore.getState().localPlayerIndex;
     if (playerIndex !== local && !isExploredFor(tile, local)) return;
@@ -55,20 +64,15 @@ export class EventEffects {
     const mapRoot = this.host.mapRoot();
     if (!app || !mapRoot) return;
     const camera = this.host.camera();
-    const scale = camera.scale;
-    const world = hexToPixel(tile, HEX_SIZE);
     const el = new Container();
     el.zIndex = 10;
     const label = new BitmapText({
       text,
-      style: { fontFamily: sizedFontFamily(FONT_BLACK, FontSize.BIG), fontSize: FontSize.BIG, fill: color },
+      style: { fontFamily: sizedFontFamily(FONT_BLACK, FontSize.SMALL), fontSize: FontSize.SMALL, fill: color },
     });
     label.anchor.set(0.5);
     el.addChild(label);
-    const start = {
-      x: camera.pan.x + world.x * scale,
-      y: camera.pan.y + (world.y - tileElevation(tile, HEX_SIZE)) * scale,
-    };
+    const start = this.tileScreenPos(camera, tile);
     el.position.set(start.x, start.y);
     mapRoot.addChild(el);
 
@@ -83,7 +87,9 @@ export class EventEffects {
         return;
       }
       const t = Math.min(1, (performance.now() - tickStart) / FLOAT_MS);
-      el.position.set(start.x, start.y - FLOAT_RISE * t);
+      // Re-read the camera each frame so the number stays glued to its hex.
+      const at = this.tileScreenPos(camera, tile);
+      el.position.set(at.x, at.y - FLOAT_RISE * t);
       el.alpha = t < 0.5 ? 1 : 1 - (t - 0.5) / 0.5;
       if (t >= 1) {
         ticker.remove(fn);
@@ -271,26 +277,22 @@ export class EventEffects {
     const sprite = new Sprite(fog.texture);
     sprite.anchor.set(0.5, fog.anchorY);
     const camera = this.host.camera();
-    const scale = camera.scale;
-    const world = hexToPixel(tile, HEX_SIZE);
-    sprite.scale.set(camera.spriteScale * scale, camera.spriteScale * scale);
-    sprite.position.set(
-      camera.pan.x + world.x * scale,
-      camera.pan.y + (world.y - tileElevation(tile, HEX_SIZE)) * scale,
-    );
     const el = new Container();
     el.addChild(sprite);
     el.zIndex = 10;
     mapRoot.addChild(el);
 
-    const score = makeLabel(`+${EXPLORED_SCORE}`, { fontSize: FontSize.NORMAL, fill: 0xffffff, fontWeight: '700', roundPixels: false });
+    const score = makeLabel(`+${EXPLORED_SCORE}`, { fontSize: FontSize.VERY_SMALL, fill: 0xffffff, fontWeight: '700', roundPixels: false });
     score.anchor.set(0.5, 0.5);
-    const fogH = sprite.height;
-    score.position.set(
-      sprite.position.x,
-      sprite.position.y - (fog.anchorY - 0.5) * fogH,
-    );
     el.addChild(score);
+    // Sprite and label follow the hex through camera pan and zoom.
+    const place = (): void => {
+      const at = this.tileScreenPos(camera, tile);
+      sprite.scale.set(camera.spriteScale * camera.scale);
+      sprite.position.set(at.x, at.y);
+      score.position.set(at.x, at.y - (fog.anchorY - 0.5) * sprite.height);
+    };
+    place();
 
     const FOG_MS = 900;
     const FOG_RISE = 60;
@@ -303,6 +305,7 @@ export class EventEffects {
         return;
       }
       const t = Math.min(1, (performance.now() - tickStart) / FOG_MS);
+      place();
       el.position.set(0, -FOG_RISE * t);
       el.alpha = t < 0.6 ? 1 : 1 - (t - 0.6) / 0.4;
       if (t >= 1) {

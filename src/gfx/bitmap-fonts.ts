@@ -5,6 +5,8 @@ import { forEachIdle } from '../util/time-slice';
 
 export const FONT_REGULAR = 'Roboto Regular';
 export const FONT_BLACK = 'Roboto Black';
+/** Pixel font for on-map +N / -N notifications (SIL OFL 1.1, see public/fonts). */
+export const FONT_PIX = 'Pix Cyrillic';
 
 const FONT_BASE = `${import.meta.env.BASE_URL}fonts/`;
 
@@ -17,11 +19,12 @@ export function fontFamilyForWeight(weight?: TextStyleFontWeight): string {
 }
 
 export async function loadBitmapFonts(): Promise<unknown> {
-  const [regular, black] = await Promise.all([
+  const [regular, black, pix] = await Promise.all([
     Assets.load<BitmapFont>(`${FONT_BASE}Roboto Regular.fnt`),
     Assets.load<BitmapFont>(`${FONT_BASE}Roboto Black.fnt`),
+    Assets.load<BitmapFont>(`${FONT_BASE}${FONT_PIX}.fnt`),
   ]);
-  for (const font of [regular, black]) {
+  for (const font of [regular, black, pix]) {
     for (const page of font.pages) {
       page.texture.source.autoGenerateMipmaps = true;
       // Sample a single nearest mip level instead of trilinear blending:
@@ -31,7 +34,7 @@ export async function loadBitmapFonts(): Promise<unknown> {
       page.texture.source.mipmapFilter = 'nearest';
     }
   }
-  return [regular, black];
+  return [regular, black, pix];
 }
 
 /** Highest device pixel ratio worth baking glyphs for. */
@@ -126,7 +129,8 @@ function warnIfOffScale(size: number): void {
  *  glyphs outside ASCII (Cyrillic, symbols) are added on first use. Falls back to
  *  the shipped atlas when disabled or the bake fails. */
 export function sizedFontFamily(family: string, fontSize: number): string {
-  if (!sizedFontsEnabled) return family;
+  // The pixel font has no CSS face to bake from: it is drawn from its shipped atlas.
+  if (!sizedFontsEnabled || family === FONT_PIX) return family;
   const size = Math.max(1, Math.round(fontSize));
   warnIfOffScale(size);
   const name = `${family}@${size}`;

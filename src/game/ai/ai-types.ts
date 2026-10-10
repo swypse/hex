@@ -37,6 +37,7 @@ export type AiAction =
   | { type: AiActionType.BUILD; q: number; r: number; kind: BuildingKind }
   | { type: AiActionType.BUILD_ROAD; q: number; r: number }
   | { type: AiActionType.BUILD_BRIDGE; q: number; r: number }
+  | { type: AiActionType.DESTROY_BUILDING; q: number; r: number }
   | { type: AiActionType.UPGRADE_SHIP; unitId: string }
   | { type: AiActionType.REPAIR; q: number; r: number }
   | { type: AiActionType.EXTINGUISH; unitId: string; q: number; r: number }

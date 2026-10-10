@@ -1,4 +1,4 @@
-import { networkBuildingIncome, canBuildFarm, canBuildGranary, canBurnBuilding, canBurnRoad, canBuildSawmill, canBuildForestTemple, canBuildMine, canBuildPort, canBuildTemple, BUILDING_COSTS } from '../economy/buildings';
+import { DESTROY_BUILDING_COST, networkBuildingIncome, canBuildFarm, canBuildGranary, canBurnBuilding, canBurnRoad, canBuildSawmill, canBuildForestTemple, canBuildMine, canBuildPort, canBuildTemple, BUILDING_COSTS } from '../economy/buildings';
 import { hexDistance, hexNeighbors } from '../map/hex';
 import { canBuildBridge, bridgeCoastOffsets, bridgeDirFor, BRIDGE_COST } from '../economy/bridges';
 import { canBuildRoad, roadCutSplits, villageConnectedNodes, ROAD_COST } from '../economy/roads';
@@ -11,7 +11,7 @@ import { reachableTargets } from '../units/selection';
 import { foodNetworkStates, networkStateOfTile, foodPressure, canSustainUnit, eatsFarmMaterials } from '../economy/food';
 import { blockedByOpening, openingAction } from './ai-opening';
 import { blockedByStone, villagesNeedingMine } from './ai-stone';
-import { planFoodFixes, planWinterStorage } from './ai-food';
+import { planFoodFixes, planGranarySpace, planWinterStorage } from './ai-food';
 import { canHeal, unitSpawnCost, UNIT_TYPES, type Unit } from '../units/units';
 import { SeededRandom } from '../../util/random';
 import { buildingsInVillage, villageBuildingLimit } from '../economy/village';
@@ -149,6 +149,8 @@ export function formatAiAction(a: AiAction): string {
       return `buildRoad (${a.q},${a.r})`;
     case AiActionType.BUILD_BRIDGE:
       return `buildBridge (${a.q},${a.r})`;
+    case AiActionType.DESTROY_BUILDING:
+      return `destroyBuilding (${a.q},${a.r})`;
     case AiActionType.OPEN_SKILL:
       return `openSkill ${a.skill}`;
     case AiActionType.STUN:
@@ -495,10 +497,19 @@ function bestAvailableAction(
   const storageScore = map.season === Season.SPRING ? 300 : 520;
   // Money kept for the granary (or the skill that unlocks it) a network needs
   // before winter, so other spends do not keep the purse below its price.
-  const granarySite = storage.needy.size > 0 && map.tiles.some((t) => canBuildGranary(map, t, player));
+  // A network whose farms are boxed in by other buildings demolishes one for it.
+  const clearings = planGranarySpace(map, player, foodStates, storage.needy);
+  const granarySite = storage.needy.size > 0 && (clearings.length > 0 || map.tiles.some((t) => canBuildGranary(map, t, player)));
   const storageReserve = storage.needy.size === 0 ? 0
     : !hasSkill(player, SkillId.GRANARY) ? (hasSkill(player, SkillId.AGRICULTURE) ? skillCost(SkillId.GRANARY, player.skills.length) : 0)
       : granarySite ? BUILDING_COSTS.granary.money : BUILDING_COSTS.farm.money;
+  for (const { tile, then } of clearings) {
+    if (state.built.has(key(tile.q, tile.r))) continue;
+    // Only when the replacement can be paid for right after the demolition.
+    const next = BUILDING_COSTS[then];
+    if (!canAffordAt(map, player, tile, { ...next, money: next.money + DESTROY_BUILDING_COST })) continue;
+    candidates.push({ score: storageScore + 5 + jitter(), action: { type: AiActionType.DESTROY_BUILDING, q: tile.q, r: tile.r } });
+  }
   for (const { tile } of storage.roads) {
     if (state.built.has(key(tile.q, tile.r)) || !canBuildRoad(map, tile, player)) continue;
     candidates.push({ score: storageScore + jitter(), action: { type: AiActionType.BUILD_ROAD, q: tile.q, r: tile.r } });
@@ -521,7 +532,12 @@ function bestAvailableAction(
   for (const tile of map.tiles) {
     if (tile.ownedBy !== player.index) continue;
     if (state.built.has(key(tile.q, tile.r))) continue;
-    if (canBuildSawmill(map, tile, player) && canAffordAt(map, player, tile, BUILDING_COSTS.sawmill)) {
+    const granaryNet = networkStateOfTile(foodStates, tile);
+    const needsStorage = granaryNet !== undefined && storage.needy.has(axialKeyOf(granaryNet.villages[0]!));
+    // A tile a needy network can put its granary on is not given back to a
+    // sawmill, or the AI would demolish it again next turn.
+    const granaryTile = needsStorage && canBuildGranary(map, tile, player);
+    if (!granaryTile && canBuildSawmill(map, tile, player) && canAffordAt(map, player, tile, BUILDING_COSTS.sawmill)) {
       if (!reserveLastSlotForMine(map, player, tile)) {
         candidates.push({ score: 360 + jitter(), action: { type: AiActionType.BUILD, q: tile.q, r: tile.r, kind: BuildingKind.SAWMILL } });
       }
@@ -541,8 +557,6 @@ function bestAvailableAction(
       const savingForGranary = hasSkill(player, SkillId.GRANARY) && storageReserve > 0 && farmScore < storageScore && player.resources.money - BUILDING_COSTS.farm.money < storageReserve;
       if (farmScore > 0 && !savingForGranary) candidates.push({ score: farmScore + jitter(), action: { type: AiActionType.BUILD, q: tile.q, r: tile.r, kind: BuildingKind.FARM } });
     }
-    const granaryNet = networkStateOfTile(foodStates, tile);
-    const needsStorage = granaryNet !== undefined && storage.needy.has(axialKeyOf(granaryNet.villages[0]!));
     if (canBuildGranary(map, tile, player) && canAffordAt(map, player, tile, BUILDING_COSTS.granary) && (needsStorage || (granaryNet?.balance ?? 0) > 0)) {
       candidates.push({ score: (needsStorage ? storageScore : 120) + jitter(), action: { type: AiActionType.BUILD, q: tile.q, r: tile.r, kind: BuildingKind.GRANARY } });
     }
@@ -782,6 +796,7 @@ function markUsed(state: AiPlannerState, action: AiAction): void {
       state.occupied.add(key(action.q, action.r));
       break;
     case AiActionType.REPAIR:
+    case AiActionType.DESTROY_BUILDING:
       state.built.add(key(action.q, action.r));
       break;
     case AiActionType.UPGRADE_SHIP:

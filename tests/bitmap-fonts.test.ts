@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { Assets } from 'pixi.js';
-import { FONT_BLACK, FONT_REGULAR, fontFamilyForWeight, loadBitmapFonts } from '../src/gfx/bitmap-fonts';
+import { FONT_BLACK, FONT_PIX, FONT_REGULAR, enableSizedFonts, fontFamilyForWeight, loadBitmapFonts, sizedFontFamily } from '../src/gfx/bitmap-fonts';
 
 describe('fontFamilyForWeight', () => {
   it('maps undefined and normal weights to Roboto Regular', () => {
@@ -33,5 +33,11 @@ describe('loadBitmapFonts', () => {
     // glyph edges when the 72px bake is downscaled to 10-26px labels.
     expect(sourceA.mipmapFilter).toBe('nearest');
     expect(sourceB.mipmapFilter).toBe('nearest');
+  });
+});
+describe('sizedFontFamily', () => {
+  it('keeps the pixel font on its shipped atlas instead of baking a Roboto lookalike', () => {
+    enableSizedFonts();
+    expect(sizedFontFamily(FONT_PIX, 14)).toBe(FONT_PIX);
   });
 });

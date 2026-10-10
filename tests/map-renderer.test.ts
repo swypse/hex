@@ -2703,9 +2703,9 @@ describe('damage preview badges', () => {
     const icon = el.children.find((c) => c instanceof Sprite) as Sprite | undefined;
     expect(icon).toBeDefined();
     expect(icon!.width).toBe(14);
-    // White 14px label with no " hp" suffix.
+    // White 12px label with no " hp" suffix.
     const label = el.children.find((c) => c instanceof BitmapText) as BitmapText | undefined;
-    expect(label!.style.fontSize).toBe(14);
+    expect(label!.style.fontSize).toBe(12);
     expect(label!.style.fill).toBe(0xffffff);
     expect(label!.text).toBe('-20');
     // A non-lethal hit keeps the attack icon.
