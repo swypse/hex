@@ -1,0 +1,339 @@
+# Game
+
+Gameplay rules for the hex strategy game. Tribe pages (special units, tribe overview) live in
+[tribes/](tribes/): [Cats](tribes/Cats.md), [Villagers](tribes/Villagers.md), [Warriors](tribes/Warriors.md),
+[Barbarians](tribes/Barbarians.md), [Forest](tribes/Forest.md), [Aqua](tribes/Aqua.md), [Sand](tribes/Sand.md).
+
+Contents: [Modes](#game-modes) · [Multiplayer](#multiplayer) · [Tribes](#tribes) · [Map](#map) · [Units](#units) ·
+[Unit actions](#unit-actions) · [Villages](#villages) · [Skills](#skills) · [Buildings](#buildings) ·
+[Economy](#economy) · [Food](#food) · [Seasons](#seasons) · [Weather](#weather) · [Bonuses](#bonuses-and-bottles) ·
+[Score](#score)
+
+## Game modes
+
+Chosen on the setup screen.
+
+1. **Capture the map** — a player wins by owning all non-free villages; the game ends once that player's turn ends
+   (the round completes, not at the final capture). Capturing the map within `10 + 5 × players` turns (quick capture)
+   gives a `players × 20` point bonus.
+2. **30 Turns** — the game ends at turn 30; the highest score wins.
+
+**Winner** among active players: highest total score → most kills → fewest units on the map → alphabetical name.
+
+## Multiplayer
+
+A player hosts a room (2-7 human players, optional AI opponents) or joins by code. Each human controls their own tribe;
+rules are the single-player ones. The room starts once everyone has picked a tribe and is ready.
+
+## Tribes
+
+Seven tribes. Every tribe plays by the same rules and differs by colour, one start bonus and one **special unit** that
+only it can spawn (no skill needed — the tribe is the gate). Details on each tribe page.
+
+| Tribe                          | Colour | Start bonus      | Special unit |
+|--------------------------------|--------|------------------|--------------|
+| [Cats](tribes/Cats.md)         | pink   | Shields skill    | Stalker      |
+| [Villagers](tribes/Villagers.md) | brown | +8 money        | Builder      |
+| [Warriors](tribes/Warriors.md) | red    | Swordsman skill  | Banner       |
+| [Barbarians](tribes/Barbarians.md) | gray | Climbing skill | Berserker    |
+| [Forest people](tribes/Forest.md) | green | Forestry skill  | Trapper      |
+| [Aqua people](tribes/Aqua.md)  | aqua   | Navigation skill | Stormcaller  |
+| [Sand people](tribes/Sand.md)  | yellow | Riding skill     | Stunner      |
+
+## Map
+
+- Hex grid. Playable radius by player count: 2 → 7, 3 → 8, 4 → 9, 5 → 10, 6 → 11, 7 → 12, plus a 2-hex water border.
+- Perlin-noise terrain in 5 biomes (Grassland, Desert, Tundra, Taiga, Rainforest); terrain types land, forest, mountain
+  and water.
+- Each player starts with a capital (with a warrior) and a nearby free (neutral) village. Villages are at least 3 hexes
+  apart and every village has at least one free tile around it.
+- A free village becomes capturable when an enemy unit stands on it (red triangle).
+
+**Fog of war** is tracked per player (AI included). Unexplored tiles are gray; units on them are invisible.
+
+- A unit that moves reveals, for every cell it visits, all tiles within its attack distance (at least the neighbours).
+- A village reveals `territory radius + 1` hexes (level 1 → 2, 2-4 → 3, 5+ → 4) at game start, on upgrade and on
+  capture. Own tiles are explored at the start.
+- The camera follows enemy actions only on explored cells.
+
+## Units
+
+Units belong to a player and are spawned in owned villages (see [Villages](#villages)). Every unit acts once per turn;
+a fresh unit waits until the next turn. Tribe special units are on the [tribe pages](#tribes).
+
+| Unit      | Move | Attack | Defense | Range | HP | Spawn cost                 | Skill     | Upkeep (money / food) | Board score |
+|-----------|------|--------|---------|-------|----|----------------------------|-----------|-----------------------|-------------|
+| Warrior   | 10   | 20     | 10      | 1     | 50 | 4 money                    | —         | 1 / 1                 | 5           |
+| Rider     | 40   | 22     | 8       | 1     | 45 | 6 money                    | Riding    | 2 / 1                 | 6           |
+| Archer    | 10   | 26     | 7       | 2     | 40 | 6 money                    | —         | 2 / 1                 | 6           |
+| Swordsman | 10   | 40     | 16      | 1     | 80 | 10 money + 2 ore           | Swordsman | 3 / 3                 | 0           |
+| Shield    | 10   | 7      | 20      | 1     | 80 | 8 money + 2 ore           | Shields   | 2 / 2                 | 0           |
+| Catapult  | 10   | 50     | 0       | 4     | 30 | 15 money + 10 wood + 3 ore | Catapult  | 5 / 3                 | 0           |
+| Knight    | 30   | 38     | 12      | 1     | 70 | 14 money + 5 ore          | Knights   | 4 / 3                 | 0           |
+
+- **Rider** can still move its full move points after attacking in the same turn.
+- **Shield** cannot attack in a turn in which it has moved (not applicable aboard a ship). Its counter-attack uses a
+  lower multiplier than other units (see [Attack](#unit-actions)), but attacking one head-on still hurts.
+- **Knight** may attack again after a kill; killing 3 units in one turn gives a 30-point **Combo kill**.
+- **Catapult** has fixed damage (no random roll), cannot attack after moving, never advances onto a killed enemy's tile
+  and never counter-attacks on land (aboard a ship the crew fires the ship's cannon). It is the only **siege** unit: it
+  can target enemy buildings, walls, villages and roads within range with the usual range/fog logic. A hit on a village
+  destroys its wall first, then lowers its level by one (minimum 1); a village with an enemy unit standing in it is hit
+  as a normal unit. Mines, sawmills, ports, temples, forest temples, bridges, farms and granaries (2 hp) are removed
+  outright; a road is hit last on a tile with a building. A volley can miss like a regular attack and is never
+  countered. The AI sieges too.
+- Pirates and units with no home village cost no upkeep.
+
+### Ships
+
+A unit that moves onto its own port becomes a **ship** and cannot move or attack again that turn.
+
+- Move points 20 / 30 / 40 and attack 10 / 20 / 30 (range 2 / 2 / 3) for ship levels 1 / 2 / 3; ships sail water and may
+  land only on a coast tile as their final step. The ship's own level sets the fog reveal distance.
+- A ship may attack after moving but cannot move after attacking. Landing turns it back into a normal unit and ends the
+  unit's turn (no move, attack or heal).
+- Upgrade (only on an owned cell): level 2 = 8 money + 4 wood; level 3 = 16 money + 8 wood + 2 ore.
+- Money upkeep per turn: 2 / 3 / 4 by level.
+
+### Pirates
+
+Neutral units that belong to no tribe (80 HP, 50 move points on sea only, attack 15 at range 3, defense 5).
+
+- From turn 7, on every odd turn, a pirate appears with 15% chance on an edge water cell. Pirates act after all players.
+- Each pirate hunts one tribe — the one with the nearest unit when it appears: it attacks that tribe's nearest unit
+  (ship or land) or moves toward it. After **3 attacks** it picks another tribe. It remembers its last two target
+  tribes and never picks from them (with two players it simply switches). It also switches when its tribe has no units
+  or has a deal with it.
+- A pirate that survives an attack from a tribe hunts that tribe for its next **3** turns.
+- A pirate adjacent to a ship tries to **capture** it (25%): on success the ship becomes a pirate ship (keeping its HP
+  and damage); on failure the pirate loses 2 HP and the ship 1 HP.
+- A **deal** (50 money) stops a pirate from attacking your tribe; only possible while it is on water you own.
+- Killing a pirate gives 30 points.
+
+### Veterans
+
+A unit's **3rd kill** (counter-attacks, storms and pirate kills count) makes it a **veteran**: it is fully healed, shows a
+star (`★ N/M`) and its owner picks a permanent bonus in a dialog that cannot be dismissed: **+5 attack**, **+10 max HP**
+(refilled) or **+20 move points** (not aboard a ship). A 3rd kill on an enemy's turn opens the dialog at the start of the
+owner's turn. AI picks at once: shields, banners, builders and stalkers take HP, riders move points, others attack.
+Pirates never become veterans.
+
+## Unit actions
+
+- **Move** — spend up to the move points. Leaving a tile costs: land and water 10, forest 14 (10 in winter, except in
+  the desert biome), mountain 20 (entering is free). A unit may always make a 1-tile move. Mountains need *Climbing*;
+  water blocks land units (ships need *Navigation*). Leaving the unit's own road tile, a road on its own territory, its
+  own village linked to its road network, or a tile of its own port water route **halves** the cost (rounded down).
+  Movement stops at the first cell adjacent to an enemy (it can be entered, cells beyond cannot; a unit next to an
+  enemy can always move 1 cell). Leaving a water tile inside a storm costs 2×.
+- **Attack** — once per turn on an enemy within range. Force-ratio formula (`COMBAT_SCALE` 1.5):
+  `attackForce = attack × hp / maxHp`; `defenseForce = defense × hp / maxHp × defenseBonus`;
+  damage = `round(attackForce / (attackForce + defenseForce) × attack × 1.5)`.
+  - `defenseBonus = 1 + reduction / 10`: own village +6 (×1.6), a wall adds +3 (×1.9); with 3+ own water temples ships
+    get +10 (×2.0), with 3+ forest temples units on forest tiles get +10.
+  - Each attack has a 10% miss chance (5% with *Science*); a miss still uses the attack.
+  - A surviving target in range counter-attacks with
+    `round(defenseForce / (attackForce + defenseForce) × defense × 1.5 × 2.25)` (`COUNTER_SCALE` 2.25; shields 2).
+  - On a kill the attacker moves onto the target's tile, unless it is an archer, a pirate, a ship, or the target was a
+    pirate or a ship.
+  - Bonuses to attack: banner +5, berserker rage +10, veteran +5 (none for ships).
+- **Heal** — if the unit has not moved/attacked, +15 HP (+10 more on a tile of a village with a university after
+  *Medicine*), once per turn.
+- **Capture village** — a unit on an enemy or free village marked capturable captures it.
+- **Disband** — costs 3 × the unit's money upkeep; not after the unit has moved or attacked.
+- **Burn / Destroy road / Extinguish** — see [Food](#food) and [Lightning and fire](#lightning-and-fire).
+- Tribe special abilities: see the [tribe pages](#tribes).
+
+## Villages
+
+- **Spawning** — pay the unit's cost in an owned village; blocked if the village tile is occupied or the village's unit
+  capacity (`1 + level`) is full.
+- **Upgrade** — `2×level` wood + `level` stone + `2×level` money (level 1: 2 wood + 1 stone + 2 money). Raises income,
+  capacity and territory.
+- **Territory radius** — level 1 → 1, 2-4 → 2, 5+ → 3.
+- **Building slots** — a village supports as many buildings as its level. Farms and granaries use no slot.
+- **Wall** — 20 money + 15 stone + 5 ore, needs *Defense*. A walled village gives its units +3 defense and must be
+  breached by siege before it can be downgraded.
+- **Road** — 5 wood + 2 stone + 10 money, needs *Roads*. Connects a tile to an adjacent own road, port or village (a
+  road must link back to an own village through the road/port/bridge network).
+- **Bridge** — 10 wood + 15 money + 5 stone, needs *Bridges*. On a water tile between two land hexes: walkable by land
+  units, ships still sail under it, connects roads. Not on a port or temple; ports and temples not on a bridge.
+- **Port connections** — own ports of one stretch of own water connect automatically (light-blue route); villages
+  reached through a port route count as road-connected and the route halves move cost for the owner. Connections are
+  recomputed live.
+- **Repair** — a damaged own building (buildings have 2 hp) is repaired for 2 wood + 2 stone + 2 ore + 3 money.
+- **Demolish** — destroys an own building for 5 money and frees the slot (the AI uses this to make room for a granary).
+- **Capture** — a captured village keeps its stock and granary food; one captured with nothing in stock starts like a
+  capital (3 wood, 2 stone, 25 food).
+
+## Skills
+
+The skill tree is shared; skills are bought with money. Cost = `3 × level + 2 × opened skills`. A level-2 skill needs
+its parent first. Opening a skill scores 15. Skills marked † also need an own university.
+
+| Skill         | Lvl | Parent      | Effect                                                                            |
+|---------------|-----|-------------|-----------------------------------------------------------------------------------|
+| Climbing      | 1   | —           | Units can enter mountains                                                         |
+| Smithery      | 2   | Climbing    | Mines on owned mountain tiles                                                     |
+| Swordsman     | 2   | Climbing    | Spawn swordsmen                                                                   |
+| Water         | 1   | —           | Ports on owned water tiles                                                        |
+| Navigation    | 2   | Water       | Units on ports become ships; ships travel water and land on coasts                |
+| Water temples | 2   | Water       | Water temples; own units/buildings near one are immune to storm damage (radius 1-3 by level) |
+| Forestry      | 1   | —           | Sawmills on owned land near forests                                               |
+| Forest temple | 2   | Forestry    | Forest temples; own units/buildings near one are spared by earthquakes (radius 1-3 by level) |
+| Roads         | 2   | Forestry    | Build roads                                                                       |
+| Science       | 1   | —           | Miss chance 5%; allows a university                                               |
+| Geology †     | 2   | Science     | Mines give +1 stone and +1 ore                                                    |
+| Engineering † | 2   | Science     | Buildings in a village with a university cost ~10% less wood and stone            |
+| Medicine †    | 2   | Science     | Units on the tiles of a village with a university heal +10 HP more                |
+| Shields       | 1   | —           | Spawn shields                                                                     |
+| Defense       | 2   | Shields     | Village walls                                                                     |
+| Catapult      | 2   | Shields     | Spawn catapults                                                                   |
+| Riding        | 1   | —           | Spawn riders                                                                      |
+| Bridges       | 2   | Riding      | Build bridges                                                                     |
+| Knights       | 2   | Riding      | Spawn knights                                                                     |
+| Agriculture   | 1   | —           | Farms                                                                             |
+| Granary       | 2   | Agriculture | Granaries next to farms                                                           |
+| Agronomy †    | 2   | Agriculture | Farms in a village with a university give +1 food, and 1 food in winter           |
+
+## Buildings
+
+Placed on owned tiles claimed by one of your villages, with no settlement or building; each needs its skill and a free
+village slot (farms and granaries need none). No building produces money. Buildings have 2 hp.
+
+| Building      | Cost                          | Skill         | Placement                                                    | Effect                                                                        |
+|---------------|-------------------------------|---------------|--------------------------------------------------------------|-------------------------------------------------------------------------------|
+| Sawmill       | 10 money                      | Forestry      | land tile adjacent to a forest                               | +1 wood per adjacent forest per level                                         |
+| Mine          | 15 money                      | Smithery      | mountain tile                                                | +1 stone and +1 ore per level (+1 each with Geology)                          |
+| Port          | 10 wood + 30 money + 2 ore    | Water         | owned water tile next to your own land                       | creates and upgrades ships                                                    |
+| Temple        | 10 stone + 30 money           | Water temples | water tile                                                   | grows +1 level every 2 turns (max 4); 10/15/20/25 score at game end           |
+| Forest temple | 10 stone + 30 money           | Forest temple | forest tile                                                  | same as temple; protects against earthquakes                                  |
+| Farm          | 15 money + 5 wood             | Agriculture   | own empty land tile (no forest/mountain/water; road is fine), no enemy unit | +2 food per round; 0 in winter (see [Food](#food))             |
+| Granary       | 20 money + 10 wood + 10 stone | Granary       | own empty land tile next to one of your farms, no enemy unit | stores up to 50 food unused by adjacent farms                                 |
+| University    | 40 money + 10 stone + 5 ore   | Science       | own empty land tile (no forest/mountain/water) of a level 5+ village; one per village; uses a slot | unlocks Geology, Agronomy, Engineering, Medicine; 2 money upkeep |
+
+A builder ([Villagers](tribes/Villagers.md)) can place a sawmill, mine, port or bridge without the skill.
+
+## Economy
+
+Five resources: **money**, **wood**, **stone**, **ore**, **food**. Money belongs to the player; the rest is held by
+**villages**. Villages joined by roads or port routes form a **network** and pool their stock (the same network shares
+food); an unconnected village uses only its own stock.
+
+**Start:** 8 money for the player; the capital has 3 wood, 2 stone, 0 ore and 25 food; other villages start empty.
+
+**Who pays:** an action on a village's territory (building, repair, spawn, upgrade, wall, port, ship upgrade, bridge,
+road, trap) draws wood/stone/ore/food from that village's network — the village first, then the rest of the network
+(most developed first). On unclaimed land the nearest own village pays. A road also draws on the networks it joins.
+Skills, disbanding, demolishing and pirate deals cost money only.
+
+**Income** is collected at the end of each round, after all players have moved:
+
+- **Money** — each village yields `max(0, 3 + 2 × level − upkeep) + 1` where the `+1` is a bonus for a village
+  connected to another own village. Upkeep = money upkeep of the units it raised (see [Units](#units)) plus **1** for
+  every road tile, sawmill, farm, granary and mine it pays for (university 2; the claiming village pays, otherwise the
+  nearest own one). An enemy unit standing on a village zeroes its income and stops its buildings' production.
+- **Wood** — sawmills. **Stone** and **Ore** — mines. **Food** — farms (see below).
+
+The resource bar always shows money and its income; wood, stone, ore and food show the stock and income of the
+**selected village's network**. Food status is shown per village in the selected-cell panel.
+
+## Food
+
+Each village eats `ceil(level / 2)` food a round. Each unit raised by a village (its home village) also eats: warrior,
+archer, rider 1; shield 2; swordsman, knight, catapult and every special unit 3. Farms yield 2 (3 with Agronomy in a
+village with a university; 0 in winter, 1 with Agronomy there; halved in a drought).
+
+At the end of each round (after income), for every player and food network:
+
+1. Villages are fed one by one, the most developed first (level, then name); each village eats first, then its units,
+   hungriest first. They eat from the network's farms — those **not** adjacent to a granary first.
+2. Food left on a farm adjacent to a granary is stored there (the emptiest first, capacity **50**; overflow lost).
+   Other leftover farm food is lost.
+3. Anything still short is taken from the network's granaries (fullest first), then from the food its villages hold
+   (the capital's starting 25). Nothing crosses networks; networks with the smaller shortage are served first.
+4. A village that stays short is **starving** (red "Starvation" label, no HP loss). A unit that stays short loses the
+   missing share of **10 HP** (rounded, never below 1): a 3-food unit that got 2 loses 3. The state clears the first
+   round everything is fed.
+
+Farms and granaries are land improvements. Catapults destroy them; an enemy unit standing on one can **burn** it
+(Burn farm / Burn granary: destroyed at once, the unit's turn is spent). An enemy on a road can **destroy** the road (a
+bridge on it too; the unit's turn is spent; a farm or granary on the same tile must be burned first), cutting food
+networks. A destroyed or burned granary loses its food. The AI also cuts roads that are the only link between two
+enemy villages.
+
+## Seasons
+
+The game starts in spring; each season lasts **6 turns** (spring 1-6, summer 7-12, autumn 13-18, winter 19-24, then
+again). The HUD shows e.g. "Spring 2/6". Seasons change terrain textures.
+
+- **Winter — ice.** Water tiles next to land with no port or bridge freeze into **ice**: walkable like land, but no
+  roads, traps or buildings, and not a shore for ports/bridges. A ship on a freezing tile lands as a normal unit; a
+  pirate ship there disappears. Ships cannot cross ice.
+- **Winter — farms** give nothing (Agronomy 1). Granaries keep their stock.
+- **Spring — thaw.** Ice melts; units still standing on ice are lost.
+
+## Weather
+
+From turn 9, every 3rd turn (9, 12, 15, …) an attempt succeeds with **30%** unless 2 events are already active. A random
+type (storm, drought, earthquake) appears on a random valid tile (none valid → the attempt fails). Each event has a
+centre, a radius and a lifetime; the HUD lists them as `Name N/M`, and tapping one centres the map. Everyone is told
+when an event starts and ends. Weather is part of saved games and multiplayer state. Tuning: `WEATHER_RULES`
+(`src/game/weather/weather.ts`).
+
+- **Storm** — 6 turns, a random water tile, radius 2-4. Every turn each ship and pirate ship in scope takes **10**
+  damage and every port 1 damage on every second turn; leaving a water tile in scope costs 2×. Each turn the centre
+  drifts to another water tile with 50%. Own ships and ports within an own water temple's radius are immune.
+- **Drought** — 5 turns, a random land tile, radius 2-4. Farms and mines in scope produce half (rounded up, min 1).
+- **Earthquake** — 1 turn, a random mountain tile, radius 1-3. Each building in scope is destroyed with 60% and each
+  unit takes **20** damage with 60%. Villages and walls are unaffected; own buildings and units within an own forest
+  temple's radius are spared.
+
+### Lightning and fire
+
+**Lightning** has its own schedule: from turn 9, every 2nd turn (9, 11, 13, …), **15%**, independent of the 2-event
+limit. It lasts 1 turn and strikes one random tile (radius 0). Tuning: `WEATHER_RULES.lightning`, `FIRE_RULES`
+(`src/game/weather/fire.ts`).
+
+- A **forest** catches fire with 80%; a **unit** takes 40-60 damage; a **building** (sawmill, mine, port, farm,
+  granary) or a **bridge** always catches fire (temples and universities are spared).
+
+**Fire** acts at round end:
+
+- A burning forest burns 3 rounds, then becomes land of its biome; a unit on it takes **10** per round.
+- A burning building takes 1 damage per round (2 hp); a burning bridge is lost after 2 rounds.
+- Each forest next to a burning forest or building catches fire with 50% per round.
+- A unit on or next to a burning tile can **Extinguish fire** (spends its whole turn).
+
+## Bonuses and bottles
+
+**Bonus hexes** (golden marker): `players + 1` on random land cells, at least 4 hexes apart and from starting villages.
+
+- A unit standing on a bonus at the start of the owner's turn can **Get the bonus**; that exhausts the unit for the
+  turn. Each bonus is claimed once.
+- Type (random): **+15 money**; **resources** (+10 wood, +5 stone, +5 ore to the nearest village); **free village
+  upgrade** of the closest village (else +15 money); **free skill** (random unopened, ignoring the parent, never a
+  university skill without one; else +15 money); **explorer** — a semi-transparent warrior makes up to 25 exploring
+  moves, then disappears.
+- The AI claims bonuses automatically and sends free units toward unexplored bonus hexes.
+
+**Bottles** float onto a random free (not owned) water hex: every 2nd turn, 20% chance; several can exist, each lasts 5
+turns. A ship on a bottle tile can **Get bottle** next turn (the ship's whole turn); one effect at random: **+50
+money**, a **random unopened skill** (never one needing a university you lack) or **+20 ship HP**. The AI collects
+bottles at the start of its turn.
+
+## Score
+
+Total score = accumulated action score + current board score. A game is rated 1-3 stars by the winner's score.
+
+**Board score** (what you own right now): explored tile 3 · village 50 · building 15 (temples give none) · bridge 5 ·
+units by type (see [Units](#units) and the tribe pages: warrior 5, rider 6, archer 6, specials 7-10).
+At game end each own water or forest temple scores 10 / 15 / 20 / 25 by level.
+
+**Action score** (immediate): capture a village 50 · upgrade a village 20 · kill a unit 25 · kill a pirate 30 ·
+combo kill 30 · open a skill 15 · quick capture win `players × 20`.
+
+**Stars:**
+
+- **Capture** — 3★: score ≥ `500 + 200 × players` within the quick-capture turns; 2★: ≥ `400 + 150 × players`.
+- **30 Turns** — 3★: score ≥ `1000 + 800 × players`; 2★: ≥ `800 + 600 × players`.

@@ -10,7 +10,7 @@ Core rules:
 ## Overview
 
 2D turn-based strategy on a hex map, singleplayer or multiplayer. The gameplay rules and content are documented in
-`GAME.md`.
+`wiki/Game.md` (tribe pages in `wiki/tribes/`).
 
 ## Tech stack
 
