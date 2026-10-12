@@ -11,6 +11,7 @@ export enum SkillId {
   SCIENCE = 'science',
   ROADS = 'roads',
   SHIELDS = 'shields',
+  ARCHER = 'archer',
   DEFENSE = 'defense',
   CATAPULT = 'catapult',
   RIDING = 'riding',

@@ -84,9 +84,10 @@ describe('food resource', () => {
 
   it('defines the unit food upkeep table', () => {
     for (const t of [UnitType.WARRIOR, UnitType.ARCHER, UnitType.RIDER] as const) expect(unitFoodUpkeep(t)).toBe(1);
-    for (const t of [UnitType.SWORDSMAN, UnitType.KNIGHT, UnitType.CATAPULT, UnitType.STALKER, UnitType.BUILDER, UnitType.BANNER, UnitType.BERSERKER, UnitType.TRAPPER, UnitType.STORMCALLER, UnitType.STUNNER] as const) {
+    for (const t of [UnitType.SWORDSMAN, UnitType.KNIGHT, UnitType.CATAPULT, UnitType.STALKER, UnitType.BUILDER, UnitType.BERSERKER, UnitType.TRAPPER, UnitType.STORMCALLER, UnitType.STUNNER] as const) {
       expect(unitFoodUpkeep(t)).toBe(3);
     }
+    expect(unitFoodUpkeep(UnitType.BANNER)).toBe(1);
   });
 });
 
@@ -207,7 +208,7 @@ describe('granaries', () => {
     expect(tileAt(map, 1, 0)!.building).toEqual({ kind: BuildingKind.GRANARY, level: 1, food: 0 });
   });
 
-  it('store the unused food of adjacent farms at round end, capped at 50', () => {
+  it('store the unused food of adjacent farms at round end, capped at 25', () => {
     const { map, p } = setup();
     const g = tileAt(map, 1, 0)!;
     g.building = { kind: BuildingKind.GRANARY, level: 1, food: 0 };
@@ -215,7 +216,7 @@ describe('granaries', () => {
     tileAt(map, 0, 1)!.building = { kind: BuildingKind.FARM, level: 1 };
     applyFood(map, p);
     expect(g.building!.food).toBe(3); // 2 farms (4) minus the village (1)
-    g.building!.food = 47;
+    g.building!.food = 22;
     applyFood(map, p);
     expect(g.building!.food).toBe(GRANARY_CAPACITY);
   });
@@ -741,5 +742,33 @@ describe('round end', () => {
       map, players, mode: GameMode.CAPTURE, turn: 1, currentPlayerIndex: 0, gameOver: false, winnerIndex: null, expectedTurns: 10, bonusAwarded: false,
     });
     expect(village.settlement!.stock).toEqual({ wood: 9, stone: 8, ore: 6, food: 11 });
+  });
+});
+
+describe('income events', () => {
+  function roundIncome(map: GameMap, p: Player): Extract<ReturnType<Simulator['drainEvents']>[number], { type: GameEventType.INCOME }>[] {
+    const sim = new Simulator(map, [p], GameMode.CAPTURE, { rng: () => 0.5 });
+    sim.startGame();
+    sim.drainEvents();
+    sim.applyCommand({ type: CommandType.END_TURN });
+    return sim.drainEvents().filter((e): e is Extract<typeof e, { type: GameEventType.INCOME }> => e.type === GameEventType.INCOME);
+  }
+
+  it('announces a village money, a mine stone + ore, a sawmill wood and a granary food gain', () => {
+    const { map, p } = setup();
+    tileAt(map, 1, 0)!.building = { kind: BuildingKind.MINE, level: 1 };
+    const sawmill = tileAt(map, -1, 0)!;
+    sawmill.building = { kind: BuildingKind.SAWMILL, level: 1 };
+    for (const [q, r] of [[-2, 0], [-1, -1]] as const) tileAt(map, q, r)!.terrain = TileType.GrasslandForest;
+    tileAt(map, 1, -1)!.building = { kind: BuildingKind.FARM, level: 1 };
+    tileAt(map, 0, -1)!.building = { kind: BuildingKind.GRANARY, level: 1, food: 0 };
+    const events = roundIncome(map, p);
+    const at = (q: number, r: number) => events.find((e) => e.q === q && e.r === r);
+    expect(at(0, 0)).toMatchObject({ playerIndex: 0, money: expect.any(Number) });
+    expect(at(0, 0)!.money).toBeGreaterThan(0);
+    expect(at(1, 0)).toMatchObject({ stone: 1, ore: 1 });
+    expect(at(1, 0)!.wood).toBeUndefined();
+    expect(at(-1, 0)).toMatchObject({ wood: 2 });
+    expect(at(0, -1)!.food).toBeGreaterThan(0);
   });
 });

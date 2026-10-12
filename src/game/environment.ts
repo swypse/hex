@@ -53,6 +53,24 @@ export class Environment {
     }
   }
 
+  /** A lightning bolt called by a stormcaller: strikes `tile` at once with the
+   *  usual lightning effects (fire, unit damage) and is announced like a
+   *  random strike. */
+  strikeLightning(tile: { q: number; r: number }): void {
+    const strike: WeatherEvent = {
+      id: `${WeatherType.LIGHTNING}@${this.turn}:${tile.q},${tile.r}`,
+      type: WeatherType.LIGHTNING,
+      q: tile.q,
+      r: tile.r,
+      radius: 0,
+      startTurn: this.turn,
+      age: 1,
+      lifetime: WEATHER_RULES.lightning.lifetime,
+    };
+    (this.map.weather ??= []).push(strike);
+    this.announceWeather(strike);
+  }
+
   /** Once the turn counter has advanced: events age and expire, storms drift,
    *  and the periodic spawn attempt may bring a new event (an earthquake strikes
    *  at once). */

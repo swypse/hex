@@ -33,13 +33,15 @@ export const COUNTER_SCALE = 2.25;
 /** A shield's counter-attack multiplier. Kept at its old strength: shields
  *  already retaliate hard, so they do not get COUNTER_SCALE on top. */
 export const SHIELD_COUNTER_SCALE = 2;
+/** Attack multiplier of a stealthed unit's strike (the stalker's sneak attack). */
+export const SNEAK_ATTACK_MULT = 2;
 
 export function missChanceFor(player: Player): number {
   return hasSkill(player, SkillId.SCIENCE) ? SCIENCE_MISS_CHANCE : MISS_CHANCE;
 }
 
 /** Raw attack force: attack × current hp ratio (no defense applied). The
- *  attack value includes banner-aura (+5) and berserker-rage (+20) bonuses. */
+ *  attack value includes banner-aura (+5) and berserker-rage (+15) bonuses. */
 export function attackDamage(attacker: Unit): number {
   return Math.round((effectiveAttack(attacker) * attacker.hp) / unitMaxHp(attacker));
 }
@@ -68,12 +70,14 @@ export interface CombatResolution {
  *  high defense force, so attackers think twice). */
 export function resolveCombat(map: GameMap | null, attacker: Unit, target: MapTile): CombatResolution {
   const defender = target.unit!;
-  // A stealthed stalker's strike ignores the defender's armor entirely.
-  const def = attacker.isStealthed === true ? 0 : (defender.defense ?? 0);
+  // A stealthed stalker's strike ignores the defender's armor entirely and
+  // hits for double (sneak attack).
+  const sneak = attacker.isStealthed === true;
+  const def = sneak ? 0 : (defender.defense ?? 0);
   // Banner aura / berserker rage raise the attack power. Ships receive no
   // bonuses (attackBonus returns 0 at sea), so their numbers stay unchanged.
   const bonus = attackBonus(attacker, map);
-  const attackForce = ((shipAttack(attacker) + bonus) * attacker.hp) / unitMaxHp(attacker);
+  const attackForce = ((shipAttack(attacker) + bonus) * (sneak ? SNEAK_ATTACK_MULT : 1) * attacker.hp) / unitMaxHp(attacker);
   const defenseForce =
     (def * defender.hp) / unitMaxHp(defender) *
     defenseBonusFor(map, defender, target);
@@ -81,7 +85,7 @@ export function resolveCombat(map: GameMap | null, attacker: Unit, target: MapTi
   if (total <= 0) return { attackerDamage: 0, counterDamage: 0 };
   // The damage scale keeps the legacy "crew attack" term (attacker.attack)
   // so a ship's counter math is unchanged, while bonuses apply on top.
-  const scaleAttack = attacker.attack + bonus;
+  const scaleAttack = (attacker.attack + bonus) * (sneak ? SNEAK_ATTACK_MULT : 1);
   const attackerDamage = Math.round((attackForce / total) * scaleAttack * COMBAT_SCALE);
   const counterMult = defender.type === UnitType.SHIELD && !isShip(defender) ? SHIELD_COUNTER_SCALE : COUNTER_SCALE;
   const counterDamage = Math.round((defenseForce / total) * def * COMBAT_SCALE * counterMult);

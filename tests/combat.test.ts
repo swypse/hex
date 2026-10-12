@@ -747,7 +747,8 @@ describe('special-unit combat hooks', () => {
     const target = map.tiles[1]!;
     target.unit = unitOf('t', UnitType.SWORDSMAN, 1, 1, 0); // defense 16, full hp
     const { attackerDamage, counterDamage } = resolveCombat(map, stalker, target);
-    expect(attackerDamage).toBe(Math.round(10 * COMBAT_SCALE));
+    // Sneak attack: the stalker's attack (20) is doubled and the 16 defense ignored.
+    expect(attackerDamage).toBe(Math.round(20 * 2 * COMBAT_SCALE));
     expect(counterDamage).toBe(0);
   });
 

@@ -607,7 +607,7 @@ describe('AI patterns', () => {
       tile(0, 0, { owner: 1, level: 1, captureReady: false }, garrison, 1),
       tile(1, 0, null, knight('enemy', 0, 1, 0)),
     );
-    const result = guardGarrisonAttack(map, player(100), garrison, map.tiles[1]!);
+    const result = guardGarrisonAttack(map, player(100, [SkillId.ARCHER]), garrison, map.tiles[1]!);
     expect(result.kind).toBe(GarrisonGuardKind.ATTACK);
     if (result.kind === GarrisonGuardKind.ATTACK) expect(result.guardType).toBe(UnitType.ARCHER);
   });

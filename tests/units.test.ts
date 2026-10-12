@@ -261,7 +261,7 @@ describe('unitMaintenance', () => {
 
 describe('special units', () => {
   const cases: Array<[UnitType, number, number, number, number, number, number, number, number]> = [
-    [UnitType.STALKER, 20, 10, 1, 20, 0, 9, 0, 2],
+    [UnitType.STALKER, 20, 20, 1, 30, 0, 9, 0, 2],
     [UnitType.BUILDER, 8, 10, 1, 40, 0, 15, 0, 0],
     [UnitType.BANNER, 8, 10, 1, 30, 0, 7, 0, 2],
     [UnitType.BERSERKER, 10, 26, 1, 50, 8, 10, 0, 2],
@@ -273,7 +273,7 @@ describe('special units', () => {
     it(`defines the ${type} unit`, () => {
       expect(UNIT_TYPES[type]).toEqual({ movePoints: move, attack: atk, attackDistance: range, maxHp: hp, defense: def, price, priceWood: wood, priceOre: ore });
       expect(UNIT_TYPE_NAMES[type]).toBeTruthy();
-      expect(unitMaintenance(makeUnit(0, type, 0, 0))).toBeGreaterThanOrEqual(2);
+      expect(unitMaintenance(makeUnit(0, type, 0, 0))).toBeGreaterThanOrEqual(type === UnitType.BANNER ? 1 : 2);
     });
   }
 });

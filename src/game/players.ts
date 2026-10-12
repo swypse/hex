@@ -28,6 +28,8 @@ export interface Player {
   strategy?: AiStrategyState;
   /** Current squad operation (AI only), rebuilt at the start of each AI turn. */
   operation?: AiOperation | null;
+  /** Turn from which the stormcaller's Call lightning is available again (unset: ready). */
+  lightningReadyTurn?: number;
 }
 
 function startingResourcesFor(tribe: Tribe): PlayerResources {

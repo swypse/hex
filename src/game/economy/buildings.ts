@@ -407,7 +407,7 @@ function payAndPlaceBuilding(map: GameMap, tile: MapTile, kind: BuildingKind, pl
 }
 
 /** What each producing building of the player yields per round. */
-function buildingYields(map: GameMap, player: Player): { tile: MapTile; wood: number; stone: number; ore: number }[] {
+export function buildingYields(map: GameMap, player: Player): { tile: MapTile; wood: number; stone: number; ore: number }[] {
   const out: { tile: MapTile; wood: number; stone: number; ore: number }[] = [];
   for (const tile of map.tiles) {
     if (tile.ownedBy !== player.index || !tile.building) continue;

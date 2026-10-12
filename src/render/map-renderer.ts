@@ -54,6 +54,21 @@ const PIRATE_DEAL_HPBAR_GAP = 4;
 const VILLAGE_LABEL_FONT_SIZE = FontSize.VERY_SMALL;
 /** Overlay stacking: village labels sit below the unit standing on the village,
  *  and both sit below everything else (hp bars, fire, markers) at zIndex 0. */
+/** Full up-down cycle of a ship's bob, a bonus marker's (a little faster), and their half-height in px. */
+const SHIP_BOB_MS = 2600;
+const BONUS_BOB_MS = 1900;
+const BOB_AMPLITUDE = 2.5;
+
+/** A sprite that bobs up and down around `baseY`; ships also move their selection glow. */
+interface BobEntry {
+  sprite: Sprite;
+  key: string;
+  baseY: number;
+  periodMs: number;
+  amplitude: number;
+  ship: boolean;
+}
+
 const OVERLAY_Z_VILLAGE_LABEL = -2;
 const OVERLAY_Z_UNIT_MIRROR = -1;
 /** Attack markers above a mirrored unit, still below hp bars (0). */
@@ -152,7 +167,7 @@ export class MapView {
   private hpOverrides = new Map<string, number>();
   /** Height of the hp `hp/maxHp` label, measured when the first bar is drawn. */
   private unitOverrides: Map<string, Unit | null> = new Map();
-  private shipBobs: { sprite: Sprite; key: string; baseY: number }[] = [];
+  private shipBobs: BobEntry[] = [];
   private shipBobRemove: (() => void) | null = null;
   private shipBusy = new Set<string>();
   /** True while the camera is being moved (drag / zoom / pan); the decorative
@@ -339,7 +354,7 @@ export class MapView {
     const labels: { tile: MapTile; owner: number; el: Container; world: { x: number; y: number } }[] = [];
     const granaryLabels: { tile: MapTile; owner: number; world: { x: number; y: number } }[] = [];
     const exclamations: { el: Container; world: { x: number; y: number } }[] = [];
-    const shipBobs: { sprite: Sprite; key: string; baseY: number }[] = [];
+    const shipBobs: BobEntry[] = [];
 
     for (const tile of map.tiles) {
       const tv = this.tileViews.get(axialKey(tile))!;
@@ -376,8 +391,12 @@ export class MapView {
         }
         if (unit.type === UnitType.PIRATE || unit.shipLevel !== undefined) {
           const sprite = tv.unitSprite;
-          if (sprite) shipBobs.push({ sprite, key: axialKey(tile), baseY: y });
+          if (sprite) shipBobs.push({ sprite, key: axialKey(tile), baseY: y, periodMs: SHIP_BOB_MS, amplitude: BOB_AMPLITUDE, ship: true });
         }
+      }
+      // Bonus markers bob like ships, a little faster.
+      if (tile.bonus && explored && tv.bonusSprite) {
+        shipBobs.push({ sprite: tv.bonusSprite, key: axialKey(tile), baseY: y, periodMs: BONUS_BOB_MS, amplitude: BOB_AMPLITUDE, ship: false });
       }
       // Damaged buildings (hp < max) show an hp bar + text like a unit's.
       const building = tile.building;
@@ -1795,7 +1814,7 @@ export class MapView {
     this.exclamationAnimRemove = () => ticker.remove(fn);
   }
 
-  /** Permanent gentle up-down bob for player ship sprites. Skipped while a ship
+  /** Permanent gentle up-down bob for ship and bonus sprites. Skipped while a ship
    * is being slid or lunged by combat/movement animations. */
   private startShipBob(): void {
     if (this.shipBobRemove || this.shipBobs.length === 0) return;
@@ -1808,12 +1827,12 @@ export class MapView {
         this.shipBobRemove = null;
         return;
       }
-      const phase = (this.animNow() - start) / 2600;
-      const offset = Math.sin(phase * Math.PI * 2) * 2.5;
+      const elapsed = this.animNow() - start;
       for (const b of this.shipBobs) {
-        if (this.shipBusy.has(b.key) || b.sprite.destroyed) continue;
-        b.sprite.position.y = b.baseY + offset;
-        this.syncGlowSprite(b.key);
+        if (b.sprite.destroyed) continue;
+        if (b.ship && this.shipBusy.has(b.key)) continue;
+        b.sprite.position.y = b.baseY + Math.sin((elapsed / b.periodMs) * Math.PI * 2) * b.amplitude;
+        if (b.ship) this.syncGlowSprite(b.key);
       }
     };
     ticker.add(fn);

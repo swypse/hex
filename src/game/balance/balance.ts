@@ -56,6 +56,7 @@ export const UNIT_SKILL: Partial<Record<UnitType, SkillId>> = {
   rider: SkillId.RIDING,
   swordsman: SkillId.SWORDSMAN,
   shield: SkillId.SHIELDS,
+  archer: SkillId.ARCHER,
   catapult: SkillId.CATAPULT,
   knight: SkillId.KNIGHTS,
 };
@@ -113,6 +114,8 @@ export interface StrikeContext {
   bonus?: number;
   /** A stealthed stalker's first strike ignores the defender's defense. */
   ignoreDefense?: boolean;
+  /** A stealthed stalker's first strike also hits for double. */
+  sneak?: boolean;
   /** Attack distance of this exchange (defender counters only if it reaches). */
   distance: number;
 }
@@ -135,7 +138,7 @@ export function strike(
   ctx: StrikeContext,
 ): { dmg: number; counter: number } {
   const rage = isRaging(attType, attHp, att.maxHp) ? RAGE_BONUS : 0;
-  const attack = att.attack + rage + (ctx.bonus ?? 0);
+  const attack = (att.attack + rage + (ctx.bonus ?? 0)) * (ctx.sneak ? 2 : 1);
   const defense = ctx.ignoreDefense ? 0 : (def.defense ?? 0);
   const attackForce = (attack * attHp) / att.maxHp;
   const defenseForce = (defense * defHp) / def.maxHp;
@@ -198,6 +201,7 @@ export function duel(
     return strike(attType, defType, att, def, attHp, defHp, {
       distance,
       ignoreDefense: attType === UnitType.STALKER && first,
+      sneak: attType === UnitType.STALKER && first,
     });
   };
 

@@ -24,6 +24,7 @@ export enum CommandType {
   TRAP = 'trap',
   EXTINGUISH = 'extinguish',
   STORM = 'storm',
+  LIGHTNING = 'lightning',
   STUN = 'stun',
   CHOOSE_VETERAN_BONUS = 'chooseVeteranBonus',
   END_TURN = 'endTurn',

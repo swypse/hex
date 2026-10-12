@@ -13,12 +13,17 @@ import { coastExposedTile } from '../ai-situation';
 import { isShip } from '../../units/ship';
 import { TRIBE_SPECIAL_UNIT } from '../../tribes';
 import { stormTargetShips } from '../../units/storm';
+import { bestLightningVillage } from '../ai-lightning';
+import { LIGHTNING_COST, lightningReady } from '../../units/lightning';
 import { flagsFor } from '../ai-flags';
 import { eatsFarmMaterials } from '../../economy/food';
 import { AiActionType, BuildingKind, SkillId, UnitType } from '@enums';
 import { tileAt } from '../../map/tile-index';
 
 import { type AiPattern, enemyCanReach, friendlyUnitsWithin, isFrontierTile, isLikelyLethal, isSupportUnit, key, nearestEnemyDistanceFrom, specialUnitWanted } from '../ai-pattern-helpers';
+
+/** Money the AI keeps after paying for a lightning. */
+const LIGHTNING_MONEY_RESERVE = 10;
 
 export const GROWTH_PATTERNS: AiPattern[] = [
   {
@@ -167,7 +172,7 @@ export const GROWTH_PATTERNS: AiPattern[] = [
   {
     id: 'special-unit-abilities',
     priority: 20,
-    evaluate({ map, player }): AiAction[] | null {
+    evaluate({ map, player, state, turn }): AiAction[] | null {
       // Storm when enemy or pirate ships sit on a stormcaller's village waters.
       // Stalker stealth and stunner stun have their own higher-priority
       // patterns (stalker-restealth, stunner-prefer-stun).
@@ -177,6 +182,17 @@ export const GROWTH_PATTERNS: AiPattern[] = [
         const idle = !u.hasMoved && !u.hasAttacked && !u.hasHealed;
         if (u.type === UnitType.STORMCALLER && idle && stormTargetShips(map, u).length > 0) {
           return [{ type: AiActionType.STORM, unitId: u.id }];
+        }
+      }
+      // Call lightning onto the most worthwhile explored enemy village once recharged,
+      // keeping a small purse for spawns.
+      if (!state.lightningCalled && lightningReady(player, turn ?? 0) && player.resources.money >= LIGHTNING_COST + LIGHTNING_MONEY_RESERVE) {
+        for (const t of map.tiles) {
+          const caller = t.unit;
+          if (!caller || caller.owner !== player.index || caller.type !== UnitType.STORMCALLER) continue;
+          if (caller.shipLevel !== undefined || (caller.stunTurns ?? 0) >= 1) continue;
+          const village = bestLightningVillage(map, player.index, caller);
+          if (village) return [{ type: AiActionType.LIGHTNING, unitId: caller.id, q: village.q, r: village.r }];
         }
       }
       return null;

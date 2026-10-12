@@ -111,6 +111,7 @@ export class SpawnDialog extends PopupDialog {
     if (type === UnitType.KNIGHT && !hasSkill(player, SkillId.KNIGHTS)) out.push(t('spawn.reasonSkill', { skill: t('skill.knights.name') }));
     if (type === UnitType.SWORDSMAN && !hasSkill(player, SkillId.SWORDSMAN)) out.push(t('spawn.reasonSkill', { skill: t('skill.swordsman.name') }));
     if (type === UnitType.SHIELD && !hasSkill(player, SkillId.SHIELDS)) out.push(t('spawn.reasonSkill', { skill: t('skill.shields.name') }));
+    if (type === UnitType.ARCHER && !hasSkill(player, SkillId.ARCHER)) out.push(t('spawn.reasonSkill', { skill: t('skill.archer.name') }));
     if (type === UnitType.CATAPULT && !hasSkill(player, SkillId.CATAPULT)) out.push(t('spawn.reasonSkill', { skill: t('skill.catapult.name') }));
     return out;
   }

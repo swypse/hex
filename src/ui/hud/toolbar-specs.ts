@@ -15,6 +15,7 @@ import { bottleCollectableFor } from '../../game/map/bottles';
 import { trapCells, TRAP_COST } from '../../game/units/traps';
 import { stormEligible } from '../../game/units/storm';
 import { extinguishCells } from '../../game/weather/fire';
+import { LIGHTNING_COST, lightningTurnsLeft, lightningVillages } from '../../game/units/lightning';
 import { adjacentEnemyVillages } from '../../game/units/stalker';
 import { BuildingKind, OverlayKind, UnitType } from '@enums';
 import { tileAt } from '../../game/map/tile-index';
@@ -163,6 +164,16 @@ export function toolbarSpecs(): ToolbarSpec[] {
     }
     if (extinguishCells(map, unit).length > 0) {
       out.push({ key: 'extinguish', label: t('action.extinguish'), disabled: !idle, onClick: () => gameController.actions.beginExtinguish() });
+    }
+    if (unit.type === UnitType.STORMCALLER && unit.shipLevel === undefined) {
+      const left = lightningTurnsLeft(player, store.turn);
+      out.push({
+        key: 'lightning',
+        label: left > 0 ? t('action.lightningRecharging', { turns: left }) : t('action.lightning', { cost: LIGHTNING_COST }),
+        disabled: left > 0 || player.resources.money < LIGHTNING_COST || lightningVillages(map, player.index, unit).length === 0,
+        visibleWhenDisabled: true,
+        onClick: () => gameController.actions.beginLightning(),
+      });
     }
     if (unit.type === UnitType.STORMCALLER && stormEligible(map, unit)) {
       out.push({ key: 'storm', label: t('action.storm'), disabled: !idle, onClick: () => gameController.actions.stormSelected() });

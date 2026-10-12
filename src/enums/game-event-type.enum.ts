@@ -18,6 +18,7 @@ export enum GameEventType {
   SHIP_REVERTED = 'shipReverted',
   UNIT_DISBANDED = 'unitDisbanded',
   SCORE_FLY = 'scoreFly',
+  INCOME = 'income',
   KNIGHT_COMBO = 'knightCombo',
   VETERAN_PROMOTED = 'veteranPromoted',
   BONUS_CLAIMED = 'bonusClaimed',

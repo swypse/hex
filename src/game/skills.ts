@@ -109,11 +109,18 @@ export const SKILLS: Record<SkillId, SkillInfo> = {
     parent: SkillId.SHIELDS,
     description: t('skill.defense.desc'),
   },
+  archer: {
+    id: SkillId.ARCHER,
+    name: t('skill.archer.name'),
+    level: 1,
+    parent: null,
+    description: t('skill.archer.desc'),
+  },
   catapult: {
     id: SkillId.CATAPULT,
     name: t('skill.catapult.name'),
     level: 2,
-    parent: SkillId.SHIELDS,
+    parent: SkillId.ARCHER,
     description: t('skill.catapult.desc'),
   },
   riding: {
@@ -171,7 +178,7 @@ export const SKILLS: Record<SkillId, SkillInfo> = {
     id: SkillId.MEDICINE,
     name: t('skill.medicine.name'),
     level: 2,
-    parent: SkillId.SCIENCE,
+    parent: SkillId.SHIELDS,
     description: t('skill.medicine.desc'),
     requiresBuilding: BuildingKind.UNIVERSITY,
   },

@@ -61,6 +61,7 @@ function playToNavalStart(sim: Simulator, dir: TutorialDirector): void {
   expect(dir.currentStep()).toBe(TutorialStepId.OPEN_CLIMBING_SMITHERY);
   run(sim, dir, { type: CommandType.OPEN_SKILL, skill: SkillId.CLIMBING });
   run(sim, dir, { type: CommandType.OPEN_SKILL, skill: SkillId.SMITHERY });
+  run(sim, dir, { type: CommandType.OPEN_SKILL, skill: SkillId.ARCHER });
   expect(dir.currentStep()).toBe(TutorialStepId.BUILD_MINE);
   run(sim, dir, { type: CommandType.BUILD, q: 2, r: -2, kind: BuildingKind.MINE });
   expect(dir.currentStep()).toBe(TutorialStepId.SPAWN_ARCHER);
@@ -239,7 +240,7 @@ describe('TutorialDirector', () => {
     dir.start();
     dir.welcomeClosed();
     const human = sim.players[TUTORIAL_HUMAN]!;
-    human.skills.push(SkillId.FORESTRY, SkillId.CLIMBING, SkillId.SMITHERY, SkillId.WATER, SkillId.NAVIGATION);
+    human.skills.push(SkillId.FORESTRY, SkillId.CLIMBING, SkillId.SMITHERY, SkillId.ARCHER, SkillId.WATER, SkillId.NAVIGATION);
     run(sim, dir, { type: CommandType.MOVE, unitId: warriorUnit(sim).id, q: 1, r: -1 });
     run(sim, dir, { type: CommandType.UPGRADE_VILLAGE, q: 0, r: 0 });
     expect(dir.currentStep()).toBe(TutorialStepId.END_TURN1);

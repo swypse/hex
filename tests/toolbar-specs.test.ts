@@ -7,7 +7,7 @@ import { SeededRandom } from '../src/util/random';
 import { gameController } from '../src/controller/game-controller';
 import { useGameStore } from '../src/store/game-store';
 import { toolbarSpecs } from '../src/ui/hud/toolbar-specs';
-import { TileType } from '../src/game/map/tile-types';
+import { isLandType, TileType } from '../src/game/map/tile-types';
 import { hexNeighbors } from '../src/game/map/hex';
 import { UNIT_TYPES } from '../src/game/units/units';
 import { Tribe } from '../src/game/tribes';
@@ -505,7 +505,7 @@ describe('toolbarSpecs', () => {
     // Layout: A --road-- target -- B. Village A is the capital and holds the
     // materials; village B (whose territory the target tile belongs to) is empty.
     const landOf = (t: MapTile | undefined): MapTile | undefined =>
-    t && t.terrain === TileType.GrasslandLand && !t.settlement && !t.unit ? t : undefined;
+    t && isLandType(t.terrain) && !t.settlement && !t.unit ? t : undefined;
     const neighbors = (t: MapTile): (MapTile | undefined)[] => hexNeighbors(t).map((n) => tileAt(map, n.q, n.r));
     // Find any A --road-- target -- B chain of four empty land tiles.
     let chain: { target: MapTile; road: MapTile; a: MapTile; b: MapTile } | null = null;

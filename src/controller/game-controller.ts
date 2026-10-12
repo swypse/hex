@@ -19,6 +19,7 @@ import { type GameStateSnapshot } from '@/game/state';
 import { TileType } from '@/game/map/tile-types';
 import { trapCells } from '@/game/units/traps';
 import { extinguishCells } from '@/game/weather/fire';
+import { lightningVillages } from '@/game/units/lightning';
 import { Tribe, tribeById } from '@/game/tribes';
 import {
   buildTutorialMap, buildTutorialPlayers, TUTORIAL_CAPITAL, TUTORIAL_ENEMY_SHIP_ID, TUTORIAL_ENEMY_WARRIOR_ID,
@@ -122,6 +123,8 @@ class GameController {
     if (this.mapRoot) return;
     this.app = app;
     this.mapRoot = root;
+    // Effects added to the map root (floating text, smoke) carry a zIndex that must win over the map layers.
+    root.sortableChildren = true;
     this.edgeLayerTarget = edgeLayerTarget;
     let lastTurn = useGameStore.getState().turn;
     this.unsubSeason?.();
@@ -927,9 +930,10 @@ class GameController {
     if (!tile) return;
     // Placement modes (builder / trapper): a tap on a highlighted cell commits
     // the build/trap; any other tap cancels the placement.
-    if (this.actions.pendingPlacement || this.actions.pendingTrap || this.actions.pendingExtinguish) {
+    if (this.actions.pendingPlacement || this.actions.pendingTrap || this.actions.pendingExtinguish || this.actions.pendingLightning) {
       if (this.actions.placementKeys.has(axialKey(tile))) {
         if (this.actions.pendingPlacement) this.actions.buildAsBuilder(this.actions.pendingPlacement.kind, q, r);
+        else if (this.actions.pendingLightning) this.actions.lightningOn(q, r);
         else if (this.actions.pendingExtinguish) this.actions.extinguishOn(q, r);
         else this.actions.placeTrapOn(q, r);
         store.setSelection(null);
@@ -1344,6 +1348,11 @@ class GameController {
       if (unit && unit.owner === store.localPlayerIndex) {
         const p = store.players[store.localPlayerIndex]!;
         this.actions.placementKeys = new Set(builderBuildable(this.sim.map, tile!, this.actions.pendingPlacement.kind, p).map((t) => axialKey(t)));
+      }
+    } else if (this.actions.pendingLightning && store.selection) {
+      const caller = tileAt(this.sim.map, store.selection.q, store.selection.r)?.unit;
+      if (caller && caller.owner === store.localPlayerIndex) {
+        this.actions.placementKeys = new Set(lightningVillages(this.sim.map, store.localPlayerIndex, caller).map((t) => axialKey(t)));
       }
     } else if (this.actions.pendingExtinguish && store.selection) {
       const unit = tileAt(this.sim.map, store.selection.q, store.selection.r)?.unit;

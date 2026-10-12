@@ -17,6 +17,7 @@ export * from './buff-id.enum';
 export * from './builder-extra-kind.enum';
 export * from './building-kind.enum';
 export * from './capture-marker-side.enum';
+export * from './city-suffix.enum';
 export * from './client-message-type.enum';
 export * from './command-type.enum';
 export * from './compass-direction.enum';

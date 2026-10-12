@@ -6,10 +6,10 @@ import type { AiAction } from './ai/ai-types';
 import { touchBottle } from './map/bottles';
 import { buildBridge, buildBridgeIgnoringSkill } from './economy/bridges';
 import {
-  buildBuilding, buildBuildingIgnoringSkill, builderBuildable, type BuilderBuildKind, buildingIncomeByVillage,
+  buildBuilding, buildBuildingIgnoringSkill, builderBuildable, type BuilderBuildKind, buildingIncomeByVillage, buildingYields,
   burnBuilding, burnRoad, canUsePort, destroyBuilding, repairBuilding
 } from './economy/buildings';
-import { captureVillage, villageIncomeTotal } from './economy/capture';
+import { captureVillage, villageIncome, villageIncomeTotal } from './economy/capture';
 import { attackableTargets, missChanceFor, performAttack, performSiege } from './units/combat';
 import { knownTribesFor } from './discovery';
 import { type GameEvent } from './events';
@@ -35,6 +35,7 @@ import { adjacentEnemyVillages } from './units/stalker';
 import type { GameStateSnapshot } from './state';
 import { addStock, migrateLegacyResources, payAt } from './economy/stock';
 import { stormDamage, stormEligible, stormTargetShips } from './units/storm';
+import { LIGHTNING_COOLDOWN_TURNS, LIGHTNING_COST, lightningReady, lightningStrikeCell, lightningVillages } from './units/lightning';
 import { TileType } from './map/tile-types';
 import { canPlaceTrapOn, TRAP_COST, trapAlive, trapDamage } from './units/traps';
 import { applyVeteranBonus, canAttack, canDisband, canHeal, canMove, disbandCost, aiVeteranBonus, needsVeteranBonus, recordKill, canDealWithPirate, hasPirateDeal, healUnit, HEAL_AMOUNT, MEDICINE_HEAL_BONUS, movePoints, PIRATE_DEAL_COST, PIRATE_OWNER, type Unit } from './units/units';
@@ -72,6 +73,7 @@ export type Command =
   | { type: CommandType.ENABLE_STEALTH; unitId: string }
   | { type: CommandType.TRAP; unitId: string; q: number; r: number }
   | { type: CommandType.STORM; unitId: string }
+  | { type: CommandType.LIGHTNING; unitId: string; q: number; r: number }
   | { type: CommandType.EXTINGUISH; unitId: string; q: number; r: number }
   | { type: CommandType.STUN; unitId: string; q: number; r: number }
   | { type: CommandType.CHOOSE_VETERAN_BONUS; unitId: string; bonus: VeteranBonus }
@@ -308,6 +310,9 @@ export class Simulator {
         break;
       case CommandType.STORM:
         ok = this.doStorm(cmd.unitId);
+        break;
+      case CommandType.LIGHTNING:
+        ok = this.doLightning(cmd.unitId, cmd.q, cmd.r);
         break;
       case CommandType.EXTINGUISH:
         ok = this.doExtinguish(cmd.unitId, cmd.q, cmd.r);
@@ -680,6 +685,25 @@ export class Simulator {
     }
     this.consumeUnitTurn(unit);
     this.emit({ type: GameEventType.STORM, unitId, q: unit.q, r: unit.r, targets: report });
+    return true;
+  }
+
+  /** Stormcaller calls a lightning bolt onto a random cell of a village it can
+   *  see. Costs money and recharges for a few turns, shared by the whole tribe;
+   *  the stormcaller itself keeps its turn. */
+  private doLightning(unitId: string, q: number, r: number): boolean {
+    const unit = this.findUnit(unitId);
+    if (!unit || unit.owner !== this.currentPlayerIndex) return false;
+    if (unit.type !== UnitType.STORMCALLER || unit.shipLevel !== undefined) return false;
+    if ((unit.stunTurns ?? 0) >= 1) return false;
+    const player = this.players[unit.owner]!;
+    if (!lightningReady(player, this.turn)) return false;
+    if (player.resources.money < LIGHTNING_COST) return false;
+    const village = lightningVillages(this.map, player.index, unit).find((t) => t.q === q && t.r === r);
+    if (!village) return false;
+    player.resources.money -= LIGHTNING_COST;
+    player.lightningReadyTurn = this.turn + LIGHTNING_COOLDOWN_TURNS;
+    this.environment.strikeLightning(lightningStrikeCell(this.map, village, this.rng));
     return true;
   }
 
@@ -1380,6 +1404,9 @@ export class Simulator {
       case AiActionType.STORM:
         ok = this.doStorm(a.unitId);
         break;
+      case AiActionType.LIGHTNING:
+        ok = this.doLightning(a.unitId, a.q, a.r);
+        break;
       case AiActionType.TRAP:
         ok = this.doBuildTrap(a.unitId, a.q, a.r);
         break;
@@ -1401,10 +1428,31 @@ export class Simulator {
 
   private applyIncome(): void {
     for (const player of this.players) {
+      this.emitIncomeEvents(player);
       player.resources.money += villageIncomeTotal(this.map, player.index);
       for (const [village, income] of buildingIncomeByVillage(this.map, player)) addStock(village, income);
     }
+    const granaryBefore = new Map<MapTile, number>();
+    for (const t of this.map.tiles) if (t.building?.kind === BuildingKind.GRANARY) granaryBefore.set(t, t.building.food ?? 0);
     this.applyFoodForAll();
+    for (const [tile, before] of granaryBefore) {
+      const gained = (tile.building?.food ?? 0) - before;
+      if (gained > 0 && tile.ownedBy !== null) this.emit({ type: GameEventType.INCOME, playerIndex: tile.ownedBy, q: tile.q, r: tile.r, food: gained });
+    }
+  }
+
+  /** Announces what the player's villages (money) and producing buildings (wood, stone, ore) pay this round. */
+  private emitIncomeEvents(player: Player): void {
+    for (const t of this.map.tiles) {
+      if (t.settlement?.owner !== player.index) continue;
+      const money = villageIncome(this.map, t);
+      if (money > 0) this.emit({ type: GameEventType.INCOME, playerIndex: player.index, q: t.q, r: t.r, money });
+    }
+    for (const y of buildingYields(this.map, player)) {
+      if (y.wood + y.stone + y.ore <= 0) continue;
+      const { wood, stone, ore } = y;
+      this.emit({ type: GameEventType.INCOME, playerIndex: player.index, q: y.tile.q, r: y.tile.r, ...(wood > 0 && { wood }), ...(stone > 0 && { stone }), ...(ore > 0 && { ore }) });
+    }
   }
 
   /** Round-end food: farms feed, villages eat, starving villages hurt their units. */

@@ -33,6 +33,8 @@ export type GameEvent =
   | { type: GameEventType.SHIP_REVERTED; unitId: string }
   | { type: GameEventType.UNIT_DISBANDED; unitId: string; q: number; r: number; playerIndex: number }
   | { type: GameEventType.SCORE_FLY; playerIndex: number; amount: number; q: number; r: number }
+  /** Round-end income of one tile: a village's money, a sawmill's wood, a mine's stone and ore, or the food a granary gained. */
+  | { type: GameEventType.INCOME; playerIndex: number; q: number; r: number; money?: number; wood?: number; stone?: number; ore?: number; food?: number }
   | { type: GameEventType.KNIGHT_COMBO; unitId: string; q: number; r: number; playerIndex: number }
   | { type: GameEventType.VETERAN_PROMOTED; unitId: string; q: number; r: number; playerIndex: number }
   | { type: GameEventType.BONUS_CLAIMED; q: number; r: number; kind: BonusKind; playerIndex: number; skill?: SkillId }

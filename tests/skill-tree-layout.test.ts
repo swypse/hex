@@ -20,7 +20,7 @@ describe('skill tree layout', () => {
 
   it('spaces the root skills evenly', () => {
     const roots = (Object.keys(SKILLS) as SkillId[]).filter((id) => SKILLS[id].parent === null);
-    expect(roots.length).toBe(7);
+    expect(roots.length).toBe(8);
     const angles = roots.map(centerAngle).sort((a, b) => a - b);
     for (let i = 0; i < angles.length; i++) {
       const a = angles[i]!;

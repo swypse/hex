@@ -106,7 +106,7 @@ export class TutorialDirector {
           (t) => t.building?.kind === BuildingKind.SAWMILL && t.ownedBy === TUTORIAL_HUMAN,
         );
       case TutorialStepId.OPEN_CLIMBING_SMITHERY:
-        return hasSkill(human, SkillId.CLIMBING) && hasSkill(human, SkillId.SMITHERY);
+        return hasSkill(human, SkillId.CLIMBING) && hasSkill(human, SkillId.SMITHERY) && hasSkill(human, SkillId.ARCHER);
       case TutorialStepId.BUILD_MINE:
         return sim.map.tiles.some(
           (t) => t.building?.kind === BuildingKind.MINE && t.ownedBy === TUTORIAL_HUMAN,

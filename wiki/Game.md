@@ -48,6 +48,8 @@ only it can spawn (no skill needed — the tribe is the gate). Details on each t
 - Each player starts with a capital (with a warrior) and a nearby free (neutral) village. Villages are at least 3 hexes
   apart and every village has at least one free tile around it.
 - A free village becomes capturable when an enemy unit stands on it (red triangle).
+- Villages are named after animals with a city suffix (Foxburg, Wolftown, Sharkcity; Russian: Фокс-бург); no two villages of a
+  game share an animal. A free village shows only "Free village" until it is captured.
 
 **Fog of war** is tracked per player (AI included). Unexplored tiles are gray; units on them are invisible.
 
@@ -59,17 +61,25 @@ only it can spawn (no skill needed — the tribe is the gate). Details on each t
 ## Units
 
 Units belong to a player and are spawned in owned villages (see [Villages](#villages)). Every unit acts once per turn;
-a fresh unit waits until the next turn. Tribe special units are on the [tribe pages](#tribes).
+a fresh unit waits until the next turn. Each tribe's special unit (last seven rows; abilities on the
+[tribe pages](#tribes)) needs no skill — only its tribe can spawn it.
 
-| Unit      | Move | Attack | Defense | Range | HP | Spawn cost                 | Skill     | Upkeep (money / food) | Board score |
-|-----------|------|--------|---------|-------|----|----------------------------|-----------|-----------------------|-------------|
-| Warrior   | 10   | 20     | 10      | 1     | 50 | 4 money                    | —         | 1 / 1                 | 5           |
-| Rider     | 40   | 22     | 8       | 1     | 45 | 6 money                    | Riding    | 2 / 1                 | 6           |
-| Archer    | 10   | 26     | 7       | 2     | 40 | 6 money                    | —         | 2 / 1                 | 6           |
-| Swordsman | 10   | 40     | 16      | 1     | 80 | 10 money + 2 ore           | Swordsman | 3 / 3                 | 0           |
-| Shield    | 10   | 7      | 20      | 1     | 80 | 8 money + 2 ore           | Shields   | 2 / 2                 | 0           |
-| Catapult  | 10   | 50     | 0       | 4     | 30 | 15 money + 10 wood + 3 ore | Catapult  | 5 / 3                 | 0           |
-| Knight    | 30   | 38     | 12      | 1     | 70 | 14 money + 5 ore          | Knights   | 4 / 3                 | 0           |
+| Unit | Move | Attack | Defense | Range | HP | Spawn cost | Skill | Upkeep (money / food) | Board score |
+|------|------|--------|---------|-------|----|------------|-------|-----------------------|-------------|
+| Warrior | 10 | 20 | 10 | 1 | 50 | 4 money | — | 1 / 1 | 5 |
+| Rider | 40 | 22 | 8 | 1 | 45 | 6 money | Riding | 2 / 1 | 6 |
+| Archer | 10 | 26 | 7 | 2 | 40 | 6 money | Archer | 2 / 1 | 6 |
+| Swordsman | 10 | 40 | 16 | 1 | 80 | 10 money + 2 ore | Swordsman | 3 / 3 | 0 |
+| Shield | 10 | 7 | 20 | 1 | 80 | 8 money + 2 ore | Shields | 2 / 2 | 0 |
+| Catapult | 10 | 50 | 0 | 4 | 30 | 15 money + 10 wood + 3 ore | Catapult | 5 / 3 | 0 |
+| Knight | 30 | 38 | 12 | 1 | 70 | 14 money + 5 ore | Knights | 4 / 3 | 0 |
+| [Stalker](tribes/Cats.md#stalker) | 20 | 20 | 0 | 1 | 30 | 9 money + 2 ore | Cats | 3 / 3 | 9 |
+| [Builder](tribes/Villagers.md#builder) | 8 | 10 | 0 | 1 | 40 | 15 money | Villagers | 2 / 3 | 7 |
+| [Banner](tribes/Warriors.md#banner) | 8 | 10 | 0 | 1 | 30 | 7 money + 2 ore | Warriors | 1 / 1 | 8 |
+| [Berserker](tribes/Barbarians.md#berserker) | 10 | 26 | 8 | 1 | 50 | 10 money + 2 ore | Barbarians | 3 / 3 | 10 |
+| [Trapper](tribes/Forest.md#trapper) | 10 | 20 | 8 | 1 | 44 | 6 money + 2 ore | Forest people | 3 / 3 | 8 |
+| [Stormcaller](tribes/Aqua.md#stormcaller) | 20 | 20 | 8 | 1 | 44 | 6 money + 2 ore | Aqua people | 3 / 3 | 9 |
+| [Stunner](tribes/Sand.md#stunner) | 8 | 20 | 10 | 2 | 40 | 7 money + 2 ore | Sand people | 2 / 3 | 7 |
 
 - **Rider** can still move its full move points after attacking in the same turn.
 - **Shield** cannot attack in a turn in which it has moved (not applicable aboard a ship). Its counter-attack uses a
@@ -136,7 +146,8 @@ Pirates never become veterans.
     `round(defenseForce / (attackForce + defenseForce) × defense × 1.5 × 2.25)` (`COUNTER_SCALE` 2.25; shields 2).
   - On a kill the attacker moves onto the target's tile, unless it is an archer, a pirate, a ship, or the target was a
     pirate or a ship.
-  - Bonuses to attack: banner +5, berserker rage +10, veteran +5 (none for ships).
+  - Bonuses to attack: banner +5, berserker rage +15, veteran +5 (none for ships). A stealthed stalker's strike
+    doubles its attack (sneak attack) and ignores the defense.
 - **Heal** — if the unit has not moved/attacked, +15 HP (+10 more on a tile of a village with a university after
   *Medicine*), once per turn.
 - **Capture village** — a unit on an enemy or free village marked capturable captures it.
@@ -185,10 +196,11 @@ its parent first. Opening a skill scores 15. Skills marked † also need an own 
 | Science       | 1   | —           | Miss chance 5%; allows a university                                               |
 | Geology †     | 2   | Science     | Mines give +1 stone and +1 ore                                                    |
 | Engineering † | 2   | Science     | Buildings in a village with a university cost ~10% less wood and stone            |
-| Medicine †    | 2   | Science     | Units on the tiles of a village with a university heal +10 HP more                |
+| Medicine †    | 2   | Shields     | Units on the tiles of a village with a university heal +10 HP more                |
+| Archer        | 1   | —           | Spawn archers                                                                     |
 | Shields       | 1   | —           | Spawn shields                                                                     |
 | Defense       | 2   | Shields     | Village walls                                                                     |
-| Catapult      | 2   | Shields     | Spawn catapults                                                                   |
+| Catapult      | 2   | Archer      | Spawn catapults                                                                   |
 | Riding        | 1   | —           | Spawn riders                                                                      |
 | Bridges       | 2   | Riding      | Build bridges                                                                     |
 | Knights       | 2   | Riding      | Spawn knights                                                                     |
@@ -209,7 +221,7 @@ village slot (farms and granaries need none). No building produces money. Buildi
 | Temple        | 10 stone + 30 money           | Water temples | water tile                                                   | grows +1 level every 2 turns (max 4); 10/15/20/25 score at game end           |
 | Forest temple | 10 stone + 30 money           | Forest temple | forest tile                                                  | same as temple; protects against earthquakes                                  |
 | Farm          | 15 money + 5 wood             | Agriculture   | own empty land tile (no forest/mountain/water; road is fine), no enemy unit | +2 food per round; 0 in winter (see [Food](#food))             |
-| Granary       | 20 money + 10 wood + 10 stone | Granary       | own empty land tile next to one of your farms, no enemy unit | stores up to 50 food unused by adjacent farms                                 |
+| Granary       | 20 money + 10 wood + 10 stone | Granary       | own empty land tile next to one of your farms, no enemy unit | stores up to 25 food unused by adjacent farms                                 |
 | University    | 40 money + 10 stone + 5 ore   | Science       | own empty land tile (no forest/mountain/water) of a level 5+ village; one per village; uses a slot | unlocks Geology, Agronomy, Engineering, Medicine; 2 money upkeep |
 
 A builder ([Villagers](tribes/Villagers.md)) can place a sawmill, mine, port or bridge without the skill.
@@ -235,6 +247,9 @@ Skills, disbanding, demolishing and pirate deals cost money only.
   nearest own one). An enemy unit standing on a village zeroes its income and stops its buildings' production.
 - **Wood** — sawmills. **Stone** and **Ore** — mines. **Food** — farms (see below).
 
+At round end the income floats up from its tile: money from each village, wood from each sawmill, stone and ore
+(one label) from each mine, and the food a granary gained (`<icon> N`).
+
 The resource bar always shows money and its income; wood, stone, ore and food show the stock and income of the
 **selected village's network**. Food status is shown per village in the selected-cell panel.
 
@@ -248,7 +263,7 @@ At the end of each round (after income), for every player and food network:
 
 1. Villages are fed one by one, the most developed first (level, then name); each village eats first, then its units,
    hungriest first. They eat from the network's farms — those **not** adjacent to a granary first.
-2. Food left on a farm adjacent to a granary is stored there (the emptiest first, capacity **50**; overflow lost).
+2. Food left on a farm adjacent to a granary is stored there (the emptiest first, capacity **25**; overflow lost).
    Other leftover farm food is lost.
 3. Anything still short is taken from the network's granaries (fullest first), then from the food its villages hold
    (the capital's starting 25). Nothing crosses networks; networks with the smaller shortage are served first.
@@ -295,6 +310,8 @@ when an event starts and ends. Weather is part of saved games and multiplayer st
 limit. It lasts 1 turn and strikes one random tile (radius 0). Tuning: `WEATHER_RULES.lightning`, `FIRE_RULES`
 (`src/game/weather/fire.ts`).
 
+- A stormcaller can also **call lightning** onto a random cell of any village its owner sees (15 money, recharges
+  3 turns for the whole tribe) with the same effects, on top of this schedule.
 - A **forest** catches fire with 80%; a **unit** takes 40-60 damage; a **building** (sawmill, mine, port, farm,
   granary) or a **bridge** always catches fire (temples and universities are spared).
 

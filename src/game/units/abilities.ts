@@ -5,14 +5,14 @@ import { unitMaxHp, veteranAttackBonus, type Unit } from './units';
 import { UnitType } from '@enums';
 
 export const BANNER_BONUS = 5;
-export const RAGE_BONUS = 10;
-export const RAGE_THRESHOLD_PCT = 0.35;
+export const RAGE_BONUS = 15;
+export const RAGE_THRESHOLD_PCT = 0.5;
 
 export function isStunned(unit: Unit): boolean {
   return (unit.stunTurns ?? 0) >= 1;
 }
 
-/** +10 atk while the unit has <= 35% max hp (berserker rage), else 0. */
+/** +15 atk while the unit has <= 50% max hp (berserker rage), else 0. */
 export function berserkerRage(unit: Unit): number {
   if (unit.type !== UnitType.BERSERKER) return 0;
   return unit.hp <= unitMaxHp(unit) * RAGE_THRESHOLD_PCT ? RAGE_BONUS : 0;
@@ -36,7 +36,7 @@ function baseAttack(unit: Unit): number {
   return shipAttack(unit);
 }
 
-/** Any current atk bonus (banner +5 / rage +10 / veteran +5); ships get none.
+/** Any current atk bonus (banner +5 / rage +15 / veteran +5); ships get none.
  *  Used for the hp-bar icon and HUD. */
 export function attackBonus(unit: Unit, map: GameMap | null): number {
   if (isShip(unit)) return 0;

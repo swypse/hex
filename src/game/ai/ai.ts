@@ -159,6 +159,8 @@ export function formatAiAction(a: AiAction): string {
       return `enableStealth ${a.unitId}`;
     case AiActionType.STORM:
       return `storm ${a.unitId}`;
+    case AiActionType.LIGHTNING:
+      return `lightning ${a.unitId} -> (${a.q},${a.r})`;
     case AiActionType.TRAP:
       return `trap ${a.unitId} -> (${a.q},${a.r})`;
     case AiActionType.BURN:
@@ -188,6 +190,7 @@ function key(q: number, r: number): string {
 const MILITARY_SKILL_ORDER: SkillId[] = [
   SkillId.FORESTRY,
   SkillId.AGRICULTURE,
+  SkillId.ARCHER,
   SkillId.CLIMBING,
   SkillId.SMITHERY,
   SkillId.SWORDSMAN,
@@ -212,6 +215,7 @@ const MILITARY_SKILL_ORDER: SkillId[] = [
 const AI_SKILL_ORDER: SkillId[] = [
   SkillId.FORESTRY,
   SkillId.AGRICULTURE,
+  SkillId.ARCHER,
   SkillId.CLIMBING,
   SkillId.SMITHERY,
   SkillId.SCIENCE,
@@ -847,6 +851,9 @@ function markUsed(state: AiPlannerState, action: AiAction): void {
     case AiActionType.OPEN_SKILL:
       state.opened.add(action.skill);
       break;
+    case AiActionType.LIGHTNING:
+      state.lightningCalled = true;
+      break;
   }
 }
 
@@ -912,7 +919,7 @@ export function* planAiActionsSteps(
       // so a step never holds the main thread for both.
       yield;
     }
-    const ctx: AiPatternContext = { map, player, rng, state, situation, difficulty, directives, operation };
+    const ctx: AiPatternContext = { map, player, rng, state, situation, difficulty, directives, operation, turn };
     let next: AiAction[] | null = null;
     let label = 'fallback(best-score)';
     let note = '';

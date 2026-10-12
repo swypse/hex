@@ -81,7 +81,10 @@ export class Bonuses {
       case BonusKind.RESOURCES:
         // The materials go to the village nearest to the bonus.
         const nearest = findClosestVillage(this.map, tile, player.index);
-        if (nearest) addStock(nearest, { wood: 10, stone: 5, ore: 5 });
+        if (nearest) {
+          addStock(nearest, { wood: 10, stone: 5, ore: 5 });
+          this.emit({ type: GameEventType.INCOME, playerIndex: player.index, q: tile.q, r: tile.r, wood: 10, stone: 5, ore: 5 });
+        }
         return { kind: BonusKind.RESOURCES };
       case BonusKind.VILLAGE_UPGRADE: {
         const village = findClosestVillage(this.map, tile, player.index);

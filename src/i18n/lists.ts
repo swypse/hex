@@ -1,5 +1,5 @@
 import { currentLanguage } from '../storage/settings';
-import { Language, NounKind, WordKind } from '@enums';
+import { CitySuffix, Language, NounKind, WordKind } from '@enums';
 
 
 
@@ -42,10 +42,6 @@ function listFor(lang: Language): WordList {
   return LISTS[lang] ?? LISTS.en;
 }
 
-export function villageNameWords(): WordList {
-  return listFor(currentLanguage());
-}
-
 function cap(word: string): string {
   return word.charAt(0).toUpperCase() + word.slice(1);
 }
@@ -66,10 +62,67 @@ function composeName(list: WordList, adjIdx: number, nounIdx: number): string {
   return `${cap(adj)} ${cap(noun)}`.trim();
 }
 
-/** Compose a village name in the current language, agreeing the adjective with
- *  the noun in languages that inflect adjectives. */
-export function villageNameAt(adjIdx: number, nounIdx: number): string {
-  return composeName(listFor(currentLanguage()), adjIdx, nounIdx);
+/** Suffix of a city-style village name in each language. */
+const CITY_SUFFIXES: Record<CitySuffix, Record<Language, string>> = {
+  [CitySuffix.TOWN]: { en: 'town', ru: 'таун' },
+  [CitySuffix.VILLE]: { en: 'ville', ru: 'вилль' },
+  [CitySuffix.CITY]: { en: 'city', ru: 'сити' },
+  [CitySuffix.BURG]: { en: 'burg', ru: 'бург' },
+  [CitySuffix.PORT]: { en: 'port', ru: 'порт' },
+  [CitySuffix.FIELD]: { en: 'field', ru: 'филд' },
+};
+
+/** The animals a village can be named after, each with the suffix that sounds
+ *  best with it and its English and Russian (transliterated) base name. One
+ *  animal names at most one village per game. */
+const VILLAGE_ANIMALS: { en: string; ru: string; suffix: CitySuffix }[] = [
+  { en: 'fox', ru: 'фокс', suffix: CitySuffix.BURG },
+  { en: 'owl', ru: 'оул', suffix: CitySuffix.TOWN },
+  { en: 'wolf', ru: 'волф', suffix: CitySuffix.TOWN },
+  { en: 'bear', ru: 'бир', suffix: CitySuffix.VILLE },
+  { en: 'lion', ru: 'лайон', suffix: CitySuffix.BURG },
+  { en: 'deer', ru: 'дир', suffix: CitySuffix.FIELD },
+  { en: 'hare', ru: 'хэр', suffix: CitySuffix.TOWN },
+  { en: 'seal', ru: 'сил', suffix: CitySuffix.PORT },
+  { en: 'goat', ru: 'гоут', suffix: CitySuffix.VILLE },
+  { en: 'mole', ru: 'моул', suffix: CitySuffix.TOWN },
+  { en: 'lynx', ru: 'линкс', suffix: CitySuffix.BURG },
+  { en: 'hawk', ru: 'хок', suffix: CitySuffix.BURG },
+  { en: 'crow', ru: 'кроу', suffix: CitySuffix.FIELD },
+  { en: 'swan', ru: 'суон', suffix: CitySuffix.PORT },
+  { en: 'toad', ru: 'тоуд', suffix: CitySuffix.VILLE },
+  { en: 'frog', ru: 'фрог', suffix: CitySuffix.TOWN },
+  { en: 'newt', ru: 'ньют', suffix: CitySuffix.FIELD },
+  { en: 'crab', ru: 'краб', suffix: CitySuffix.PORT },
+  { en: 'moth', ru: 'мос', suffix: CitySuffix.TOWN },
+  { en: 'wasp', ru: 'васп', suffix: CitySuffix.BURG },
+  { en: 'eagle', ru: 'игл', suffix: CitySuffix.FIELD },
+  { en: 'shark', ru: 'шарк', suffix: CitySuffix.CITY },
+];
+
+/** "Foxburg" in English, "Фокс-бург" in Russian. */
+function cityName(animal: (typeof VILLAGE_ANIMALS)[number], lang: Language): string {
+  const suffix = CITY_SUFFIXES[animal.suffix][lang];
+  return lang === Language.RU ? `${cap(animal.ru)}-${suffix}` : cap(animal.en + suffix);
+}
+
+/** Every city-style village name in the current language, one per animal. */
+export function villageAnimalNames(): string[] {
+  const lang = currentLanguage();
+  return VILLAGE_ANIMALS.map((a) => cityName(a, lang));
+}
+
+/** The name of a city-style village in the current language when `name` is one
+ *  in either language; null otherwise (older "Old Oak" names are not). */
+function localizeCityName(name: string): string | null {
+  const lang = currentLanguage();
+  const lower = name.toLowerCase();
+  for (const animal of VILLAGE_ANIMALS) {
+    for (const from of [Language.EN, Language.RU] as Language[]) {
+      if (cityName(animal, from).toLowerCase() === lower) return cityName(animal, lang);
+    }
+  }
+  return null;
 }
 
 type FoundWord = { idx: number; kind: WordKind };
@@ -124,6 +177,8 @@ function findToken(token: string): FoundWord | null {
  *  noun when the target language does that (Russian). Unknown words are kept
  *  as-is. */
 export function localizeVillageName(name: string): string {
+  const city = localizeCityName(name);
+  if (city !== null) return city;
   const target = listFor(currentLanguage());
   const tokens = name.split(' ');
   const found = tokens.map((token) => ({ token, word: findToken(token) }));

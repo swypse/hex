@@ -20,8 +20,8 @@ Barbarian that rages as it is wounded. The best raw fighter among the special un
 
 | Move | Attack | Defense | Range | HP | Spawn cost | Upkeep (money / food) | Board score |
 |------|--------|---------|-------|----|------------|-----------------------|-------------|
-| 10 | 26 | 8 | 1 | 50 | 10 money + 2 ore | 4 / 3 | 10 |
+| 10 | 26 | 8 | 1 | 50 | 10 money + 2 ore | 3 / 3 | 10 |
 
-- **Rage.** At **35% HP or less** (of its max HP) it gains **+10 attack** and takes **no counter-attack damage**.
+- **Rage.** At **50% HP or less** (of its max HP) it gains **+15 attack** and takes **no counter-attack damage**.
 - **Indicator.** While raging it shows an attack icon with `+10`.
 - **Stacks with other bonuses.** Rage adds to banner and veteran bonuses.

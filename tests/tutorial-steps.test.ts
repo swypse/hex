@@ -60,7 +60,7 @@ describe('tutorial steps', () => {
 
   it('highlights forestry during openForestry and climbing+smithery during openClimbingSmithery', () => {
     expect(STEP_CONFIG.openForestry.highlightSkills).toEqual([SkillId.FORESTRY]);
-    expect(STEP_CONFIG.openClimbingSmithery.highlightSkills).toEqual([SkillId.CLIMBING, SkillId.SMITHERY]);
+    expect(STEP_CONFIG.openClimbingSmithery.highlightSkills).toEqual([SkillId.CLIMBING, SkillId.SMITHERY, SkillId.ARCHER]);
   });
 
   it('drives the skills-button pulse from the skill steps only', () => {

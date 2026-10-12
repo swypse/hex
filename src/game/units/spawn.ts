@@ -23,6 +23,7 @@ export function spawnUnit(
   if (type === UnitType.KNIGHT && !hasSkill(player, SkillId.KNIGHTS)) return false;
   if (type === UnitType.SWORDSMAN && !hasSkill(player, SkillId.SWORDSMAN)) return false;
   if (type === UnitType.SHIELD && !hasSkill(player, SkillId.SHIELDS)) return false;
+  if (type === UnitType.ARCHER && !hasSkill(player, SkillId.ARCHER)) return false;
   if (type === UnitType.CATAPULT && !hasSkill(player, SkillId.CATAPULT)) return false;
   // Special units: a tribe's own special is allowed with no skill; another
   // tribe's special is never allowed.

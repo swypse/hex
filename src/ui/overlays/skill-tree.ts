@@ -20,6 +20,8 @@ import { THEME } from '../../gfx/theme';
 import { FontSize, SkillId } from '@enums';
 
 const RING_SPACING = 150;
+/** Diameter of a skill node's medallion in the tree. */
+const MEDALLION_SIZE = 56;
 /** The tree is magnified up to the max zoom: bake its text that many times
  *  larger so it stays sharp when zoomed all the way in. */
 const TREE_TEXT_BAKE = 3;
@@ -124,6 +126,8 @@ export class SkillTree {
     const el = new Container();
     const bg = new Graphics();
     bg.rect(0, 0, host.app.screen.width, host.app.screen.height).fill(THEME.skillTree.bg);
+    // Swallow pointer events so a tap on the backdrop never reaches the map below.
+    bg.eventMode = 'static';
     el.addChild(bg);
     root.addChild(el);
     this.el = el;
@@ -226,7 +230,7 @@ export class SkillTree {
       const p = POS[id];
       const wx = this.pan.x + p.x * s;
       const wy = this.pan.y + p.y * s;
-      const r = Math.max(12, 32 * s);
+      const r = Math.max(12, (MEDALLION_SIZE / 2 - 4) * s);
       const d2 = (x - wx) * (x - wx) + (y - wy) * (y - wy);
       if (d2 <= r * r && d2 < bestD) {
         bestD = d2;
@@ -388,7 +392,7 @@ export class SkillTree {
       ring.addChild(line);
     }
 
-    const rootChip = makeIconChip(`${tribe.code}-icon.png`, 40, { bgColor: 0xffffff, border: { width: 4, color: THEME.skillTree.openedSkillStroke, alignment: 0 } });
+    const rootChip = makeIconChip(`${tribe.code}-icon.png`, MEDALLION_SIZE, { bgColor: 0xffffff, border: { width: 4, color: THEME.skillTree.openedSkillStroke, alignment: 0 } });
     rootChip.position.set(CX, CY);
     ring.addChild(rootChip);
 
@@ -397,8 +401,8 @@ export class SkillTree {
       const opened = hasSkill(human, id);
       if (!opened && highlight.has(id)) {
         const halo = new Graphics();
-        halo.circle(pos.x, pos.y, 43).stroke({ width: 5, color: 0xffd700, alpha: 0.95 });
-        halo.circle(pos.x, pos.y, 48).stroke({ width: 2, color: 0xffd700, alpha: 0.5 });
+        halo.circle(pos.x, pos.y, 35).stroke({ width: 5, color: 0xffd700, alpha: 0.95 });
+        halo.circle(pos.x, pos.y, 40).stroke({ width: 2, color: 0xffd700, alpha: 0.5 });
         ring.addChild(halo);
       }
       // Skill nodes are intentionally not Pixi-interactive: panning, zooming
@@ -409,7 +413,7 @@ export class SkillTree {
         skill: id,
         opened,
         priceText: opened ? '\u2713' : String(skillCost(id, human.skills.length)),
-        size: 72,
+        size: MEDALLION_SIZE,
         app: host.app,
         textBake: TREE_TEXT_BAKE,
       });
@@ -422,7 +426,7 @@ export class SkillTree {
         bake: TREE_TEXT_BAKE,
       });
       name.anchor.set(0.5, 0.5);
-      name.position.set(pos.x, pos.y + 58);
+      name.position.set(pos.x, pos.y + MEDALLION_SIZE / 2 + 22);
       node.addChild(name);
       ring.addChild(node);
     }

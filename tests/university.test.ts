@@ -72,7 +72,7 @@ describe('university', () => {
 describe('university skills', () => {
   it('Geology, Agronomy, Engineering and Medicine need an own university', () => {
     const { map, p, site } = setup();
-    p.skills = [SkillId.SCIENCE, SkillId.AGRICULTURE];
+    p.skills = [SkillId.SCIENCE, SkillId.AGRICULTURE, SkillId.SHIELDS];
     for (const id of [SkillId.GEOLOGY, SkillId.AGRONOMY, SkillId.ENGINEERING, SkillId.MEDICINE]) {
       expect(canOpenSkill(p, id, map)).toBe(false);
       expect(canOpenSkill(p, id, null)).toBe(false);
@@ -84,12 +84,13 @@ describe('university skills', () => {
     }
   });
 
-  it('Catapult is a child of Shields', () => {
-    expect(SKILLS.catapult.parent).toBe(SkillId.SHIELDS);
+  it('Catapult is a child of Archer and Medicine of Shields', () => {
+    expect(SKILLS.catapult.parent).toBe(SkillId.ARCHER);
+    expect(SKILLS.medicine.parent).toBe(SkillId.SHIELDS);
     const { map, p } = setup();
     p.skills = [SkillId.SCIENCE];
     expect(canOpenSkill(p, SkillId.CATAPULT, map)).toBe(false);
-    p.skills = [SkillId.SHIELDS];
+    p.skills = [SkillId.ARCHER];
     expect(canOpenSkill(p, SkillId.CATAPULT, map)).toBe(true);
   });
 });

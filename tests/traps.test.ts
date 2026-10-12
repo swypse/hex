@@ -42,15 +42,15 @@ function findUnit(id: string): Unit {
 }
 
 describe('trapper traps', () => {
-  it('places a trap on an adjacent unowned land tile, paying 5 money + 3 ore', () => {
+  it('places a trap on an adjacent unowned land tile, paying 3 money + 2 ore', () => {
     const trapper = place(0, UnitType.TRAPPER, 0, 0);
     const ok = sim.applyCommand({ type: CommandType.TRAP, unitId: trapper.id, q: 1, r: 0 });
     expect(ok).toBe(true);
     expect(tileAt(map, 1, 0)!.trap).toMatchObject({ owner: 0, placedTurn: sim.turn });
     expect(findUnit(trapper.id).hasMoved).toBe(true);
-    expect(sim.players[0]!.resources.money).toBe(95);
-    expect(totalStock(sim.map, 0).ore).toBe(97);
-    expect(TRAP_COST).toEqual({ wood: 0, stone: 0, money: 5, ore: 3, food: 0 });
+    expect(sim.players[0]!.resources.money).toBe(97);
+    expect(totalStock(sim.map, 0).ore).toBe(98);
+    expect(TRAP_COST).toEqual({ wood: 0, stone: 0, money: 3, ore: 2, food: 0 });
   });
 
   it('places a trap on its own cell, the one the trapper stands on', () => {

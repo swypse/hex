@@ -50,17 +50,26 @@ describe('Russian village name agreement', () => {
     expect(localizeVillageName('Золотые Ворота')).toBe('Golden Gate');
   });
 
-  it('generates only agreeing Russian names for every adjective/noun pair', () => {
+  it('generates Russian city-style names that localization leaves unchanged', () => {
     fakeStorage();
     setLanguage(Language.RU);
-    // 10x10 pools → 100 combos; requesting the full pool exercises every pair.
     const names = generateVillageNames(100, new SeededRandom(3));
-    expect(names).toHaveLength(100);
-    expect(new Set(names).size).toBe(100);
+    expect(new Set(names).size).toBe(names.length);
     for (const name of names) {
-      // Re-localizing an already-agreed name must be a no-op; a masculine
-      // adjective on a feminine/plural noun would come back changed.
+      expect(name).toMatch(/^[А-ЯЁ][а-яё]+-[а-яё]+$/);
       expect(localizeVillageName(name)).toBe(name);
     }
+  });
+
+  it('translates city-style names between English and Russian', () => {
+    fakeStorage();
+    setLanguage(Language.RU);
+    expect(localizeVillageName('Foxburg')).toBe('Фокс-бург');
+    expect(localizeVillageName('Wolftown')).toBe('Волф-таун');
+    expect(localizeVillageName('Sharkcity')).toBe('Шарк-сити');
+    setLanguage(Language.EN);
+    expect(localizeVillageName('Фокс-бург')).toBe('Foxburg');
+    expect(localizeVillageName('Бир-вилль')).toBe('Bearville');
+    expect(localizeVillageName('Deerfield')).toBe('Deerfield');
   });
 });

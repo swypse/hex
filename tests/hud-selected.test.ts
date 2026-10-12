@@ -152,7 +152,7 @@ describe('HudSelected village building constraints', () => {
     tileAt(map, 1, -1)!.ownedBy = 0;
     tileAt(map, 1, -1)!.building = { kind: BuildingKind.FARM, level: 1 };
     useGameStore.setState({ selection: { kind: SelectionKind.TILE, q: 1, r: 0 } });
-    expect(texts()).toContain('Stored food: 7/50 (collects what adjacent farms do not use)');
+    expect(texts()).toContain('Stored food: 7/25 (collects what adjacent farms do not use)');
   });
 
   it('lays the drop shadow beneath the info panel background', () => {
@@ -200,6 +200,15 @@ describe('HudSelected village building constraints', () => {
   it('omits building info for a free village', () => {
     mount(2, 1, null);
     expect(texts().join('\n')).not.toContain('Buildings:');
+  });
+
+  it('hides the name of a free village until it is captured', () => {
+    mount(1, 0, null);
+    expect(texts().join('\n')).toContain('Free village');
+    expect(texts().join('\n')).not.toContain('Alpha');
+    hud.destroy();
+    mount(1, 0, 0);
+    expect(texts().join('\n')).toContain('Alpha');
   });
 
   it('does not show Owner or Village lines for an owned village with a unit', () => {
@@ -643,18 +652,18 @@ describe('HudSelected berserker rage attack info', () => {
     (gameController as unknown as { sim: unknown }).sim = originalSim;
   });
 
-  it('appends the +10 rage bonus to the attack value while rage is active', () => {
-    boot(10); // 10 <= 35% of 50 → raging
+  it('appends the +15 rage bonus to the attack value while rage is active', () => {
+    boot(10); // 10 <= 50% of 50 → raging
     const all = texts().join('\n');
-    expect(all).toMatch(/\+10/);
+    expect(all).toMatch(/\+15/);
     // No hp readout in the panel anymore.
     expect(all).not.toMatch(/\/50/);
   });
 
   it('shows a plain attack value when not raging', () => {
-    boot(40); // above the 35% rage threshold
+    boot(40); // above the 50% rage threshold
     const all = texts().join('\n');
-    expect(all).not.toMatch(/\+10/);
+    expect(all).not.toMatch(/\+15/);
   });
 });
 
@@ -1232,3 +1241,64 @@ describe('HudSelected weather effects', () => {
   });
 });
 
+
+describe('HudSelected stormcaller lightning recharge line', () => {
+  let hud: HudSelected;
+  const originalSim = (gameController as unknown as { sim: unknown }).sim;
+
+  const texts = (): string[] => {
+    const el = (hud as unknown as { el: Container }).el!;
+    const out: string[] = [];
+    const walk = (c: Container): void => {
+      for (const ch of c.children) {
+        if (ch instanceof BitmapText) out.push((ch as BitmapText).text);
+        if (ch instanceof Container) walk(ch as Container);
+      }
+    };
+    walk(el);
+    return out;
+  };
+
+  /** Selects an own stormcaller whose lightning is ready `readyIn` turns from the current turn. */
+  const boot = (readyIn: number | null): void => {
+    (globalThis as { CanvasRenderingContext2D?: unknown }).CanvasRenderingContext2D = class {};
+    (globalThis as { document?: unknown }).document = {
+      createElement: () => ({ getContext: () => fakeCanvasContext(), width: 0, height: 0 }),
+    };
+    const map = makeTestMap(2);
+    tileAt(map, 0, 0)!.unit = makeUnit('s1', 0, UnitType.STORMCALLER, 0, 0);
+    const players = buildPlayers(Tribe.Aqua, 1, new SeededRandom(1));
+    const sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5 });
+    if (readyIn !== null) players[0]!.lightningReadyTurn = sim.turn + readyIn;
+    (gameController as unknown as { sim: Simulator | null }).sim = sim;
+    useGameStore.setState({
+      screen: Screen.GAME,
+      players,
+      localPlayerIndex: 0,
+      turn: sim.turn,
+      selection: { kind: SelectionKind.UNIT, q: 0, r: 0 },
+      tutorial: false,
+      tutorialStep: null,
+    });
+    hud = new HudSelected();
+    hud.mount(makeHost(), new Container());
+  };
+
+  afterEach(() => {
+    hud?.destroy();
+    (gameController as unknown as { sim: unknown }).sim = originalSim;
+  });
+
+  it('shows the turns left while the lightning recharges', () => {
+    boot(2);
+    expect(texts()).toContain('2 turns until lightning can be used');
+  });
+
+  it('shows no line when the lightning is ready', () => {
+    boot(null);
+    expect(texts().some((x) => x.includes('until lightning'))).toBe(false);
+    hud.destroy();
+    boot(0);
+    expect(texts().some((x) => x.includes('until lightning'))).toBe(false);
+  });
+});

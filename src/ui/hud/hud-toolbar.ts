@@ -45,6 +45,7 @@ const ICON_ACTIONS: Record<string, string> = {
   'thorn-trap': 'thorn-trap',
   extinguish: 'extinguish',
   storm: 'stormcaller',
+  lightning: 'lightning',
 };
 
 const LAST_TURN_COLOR = 0x9cff55;

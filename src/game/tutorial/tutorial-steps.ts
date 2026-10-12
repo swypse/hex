@@ -128,10 +128,10 @@ export const STEP_CONFIG: Record<TutorialStepId, TutorialStepDef> = {
   },
   openClimbingSmithery: {
     id: TutorialStepId.OPEN_CLIMBING_SMITHERY,
-    heading: 'Research Climbing and Smithery',
-    text: 'You will need stone and ore for mines and stronger units. Open the skill tree and research Climbing, then its child Smithery. Both nodes are highlighted.',
+    heading: 'Research Climbing, Smithery and Archer',
+    text: 'You will need stone and ore for mines and stronger units, and the Archer skill to spawn archers. Open the skill tree and research Climbing, then its child Smithery, and the Archer skill. All three nodes are highlighted.',
     markers: [],
-    highlightSkills: [SkillId.CLIMBING, SkillId.SMITHERY],
+    highlightSkills: [SkillId.CLIMBING, SkillId.SMITHERY, SkillId.ARCHER],
     highlightEndTurn: false,
     pulseSkillsButton: true,
     dialog: false,

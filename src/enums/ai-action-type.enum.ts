@@ -15,6 +15,7 @@ export enum AiActionType {
   EXTINGUISH = 'extinguish',
   ENABLE_STEALTH = 'enableStealth',
   STORM = 'storm',
+  LIGHTNING = 'lightning',
   TRAP = 'trap',
   BURN = 'burn',
   BURN_ROAD = 'burnRoad',

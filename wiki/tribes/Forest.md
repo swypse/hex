@@ -23,7 +23,7 @@ Forest hunter who sows thorn traps. A solid defender that turns roads and chokep
 | 10 | 20 | 8 | 1 | 44 | 6 money + 2 ore | 3 / 3 | 8 |
 
 - **Thorn trap.** Consumes its turn to place a trap on a non-water cell it stands on or is adjacent to (radius 1), provided that cell has no village or building, no other unit and no trap already. Not on ice.
-- **Cost.** 5 money + 3 ore, paid like other territory actions.
+- **Cost.** 3 money + 2 ore, paid like other territory actions.
 - **Hidden.** Traps are visible only to the trapper's owner.
 - **Lifetime.** A trap lasts 10 turns and vanishes when triggered.
 - **Trigger.** An enemy unit that moves onto a trap stops there and takes ~45 damage (attack 30 at full HP vs. defense 0, no miss, no counter); the trap disappears. A melee unit that kills someone and advances onto their tile also trips a trap buried there.

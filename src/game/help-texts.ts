@@ -11,6 +11,7 @@ import { t } from '../i18n';
 import { BuildingKind } from '@enums';
 
 export function settlementHelpTitle(tile: MapTile): string {
+  if (tile.settlement?.owner === null) return t('hud.selected.freeVillage');
   const name = tile.settlement?.name;
   return name && name.length > 0 ? name : t('hud.selected.settlementDefault');
 }

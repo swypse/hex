@@ -196,6 +196,15 @@ describe('bonus claiming (simulator)', () => {
     expect(readStock(village).ore).toBe(before.ore + 5);
   });
 
+  it('resources bonus announces the materials at the bonus tile', () => {
+    const { target, sim } = makeSim(BonusKind.RESOURCES);
+    sim.applyCommand({ type: CommandType.END_TURN });
+    sim.drainEvents();
+    sim.applyCommand({ type: CommandType.CLAIM_BONUS });
+    const income = sim.drainEvents().filter((e) => e.type === GameEventType.INCOME);
+    expect(income).toEqual([{ type: GameEventType.INCOME, playerIndex: 0, q: target.q, r: target.r, wood: 10, stone: 5, ore: 5 }]);
+  });
+
   it('villageUpgrade bonus upgrades the closest village for free', () => {
     const { map, target, sim } = makeSim(BonusKind.VILLAGE_UPGRADE);
     const village = tileAt(map, 0, 0)!;

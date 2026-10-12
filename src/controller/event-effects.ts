@@ -9,6 +9,7 @@ import { THEME } from '../gfx/theme';
 import { useGameStore } from '../store/game-store';
 import { EXPLORED_SCORE } from '../game/score';
 import { makeLabel } from '../gfx/label';
+import { makeIcon32 } from '../gfx/icons32';
 import { FONT_BLACK, sizedFontFamily } from '../gfx/bitmap-fonts';
 import { markDirty } from '../gfx/render-gate';
 import { FontSize } from '@enums';
@@ -16,6 +17,21 @@ import { FontSize } from '@enums';
 import type { EventHost } from './event-presenter';
 
 const HEX_SIZE = 40;
+/** Side of the resource icon in a floating income label. */
+const INCOME_ICON_SIZE = 16;
+/** Dark plate behind an income or score label: alpha, padding (px) and corner radius. */
+const FLOAT_BG_ALPHA = 0.6;
+const FLOAT_BG_PAD_X = 4;
+const FLOAT_BG_PAD_Y = 2;
+const FLOAT_BG_RADIUS = 2;
+/** Resources a floating income label can show, in display order, with their 32px icon. */
+const INCOME_PARTS = [
+  { key: 'money', icon: 'gold-32' },
+  { key: 'wood', icon: 'wood-32' },
+  { key: 'stone', icon: 'stone-32' },
+  { key: 'ore', icon: 'ore-32' },
+  { key: 'food', icon: 'food-32' },
+] as const;
 const DEATH_PARTICLE_COUNT = 10;
 const DEATH_RISE = 200;
 const DEATH_MS = 3000;
@@ -50,7 +66,7 @@ export class EventEffects {
     const local = useGameStore.getState().localPlayerIndex;
     if (playerIndex !== local && !isExploredFor(tile, local)) return;
     // Let the -N damage number appear first.
-    setTimeout(() => this.spawnFloatText(tile, `+${amount}`, 0xffd700), SCORE_FLY_DELAY_MS);
+    setTimeout(() => this.floatUp(tile, [{ text: `+${amount}`, color: 0xffd700 }], true), SCORE_FLY_DELAY_MS);
   }
 
   spawnHpText(tile: MapTile, text: string, color: number): void {
@@ -60,18 +76,56 @@ export class EventEffects {
   }
 
   spawnFloatText(tile: MapTile, text: string, color: number): void {
+    this.floatUp(tile, [{ text, color }]);
+  }
+
+  /** Round-end income: one label of "<icon> N" parts (money, wood, stone + ore, food) lifting up from the tile. */
+  spawnIncomeFly(tile: MapTile, income: Partial<Record<'money' | 'wood' | 'stone' | 'ore' | 'food', number>>): void {
+    const parts = INCOME_PARTS
+      .filter(({ key }) => (income[key] ?? 0) > 0)
+      .map(({ key, icon }) => ({ icon, text: String(income[key]), color: 0xffffff }));
+    if (parts.length > 0) this.floatUp(tile, parts, true);
+  }
+
+  /** Lifts a row of optional-icon + text parts up from `tile` and fades it out. */
+  private floatUp(tile: MapTile, parts: { text: string; color: number; icon?: string }[], withBackground = false): void {
     const app = this.host.app();
     const mapRoot = this.host.mapRoot();
     if (!app || !mapRoot) return;
     const camera = this.host.camera();
     const el = new Container();
     el.zIndex = 10;
-    const label = new BitmapText({
-      text,
-      style: { fontFamily: sizedFontFamily(FONT_BLACK, FontSize.SMALL), fontSize: FontSize.SMALL, fill: color },
-    });
-    label.anchor.set(0.5);
-    el.addChild(label);
+    const row = new Container();
+    let x = 0;
+    let rowH = INCOME_ICON_SIZE;
+    for (const part of parts) {
+      if (part.icon) {
+        const icon = makeIcon32(part.icon, INCOME_ICON_SIZE);
+        icon.anchor.set(0, 0.5);
+        icon.position.set(x, 0);
+        row.addChild(icon);
+        x += INCOME_ICON_SIZE + 2;
+      }
+      const label = new BitmapText({
+        text: part.text,
+        style: { fontFamily: sizedFontFamily(FONT_BLACK, FontSize.SMALL), fontSize: FontSize.SMALL, fill: part.color },
+      });
+      label.anchor.set(0, 0.5);
+      label.position.set(x, 0);
+      row.addChild(label);
+      rowH = Math.max(rowH, label.height);
+      x += label.width + 6;
+    }
+    const rowW = x - 6;
+    // Centre the row on the hex.
+    row.position.set(-rowW / 2, 0);
+    if (withBackground) {
+      const bg = new Graphics();
+      bg.roundRect(-rowW / 2 - FLOAT_BG_PAD_X, -rowH / 2 - FLOAT_BG_PAD_Y, rowW + FLOAT_BG_PAD_X * 2, rowH + FLOAT_BG_PAD_Y * 2, FLOAT_BG_RADIUS)
+        .fill({ color: 0x000000, alpha: FLOAT_BG_ALPHA });
+      el.addChild(bg);
+    }
+    el.addChild(row);
     const start = this.tileScreenPos(camera, tile);
     el.position.set(start.x, start.y);
     mapRoot.addChild(el);

@@ -12,6 +12,7 @@ export const ACTION_BUTTON_ICON_FILES: Record<string, string> = {
   extinguish: 'action-fire-extinguish',
   stealth: 'action-stealth',
   stormcaller: 'action-stormcaller',
+  lightning: 'action-stormcaller-lightning',
   sawmill: 'action-build-sawmill',
   mine: 'action-build-mine',
   farm: 'action-build-farm',

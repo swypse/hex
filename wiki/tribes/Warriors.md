@@ -20,7 +20,7 @@ Standard bearer: a weak fighter whose value is the aura it carries. Keep it behi
 
 | Move | Attack | Defense | Range | HP | Spawn cost | Upkeep (money / food) | Board score |
 |------|--------|---------|-------|----|------------|-----------------------|-------------|
-| 8 | 10 | 0 | 1 | 30 | 7 money + 2 ore | 3 / 3 | 8 |
+| 8 | 10 | 0 | 1 | 30 | 7 money + 2 ore | 1 / 1 | 8 |
 
 - **War cry aura.** Allied units within 2 hexes gain **+5 attack** (never the banner itself, and never ships).
 - **No stacking.** Several banners do not add up: the bonus is always a flat +5.

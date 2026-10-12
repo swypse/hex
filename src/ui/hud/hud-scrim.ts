@@ -2,8 +2,10 @@ import { Container, FillGradient, Graphics } from 'pixi.js';
 import { type UIHost, type Widget } from '../host';
 import { ScrimSide } from '@enums';
 
-/** Height of the full-width top/bottom scrim band. */
-const SCENIC_BAND_H = 70;
+/** Height of the full-width top scrim band. */
+const TOP_BAND_H = 70;
+/** Height of the full-width bottom scrim band. */
+const BOTTOM_BAND_H = 90;
 
 export interface HudScrimOptions {
   /** 'top' fades opaque→transparent downward; 'bottom' is the mirror. */
@@ -41,6 +43,7 @@ export class HudScrim implements Widget {
     if (!this.el || !this.host) return;
     const screenW = this.host.app.screen.width;
     const screenH = this.host.app.screen.height;
+    const bandH = this.side === ScrimSide.TOP ? TOP_BAND_H : BOTTOM_BAND_H;
     this.el.clear();
     this.gradient?.destroy();
     // Fade from 0.8 alpha at the screen edge to fully transparent away from it.
@@ -51,16 +54,16 @@ export class HudScrim implements Widget {
     const gradient = new FillGradient({
       type: 'linear',
       start: { x: 0, y: 0 },
-      end: { x: 0, y: SCENIC_BAND_H },
+      end: { x: 0, y: bandH },
       colorStops: [
         { offset: 0, color: [0, 0, 0, edge] },
         { offset: 1, color: [0, 0, 0, away] },
       ],
       textureSpace: 'global',
     });
-    this.el.rect(0, 0, screenW, SCENIC_BAND_H).fill(gradient);
+    this.el.rect(0, 0, screenW, bandH).fill(gradient);
     this.gradient = gradient;
-    this.el.position.set(0, this.side === ScrimSide.TOP ? 0 : screenH - SCENIC_BAND_H);
+    this.el.position.set(0, this.side === ScrimSide.TOP ? 0 : screenH - bandH);
   };
 
   destroy(): void {

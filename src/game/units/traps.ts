@@ -3,7 +3,7 @@ import { type GameMap, type MapTile } from '../map/map-gen';
 import { isIceType, isWaterType } from '../map/tile-types';
 import { type Resources } from '../economy/resources';
 
-export const TRAP_COST: Resources = { wood: 0, stone: 0, money: 5, ore: 3, food: 0 };
+export const TRAP_COST: Resources = { wood: 0, stone: 0, money: 3, ore: 2, food: 0 };
 export const TRAP_TURNS = 10;
 const TRAP_ATTACK = 30;
 

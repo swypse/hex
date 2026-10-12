@@ -20,6 +20,8 @@ export class UnitActions {
   pendingPlacement: { unitId: string; kind: BuilderBuildKind } | null = null;
   pendingTrap: { unitId: string } | null = null;
   pendingExtinguish: { unitId: string } | null = null;
+  /** Stormcaller's Call lightning: the visible villages are highlighted and one is tapped. */
+  pendingLightning: { unitId: string } | null = null;
 
   constructor(private readonly host: UnitActionsHost) {}
 
@@ -117,6 +119,7 @@ export class UnitActions {
     this.pendingPlacement = { unitId: unit.id, kind };
     this.pendingTrap = null;
     this.pendingExtinguish = null;
+    this.pendingLightning = null;
     store.setOverlay(null);
     this.render();
   }
@@ -133,6 +136,7 @@ export class UnitActions {
     this.pendingPlacement = null;
     this.pendingTrap = null;
     this.pendingExtinguish = null;
+    this.pendingLightning = null;
     this.placementKeys.clear();
     useGameStore.getState().setSelection(null);
     this.render();
@@ -149,6 +153,7 @@ export class UnitActions {
     this.pendingTrap = { unitId: unit.id };
     this.pendingPlacement = null;
     this.pendingExtinguish = null;
+    this.pendingLightning = null;
     this.render();
   }
 
@@ -166,9 +171,33 @@ export class UnitActions {
     this.render();
   }
 
+  /** Stormcaller: enter Call lightning mode; every village the player sees is highlighted. */
+  beginLightning(): void {
+    const store = useGameStore.getState();
+    if (store.aiActive) return;
+    const selection = store.selection;
+    if (!selection || !this.sim) return;
+    const unit = tileAt(this.sim.map, selection.q, selection.r)?.unit;
+    if (!unit || unit.owner !== store.localPlayerIndex || unit.type !== UnitType.STORMCALLER) return;
+    this.pendingLightning = { unitId: unit.id };
+    this.pendingPlacement = null;
+    this.pendingTrap = null;
+    this.pendingExtinguish = null;
+    this.render();
+  }
+
+  lightningOn(q: number, r: number): void {
+    const pending = this.pendingLightning;
+    this.pendingLightning = null;
+    this.placementKeys.clear();
+    if (!pending || !this.sim) return;
+    this.sendCommand({ type: CommandType.LIGHTNING, unitId: pending.unitId, q, r });
+  }
+
   extinguishOn(q: number, r: number): void {
     const pending = this.pendingExtinguish;
     this.pendingExtinguish = null;
+    this.pendingLightning = null;
     this.placementKeys.clear();
     if (!pending || !this.sim) return;
     this.sendCommand({ type: CommandType.EXTINGUISH, unitId: pending.unitId, q, r });

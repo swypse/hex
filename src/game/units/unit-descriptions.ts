@@ -18,7 +18,7 @@ const LAND_KEYS: Record<UnitType, string[]> = {
   banner: ['help.banner.base', 'help.banner.aura', 'help.banner.nostack'],
   berserker: ['help.berserker.base', 'help.berserker.rage'],
   trapper: ['help.trapper.base', 'help.trapper.trap', 'help.trapper.cost', 'help.trapper.lifetime'],
-  stormcaller: ['help.stormcaller.base', 'help.stormcaller.storm', 'help.stormcaller.eligibility'],
+  stormcaller: ['help.stormcaller.base', 'help.stormcaller.storm', 'help.stormcaller.eligibility', 'help.stormcaller.lightning'],
   stunner: ['help.stunner.base', 'help.stunner.range', 'help.stunner.stun'],
 };
 

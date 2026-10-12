@@ -61,6 +61,7 @@ const INSTANT_EVENTS: ReadonlySet<GameEvent['type']> = new Set<GameEvent['type']
   GameEventType.SHIP_REVERTED,
   GameEventType.SEASON_CHANGED,
   GameEventType.SCORE_FLY,
+  GameEventType.INCOME,
   GameEventType.KNIGHT_COMBO,
   GameEventType.ACHIEVEMENT_UNLOCKED,
 ]);
@@ -348,6 +349,12 @@ export class EventPresenter {
             if (e.playerIndex !== useGameStore.getState().localPlayerIndex) break;
             const tile = tileAt(sim.map, e.q, e.r);
             if (tile) this.effects.spawnScoreFly(tile, e.playerIndex, e.amount);
+            break;
+          }
+          case GameEventType.INCOME: {
+            if (e.playerIndex !== useGameStore.getState().localPlayerIndex) break;
+            const tile = tileAt(sim.map, e.q, e.r);
+            if (tile) this.effects.spawnIncomeFly(tile, e);
             break;
           }
           case GameEventType.KNIGHT_COMBO: {
@@ -1251,12 +1258,15 @@ export class EventPresenter {
       });
       shakeMs = this.host.mapView()?.shakeTiles(visible) ?? 0;
     }
-    useGameStore.getState().setCenterMessage(
-      t('weather.started', {
-        name: t(`weather.${weather.type}` as never),
-        where: t(`weather.where.${compassDirection(weather)}` as never),
-      }),
-    );
+    // The bolt and its effects speak for themselves: no announcement for lightning.
+    if (weather.type !== WeatherType.LIGHTNING) {
+      useGameStore.getState().setCenterMessage(
+        t('weather.started', {
+          name: t(`weather.${weather.type}` as never),
+          where: t(`weather.where.${compassDirection(weather)}` as never),
+        }),
+      );
+    }
     // Messages queue in the store; only the shake has to play out first.
     if (shakeMs > 0) await sleep(shakeMs);
   }

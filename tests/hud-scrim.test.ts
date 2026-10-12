@@ -49,14 +49,14 @@ describe('HudScrim', () => {
     scrim.destroy();
   });
 
-  it('bottom scrim: full-width 70px band flush with the screen bottom', () => {
+  it('bottom scrim: full-width 90px band flush with the screen bottom', () => {
     const scrim = new HudScrim({ side: ScrimSide.BOTTOM });
     scrim.mount(host, root);
     const el = (scrim as unknown as { el: Container }).el!;
-    expect(el.position.y).toBe(800 - 70);
+    expect(el.position.y).toBe(800 - 90);
     const bounds = el.getLocalBounds();
     expect(bounds.width).toBe(1280);
-    expect(bounds.height).toBe(70);
+    expect(bounds.height).toBe(90);
     scrim.destroy();
   });
 

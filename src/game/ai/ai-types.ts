@@ -43,6 +43,7 @@ export type AiAction =
   | { type: AiActionType.EXTINGUISH; unitId: string; q: number; r: number }
   | { type: AiActionType.ENABLE_STEALTH; unitId: string }
   | { type: AiActionType.STORM; unitId: string }
+  | { type: AiActionType.LIGHTNING; unitId: string; q: number; r: number }
   | { type: AiActionType.TRAP; unitId: string; q: number; r: number }
   | { type: AiActionType.BURN; unitId: string }
   | { type: AiActionType.BURN_ROAD; unitId: string }
@@ -59,6 +60,8 @@ export interface AiPlannerState {
   occupied: Set<string>;
   /** Kinds of buildings planned this turn (not yet on the board in snapshot planning). */
   plannedKinds?: Set<BuildingKind>;
+  /** A lightning was already called this turn (it recharges for several turns). */
+  lightningCalled?: boolean;
 }
 
 /** A persistent multi-unit plan against one enemy village: the squad first

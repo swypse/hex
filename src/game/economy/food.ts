@@ -18,7 +18,7 @@ export const FARM_FOOD = 2;
 export const AGRONOMY_FOOD = 1;
 export const AGRONOMY_WINTER_FOOD = 1;
 /** Most food one granary can hold. */
-export const GRANARY_CAPACITY = 50;
+export const GRANARY_CAPACITY = 25;
 /** Hp a unit loses when it gets none of the food it needs; a partly fed unit
  *  loses the missing share of it (rounded). */
 export const STARVATION_DAMAGE = 10;

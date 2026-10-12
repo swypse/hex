@@ -158,7 +158,7 @@ describe('Naval skill priority', () => {
   });
 
   it('opens only the naval skill chain while threatened, never economy skills', () => {
-    const allowed = new Set(['water', 'navigation', 'shields', 'catapult']);
+    const allowed = new Set(['water', 'navigation', 'archer', 'catapult']);
     const player = aiPlayer({ resources: { wood: 0, stone: 0, money: 200, ore: 0, food: 20 } });
     const map = coastalMap();
     const actions = planAiActions(map, fund(map, player), new SeededRandom(1), GameMode.CAPTURE);

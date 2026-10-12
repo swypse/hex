@@ -57,15 +57,15 @@ describe('banner aura', () => {
 });
 
 describe('berserker rage', () => {
-  it('gives +10 at or below 35% HP, else 0', () => {
+  it('gives +15 at or below 50% HP, else 0', () => {
     const u = makeUnit(0, UnitType.BERSERKER, 0, 0);
     expect(berserkerRage(u)).toBe(0);
-    u.hp = 25; // 50% of 50 — above the 35% threshold
+    u.hp = 26; // just above 50% of 50
     expect(berserkerRage(u)).toBe(0);
-    u.hp = 17; // exactly 35% of 50
-    expect(berserkerRage(u)).toBe(10);
+    u.hp = 25; // exactly 50% of 50
+    expect(berserkerRage(u)).toBe(15);
     u.hp = 10;
-    expect(berserkerRage(u)).toBe(10);
+    expect(berserkerRage(u)).toBe(15);
   });
 
   it('only applies to berserkers', () => {
@@ -79,12 +79,12 @@ describe('effectiveAttack', () => {
     put(map, 1, 0, makeUnit(0, UnitType.BANNER, 1, 0));
     const berserker = makeUnit(0, UnitType.BERSERKER, 0, 0, { hp: 10 }); // raging
     put(map, 0, 0, berserker);
-    expect(effectiveAttack(berserker, map)).toBe(26 + 5 + 10);
+    expect(effectiveAttack(berserker, map)).toBe(26 + 5 + 15);
   });
 
   it('no map means no aura but rage still applies', () => {
     expect(effectiveAttack(makeUnit(0, UnitType.WARRIOR, 0, 0), null)).toBe(20);
-    expect(effectiveAttack(makeUnit(0, UnitType.BERSERKER, 0, 0, { hp: 10 }), null)).toBe(26 + 10);
+    expect(effectiveAttack(makeUnit(0, UnitType.BERSERKER, 0, 0, { hp: 10 }), null)).toBe(26 + 15);
   });
 });
 

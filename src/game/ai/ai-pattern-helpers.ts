@@ -30,6 +30,8 @@ export interface AiPatternContext {
   difficulty?: AiDifficultyProfile;
   directives?: AiDirectives;
   operation?: AiOperation | null;
+  /** The game turn being planned (0 when the caller did not pass it). */
+  turn?: number;
 }
 
 export interface AiPattern {
@@ -284,6 +286,7 @@ export function bestSpawnableUnitType(
     if (type === UnitType.SWORDSMAN && !hasSkill(player, SkillId.SWORDSMAN)) continue;
     if (type === UnitType.CATAPULT && !hasSkill(player, SkillId.CATAPULT)) continue;
     if (type === UnitType.SHIELD && !hasSkill(player, SkillId.SHIELDS)) continue;
+    if (type === UnitType.ARCHER && !hasSkill(player, SkillId.ARCHER)) continue;
     const cost = unitSpawnCost(type);
     // The money is the player's; wood and ore come from the spawning village's
     // network (without a village only the money can be checked).

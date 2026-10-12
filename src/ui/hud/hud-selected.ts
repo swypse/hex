@@ -10,6 +10,7 @@ import { activeBuffs, VILLAGE_DEFENSE } from '../../game/units/buffs';
 import { isShip } from '../../game/units/ship';
 import { villageCapacity, villageBuildingLimit, buildingKindsInVillage, unitsInVillage } from '../../game/economy/village';
 import { tileUpkeep, villageIncomeBreakdown } from '../../game/economy/capture';
+import { lightningTurnsLeft } from '../../game/units/lightning';
 import { farmYield, GRANARY_CAPACITY, STARVATION_DAMAGE, villageFood, villageGranaries } from '../../game/economy/food';
 import { villageUpgradeCost } from '../../game/economy/resources';
 import { buildingYield, buildingHp, canPlaceFoodBuilding, BUILDING_NAMES, DESTROY_BUILDING_COST } from '../../game/economy/buildings';
@@ -176,6 +177,14 @@ export class HudSelected implements Widget {
         lines.push(t('hud.selected.kills', { n: unit.kills ?? 0 }));
         bolds.push(false);
       }
+      // A stormcaller of the local player shows how long its lightning still recharges.
+      if (unit.type === UnitType.STORMCALLER && unit.owner === s.localPlayerIndex && human) {
+        const turnsLeft = lightningTurnsLeft(human, s.turn);
+        if (turnsLeft > 0) {
+          lines.push(t('hud.selected.lightningRecharge', { n: turnsLeft }));
+          bolds.push(false);
+        }
+      }
       for (const buff of defenseBuffs) {
         extraRows.set(lines.length, { name: '', pairs: [{ icon: 'def-32', value: t(buff.key, { n: buff.amount }) }] });
         lines.push('');
@@ -203,7 +212,8 @@ export class HudSelected implements Widget {
       // The village line carries the income as an icon + value pair, like the
       // unit characteristics row.
       settlementRow = {
-        name: t('hud.selected.settlement', { name: settlement.name ?? t('hud.selected.settlementDefault'), level: settlement.level }),
+        // A free village stays unnamed until it is captured.
+        name: t('hud.selected.settlement', { name: settlement.owner === null ? t('hud.selected.freeVillage') : settlement.name ?? t('hud.selected.settlementDefault'), level: settlement.level }),
         pairs: [{ icon: 'unit-32', value: `${unitsInVillage(map, tile)}/${villageCapacity(settlement.level)}` }],
       };
       lines.push('');
