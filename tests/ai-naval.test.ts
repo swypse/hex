@@ -119,6 +119,11 @@ describe('Naval skill priority', () => {
     tileAt(map, 1, 0)!.terrain = TileType.Water;
     tileAt(map, 3, 0)!.terrain = TileType.Water;
     tileAt(map, 3, 0)!.unit = pirate('p1', 3, 0);
+    // A farm feeds the village, so food is no pressure that would open Agriculture.
+    const farm = tileAt(map, 0, 1)!;
+    farm.ownedBy = 1;
+    farm.claimedByVillage = { q: 0, r: 0 };
+    farm.building = { kind: BuildingKind.FARM, level: 1 };
     return map;
   }
 

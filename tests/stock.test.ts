@@ -310,7 +310,7 @@ describe('food reserve per network', () => {
     // A has nothing to eat: its warrior starves while B's is fed from B's food.
     expect(reports.map((r) => r.village)).toEqual([a]);
     expect(readStock(a).food).toBe(0);
-    expect(readStock(b).food).toBe(9);
+    expect(readStock(b).food).toBe(8); // its village and its warrior ate 1 each
   });
 
   it('connected villages share the food', () => {
@@ -320,7 +320,7 @@ describe('food reserve per network', () => {
     tileAt(map, 0, 1)!.unit = u;
     addStock(b, { food: 10 });
     expect(applyFood(map, p)).toEqual([]);
-    expect(readStock(b).food).toBe(9);
+    expect(readStock(b).food).toBe(7); // two villages and a warrior ate 1 each
     expect(readStock(a).food).toBe(0);
   });
 });

@@ -23,6 +23,11 @@ export const GRANARY_CAPACITY = 50;
  *  loses the missing share of it (rounded). */
 export const STARVATION_DAMAGE = 10;
 
+/** Food a village itself eats each round: half its level, rounded up. */
+export function villageFoodUpkeep(level: number): number {
+  return Math.ceil(level / 2);
+}
+
 /** Order in which equally hungry units are fed (the hungriest go first). */
 const UNIT_FEED_PRIORITY: UnitType[] = [
   UnitType.KNIGHT, UnitType.CATAPULT, UnitType.SWORDSMAN, UnitType.STORMCALLER, UnitType.BERSERKER, UnitType.TRAPPER, UnitType.STUNNER, UnitType.STALKER, UnitType.BUILDER, UnitType.BANNER,
@@ -65,10 +70,18 @@ function granariesOf(map: GameMap, ownerIndex: number, villageKeys: Set<string>)
   return map.tiles.filter((t) => t.building?.kind === BuildingKind.GRANARY && t.ownedBy === ownerIndex && claimedBy(t, villageKeys));
 }
 
-/** Units raised by these villages that eat food, in feeding order: village by
- *  village (as given), hungriest unit first. */
-function eatersOf(map: GameMap, ownerIndex: number, villages: MapTile[]): { unit: Unit; tile: MapTile; village: MapTile }[] {
-  const out: { unit: Unit; tile: MapTile; village: MapTile }[] = [];
+interface FoodEater {
+  /** The eating unit; null when the eater is the village itself. */
+  unit: Unit | null;
+  tile: MapTile;
+  village: MapTile;
+  need: number;
+}
+
+/** Eaters of these villages in feeding order: village by village (as given),
+ *  the village itself first, then the units it raised, hungriest first. */
+function eatersOf(map: GameMap, ownerIndex: number, villages: MapTile[]): FoodEater[] {
+  const out: FoodEater[] = [];
   const byVillage = new Map<string, { unit: Unit; tile: MapTile }[]>();
   for (const t of map.tiles) {
     const u = t.unit;
@@ -81,7 +94,8 @@ function eatersOf(map: GameMap, ownerIndex: number, villages: MapTile[]): { unit
   for (const village of villages) {
     const list = byVillage.get(axialKey(village)) ?? [];
     list.sort((a, b) => compareUnits(a.unit, b.unit));
-    for (const e of list) out.push({ ...e, village });
+    if (village.settlement) out.push({ unit: null, tile: village, village, need: villageFoodUpkeep(village.settlement.level) });
+    for (const e of list) out.push({ ...e, village, need: unitFoodUpkeep(e.unit.type) });
   }
   return out;
 }
@@ -114,7 +128,7 @@ export function adjacentFarmCount(map: GameMap, tile: MapTile, ownerIndex: numbe
 export interface VillageFood {
   /** Food per round from the farms of the village's whole network. */
   production: number;
-  /** Food per round eaten by the units of the whole network. */
+  /** Food per round eaten by the villages and units of the whole network. */
   upkeep: number;
   /** production − upkeep for one round. */
   balance: number;
@@ -128,7 +142,7 @@ export interface VillageFood {
 function networkFood(map: GameMap, ownerIndex: number, villages: MapTile[], owner: Player | null | undefined): Omit<VillageFood, 'starving'> {
   const keys = keysOf(villages);
   const production = farmsOf(map, ownerIndex, keys).reduce((sum, farm) => sum + farmYield(owner, map, farm), 0);
-  const upkeep = eatersOf(map, ownerIndex, villages).reduce((sum, e) => sum + unitFoodUpkeep(e.unit.type), 0);
+  const upkeep = eatersOf(map, ownerIndex, villages).reduce((sum, e) => sum + e.need, 0);
   const granaryFood = granariesOf(map, ownerIndex, keys).reduce((sum, t) => sum + (t.building?.food ?? 0), 0);
   return { production, upkeep, balance: production - upkeep, granaryFood, networkSize: villages.length };
 }
@@ -213,12 +227,12 @@ export function applyFood(map: GameMap, player: Player, dryRun = false): Starvat
     return got;
   };
 
-  interface Eater { unit: Unit; tile: MapTile; village: MapTile; need: number; got: number }
+  interface Eater extends FoodEater { got: number }
   interface Net { villages: MapTile[]; eaters: Eater[]; keys: Set<string> }
   const nets: Net[] = foodNetworks(map, owner).map((villages) => ({
     villages,
     keys: keysOf(villages),
-    eaters: eatersOf(map, owner, villages).map((e) => ({ ...e, need: unitFoodUpkeep(e.unit.type), got: 0 })),
+    eaters: eatersOf(map, owner, villages).map((e) => ({ ...e, got: 0 })),
   }));
 
   // Stage 1: the farms feed their network; leftovers of farms next to a granary are stored.
@@ -290,6 +304,7 @@ export function applyFood(map: GameMap, player: Player, dryRun = false): Starvat
     for (const e of net.eaters) {
       if (e.got >= e.need) continue;
       e.village.settlement!.starving = true;
+      if (!e.unit) continue;
       e.unit.starving = true;
       let report = reports.get(e.village);
       if (!report) reports.set(e.village, (report = { village: e.village, units: [] }));

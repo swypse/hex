@@ -60,8 +60,8 @@ function makeAiMap(): GameMap {
   const village = makeTile(0, 0, 1, { owner: 1, level: 1, captureReady: false });
   // Two tiles share the hex (the village and the warrior standing on it); the
   // map index keeps the last one, so both hold the starting food.
-  const warrior = makeTile(0, 0, 1, { owner: 1, level: 1, captureReady: false, stock: { wood: 0, stone: 0, ore: 0, food: 20 } }, makeWarrior('w1', 1, 0, 0));
-  village.settlement!.stock = { wood: 0, stone: 0, ore: 0, food: 20 };
+  const warrior = makeTile(0, 0, 1, { owner: 1, level: 1, captureReady: false, stock: { wood: 0, stone: 0, ore: 0, food: 40 } }, makeWarrior('w1', 1, 0, 0));
+  village.settlement!.stock = { wood: 0, stone: 0, ore: 0, food: 40 };
   const target = makeTile(1, 0, null);
   return { radius: 4, tiles: [village, warrior, target], spawns: [] };
 }

@@ -118,7 +118,7 @@ describe('HudSelected village building constraints', () => {
 
   it('shows the food balance of an own village and a red starvation line when it starves', () => {
     mount(1, 0, 0);
-    expect(texts().some((s) => s.includes('(0 - 0)'))).toBe(true);
+    expect(texts().some((s) => s.includes('(0 - 1)'))).toBe(true);
     expect(texts().some((s) => s.startsWith('Starving!'))).toBe(false);
     const village = tileAt(gameController.getMap()!, 0, 0)!;
     village.settlement!.starving = true;

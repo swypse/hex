@@ -239,7 +239,7 @@ describe('AI and the university', () => {
       farm.building = { kind: BuildingKind.FARM, level: 1 };
       if (withUniversity) tileAt(map, 0, 1)!.building = { kind: BuildingKind.UNIVERSITY, level: 1 };
       let n = 0;
-      for (const [q, r] of [[0, 0], [-1, 0], [0, -1], [1, -1], [-1, 1]] as const) {
+      for (const [q, r] of [[0, 0], [-1, 0], [0, -1], [1, -1]] as const) {
         const t = tileAt(map, q, r)!;
         t.unit = makeUnit(`k${n++}`, 1, UnitType.KNIGHT, q, r);
         t.unit.spawnVillage = { q: 0, r: 0 };
