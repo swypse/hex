@@ -54,6 +54,7 @@ export const ACTION_BUTTON_ATLAS_FRAMES: Record<string, { x: number; y: number }
   'action-stats': { x: 120, y: 1080 },
   'action-stealth': { x: 240, y: 1080 },
   'action-stormcaller': { x: 360, y: 1080 },
-  'action-upgrade': { x: 480, y: 1080 },
-  'action-water-temple': { x: 0, y: 1200 },
+  'action-stormcaller-lightning': { x: 480, y: 1080 },
+  'action-upgrade': { x: 0, y: 1200 },
+  'action-water-temple': { x: 120, y: 1200 },
 };
