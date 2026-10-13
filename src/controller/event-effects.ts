@@ -10,7 +10,7 @@ import { useGameStore } from '../store/game-store';
 import { EXPLORED_SCORE } from '../game/score';
 import { makeLabel } from '../gfx/label';
 import { makeIcon32 } from '../gfx/icons32';
-import { FONT_BLACK, sizedFontFamily } from '../gfx/bitmap-fonts';
+import { FONT_BLACK, FONT_REGULAR, sizedFontFamily } from '../gfx/bitmap-fonts';
 import { markDirty } from '../gfx/render-gate';
 import { FontSize } from '@enums';
 
@@ -80,11 +80,13 @@ export class EventEffects {
   }
 
   /** Round-end income: one label of "<icon> N" parts (money, wood, stone + ore, food) lifting up from the tile. */
-  spawnIncomeFly(tile: MapTile, income: Partial<Record<'money' | 'wood' | 'stone' | 'ore' | 'food', number>>): void {
+  spawnIncomeFly(tile: MapTile, income: Partial<Record<'money' | 'wood' | 'stone' | 'ore' | 'food', number>>, delayMs = 0): void {
     const parts = INCOME_PARTS
       .filter(({ key }) => (income[key] ?? 0) > 0)
       .map(({ key, icon }) => ({ icon, text: String(income[key]), color: 0xffffff }));
-    if (parts.length > 0) this.floatUp(tile, parts, true);
+    if (parts.length === 0) return;
+    if (delayMs > 0) setTimeout(() => this.floatUp(tile, parts, true), delayMs);
+    else this.floatUp(tile, parts, true);
   }
 
   /** Lifts a row of optional-icon + text parts up from `tile` and fades it out. */
@@ -108,7 +110,8 @@ export class EventEffects {
       }
       const label = new BitmapText({
         text: part.text,
-        style: { fontFamily: sizedFontFamily(FONT_BLACK, FontSize.SMALL), fontSize: FontSize.SMALL, fill: part.color },
+        // Plated badges (income, score) use the regular weight; plain hp numbers stay bold.
+        style: { fontFamily: sizedFontFamily(withBackground ? FONT_REGULAR : FONT_BLACK, FontSize.SMALL), fontSize: FontSize.SMALL, fill: part.color },
       });
       label.anchor.set(0, 0.5);
       label.position.set(x, 0);

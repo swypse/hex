@@ -21,6 +21,7 @@ import { SKILLS } from '../game/skills';
 import { achievementIcon, achievementNameKey } from '../game/achievements';
 import { CameraController } from './camera-controller';
 import { initialAttackHpOverrides, hpOverrideAfterAttack } from './attack-hp';
+import { incomeBadgeDelays } from './income-order';
 import { attackPresenceParticipants, type AttackPresenceParticipant } from './attack-presence';
 import { t } from '../i18n';
 import { sfx } from '../sound/sfx';
@@ -284,6 +285,7 @@ export class EventPresenter {
     }
     const initialPresence = this.presenceOverrides(events, 0);
     if (initialPresence.size > 0) this.host.mapView()?.setUnitOverrides(initialPresence);
+    const incomeDelays = incomeBadgeDelays(events, local);
     let hadAttack = false;
     try {
       for (let i = 0; i < events.length; i++) {
@@ -354,7 +356,7 @@ export class EventPresenter {
           case GameEventType.INCOME: {
             if (e.playerIndex !== useGameStore.getState().localPlayerIndex) break;
             const tile = tileAt(sim.map, e.q, e.r);
-            if (tile) this.effects.spawnIncomeFly(tile, e);
+            if (tile) this.effects.spawnIncomeFly(tile, e, incomeDelays.get(e) ?? 0);
             break;
           }
           case GameEventType.KNIGHT_COMBO: {
