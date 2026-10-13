@@ -9,7 +9,7 @@ import { isExploredFor } from '../../map/explore';
 import { type AiAction } from '../ai-types';
 import { AiActionType, SkillId, SpawnPreference, UnitType } from '@enums';
 
-import { type AiPattern, berserkerShouldPress, bestSpawnableUnitType, enemyCanAttackNext, enemyCanReach, isSupportUnit, key, landEnemyCanReach, nearestEnemyDistanceFrom } from '../ai-pattern-helpers';
+import { type AiPattern, berserkerShouldPress, bestSpawnableUnitType, enemyCanAttackNext, enemyCanReach, isSupportUnit, key, landEnemyCanReach, nearestEnemyDistanceFrom, spawnWouldBeKilled } from '../ai-pattern-helpers';
 
 export const DEFENSE_PATTERNS: AiPattern[] = [
   {
@@ -69,7 +69,8 @@ export const DEFENSE_PATTERNS: AiPattern[] = [
         if (state.spawned.has(k)) continue;
         if (v.unit) continue;
         if (!landEnemyCanReach(map, v, player.index)) continue;
-        const type = bestSpawnableUnitType(player, SpawnPreference.DEFENSE, map, v);
+        // Never raise a unit the enemies in reach would kill before it acts.
+        const type = bestSpawnableUnitType(player, SpawnPreference.DEFENSE, map, v, (ty) => !spawnWouldBeKilled(map, v, player.index, ty));
         if (!type) continue;
         return [{ type: AiActionType.SPAWN, q: v.q, r: v.r, unitType: type }];
       }

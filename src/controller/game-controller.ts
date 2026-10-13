@@ -1013,8 +1013,8 @@ class GameController {
     store.setSelection(next);
     sfx.play('click');
     if (next.kind === SelectionKind.UNIT) {
-      const u = tileAt(this.sim.map, next.q, next.r)?.unit;
-      if (u && u.owner === store.localPlayerIndex) this.mapView?.bounceUnit(next.q, next.r);
+      // Any selected unit lifts, enemies and pirates included.
+      if (tileAt(this.sim.map, next.q, next.r)?.unit) this.mapView?.bounceUnit(next.q, next.r);
     }
     this.render();
   }

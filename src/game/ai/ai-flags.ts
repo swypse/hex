@@ -31,6 +31,9 @@ export interface AiFlags {
   /** Offensive spawns pick a knight/rider/swordsman/warrior when ranged units outnumber such finishers 2:1,
    *  so a ranged garrison kill is followed by a unit that can step onto the emptied village. */
   finishers: boolean;
+  /** Idle units go for enemy buildings in reach, most valuable first (granary, university, farm,
+   *  mine, sawmill): catapults siege them, other units burn farms and granaries. */
+  raidBuildings: boolean;
 }
 
 /** Shipped defaults. `multiSpecial` stays off: a 160-game benchmark showed no gain (44% wins,
@@ -38,9 +41,9 @@ export interface AiFlags {
  *  the solo-hunt/naval patterns so it only ever claims units those left idle — an earlier
  *  placement ahead of them regressed the AI (44% wins, fewer enemy villages captured) by pulling
  *  units off easy solo kills to wait for the group. */
-const DEFAULT_AI_FLAGS: AiFlags = { militarySkills: true, berserkerHold: true, stunnerHunt: true, multiSpecial: false, operations: true, composition: false, stoneFocus: true, march: true, finishers: true };
-export const ALL_AI_FLAGS_ON: AiFlags = { militarySkills: true, berserkerHold: true, stunnerHunt: true, multiSpecial: true, operations: true, composition: true, stoneFocus: true, march: true, finishers: true };
-export const ALL_AI_FLAGS_OFF: AiFlags = { militarySkills: false, berserkerHold: false, stunnerHunt: false, multiSpecial: false, operations: false, composition: false, stoneFocus: false, march: false, finishers: false };
+const DEFAULT_AI_FLAGS: AiFlags = { militarySkills: true, berserkerHold: true, stunnerHunt: true, multiSpecial: false, operations: true, composition: false, stoneFocus: true, march: true, finishers: true, raidBuildings: true };
+export const ALL_AI_FLAGS_ON: AiFlags = { militarySkills: true, berserkerHold: true, stunnerHunt: true, multiSpecial: true, operations: true, composition: true, stoneFocus: true, march: true, finishers: true, raidBuildings: true };
+export const ALL_AI_FLAGS_OFF: AiFlags = { militarySkills: false, berserkerHold: false, stunnerHunt: false, multiSpecial: false, operations: false, composition: false, stoneFocus: false, march: false, finishers: false, raidBuildings: false };
 
 export function flagsFor(player: Pick<Player, 'aiFlags'>): AiFlags {
   return player.aiFlags ? { ...DEFAULT_AI_FLAGS, ...player.aiFlags } : DEFAULT_AI_FLAGS;

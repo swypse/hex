@@ -7,7 +7,7 @@ import type { Player } from '../players';
 import { unitMaxHp, type Unit } from './units';
 import { attackBonus, effectiveAttack, berserkerRage, isStunned } from './abilities';
 import { damageReduction } from './buffs';
-import { BUILDING_MAX_HP } from '../economy/buildings';
+import { BUILDING_MAX_HP, raidPriority } from '../economy/buildings';
 import { SiegeTargetKind, SkillId, UnitType } from '@enums';
 
 interface AttackResult {
@@ -229,7 +229,8 @@ function chooseBestSiegeTarget(map: GameMap, unit: Unit, playerIndex = 0): MapTi
       s = 400 + t.settlement.level * 50;
       if (t.settlement.wall) s += 80;
     } else if (t.building) {
-      s = 150;
+      // Production and food buildings first (granary > university > farm > mine > sawmill).
+      s = 150 + raidPriority(t.building.kind) * 8;
     } else if (t.bridge !== undefined && t.bridge !== null) {
       s = 80;
     } else {
@@ -245,6 +246,16 @@ function chooseBestSiegeTarget(map: GameMap, unit: Unit, playerIndex = 0): MapTi
   return best;
 }
 
+/** An enemy trapper (44 hp, defense 8, a hard counter) is a poor target for a
+ *  melee unit that cannot kill it outright: archers and catapults should wear
+ *  it down and melee only finish it, taking no counter. A raging berserker
+ *  takes no counter and ships fire from range, so neither is held back. */
+export function isPoorTrapperTarget(attacker: Unit, target: Unit): boolean {
+  if (target.type !== UnitType.TRAPPER) return false;
+  if (attacker.attackDistance > 1 || isShip(attacker) || berserkerRage(attacker) > 0) return false;
+  return attackDamage(attacker) < target.hp;
+}
+
 export function chooseBestAttack(map: GameMap, unit: Unit, playerIndex = 0): MapTile | null {
   const targets = attackableTargets(map, unit, playerIndex);
   let best: MapTile | null = null;
@@ -254,6 +265,7 @@ export function chooseBestAttack(map: GameMap, unit: Unit, playerIndex = 0): Map
     // AI prefers unit targets, handling those in the fallback below.
     if (!t.unit) continue;
     const target = t.unit!;
+    if (isPoorTrapperTarget(unit, target)) continue;
     const dmg = attackDamage(unit);
     let s = 0;
     if (dmg >= target.hp) s += 500;

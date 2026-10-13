@@ -5,6 +5,7 @@ import type { Resources, Stock } from './resources';
 import { tileMapByKey } from '../map/tile-index';
 import { tileAt } from '../map/tile-index';
 import { roadNetworkComponents } from './road-network';
+import { BUILDING_MATERIALS, heldInBuilding, holdsMaterials, type BuildingMaterial } from './building-stock';
 
 export type { Stock } from './resources';
 
@@ -65,23 +66,54 @@ export function villageNetwork(map: GameMap, village: MapTile): MapTile[] {
   return [village, ...net.filter((v) => v !== village)];
 }
 
-/** Everything the villages of `village`'s network hold together. */
+/** Producing buildings (sawmills, mines) of the player that stand on the
+ *  territory of any of these villages: what they collected is part of those
+ *  villages' pooled stock. */
+function buildingsOfVillages(map: GameMap, villages: MapTile[]): MapTile[] {
+  const owner = villages[0]?.settlement?.owner;
+  if (owner === null || owner === undefined) return [];
+  const keys = new Set(villages.map((v) => axialKey(v)));
+  const out: MapTile[] = [];
+  for (const t of map.tiles) {
+    const b = t.building;
+    if (!b || t.ownedBy !== owner || !holdsMaterials(b.kind)) continue;
+    const c = t.claimedByVillage;
+    if (c && keys.has(axialKey(c))) out.push(t);
+  }
+  return out;
+}
+
+function addBuildingStock(total: Stock, buildings: MapTile[]): void {
+  for (const t of buildings) {
+    for (const m of BUILDING_MATERIALS) total[m] += heldInBuilding(t.building!, m);
+  }
+}
+
+/** Everything the villages of `village`'s network hold together, plus what the
+ *  sawmills and mines on their territory have collected. */
 export function networkStock(map: GameMap, village: MapTile): Stock {
+  const villages = villageNetwork(map, village);
   const total = emptyStock();
-  for (const v of villageNetwork(map, village)) {
+  for (const v of villages) {
     const s = readStock(v);
     for (const k of KEYS) total[k] += s[k];
   }
+  addBuildingStock(total, buildingsOfVillages(map, villages));
   return total;
 }
 
-/** Everything all of the player's villages hold, connected or not. */
+/** Everything all of the player's villages hold, connected or not, plus the
+ *  materials held by all of the player's sawmills and mines. */
 export function totalStock(map: GameMap, ownerIndex: number): Stock {
   const total = emptyStock();
   for (const t of map.tiles) {
-    if (t.settlement?.owner !== ownerIndex) continue;
-    const s = readStock(t);
-    for (const k of KEYS) total[k] += s[k];
+    if (t.settlement?.owner === ownerIndex) {
+      const s = readStock(t);
+      for (const k of KEYS) total[k] += s[k];
+    }
+    if (t.building && t.ownedBy === ownerIndex && holdsMaterials(t.building.kind)) {
+      for (const m of BUILDING_MATERIALS) total[m] += heldInBuilding(t.building, m);
+    }
   }
   return total;
 }
@@ -137,12 +169,13 @@ function payPool(map: GameMap, payer: MapTile, joined: MapTile[]): MapTile[] {
   return pool;
 }
 
-function poolStock(pool: MapTile[]): Stock {
+function poolStock(map: GameMap, pool: MapTile[]): Stock {
   const total = emptyStock();
   for (const v of pool) {
     const s = readStock(v);
     for (const k of KEYS) total[k] += s[k];
   }
+  addBuildingStock(total, buildingsOfVillages(map, pool));
   return total;
 }
 
@@ -161,7 +194,7 @@ export function canAffordAt(
   if (!needsStock) return true;
   const village = payerVillage(map, player.index, where);
   if (!village) return false;
-  const have = poolStock(payPool(map, village, joined));
+  const have = poolStock(map, payPool(map, village, joined));
   return KEYS.every((k) => have[k] >= cost[k]);
 }
 
@@ -181,8 +214,23 @@ export function payAt(
   const village = payerVillage(map, player.index, where);
   if (!village) return true;
   const pool = payPool(map, village, joined);
+  const buildings = buildingsOfVillages(map, pool);
   for (const k of KEYS) {
     let left = cost[k];
+    // What sawmills and mines hold is spent first (the fullest first), so they
+    // collect again; then the villages' own stock.
+    if (k !== 'food') {
+      const material: BuildingMaterial = k;
+      const holders = buildings
+        .filter((t) => heldInBuilding(t.building!, material) > 0)
+        .sort((a, b) => heldInBuilding(b.building!, material) - heldInBuilding(a.building!, material));
+      for (const t of holders) {
+        if (left <= 0) break;
+        const take = Math.min(heldInBuilding(t.building!, material), left);
+        t.building![material] = heldInBuilding(t.building!, material) - take;
+        left -= take;
+      }
+    }
     for (const v of pool) {
       if (left <= 0) break;
       const stock = stockOf(v);

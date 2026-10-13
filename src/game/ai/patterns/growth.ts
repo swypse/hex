@@ -20,7 +20,7 @@ import { eatsFarmMaterials } from '../../economy/food';
 import { AiActionType, BuildingKind, SkillId, UnitType } from '@enums';
 import { tileAt } from '../../map/tile-index';
 
-import { type AiPattern, enemyCanReach, friendlyUnitsWithin, isFrontierTile, isLikelyLethal, isSupportUnit, key, nearestEnemyDistanceFrom, specialUnitWanted } from '../ai-pattern-helpers';
+import { type AiPattern, enemyCanReach, friendlyUnitsWithin, isFrontierTile, isLikelyLethal, isSupportUnit, key, nearestEnemyDistanceFrom, specialUnitWanted, spawnWouldBeKilled } from '../ai-pattern-helpers';
 
 /** Money the AI keeps after paying for a lightning. */
 const LIGHTNING_MONEY_RESERVE = 10;
@@ -121,6 +121,7 @@ export const GROWTH_PATTERNS: AiPattern[] = [
           if (!canAffordAt(map, player, v, cost)) continue;
           const k = key(v.q, v.r);
           if (state.spawned.has(k) || state.occupied.has(k)) continue;
+          if (spawnWouldBeKilled(map, v, player.index, special)) continue;
           const enemyDist = nearestEnemyDistanceFrom(map, player.index, v);
           const score =
             special === UnitType.BANNER

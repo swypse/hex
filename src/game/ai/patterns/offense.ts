@@ -3,7 +3,7 @@ import { hasSkill } from '../../skills';
 import { reachableTargets } from '../../units/selection';
 import { movePoints, type Unit } from '../../units/units';
 import { hexDistance } from '../../map/hex';
-import { attackableTargets, attackDamage } from '../../units/combat';
+import { attackableTargets, attackDamage, isPoorTrapperTarget } from '../../units/combat';
 import { isExploredFor } from '../../map/explore';
 import { type AiAction } from '../ai-types';
 import { coastExposedTile } from '../ai-situation';
@@ -172,6 +172,11 @@ export const OFFENSE_PATTERNS: AiPattern[] = [
           t.unit.owner !== player.index,
       );
       if (!enemyInVillage) return null;
+      // A trapper in the village is shot by ranged units first; melee units
+      // join only when they finish it. Ranged units able to hit it now or
+      // after a move are what holds the melee ones back.
+      const trapper = enemyInVillage.unit?.type === UnitType.TRAPPER;
+      const rangedCanHit = trapper && attackersForTile(map, player, enemyInVillage, state).some((a) => a.unit.attackDistance > 1);
       const actions: AiAction[] = [];
       for (const t of map.tiles) {
         const unit = t.unit;
@@ -181,6 +186,7 @@ export const OFFENSE_PATTERNS: AiPattern[] = [
         // kill the defender outright.
         if (isSupportUnit(unit)) continue;
         if (unit.type === UnitType.STALKER && enemyInVillage.unit && attackDamage(unit) < enemyInVillage.unit.hp) continue;
+        if (rangedCanHit && enemyInVillage.unit && isPoorTrapperTarget(unit, enemyInVillage.unit)) continue;
         if (
           attackableTargets(map, unit, unit.owner).some(
             (a) => a.q === enemyInVillage.q && a.r === enemyInVillage.r,

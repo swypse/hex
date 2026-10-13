@@ -11,6 +11,7 @@ import { isShip } from '../../game/units/ship';
 import { villageCapacity, villageBuildingLimit, buildingKindsInVillage, unitsInVillage } from '../../game/economy/village';
 import { tileUpkeep, villageIncomeBreakdown } from '../../game/economy/capture';
 import { lightningTurnsLeft } from '../../game/units/lightning';
+import { buildingCapacity, heldInBuilding } from '../../game/economy/building-stock';
 import { farmYield, granaryCapacity, STARVATION_DAMAGE, villageFood, villageGranaries } from '../../game/economy/food';
 import { villageUpgradeCost } from '../../game/economy/resources';
 import { buildingYield, buildingHp, canPlaceFoodBuilding, BUILDING_NAMES, DESTROY_BUILDING_COST } from '../../game/economy/buildings';
@@ -292,6 +293,17 @@ export class HudSelected implements Widget {
       if (b.kind === BuildingKind.GRANARY) {
         const map = gameController.getMap();
         lines.push(t('hud.selected.granaryFood', { food: b.food ?? 0, cap: map ? granaryCapacity(map, tile) : 0 }));
+        bolds.push(false);
+      }
+      if (b.kind === BuildingKind.SAWMILL) {
+        lines.push(t('hud.selected.sawmillWood', { held: heldInBuilding(b, 'wood'), cap: buildingCapacity(b, 'wood') }));
+        bolds.push(false);
+      }
+      if (b.kind === BuildingKind.MINE) {
+        lines.push(t('hud.selected.mineStock', {
+          stone: heldInBuilding(b, 'stone'), ore: heldInBuilding(b, 'ore'),
+          stoneCap: buildingCapacity(b, 'stone'), oreCap: buildingCapacity(b, 'ore'),
+        }));
         bolds.push(false);
       }
     }

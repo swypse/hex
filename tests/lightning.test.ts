@@ -92,7 +92,7 @@ describe('AI stormcaller lightning', () => {
     const { AiActionType } = await import('@enums');
     sim.players[0]!.isHuman = false;
     tileAt(map, 2, -1)!.unit = makeUnit('e', 1, UnitType.WARRIOR, 2, -1); // something worth striking
-    const plan = () => planAiActions(map, sim.players[0]!, new SeededRandom(1), GameMode.TURNS30, undefined, sim.turn)
+    const plan = () => planAiActions(map, sim.players[0]!, new SeededRandom(1), GameMode.TURNS30, sim.turn)
       .filter((a) => a.type === AiActionType.LIGHTNING);
     expect(plan()).toEqual([{ type: AiActionType.LIGHTNING, unitId: 'sc', q: 2, r: 0 }]);
     sim.players[0]!.lightningReadyTurn = sim.turn + 2;
@@ -103,7 +103,7 @@ describe('AI stormcaller lightning', () => {
     const { planAiActions } = await import('@/game/ai/ai');
     const { AiActionType } = await import('@enums');
     sim.players[0]!.isHuman = false;
-    const plan = () => planAiActions(map, sim.players[0]!, new SeededRandom(1), GameMode.TURNS30, undefined, sim.turn)
+    const plan = () => planAiActions(map, sim.players[0]!, new SeededRandom(1), GameMode.TURNS30, sim.turn)
       .filter((a) => a.type === AiActionType.LIGHTNING);
     sim.players[0]!.resources.money = LIGHTNING_COST;
     expect(plan()).toEqual([]);

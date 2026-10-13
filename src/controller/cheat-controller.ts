@@ -1,4 +1,3 @@
-import { aiLoggingEnabled, setAiLogging } from '@/game/ai/ai';
 import { RESOURCE_CHEAT_AMOUNT } from '@/game/cheats';
 import { type GameEvent } from '@/game/events';
 import { hexDistance } from '@/game/map/hex';
@@ -204,10 +203,5 @@ export class CheatController {
       await this.host.presentEvents(this.host.sim.drainEvents(), preExplored);
       this.host.syncStore();
     }).then(() => applied);
-  }
-
-  /** Cheat: toggles AI decision logging; returns the new on/off state. */
-  cheatToggleAiLogs(): boolean {
-    return setAiLogging(!aiLoggingEnabled());
   }
 }

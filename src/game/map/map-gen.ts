@@ -53,6 +53,11 @@ export interface Building {
   level: number;
   /** Granary only: food stored (0 at creation, +1 per adjacent farm each turn). */
   food?: number;
+  /** Sawmill: wood held (cap 20). Mine: stone and ore held (cap 20 each). They
+   *  pay builds and spawns of the village network the building stands in. */
+  wood?: number;
+  stone?: number;
+  ore?: number;
   bornTurn?: number;
   /** Remaining hp after catapult siege damage; `undefined` = full (2). */
   hp?: number;

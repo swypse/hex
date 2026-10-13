@@ -156,6 +156,22 @@ describe('HudSelected village building constraints', () => {
     expect(texts()).toContain('Stored food: 7/10 (collects what adjacent farms do not use)');
   });
 
+  it('shows what a selected sawmill and mine hold and their capacity', () => {
+    mount(1, 0, 0);
+    const map = gameController.getMap()!;
+    const sawmill = tileAt(map, 1, 0)!;
+    sawmill.ownedBy = 0;
+    sawmill.building = { kind: BuildingKind.SAWMILL, level: 1, wood: 12 };
+    useGameStore.setState({ selection: { kind: SelectionKind.TILE, q: 1, r: 0 } });
+    expect(texts().some((x) => x.startsWith('Stored wood: 12/20'))).toBe(true);
+
+    const mine = tileAt(map, 1, -1)!;
+    mine.ownedBy = 0;
+    mine.building = { kind: BuildingKind.MINE, level: 1, stone: 5, ore: 9 };
+    useGameStore.setState({ selection: { kind: SelectionKind.TILE, q: 1, r: -1 } });
+    expect(texts().some((x) => x.startsWith('Stored: 5/20 stone, 9/20 ore'))).toBe(true);
+  });
+
   it('lays the drop shadow beneath the info panel background', () => {
     mount(1, 1, 0);
     const el = (hud as unknown as { el: Container }).el!;

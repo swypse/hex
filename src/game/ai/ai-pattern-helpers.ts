@@ -4,10 +4,10 @@ import { canAffordAt } from '../economy/stock';
 import { isMountainType } from '../map/tile-types';
 import { hasSkill } from '../skills';
 import { reachableTargets } from '../units/selection';
-import { movePoints, unitSpawnCost, UNIT_ATTACK_DISTANCE, type Unit } from '../units/units';
+import { makeUnit, movePoints, unitMaxHp, unitSpawnCost, UNIT_ATTACK_DISTANCE, type Unit } from '../units/units';
 import { SeededRandom } from '../../util/random';
 import { hexDistance, hexNeighbors } from '../map/hex';
-import { attackableTargets, attackDamage, counterDamageTo as counterDamageToFromCombat } from '../units/combat';
+import { attackableTargets, attackDamage, counterDamageTo as counterDamageToFromCombat, isPoorTrapperTarget, resolveCombat } from '../units/combat';
 import { unitsInVillage, villageCapacity, buildingsInVillage, villageBuildingLimit } from '../economy/village';
 import { isExploredFor } from '../map/explore';
 import { type AiAction, type AiDirectives, type AiOperation, type AiPlannerState } from './ai-types';
@@ -266,6 +266,30 @@ function visibleEnemyComposition(map: GameMap, playerIndex: number): Map<UnitTyp
   return counts;
 }
 
+/** Whether a fresh unit of `type` raised on `village` would be killed during
+ *  the enemy's next turn: the damage of every visible enemy land unit that can
+ *  reach the tile (adjacent units, archers, riders, knights, catapults...
+ *  anything whose move + attack range covers it) is summed against the unit at
+ *  full hp, with the village's defense bonus. Order, misses and counters are
+ *  ignored. Ships and pirates are left out: the naval-threat spawns (catapult,
+ *  shield) are made on purpose against them. */
+export function spawnWouldBeKilled(map: GameMap, village: MapTile, playerIndex: number, type: UnitType): boolean {
+  const ghost = makeUnit(playerIndex, type, village.q, village.r);
+  const ghostTile: MapTile = { ...village, unit: ghost };
+  const hp = unitMaxHp(ghost);
+  let damage = 0;
+  for (const t of map.tiles) {
+    const enemy = t.unit;
+    if (!enemy || enemy.owner === playerIndex || enemy.owner < 0 || isShip(enemy)) continue;
+    if (enemy.isStealthed === true || !isExploredFor(t, playerIndex)) continue;
+    const reach = enemyReach(enemy);
+    if (hexDistance(village, t) > reach.move + reach.attack) continue;
+    damage += resolveCombat(map, enemy, ghostTile).attackerDamage;
+    if (damage >= hp) return true;
+  }
+  return false;
+}
+
 /** Best affordable, unlocked unit type for `prefer`. Behind `AiFlags.composition`
  *  (off by default — see the flag's doc comment), and with `map` and a visible
  *  enemy army, offense/defense spawns are picked by open-terrain duel counter
@@ -277,9 +301,12 @@ export function bestSpawnableUnitType(
   prefer: SpawnPreference = SpawnPreference.OFFENSE,
   map?: GameMap,
   village?: MapTile,
+  /** Optional filter: types it rejects are never chosen (e.g. would die at once). */
+  allowed?: (type: UnitType) => boolean,
 ): UnitType | null {
   const candidates: UnitType[] = [];
   for (const type of SPAWN_ORDER[prefer]) {
+    if (allowed && !allowed(type)) continue;
     if (TRIBE_SPECIAL_UNIT[player.tribe] !== type && Object.values(TRIBE_SPECIAL_UNIT).includes(type)) continue;
     if (type === UnitType.RIDER && !hasSkill(player, SkillId.RIDING)) continue;
     if (type === UnitType.KNIGHT && !hasSkill(player, SkillId.KNIGHTS)) continue;
@@ -450,6 +477,14 @@ export function attackersForTile(
       }
     }
   }
-  return out;
+  const target = targetTile.unit;
+  if (!target || target.type !== UnitType.TRAPPER) return out;
+  // A trapper is worn down by ranged units; a melee unit joins only when it
+  // finishes the job (so it takes no counter).
+  const poor = (a: { unit: Unit }): boolean => isPoorTrapperTarget(a.unit, target);
+  const rangedDamage = out.filter((a) => !poor(a) && a.unit.attackDistance > 1).reduce((s, a) => s + attackDamage(a.unit), 0);
+  return out
+    .filter((a) => !poor(a) || rangedDamage + attackDamage(a.unit) >= target.hp)
+    .sort((a, b) => Number(a.unit.attackDistance <= 1) - Number(b.unit.attackDistance <= 1));
 }
 

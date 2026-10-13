@@ -6,6 +6,7 @@ import {
 import { type GameMap, type MapTile } from '../game/map/map-gen';
 import { bridgeCoastOffsets } from '../game/economy/bridges';
 import { granaryCapacity } from '../game/economy/food';
+import { buildingCapacity, heldInBuilding } from '../game/economy/building-stock';
 import { portDirection, buildingHp, BUILDING_MAX_HP } from '../game/economy/buildings';
 import { type Player } from '../game/players';
 import { type Selection } from '../game/units/selection';
@@ -32,7 +33,7 @@ import { villageLabelTextColor } from './village-label-color';
 import { unitGlowColor } from './unit-glow-color';
 import { weatherOverlayAt } from '../game/weather/weather';
 import { HP_BAR_BOX_TOP, HP_BAR_ICON_GAP } from './hp-bar-layout';
-import { icons32FrameTexture } from '../gfx/icons32';
+import { icons32FrameTexture, makeIcon32 } from '../gfx/icons32';
 import { BuildingKind, FontSize, PortDirection, Season, SelectionKind, UnitFacing, UnitType } from '@enums';
 import { tileMapByKey } from '../game/map/tile-index';
 
@@ -434,7 +435,9 @@ export class MapView {
           world: { x: p.x, y: y + this.hexSize * 0.35 + 5 }
         });
       }
-      if (tile.building?.kind === BuildingKind.GRANARY && tile.ownedBy !== null && tile.ownedBy !== undefined && explored && !detailHidden) {
+      const kind = tile.building?.kind;
+      const hasStockLabel = kind === BuildingKind.GRANARY || kind === BuildingKind.SAWMILL || kind === BuildingKind.MINE;
+      if (hasStockLabel && tile.ownedBy !== null && tile.ownedBy !== undefined && explored && !detailHidden) {
         granaryLabels.push({ tile, owner: tile.ownedBy, world: { x: p.x, y: y + this.hexSize * 0.35 + 5 } });
       }
       if (tile.settlement && tile.settlement.captureReady && tile.unit && tile.unit.owner !== tile.settlement.owner && explored) {
@@ -2036,28 +2039,69 @@ export class MapView {
     this.mirroredKeys.add(axialKey(tile));
   }
 
-  /** Stored food of a granary (`food/capacity`) in the village name style: white
-   *  text on a plate in the owner's tribe colour. */
+  /** What the stock plate of a granary, sawmill or mine shows: a granary and a
+   *  sawmill `held/capacity`; a mine `<stone icon> N <ore icon> M`. */
+  private stockLabelParts(tile: MapTile): { text: string; icon?: string }[] {
+    const b = tile.building;
+    if (!b) return [];
+    if (b.kind === BuildingKind.GRANARY) {
+      return [{ text: `${b.food ?? 0}/${this.map ? granaryCapacity(this.map, tile) : 0}` }];
+    }
+    if (b.kind === BuildingKind.SAWMILL) {
+      return [{ text: `${heldInBuilding(b, 'wood')}/${buildingCapacity(b, 'wood')}` }];
+    }
+    return [
+      { icon: 'stone-32', text: String(heldInBuilding(b, 'stone')) },
+      { icon: 'ore-32', text: String(heldInBuilding(b, 'ore')) },
+    ];
+  }
+
+  /** The materials a granary, sawmill or mine holds, in the village name style:
+   *  white text (and icons) on a plate in the owner's tribe colour. */
   private addGranaryLabel(tile: MapTile, owner: number, world: { x: number; y: number }, players: Player[]): void {
     const tribe = players[owner] ? tribeById(players[owner]!.tribe) : undefined;
     if (!tribe) return;
+    const parts = this.stockLabelParts(tile);
+    if (parts.length === 0) return;
     const el = new Container();
-    const plateColor = territoryColor(tribe, this.knownOwners.has(owner));
-    const label = this.pool.takeText(`${tile.building?.food ?? 0}/${this.map ? granaryCapacity(this.map, tile) : 0}`, {
-      fontSize: VILLAGE_LABEL_FONT_SIZE,
-      fill: villageLabelTextColor(tribe, this.knownOwners.has(owner)),
-      fontFamily: FONT_REGULAR,
+    const known = this.knownOwners.has(owner);
+    const plateColor = territoryColor(tribe, known);
+    const iconSize = 14;
+    const iconGap = 2;
+    const partGap = 6;
+    const items: { text: BitmapText; icon: Sprite | null; width: number }[] = parts.map((part) => {
+      const text = this.pool.takeText(part.text, {
+        fontSize: VILLAGE_LABEL_FONT_SIZE,
+        fill: villageLabelTextColor(tribe, known),
+        fontFamily: FONT_REGULAR,
+      });
+      text.anchor.set(0, 0.5);
+      text.zIndex = 1;
+      const icon = part.icon ? makeIcon32(part.icon, iconSize) : null;
+      return { text, icon, width: (icon ? iconSize + iconGap : 0) + text.width };
     });
-    label.anchor.set(0.5, 0.5);
-    label.zIndex = 1;
+    const contentW = items.reduce((sum, it) => sum + it.width, 0) + partGap * (items.length - 1);
+    const contentH = Math.max(...items.map((it) => Math.max(it.text.height, it.icon ? iconSize : 0)));
     const padX = 4;
     const bg = this.pool.takeGraphics();
     bg.zIndex = 0;
-    bg.roundRect(-label.width / 2 - padX, -label.height / 2 - 1, label.width + padX * 2, label.height + 2, 2).fill(plateColor);
+    bg.roundRect(-contentW / 2 - padX, -contentH / 2 - 1, contentW + padX * 2, contentH + 2, 2).fill(plateColor);
     el.sortableChildren = true;
     el.zIndex = OVERLAY_Z_VILLAGE_LABEL;
     el.addChild(bg);
-    el.addChild(label);
+    let x = -contentW / 2;
+    for (const it of items) {
+      if (it.icon) {
+        it.icon.anchor.set(0, 0.5);
+        it.icon.zIndex = 1;
+        it.icon.position.set(x, 0);
+        el.addChild(it.icon);
+        x += iconSize + iconGap;
+      }
+      it.text.position.set(x, 0);
+      el.addChild(it.text);
+      x += it.text.width + partGap;
+    }
     el.position.set(world.x, world.y);
     this.overlay.addChild(el);
     this.overlayItems.push({ el, world });

@@ -7,7 +7,6 @@ import {
   SKILLS_CHEAT_WORD,
   FOG_CHEAT_WORD,
   PIRATES_CHEAT_WORD,
-  AI_LOGS_CHEAT_WORD,
   WIN_CHEAT_WORD,
 } from '../src/game/cheats';
 
@@ -40,13 +39,6 @@ describe('cheat code buffer', () => {
     expect(buffer).toBe(PIRATES_CHEAT_WORD);
     expect(triggeredCheat(type('xxpirates'))).toBe(PIRATES_CHEAT_WORD);
     expect(cheatCodeTriggered(type('pira'))).toBe(false);
-  });
-
-  it('triggers the ailogs cheat', () => {
-    const buffer = type('ailogs');
-    expect(buffer).toBe(AI_LOGS_CHEAT_WORD);
-    expect(triggeredCheat(type('xxailogs'))).toBe(AI_LOGS_CHEAT_WORD);
-    expect(cheatCodeTriggered(type('ailo'))).toBe(false);
   });
 
   it('triggers the win cheat', () => {

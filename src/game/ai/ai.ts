@@ -16,8 +16,7 @@ import { unitMaxHp, canHeal, unitSpawnCost, UNIT_TYPES, type Unit } from '../uni
 import { SeededRandom } from '../../util/random';
 import { buildingsInVillage, villageBuildingLimit } from '../economy/village';
 import { isMountainType } from '../map/tile-types';
-import { TRIBES } from '../tribes';
-import { AI_PATTERNS, AI_TUNING, type AiPatternContext, bestSpawnableUnitType, enemyCanAttackNext, enemyCanReach, guardGarrisonAttack, incomingForceAt, isFrontierTile, isLikelyLethal, isSupportUnit, INCOMING_FORCE_WEIGHT, landEnemyCanReach, LETHAL_PENALTY, nearestEnemyDistanceFrom, nearestFreeVillageDistanceFrom, nearestOwnUnitDistanceFrom, nearestVillageDistanceFrom } from './ai-patterns';
+import { AI_PATTERNS, AI_TUNING, type AiPatternContext, bestSpawnableUnitType, enemyCanAttackNext, enemyCanReach, guardGarrisonAttack, incomingForceAt, isFrontierTile, isLikelyLethal, isSupportUnit, INCOMING_FORCE_WEIGHT, landEnemyCanReach, LETHAL_PENALTY, nearestEnemyDistanceFrom, nearestFreeVillageDistanceFrom, nearestOwnUnitDistanceFrom, nearestVillageDistanceFrom, spawnWouldBeKilled } from './ai-patterns';
 import { type AiAction, type AiDirectives, type AiPlannerState } from './ai-types';
 import { attackableTargets, chooseBestAttack, tradeIsFavorable } from '../units/combat';
 import { isExploredFor } from '../map/explore';
@@ -76,101 +75,6 @@ const NAVAL_EXPOSURE_PENALTY = 400;
 
 /** Hexes from a naval enemy within which an own village prefers shield spawns. */
 const NAVAL_VILLAGE_GUARD_RADIUS = 6;
-
-/** When true, planAiActions logs each AI's situation and every decision. */
-let AI_DEBUG_LOGGING = false;
-
-export function aiLoggingEnabled(): boolean {
-  return AI_DEBUG_LOGGING;
-}
-
-/** Toggles AI decision logging; returns the new state. */
-export function setAiLogging(enabled: boolean): boolean {
-  AI_DEBUG_LOGGING = enabled;
-  return AI_DEBUG_LOGGING;
-}
-
-function aiLog(...parts: unknown[]): void {
-  if (AI_DEBUG_LOGGING) console.log('[AI]', ...parts);
-}
-
-function tribeName(player: Player): string {
-  return TRIBES.find((x) => x.id === player.tribe)?.name ?? String(player.tribe);
-}
-
-/** Debug header printed at the start of an AI turn. */
-export function logAiTurnStart(player: Player, turn: number): void {
-  if (!AI_DEBUG_LOGGING) return;
-  aiLog(`${tribeName(player)} "${player.name}" — turn ${turn} START`);
-}
-
-function situationSummary(situation: AiSituation): string {
-  const naval = situation.navalThreat
-    ? ` navalThreat=true x${situation.navalEnemies.length} d=${situation.nearestNaval?.distance ?? '?'}`
-    : ' navalThreat=false';
-  const front = situation.frontTarget ? ` front=(${situation.frontTarget.q},${situation.frontTarget.r})` : '';
-  return (
-    `stance=${situation.stance} endangered=${situation.endangered} dangers=${situation.dangers.length}` +
-    ` enemies=${situation.enemies.length} freeVillages=${situation.freeVillages.length}` +
-    ` ownPower=${situation.ownPower} enemyPower=${situation.enemyPower}` +
-    naval + front
-  );
-}
-
-/** Debug tag describing how one planned action was produced. */
-export interface AiActionMarker {
-  label: string;
-  note: string;
-}
-
-export function formatAiAction(a: AiAction): string {
-  switch (a.type) {
-    case AiActionType.MOVE:
-      return `move ${a.unitId} (${a.q},${a.r})`;
-    case AiActionType.ATTACK:
-      return `attack ${a.unitId} -> (${a.q},${a.r})`;
-    case AiActionType.HEAL:
-      return `heal ${a.unitId}`;
-    case AiActionType.CAPTURE:
-      return `capture ${a.unitId} (${a.q},${a.r})`;
-    case AiActionType.SPAWN:
-      return `spawn ${a.unitType} (${a.q},${a.r})`;
-    case AiActionType.UPGRADE:
-      return `upgrade village (${a.q},${a.r})`;
-    case AiActionType.UPGRADE_SHIP:
-      return `upgradeShip ${a.unitId}`;
-    case AiActionType.REPAIR:
-      return `repair (${a.q},${a.r})`;
-    case AiActionType.EXTINGUISH:
-      return `extinguish ${a.unitId} (${a.q},${a.r})`;
-    case AiActionType.BUILD:
-      return `build ${a.kind} (${a.q},${a.r})`;
-    case AiActionType.BUILD_ROAD:
-      return `buildRoad (${a.q},${a.r})`;
-    case AiActionType.BUILD_BRIDGE:
-      return `buildBridge (${a.q},${a.r})`;
-    case AiActionType.DESTROY_BUILDING:
-      return `destroyBuilding (${a.q},${a.r})`;
-    case AiActionType.OPEN_SKILL:
-      return `openSkill ${a.skill}`;
-    case AiActionType.STUN:
-      return `stun ${a.unitId} -> (${a.q},${a.r})`;
-    case AiActionType.ENABLE_STEALTH:
-      return `enableStealth ${a.unitId}`;
-    case AiActionType.STORM:
-      return `storm ${a.unitId}`;
-    case AiActionType.LIGHTNING:
-      return `lightning ${a.unitId} -> (${a.q},${a.r})`;
-    case AiActionType.TRAP:
-      return `trap ${a.unitId} -> (${a.q},${a.r})`;
-    case AiActionType.BURN:
-      return `burn ${a.unitId}`;
-    case AiActionType.BURN_ROAD:
-      return `burnRoad ${a.unitId}`;
-    case AiActionType.BUILDER_BUILD:
-      return `builderBuild ${a.unitId} ${a.kind} (${a.q},${a.r})`;
-  }
-}
 
 /** Score of destroying the only road linking two enemy villages (above a normal attack, below burning a food building). */
 const ROAD_CUT_SCORE = 4200;
@@ -343,7 +247,8 @@ function bestAvailableAction(
               : situation?.stance === AiStance.SETTLE && freeVillageToGrab
                 ? SpawnPreference.SCOUT
                 : SpawnPreference.OFFENSE;
-      const type = bestSpawnableUnitType(player, prefer, map, v);
+      // Never raise a unit the enemies in reach would kill before it acts.
+      const type = bestSpawnableUnitType(player, prefer, map, v, (ty) => !spawnWouldBeKilled(map, v, player.index, ty));
       if (type) {
         const cost = unitSpawnCost(type);
         if (canAffordAt(map, player, v, cost)) {
@@ -861,18 +766,17 @@ function markUsed(state: AiPlannerState, action: AiAction): void {
  *  effect. Supplying it switches the planner to live mode: every step is
  *  applied before the next is chosen, so patterns always see the real board
  *  (kills, misses, counter damage, spent money) instead of a frozen snapshot. */
-export type AiActionExecutor = (action: AiAction, marker: AiActionMarker) => boolean;
+export type AiActionExecutor = (action: AiAction) => boolean;
 
 export function planAiActions(
   map: GameMap,
   player: Player,
   rng: SeededRandom,
   mode: GameMode = GameMode.CAPTURE,
-  markers?: AiActionMarker[],
   turn: number = 0,
   execute?: AiActionExecutor,
 ): AiAction[] {
-  const steps = planAiActionsSteps(map, player, rng, mode, markers, turn, execute);
+  const steps = planAiActionsSteps(map, player, rng, mode, turn, execute);
   let step = steps.next();
   while (!step.done) step = steps.next();
   return step.value;
@@ -886,7 +790,6 @@ export function* planAiActionsSteps(
   player: Player,
   rng: SeededRandom,
   mode: GameMode = GameMode.CAPTURE,
-  markers?: AiActionMarker[],
   turn: number = 0,
   execute?: AiActionExecutor,
 ): Generator<void, AiAction[], void> {
@@ -894,8 +797,6 @@ export function* planAiActionsSteps(
   let situation = analyzeSituation(map, player, mode, difficulty);
   const strategy = updateStrategy(map, player, situation, mode, difficulty, turn, rng);
   let directives = deriveDirectives(map, player, situation, difficulty, strategy);
-  if (AI_DEBUG_LOGGING) aiLog(`  situation: ${situationSummary(situation)}`);
-  if (AI_DEBUG_LOGGING) aiLog(`  strategy: ${strategy.goals.map((g) => `${g.id}:${g.phase}`).join(',')} directives: {front=${directives.frontTarget ? key(directives.frontTarget.q, directives.frontTarget.r) : '-'}, reserve=${directives.moneyReserve}, pace=${directives.pace}}`);
   const state: AiPlannerState = {
     moved: new Set(),
     acted: new Set(),
@@ -909,7 +810,6 @@ export function* planAiActionsSteps(
   const patterns = buildPatterns();
   const operation = updateOperation(map, player, situation, turn);
   const actions: AiAction[] = [];
-  let stepNo = 0;
   if (execute) yield;
   for (let i = 0; i < MAX_PLAN_STEPS; i++) {
     if (execute && i > 0) {
@@ -921,34 +821,23 @@ export function* planAiActionsSteps(
     }
     const ctx: AiPatternContext = { map, player, rng, state, situation, difficulty, directives, operation, turn };
     let next: AiAction[] | null = null;
-    let label = 'fallback(best-score)';
-    let note = '';
     for (const pattern of patterns) {
       next = pattern.evaluate(ctx);
-      if (next) {
-        label = `pattern=${pattern.id}`;
-        if (pattern.id.startsWith('naval-')) note = ` (navalThreat=${situation.navalThreat})`;
-        break;
-      }
+      if (next) break;
     }
     if (!next) {
       const source: { kind: AiPickMode } = { kind: AiPickMode.BEST };
       next = bestAvailableAction(map, player, rng, state, situation, difficulty, directives, source);
-      if (next && source.kind === AiPickMode.RANDOM) label = 'fallback(RANDOM mistake)';
     }
     if (!next) break;
-    stepNo += 1;
-    aiLog(`  step ${stepNo}. ${label} -> ${next.map(formatAiAction).join(' | ')}${note}`);
     // A failed action cancels the rest of its step (e.g. the attack after a
     // failed move), but every action is still marked used so the planner
     // cannot pick the same doomed step again.
     let failed = false;
     for (const a of next) {
       actions.push(a);
-      const marker = { label, note };
-      if (markers) markers.push(marker);
       markUsed(state, a);
-      if (execute && !failed && !execute(a, marker)) failed = true;
+      if (execute && !failed && !execute(a)) failed = true;
     }
     if (execute) yield;
   }

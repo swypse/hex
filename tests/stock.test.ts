@@ -175,15 +175,17 @@ describe('building income goes to villages', () => {
     expect(networkBuildingIncome(map, p, a).wood).toBe(1);
   });
 
-  it('the round-end income lands in the village stock, not on the player', () => {
+  it('the round-end income is kept in the sawmill, pooled with the claiming village, not on the player', () => {
     const { map, a, b, p } = sawmillScene();
     const players = [p, buildPlayers(Tribe.Villagers, 1, new SeededRandom(2))[1]!];
     const sim = new Simulator(map, players, GameMode.TURNS30, { rng: () => 0.5, disablePirates: true });
     sim.startGame();
     sim.drainEvents();
     sim.applyCommand({ type: CommandType.END_TURN });
-    expect(readStock(b).wood).toBe(1);
-    expect(readStock(a).wood).toBe(0);
+    expect(tileAt(map, 4, 1)!.building!.wood).toBe(1);
+    expect(readStock(b).wood).toBe(0);
+    expect(networkStock(map, b).wood).toBe(1);
+    expect(networkStock(map, a).wood).toBe(0);
     expect(Object.keys(p.resources)).toEqual(['money']);
   });
 });

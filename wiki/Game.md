@@ -91,7 +91,8 @@ a fresh unit waits until the next turn. Each tribe's special unit (last seven ro
   destroys its wall first, then lowers its level by one (minimum 1); a village with an enemy unit standing in it is hit
   as a normal unit. Mines, sawmills, ports, temples, forest temples, bridges, farms and granaries (2 hp) are removed
   outright; a road is hit last on a tile with a building. A volley can miss like a regular attack and is never
-  countered. The AI sieges too.
+  countered. The AI sieges too, going for enemy buildings in this order: granary, university, farm, mine, sawmill; its
+  other units burn enemy farms and granaries.
 - Pirates and units with no home village cost no upkeep.
 
 ### Ships
@@ -215,8 +216,8 @@ village slot (farms and granaries need none). No building produces money. Buildi
 
 | Building      | Cost                          | Skill         | Placement                                                    | Effect                                                                        |
 |---------------|-------------------------------|---------------|--------------------------------------------------------------|-------------------------------------------------------------------------------|
-| Sawmill       | 10 money                      | Forestry      | land tile adjacent to a forest                               | +1 wood per adjacent forest per level                                         |
-| Mine          | 15 money                      | Smithery      | mountain tile                                                | +1 stone and +1 ore per level (+1 each with Geology)                          |
+| Sawmill       | 10 money                      | Forestry      | land tile adjacent to a forest                               | +1 wood per adjacent forest per level; holds up to 20 wood                    |
+| Mine          | 15 money                      | Smithery      | mountain tile                                                | +1 stone and +1 ore per level (+1 each with Geology); holds up to 20 of each  |
 | Port          | 10 wood + 30 money + 2 ore    | Water         | owned water tile next to your own land                       | creates and upgrades ships                                                    |
 | Temple        | 10 stone + 30 money           | Water temples | water tile                                                   | grows +1 level every 2 turns (max 4); 10/15/20/25 score at game end           |
 | Forest temple | 10 stone + 30 money           | Forest temple | forest tile                                                  | same as temple; protects against earthquakes                                  |
@@ -235,8 +236,8 @@ food); an unconnected village uses only its own stock.
 **Start:** 8 money for the player; the capital has 3 wood, 2 stone, 0 ore and 25 food; other villages start empty.
 
 **Who pays:** an action on a village's territory (building, repair, spawn, upgrade, wall, port, ship upgrade, bridge,
-road, trap) draws wood/stone/ore/food from that village's network — the village first, then the rest of the network
-(most developed first). On unclaimed land the nearest own village pays. A road also draws on the networks it joins.
+road, trap) draws wood/stone/ore/food from that village's network — first what its sawmills and mines hold, then the
+village itself, then the rest of the network (most developed first). On unclaimed land the nearest own village pays. A road also draws on the networks it joins.
 Skills, disbanding, demolishing and pirate deals cost money only.
 
 **Income** is collected at the end of each round, after all players have moved:
@@ -245,10 +246,15 @@ Skills, disbanding, demolishing and pirate deals cost money only.
   connected to another own village. Upkeep = money upkeep of the units it raised (see [Units](#units)) plus **1** for
   every road tile, sawmill, farm, granary and mine it pays for (university 2; the claiming village pays, otherwise the
   nearest own one). An enemy unit standing on a village zeroes its income and stops its buildings' production.
-- **Wood** — sawmills. **Stone** and **Ore** — mines. **Food** — farms (see below).
+- **Wood** — sawmills. **Stone** and **Ore** — mines. **Food** — farms (see below). Sawmills and mines **keep** what
+  they collect: a sawmill holds up to **20 wood**, a mine up to **20 stone and 20 ore**, and a full building stops
+  collecting that material (the surplus is lost). The map shows each one's stock under its tile (sawmill `N/20`, mine
+  `<stone icon> N <ore icon> M`), like a granary's food. The stock of a village's sawmills and mines counts with the
+  village's own stock for its network: builds, spawns, upgrades and roads draw on the buildings first (the fullest
+  first), then on the villages. A destroyed or burned building loses its stock; a captured one keeps it.
 
 At round end the income floats up from its tile: money from each village, wood from each sawmill, stone and ore
-(one label) from each mine, and the food a granary gained (`<icon> N`).
+(one label) from each mine (what was actually stored), and the food a granary gained (`<icon> N`).
 
 The resource bar always shows money and its income; wood, stone, ore and food show the stock and income of the
 **selected village's network**. Food status is shown per village in the selected-cell panel.

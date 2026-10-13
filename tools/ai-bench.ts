@@ -15,7 +15,6 @@ import { initialExplorationFor } from '../src/game/map/explore';
 import { exploreVillageSights } from '../src/game/economy/village';
 import { hexDistance } from '../src/game/map/hex';
 import { ALL_AI_FLAGS_OFF, ALL_AI_FLAGS_ON, type AiFlags } from '../src/game/ai/ai-flags';
-import { setAiLogging } from '../src/game/ai/ai';
 import { AI_TUNING } from '../src/game/ai/ai-patterns';
 import type { AiDifficulty } from '../src/game/ai/ai-difficulty';
 
@@ -48,18 +47,7 @@ interface Tally {
   enemyCaps: number;
   aiMs: number;
 }
-// Capture the AI decision log so a leaving garrison can be traced to the pattern that moved it.
-const lastMove = new Map<string, string>();
 const realLog = console.log.bind(console);
-if (process.env.TRACE) {
-  setAiLogging(true);
-  console.log = (...a: unknown[]): void => {
-    const line = String(a.join(' '));
-    const m = /exec OK\s+#\d+ move (\S+) \(.*<(.*?)>/.exec(line);
-    if (m) lastMove.set(m[1]!, m[2]!);
-    else if (!line.startsWith('[AI]')) realLog(...a);
-  };
-}
 const reasons: Record<string, number> = {};
 const tally: Record<Engine, Tally> = {
   A: { seats: 0, wins: 0, villages: 0, score: 0, kills: 0, exposure: 0, eliminated: 0, lost: 0, freeCaps: 0, enemyCaps: 0, aiMs: 0 },
@@ -119,7 +107,7 @@ function playGame(seed: number): void {
         if (was === undefined) why = 'captured-this-turn';
         else if (was) {
           const alive = map.tiles.some((t) => t.unit?.id === was);
-          why = alive ? `garrison-left:${lastMove.get(was) ?? '?'}` : 'garrison-died';
+          why = alive ? 'garrison-left' : 'garrison-died';
         } else why = players[i]!.resources.money >= 4 ? 'empty-had-money' : 'empty-broke';
         reasons[why] = (reasons[why] ?? 0) + 1;
       }

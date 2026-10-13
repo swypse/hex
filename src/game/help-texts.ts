@@ -2,6 +2,7 @@ import { type GameMap, type MapTile } from './map/map-gen';
 import { BUILDING_COSTS, BUILDING_NAMES, buildingYield } from './economy/buildings';
 import { UNIVERSITY_UPKEEP, villageIncome } from './economy/capture';
 import { AGRONOMY_FOOD, FARM_FOOD, granaryCapacity, GRANARY_CAPACITY_PER_FARM, STARVATION_DAMAGE } from './economy/food';
+import { buildingCapacity, heldInBuilding } from './economy/building-stock';
 import { villageUpgradeCost } from './economy/resources';
 import { buildingsInVillage, claimRadius, villageBuildingLimit, unitsInVillage, villageCapacity } from './economy/village';
 import { SHIP_UPGRADE_COST } from './units/ship';
@@ -88,6 +89,7 @@ export function buildingHelpLines(map: GameMap, tile: MapTile): string[] {
       const y = buildingYield(map, tile, null);
       return [
         t('help.building.sawmill.produce', { level: b.level, wood: y.wood }),
+        t('help.building.sawmill.store', { held: heldInBuilding(b, 'wood'), cap: buildingCapacity(b, 'wood') }),
         t('help.building.sawmill.skill', { money: BUILDING_COSTS.sawmill.money }),
         t('help.building.sawmill.place'),
       ];
@@ -97,6 +99,10 @@ export function buildingHelpLines(map: GameMap, tile: MapTile): string[] {
       const note = y.ore > b.level ? t('help.building.mine.note') : '';
       return [
         t('help.building.mine.produce', { stone: y.stone, ore: y.ore, level: b.level, note }),
+        t('help.building.mine.store', {
+          stone: heldInBuilding(b, 'stone'), ore: heldInBuilding(b, 'ore'),
+          stoneCap: buildingCapacity(b, 'stone'), oreCap: buildingCapacity(b, 'ore'),
+        }),
         t('help.building.mine.skill', { money: BUILDING_COSTS.mine.money }),
         t('help.building.mine.place'),
       ];

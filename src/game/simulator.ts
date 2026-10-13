@@ -1,12 +1,12 @@
 import { SeededRandom } from '@/util';
 import { AchievementId, VeteranBonus, AiActionType, AiEngine, BuilderExtraKind, BuildingKind, CommandType, GameEventType, GameMode, Season, SkillId, UnitType, WeatherType } from '@enums';
 import { awardAchievementScores, currentlyMetIds, evaluateAchievements } from './achievements';
-import { type AiActionMarker, aiLoggingEnabled, formatAiAction, logAiTurnStart, planAiActions, planAiActionsSteps } from './ai/ai';
+import { planAiActions, planAiActionsSteps } from './ai/ai';
 import type { AiAction } from './ai/ai-types';
 import { touchBottle } from './map/bottles';
 import { buildBridge, buildBridgeIgnoringSkill } from './economy/bridges';
 import {
-  buildBuilding, buildBuildingIgnoringSkill, builderBuildable, type BuilderBuildKind, buildingIncomeByVillage, buildingYields,
+  buildBuilding, buildBuildingIgnoringSkill, builderBuildable, type BuilderBuildKind, buildingGains, storeBuildingGains,
   burnBuilding, burnRoad, canUsePort, destroyBuilding, repairBuilding
 } from './economy/buildings';
 import { captureVillage, villageIncome, villageIncomeTotal } from './economy/capture';
@@ -33,7 +33,7 @@ import { hasSkill, openSkill as applySkill } from './skills';
 import { spawnUnit } from './units/spawn';
 import { adjacentEnemyVillages } from './units/stalker';
 import type { GameStateSnapshot } from './state';
-import { addStock, migrateLegacyResources, payAt } from './economy/stock';
+import { migrateLegacyResources, payAt } from './economy/stock';
 import { stormDamage, stormEligible, stormTargetShips } from './units/storm';
 import { LIGHTNING_COOLDOWN_TURNS, LIGHTNING_COST, lightningReady, lightningStrikeCell, lightningVillages } from './units/lightning';
 import { TileType } from './map/tile-types';
@@ -1324,36 +1324,24 @@ export class Simulator {
 
   private *runAiTurnSteps(playerIndex: number): Generator<void, void, void> {
     const ai = this.players[playerIndex]!;
-    logAiTurnStart(ai, this.turn);
     this.resolveVeteransFor(playerIndex);
     this.bonuses.doClaimBonus();
     this.bonuses.collectAiBottles(playerIndex);
     this.markCaptureReadyFor(playerIndex);
     this.decrementStunsFor(playerIndex);
     this.emit({ type: GameEventType.AI_TURN, playerIndex });
-    const markers: AiActionMarker[] = [];
-    let actionNo = 0;
-    const exec = (a: AiAction, marker?: AiActionMarker): boolean => {
-      actionNo += 1;
-      const ok = untrackedNetworks(() => this.execAiAction(a));
-      if (aiLoggingEnabled()) {
-        const m = marker ?? (actionNo - 1 < markers.length ? markers[actionNo - 1] : undefined);
-        const tag = m ? `<${m.label}>${m.note}` : '<unknown>';
-        console.log(`[AI]   exec ${ok ? 'OK  ' : 'FAIL'} #${actionNo} ${formatAiAction(a)} ${tag}`);
-      }
-      return ok;
-    };
+    const exec = (a: AiAction): boolean => untrackedNetworks(() => this.execAiAction(a));
     if (ai.aiEngine !== AiEngine.BATCH) {
       // Planning only reads the map between actions: let the network memo skip
       // its per-query fingerprint pass (actions bump the epoch, see exec).
       trackNetworkEpoch(this.map);
       try {
-        yield* planAiActionsSteps(this.map, ai, this.aiRng(), this.mode, undefined, this.turn, exec);
+        yield* planAiActionsSteps(this.map, ai, this.aiRng(), this.mode, this.turn, exec);
       } finally {
         trackNetworkEpoch(null);
       }
     } else {
-      const actions = planAiActions(this.map, ai, this.aiRng(), this.mode, markers, this.turn);
+      const actions = planAiActions(this.map, ai, this.aiRng(), this.mode, this.turn);
       for (const a of actions) exec(a);
     }
     this.evaluateAchievementsForAll();
@@ -1434,9 +1422,12 @@ export class Simulator {
 
   private applyIncome(): void {
     for (const player of this.players) {
-      this.emitIncomeEvents(player);
+      const gains = buildingGains(this.map, player);
+      this.emitIncomeEvents(player, gains);
       player.resources.money += villageIncomeTotal(this.map, player.index);
-      for (const [village, income] of buildingIncomeByVillage(this.map, player)) addStock(village, income);
+      // Sawmills and mines keep what they collect (up to their capacity); it
+      // pays for builds like village stock does.
+      storeBuildingGains(gains);
     }
     const granaryBefore = new Map<MapTile, number>();
     for (const t of this.map.tiles) if (t.building?.kind === BuildingKind.GRANARY) granaryBefore.set(t, t.building.food ?? 0);
@@ -1448,13 +1439,13 @@ export class Simulator {
   }
 
   /** Announces what the player's villages (money) and producing buildings (wood, stone, ore) pay this round. */
-  private emitIncomeEvents(player: Player): void {
+  private emitIncomeEvents(player: Player, gains: { tile: MapTile; wood: number; stone: number; ore: number }[]): void {
     for (const t of this.map.tiles) {
       if (t.settlement?.owner !== player.index) continue;
       const money = villageIncome(this.map, t);
       if (money > 0) this.emit({ type: GameEventType.INCOME, playerIndex: player.index, q: t.q, r: t.r, money });
     }
-    for (const y of buildingYields(this.map, player)) {
+    for (const y of gains) {
       if (y.wood + y.stone + y.ore <= 0) continue;
       const { wood, stone, ore } = y;
       this.emit({ type: GameEventType.INCOME, playerIndex: player.index, q: y.tile.q, r: y.tile.r, ...(wood > 0 && { wood }), ...(stone > 0 && { stone }), ...(ore > 0 && { ore }) });

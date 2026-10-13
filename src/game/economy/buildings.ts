@@ -13,6 +13,7 @@ import { canBuildBridgeHere, BRIDGE_COST } from './bridges';
 import { canBuildRoadHere, ROAD_COST } from './roads';
 import { BuilderBuildStatus, BuilderExtraKind, BuildingKind, PortDirection, SkillId } from '@enums';
 import { droughtOverTile, halvedYield } from '../weather/weather';
+import { heldInBuilding, roomInBuilding } from './building-stock';
 
 export type BuilderBuildKind = BuildingKind | BuilderExtraKind;
 /** The structures a builder unit can place from its build menu. */
@@ -198,8 +199,25 @@ export function canBuildUniversity(map: GameMap, tile: MapTile, player: Player):
   return !tileHasUniversity(map, tile);
 }
 
-function isFoodBuilding(building: { kind: BuildingKind } | null | undefined): boolean {
+export function isFoodBuilding(building: { kind: BuildingKind } | null | undefined): boolean {
   return building?.kind === BuildingKind.FARM || building?.kind === BuildingKind.GRANARY;
+}
+
+/** Enemy buildings the AI tries to destroy, most valuable first. Anything
+ *  else (ports, temples...) is only hit when it is the sole target. */
+export const ENEMY_BUILDING_RAID_ORDER: readonly BuildingKind[] = [
+  BuildingKind.GRANARY,
+  BuildingKind.UNIVERSITY,
+  BuildingKind.FARM,
+  BuildingKind.MINE,
+  BuildingKind.SAWMILL,
+];
+
+/** Raid value of a building kind: 5 for the first of `ENEMY_BUILDING_RAID_ORDER`
+ *  down to 1 for the last, 0 for kinds not worth a raid. */
+export function raidPriority(kind: BuildingKind): number {
+  const i = ENEMY_BUILDING_RAID_ORDER.indexOf(kind);
+  return i < 0 ? 0 : ENEMY_BUILDING_RAID_ORDER.length - i;
 }
 
 /** Whether `unit`, standing on an enemy farm or granary, may burn it: the unit
@@ -458,15 +476,40 @@ export function buildingYields(map: GameMap, player: Player): { tile: MapTile; w
   return out;
 }
 
-/** Materials the player's buildings produce per round, by the village that
- *  receives them (the one claiming the building's tile, else the nearest own
- *  village). */
+/** What the player's sawmills and mines will actually collect this round: their
+ *  yield, cut to the room left in each building (a full one collects nothing). */
+export function buildingGains(map: GameMap, player: Player): { tile: MapTile; wood: number; stone: number; ore: number }[] {
+  return buildingYields(map, player).map((y) => {
+    const b = y.tile.building!;
+    return {
+      tile: y.tile,
+      wood: Math.min(y.wood, roomInBuilding(b, 'wood')),
+      stone: Math.min(y.stone, roomInBuilding(b, 'stone')),
+      ore: Math.min(y.ore, roomInBuilding(b, 'ore')),
+    };
+  });
+}
+
+/** Stores a round's gains in the buildings that produced them. */
+export function storeBuildingGains(gains: { tile: MapTile; wood: number; stone: number; ore: number }[]): void {
+  for (const g of gains) {
+    const b = g.tile.building;
+    if (!b) continue;
+    if (g.wood > 0) b.wood = heldInBuilding(b, 'wood') + g.wood;
+    if (g.stone > 0) b.stone = heldInBuilding(b, 'stone') + g.stone;
+    if (g.ore > 0) b.ore = heldInBuilding(b, 'ore') + g.ore;
+  }
+}
+
+/** Materials the player's buildings collect per round, by the village whose
+ *  network they belong to (the one claiming the building's tile, else the
+ *  nearest own village). Capped by each building's room. */
 export function buildingIncomeByVillage(
   map: GameMap,
   player: Player,
 ): Map<MapTile, { wood: number; stone: number; ore: number }> {
   const out = new Map<MapTile, { wood: number; stone: number; ore: number }>();
-  for (const y of buildingYields(map, player)) {
+  for (const y of buildingGains(map, player)) {
     const village = payerVillage(map, player.index, y.tile);
     if (!village) continue;
     const cur = out.get(village) ?? { wood: 0, stone: 0, ore: 0 };
@@ -484,7 +527,7 @@ export function buildingIncome(
   player: Player,
 ): { wood: number; stone: number; ore: number } {
   const total = { wood: 0, stone: 0, ore: 0 };
-  for (const y of buildingYields(map, player)) {
+  for (const y of buildingGains(map, player)) {
     total.wood += y.wood;
     total.stone += y.stone;
     total.ore += y.ore;

@@ -4,7 +4,7 @@ import { hasSkill } from '../../skills';
 import { reachableTargets } from '../../units/selection';
 import { unitMaxHp } from '../../units/units';
 import { hexDistance } from '../../map/hex';
-import { attackableTargets, attackDamage, tradeIsFavorable } from '../../units/combat';
+import { attackableTargets, attackDamage, isPoorTrapperTarget, tradeIsFavorable } from '../../units/combat';
 import { builderBuildable, BUILDING_COSTS, type BuilderBuildableKind } from '../../economy/buildings';
 import { type AiAction } from '../ai-types';
 import { coastExposedTile, isMelee, isNavalEnemy } from '../ai-situation';
@@ -236,6 +236,8 @@ export const UNIT_PATTERNS: AiPattern[] = [
         for (const e of situation.enemies) {
           const enemyTile = e.tile;
           if (!enemyTile.unit || enemyTile.unit.owner === player.index) continue;
+          // A trapper is left to archers and catapults; melee only finish it.
+          if (isPoorTrapperTarget(unit, enemyTile.unit)) continue;
           // Naval enemies cannot be reached by land chases; ships handle them
           // in their own naval-hunt pattern.
           if (isNavalEnemy(e.unit)) continue;
