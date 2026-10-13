@@ -1,21 +1,19 @@
-import { createRequire } from 'node:module';
-import type { DatabaseSync as DatabaseSyncType } from 'node:sqlite';
 import { beforeEach, describe, expect, it } from 'vitest';
+import { loadSqlite } from './helpers/sqlite';
 import { SqlUserRepository } from '../worker/src/auth/sql-user-repository';
 import type { UserRecord } from '../worker/src/auth/user-repository';
 
-// Loaded via require: vite cannot resolve the `node:sqlite` builtin in an import.
-const { DatabaseSync } = createRequire(import.meta.url)('node:sqlite') as { DatabaseSync: typeof DatabaseSyncType };
+const DatabaseSync = loadSqlite();
 
 const user = (over: Partial<UserRecord> = {}): UserRecord => ({
   id: 'u1', name: 'Ann', email: 'ann@example.com', passwordHash: 'h', confirmed: false, createdAt: 1, ...over,
 });
 
-describe('SqlUserRepository', () => {
+describe.skipIf(!DatabaseSync)('SqlUserRepository', () => {
   let repo: SqlUserRepository;
 
   beforeEach(() => {
-    const db = new DatabaseSync(':memory:');
+    const db = new DatabaseSync!(':memory:');
     repo = new SqlUserRepository({
       // Like DO SqlStorage, the statement runs on exec, not on toArray.
       exec: (q, ...b) => {

@@ -1,6 +1,5 @@
-import { createRequire } from 'node:module';
-import type { DatabaseSync as DatabaseSyncType } from 'node:sqlite';
 import { beforeEach, describe, expect, it } from 'vitest';
+import { loadSqlite } from './helpers/sqlite';
 import { AuthService } from '../worker/src/auth/auth-service';
 import { MemoryUserRepository } from '../worker/src/auth/memory-user-repository';
 import { MemoryResultRepository } from '../worker/src/results/memory-result-repository';
@@ -12,7 +11,7 @@ import { parseGameResult } from '../src/results/result-validation';
 import type { GameResultInput } from '../src/results/result-types';
 import { AuthError, GameMode, Tribe } from '@enums';
 
-const { DatabaseSync } = createRequire(import.meta.url)('node:sqlite') as { DatabaseSync: typeof DatabaseSyncType };
+const DatabaseSync = loadSqlite();
 
 const result = (over: Partial<GameResultInput> = {}): GameResultInput => ({
   id: 'game-0001-abcd', tribe: Tribe.Cats, score: 500, stars: 2, mode: GameMode.CAPTURE, turns: 30, players: 3, won: true, ...over,
@@ -41,8 +40,8 @@ describe('parseGameResult', () => {
   });
 });
 
-function suite(name: string, make: () => ResultRepository): void {
-  describe(`ResultService over ${name}`, () => {
+function suite(name: string, make: () => ResultRepository, skip = false): void {
+  describe.skipIf(skip)(`ResultService over ${name}`, () => {
     let service: ResultService;
     beforeEach(() => {
       service = new ResultService(make(), () => 1);
@@ -78,14 +77,14 @@ function suite(name: string, make: () => ResultRepository): void {
 
 suite('memory', () => new MemoryResultRepository());
 suite('sqlite', () => {
-  const db = new DatabaseSync(':memory:');
+  const db = new DatabaseSync!(':memory:');
   return new SqlResultRepository({
     exec: (q, ...b) => {
       const rows = db.prepare(q).all(...(b as never[])) as Record<string, unknown>[];
       return { toArray: () => rows };
     },
   });
-});
+}, !DatabaseSync);
 
 describe('results routes', () => {
   const codes: string[] = [];
