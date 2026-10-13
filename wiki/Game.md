@@ -220,11 +220,11 @@ village slot (farms and granaries need none). No building produces money. Buildi
 | Port          | 10 wood + 30 money + 2 ore    | Water         | owned water tile next to your own land                       | creates and upgrades ships                                                    |
 | Temple        | 10 stone + 30 money           | Water temples | water tile                                                   | grows +1 level every 2 turns (max 4); 10/15/20/25 score at game end           |
 | Forest temple | 10 stone + 30 money           | Forest temple | forest tile                                                  | same as temple; protects against earthquakes                                  |
-| Farm          | 15 money + 5 wood             | Agriculture   | own empty land tile (no forest/mountain/water; road is fine), no enemy unit | +2 food per round; 0 in winter (see [Food](#food))             |
-| Granary       | 20 money + 10 wood + 10 stone | Granary       | own empty land tile next to one of your farms, no enemy unit | stores up to 25 food unused by adjacent farms                                 |
+| Farm          | 15 money + 5 wood             | Agriculture   | own empty land tile (no forest/mountain/water; road is fine), no enemy unit | +3 food per round; 0 in winter (see [Food](#food))             |
+| Granary       | 20 money + 10 wood + 10 stone | Granary       | own empty land tile next to one of your farms, no enemy unit | stores unused food of adjacent farms, up to 10 per adjacent farm              |
 | University    | 40 money + 10 stone + 5 ore   | Science       | own empty land tile (no forest/mountain/water) of a level 5+ village; one per village; uses a slot | unlocks Geology, Agronomy, Engineering, Medicine; 2 money upkeep |
 
-A builder ([Villagers](tribes/Villagers.md)) can place a sawmill, mine, port or bridge without the skill.
+A builder ([Villagers](tribes/Villagers.md)) can place a sawmill, mine, port, bridge or road without the skill.
 
 ## Economy
 
@@ -256,14 +256,15 @@ The resource bar always shows money and its income; wood, stone, ore and food sh
 ## Food
 
 Each village eats `ceil(level / 2)` food a round. Each unit raised by a village (its home village) also eats: warrior,
-archer, rider 1; shield 2; swordsman, knight, catapult and every special unit 3. Farms yield 2 (3 with Agronomy in a
+archer, rider 1; shield 2; swordsman, knight, catapult and every special unit 3. Farms yield 3 (4 with Agronomy in a
 village with a university; 0 in winter, 1 with Agronomy there; halved in a drought).
 
 At the end of each round (after income), for every player and food network:
 
 1. Villages are fed one by one, the most developed first (level, then name); each village eats first, then its units,
    hungriest first. They eat from the network's farms — those **not** adjacent to a granary first.
-2. Food left on a farm adjacent to a granary is stored there (the emptiest first, capacity **25**; overflow lost).
+2. Food left on a farm adjacent to a granary is stored there (the emptiest first; a granary holds **10 per adjacent farm**; overflow lost; if an adjacent farm is destroyed the stored
+   food stays, but nothing more is stored until it is below the new capacity).
    Other leftover farm food is lost.
 3. Anything still short is taken from the network's granaries (fullest first), then from the food its villages hold
    (the capital's starting 25). Nothing crosses networks; networks with the smaller shortage are served first.

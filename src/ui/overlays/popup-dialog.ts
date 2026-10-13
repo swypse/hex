@@ -4,8 +4,8 @@ import { type UIHost } from '../host';
 import { makeLabel } from '../../gfx/label';
 import { Popup } from '../kit/popup';
 
-/** Wrapped grey hint text at the top of a popup body. */
-export function addPopupHint(popup: Popup, text: string): void {
+/** Wrapped grey hint text at the top of a popup body; returns its height. */
+export function addPopupHint(popup: Popup, text: string): number {
   const label = makeLabel(text, {
     fontSize: FontSize.SMALL,
     fill: 0xcccccc,
@@ -14,6 +14,7 @@ export function addPopupHint(popup: Popup, text: string): void {
   });
   label.position.set(0, 0);
   popup.content.addChild(label);
+  return label.height;
 }
 
 /** Base of the overlays that are a single Popup: owns it, plays its hide

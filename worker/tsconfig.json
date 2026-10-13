@@ -12,5 +12,5 @@
     "noEmit": true,
     "esModuleInterop": true
   },
-  "include": ["src", "../server/relay-core.d.mts", "../server/worker/relay-wiring.d.mts"]
+  "include": ["src", "../src/auth/auth-types.ts", "../src/auth/auth-validation.ts", "../src/enums/auth-error.enum.ts", "../src/enums/game-mode.enum.ts", "../src/enums/tribe.enum.ts", "../src/results/result-types.ts", "../src/results/result-validation.ts", "../server/relay-core.d.mts", "../server/worker/relay-wiring.d.mts"]
 }

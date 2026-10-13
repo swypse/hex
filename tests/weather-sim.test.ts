@@ -40,9 +40,9 @@ describe('drought economy', () => {
     const inside = tileAt(map, -1, 0)!;
     const outside = tileAt(map, -5, 0)!;
     map.weather = [weatherOf(WeatherType.DROUGHT, -1, 0)];
-    expect(farmYield(null, map, inside)).toBe(1); // 2 -> 1
-    expect(farmYield(null, map, outside)).toBe(2);
-    expect(farmYield(null, map)).toBe(2); // no tile given: normal
+    expect(farmYield(null, map, inside)).toBe(2); // 3 -> 2 (rounded up)
+    expect(farmYield(null, map, outside)).toBe(3);
+    expect(farmYield(null, map)).toBe(3); // no tile given: normal
   });
 
   it('halves a mine with the geology bonus, but never below 1', () => {

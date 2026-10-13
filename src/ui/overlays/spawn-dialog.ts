@@ -1,5 +1,5 @@
 import { t } from '../../i18n';
-import { Container, Graphics } from 'pixi.js';
+import { type Container } from 'pixi.js';
 import { gameController } from '../../controller/game-controller';
 import { hasSkill } from '../../game/skills';
 import { networkStock } from '../../game/economy/stock';
@@ -9,8 +9,7 @@ import type { Player } from '../../game/players';
 import { useGameStore } from '../../store/game-store';
 import { type UIHost } from '../host';
 import { Button } from '../kit/button';
-import { makeActionButtonIcon } from '../../gfx/action-button-icons';
-import { makeIcon } from '../kit/icon';
+import { ACTION_CELL_H, ACTION_CELL_W, makeActionCircleButton, resourceCostParts } from '../kit/action-circle-button';
 import { makeLabel } from '../../gfx/label';
 import { Popup } from '../kit/popup';
 import { PopupDialog } from './popup-dialog';
@@ -19,10 +18,8 @@ import { tileAt } from '../../game/map/tile-index';
 
 // Fixed 3-icon grid: 3 columns, 4px margins around each cell.
 const COLS = 3;
-const CELL_W = 92;
-const CELL_H = 112;
 const ITEM_PAD = 4;
-const RESOURCE_ICON_SIZE = 16;
+const EMPTY_COST = { wood: 0, stone: 0, money: 0, ore: 0, food: 0 };
 // The circle buttons are drawn flush with (0, 0) inside their cell, and their
 // stroke is centered on the circle path, so it overhangs the fill by half its
 // width. Without this margin the popup's content mask (which starts exactly
@@ -65,7 +62,7 @@ export class SpawnDialog extends PopupDialog {
       title: t('spawn.title'),
       // Sized so the content area holds exactly 3 columns + the inter-cell
       // margins, plus a 4px margin on each side of the grid itself.
-      width: 2 * 20 + 2 * GRID_MARGIN + COLS * CELL_W + (COLS - 1) * ITEM_PAD,
+      width: 2 * 20 + 2 * GRID_MARGIN + COLS * ACTION_CELL_W + (COLS - 1) * ITEM_PAD,
       onClose: () => useGameStore.getState().setOverlay(null),
     });
     root.addChild(popup.el);
@@ -131,67 +128,23 @@ export class SpawnDialog extends PopupDialog {
     types.forEach((type, i) => {
       const col = i % cols;
       const row = Math.floor(i / cols);
-      const item = new Container();
-      item.position.set(GRID_MARGIN + col * (CELL_W + ITEM_PAD), GRID_MARGIN + row * (CELL_H + ITEM_PAD));
-      item.eventMode = 'static';
-      item.cursor = 'pointer';
-
-      const circle = new Graphics();
-      circle.circle(CELL_W / 2, 30, 30).fill(0x333333).stroke({ width: 2, color: 0x888888 });
-      item.addChild(circle);
-
-      // Clip the icon to the circle so its texture never spills past the
-      // button's border.
-      const clip = new Graphics();
-      clip.circle(CELL_W / 2, 30, 30).fill(0xffffff);
-      item.addChild(clip);
-
-      const icon = makeActionButtonIcon(`action-spawn-${type}`, 60);
-      icon.position.set(CELL_W / 2, 30);
-      icon.mask = clip;
-      item.addChild(icon);
-
-      const name = makeLabel(UNIT_TYPE_NAMES[type], { fontSize: FontSize.SMALL, fill: 0xffffff });
-      name.position.set((CELL_W - name.width) / 2, 66);
-      item.addChild(name);
-
-      this.addPriceRow(item, type);
-
       const reasons = this.reasons(type);
       const disabled = reasons.length > 0;
-      item.alpha = disabled ? 0.4 : 1;
-      item.on('pointertap', () => {
-        if (disabled) {
-          this.drawReasons(type);
-        } else {
-          gameController.actions.spawnSelectedVillage(type);
-        }
+      const info = UNIT_TYPES[type];
+      const item = makeActionCircleButton({
+        icon: `action-spawn-${type}`,
+        name: UNIT_TYPE_NAMES[type],
+        cost: resourceCostParts({ ...EMPTY_COST, money: info.price, wood: info.priceWood, ore: info.priceOre }),
+        dimmed: disabled,
+        onClick: () => {
+          if (disabled) this.drawReasons(type);
+          else gameController.actions.spawnSelectedVillage(type);
+        },
       });
+      item.position.set(GRID_MARGIN + col * (ACTION_CELL_W + ITEM_PAD), GRID_MARGIN + row * (ACTION_CELL_H + ITEM_PAD));
       content.addChild(item);
     });
     this.popup.reflow();
-  }
-
-  /** Money / wood / ore costs as a centred row of 16px resource icons next to
-   *  their amounts, e.g. `30 💰 20 🪵 5 ⛏`. Zero-cost resources are omitted. */
-  private addPriceRow(item: Container, type: UnitType): void {
-    const info = UNIT_TYPES[type];
-    const parts: { icon: string; label: string }[] = [{ icon: 'gold-32', label: String(info.price) }];
-    if (info.priceWood > 0) parts.push({ icon: 'wood-32', label: String(info.priceWood) });
-    if (info.priceOre > 0) parts.push({ icon: 'ore-32', label: String(info.priceOre) });
-
-    const row = new Container();
-    let x = 0;
-    for (const p of parts) {
-      const value = makeLabel(p.label, { fontSize: FontSize.SMALL, fill: 0xffffff });
-      const icon = makeIcon(p.icon, RESOURCE_ICON_SIZE);
-      icon.position.set(x + value.width + RESOURCE_ICON_SIZE / 2 + 2, RESOURCE_ICON_SIZE / 2);
-      value.position.set(x, 0);
-      row.addChild(value, icon);
-      x += value.width + RESOURCE_ICON_SIZE + 2 + 6;
-    }
-    row.position.set((CELL_W - x) / 2, 84);
-    item.addChild(row);
   }
 
   private drawReasons(type: UnitType): void {

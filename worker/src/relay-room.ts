@@ -1,9 +1,14 @@
 import { DurableObject } from 'cloudflare:workers';
 import { RelayCore } from '../../server/relay-core.mjs';
 import { wireMember } from '../../server/worker/relay-wiring.mjs';
+import type { UserDirectory } from './auth/user-directory';
 
 export interface Env {
   RELAY_ROOM: DurableObjectNamespace<RelayRoom>;
+  USER_DIRECTORY: DurableObjectNamespace<UserDirectory>;
+  /** Gmail SMTP credentials (wrangler secrets); unset = log codes instead of mailing. */
+  GMAIL_USER?: string;
+  GMAIL_APP_PASSWORD?: string;
 }
 
 /** One Durable Object instance per room code. Holds that room's relay state. */

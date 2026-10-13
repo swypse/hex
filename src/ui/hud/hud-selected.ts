@@ -11,7 +11,7 @@ import { isShip } from '../../game/units/ship';
 import { villageCapacity, villageBuildingLimit, buildingKindsInVillage, unitsInVillage } from '../../game/economy/village';
 import { tileUpkeep, villageIncomeBreakdown } from '../../game/economy/capture';
 import { lightningTurnsLeft } from '../../game/units/lightning';
-import { farmYield, GRANARY_CAPACITY, STARVATION_DAMAGE, villageFood, villageGranaries } from '../../game/economy/food';
+import { farmYield, granaryCapacity, STARVATION_DAMAGE, villageFood, villageGranaries } from '../../game/economy/food';
 import { villageUpgradeCost } from '../../game/economy/resources';
 import { buildingYield, buildingHp, canPlaceFoodBuilding, BUILDING_NAMES, DESTROY_BUILDING_COST } from '../../game/economy/buildings';
 import { TRAP_TURNS } from '../../game/units/traps';
@@ -234,7 +234,7 @@ export class HudSelected implements Widget {
       }
       if (settlement.owner === human.index) {
         if (villageGranaries(map, tile).length > 0) {
-          lines.push(t('hud.selected.villageGranary', { food: villageFood(map, tile, human).granaryFood, cap: villageGranaries(map, tile).length * GRANARY_CAPACITY }));
+          lines.push(t('hud.selected.villageGranary', { food: villageFood(map, tile, human).granaryFood, cap: villageGranaries(map, tile).reduce((sum, g) => sum + granaryCapacity(map, g), 0) }));
           bolds.push(false);
         }
       }
@@ -290,7 +290,8 @@ export class HudSelected implements Widget {
       lines.push('');
       bolds.push(true);
       if (b.kind === BuildingKind.GRANARY) {
-        lines.push(t('hud.selected.granaryFood', { food: b.food ?? 0, cap: GRANARY_CAPACITY }));
+        const map = gameController.getMap();
+        lines.push(t('hud.selected.granaryFood', { food: b.food ?? 0, cap: map ? granaryCapacity(map, tile) : 0 }));
         bolds.push(false);
       }
     }

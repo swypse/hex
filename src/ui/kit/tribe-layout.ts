@@ -2,7 +2,9 @@ import type { Container } from 'pixi.js';
 
 const TRIBE_DIAM = 56;
 export const TRIBE_GAP = 16;
-export const TRIBE_ROW_STEP = 88;
+/** Height reserved under a tribe name for its best-result stars. */
+export const TRIBE_STARS_HEIGHT = 16;
+export const TRIBE_ROW_STEP = 88 + TRIBE_STARS_HEIGHT - 4;
 
 interface TribeSlot {
   x: number;

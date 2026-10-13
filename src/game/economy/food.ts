@@ -13,12 +13,12 @@ import { tileMapByKey } from '../map/tile-index';
 
 
 /** Food a farm yields at the end of each round. */
-export const FARM_FOOD = 2;
+export const FARM_FOOD = 3;
 /** Extra food Agronomy gives a farm in a village with a university, and what such a farm yields in winter. */
 export const AGRONOMY_FOOD = 1;
 export const AGRONOMY_WINTER_FOOD = 1;
-/** Most food one granary can hold. */
-export const GRANARY_CAPACITY = 25;
+/** Food a granary can hold per own farm adjacent to it. */
+export const GRANARY_CAPACITY_PER_FARM = 10;
 /** Hp a unit loses when it gets none of the food it needs; a partly fed unit
  *  loses the missing share of it (rounded). */
 export const STARVATION_DAMAGE = 10;
@@ -34,7 +34,7 @@ const UNIT_FEED_PRIORITY: UnitType[] = [
   UnitType.SHIELD, UnitType.RIDER, UnitType.ARCHER, UnitType.WARRIOR, UnitType.PIRATE,
 ];
 
-/** Farm yield per round: nothing in winter, otherwise 2 (+1 with Agronomy in a
+/** Farm yield per round: nothing in winter, otherwise 3 (+1 with Agronomy in a
  *  village with a university), halved (rounded up) for a farm inside a drought. */
 export function farmYield(owner: Player | null | undefined, map?: Pick<GameMap, 'season' | 'weather'> & Partial<Pick<GameMap, 'tiles'>>, farm?: MapTile): number {
   // Agronomy: a farm in a village with a university yields 1 more, and 1 in winter.
@@ -125,6 +125,15 @@ export function adjacentFarmCount(map: GameMap, tile: MapTile, ownerIndex: numbe
   return n;
 }
 
+/** Most food this granary can store: 10 per adjacent own farm. Losing a farm
+ *  does not destroy food already stored; the granary just takes in no more
+ *  until it is below the new capacity. */
+export function granaryCapacity(map: GameMap, granary: MapTile): number {
+  const owner = granary.ownedBy;
+  if (owner === null || owner === undefined) return 0;
+  return adjacentFarmCount(map, granary, owner) * GRANARY_CAPACITY_PER_FARM;
+}
+
 export interface VillageFood {
   /** Food per round from the farms of the village's whole network. */
   production: number;
@@ -190,7 +199,7 @@ export function foodNetIncome(map: GameMap, player: Player): number {
  *  share their food. In each such network the units are fed village by village
  *  (most developed first) and unit by unit (hungriest first) from the farms,
  *  farms away from granaries first. Food left on a farm next to a granary is
- *  stored there (up to GRANARY_CAPACITY, the rest is lost). A unit still short
+ *  stored there (up to the granary's capacity, the rest is lost). A unit still short
  *  of food is fed from the network's granaries, then the starting reserve, then
  *  other granaries. A unit that stays short loses the missing share of
  *  STARVATION_DAMAGE hp (never below 1) and its village is starving. With
@@ -206,6 +215,8 @@ export function applyFood(map: GameMap, player: Player, dryRun = false): Starvat
   const reserves = new Map<MapTile, number>();
   for (const t of map.tiles) if (t.settlement?.owner === owner) reserves.set(t, readStock(t).food);
   const stored = (g: MapTile): number => amounts.get(g) ?? 0;
+  const capacities = new Map<MapTile, number>(granaries.map((g) => [g, granaryCapacity(map, g)]));
+  const capacity = (g: MapTile): number => capacities.get(g) ?? 0;
 
   const adjacentGranaries = (farm: MapTile): MapTile[] => {
     const out: MapTile[] = [];
@@ -253,11 +264,11 @@ export function applyFood(map: GameMap, player: Player, dryRun = false): Starvat
       let left = rest;
       // Leftover goes to the emptiest adjacent granary that still has room.
       while (left > 0) {
-        const open = adjacentGranaries(farm).filter((gr) => stored(gr) < GRANARY_CAPACITY);
+        const open = adjacentGranaries(farm).filter((gr) => stored(gr) < capacity(gr));
         if (open.length === 0) break;
         open.sort((a, b) => stored(a) - stored(b));
         const gr = open[0]!;
-        const add = Math.min(left, GRANARY_CAPACITY - stored(gr));
+        const add = Math.min(left, capacity(gr) - stored(gr));
         amounts.set(gr, stored(gr) + add);
         left -= add;
       }

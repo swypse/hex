@@ -1,3 +1,4 @@
+import { TRIBE_ROW_STEP } from '../src/ui/kit/tribe-layout';
 import { ConnectionState, GameMode, LobbyRole, NetMode, Screen } from '@enums';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Container, Sprite, BitmapText } from 'pixi.js';
@@ -262,7 +263,7 @@ describe('LobbyScreen host copy join link button', () => {
     // The picker always draws two centered rows (see lobby-host.test.ts).
     const rowYs = [...new Set(options.map((o) => Math.round((o as Container).position.y)))].sort((a, b) => a - b);
     expect(rowYs).toHaveLength(2);
-    expect(rowYs[1]! - rowYs[0]!).toBeCloseTo(88, 5);
+    expect(rowYs[1]! - rowYs[0]!).toBeCloseTo(TRIBE_ROW_STEP, 5);
     for (const ry of rowYs) {
       const row = options.filter((o) => Math.round((o as Container).position.y) === ry);
       const xs = row.map((o) => (o as Container).position.x).sort((a, b) => a - b);

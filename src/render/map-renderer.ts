@@ -5,7 +5,7 @@ import {
 } from '../game/map/hex';
 import { type GameMap, type MapTile } from '../game/map/map-gen';
 import { bridgeCoastOffsets } from '../game/economy/bridges';
-import { GRANARY_CAPACITY } from '../game/economy/food';
+import { granaryCapacity } from '../game/economy/food';
 import { portDirection, buildingHp, BUILDING_MAX_HP } from '../game/economy/buildings';
 import { type Player } from '../game/players';
 import { type Selection } from '../game/units/selection';
@@ -1310,11 +1310,17 @@ export class MapView {
     const siblings = this.container.children;
     const idx = siblings.indexOf(el);
     if (idx === -1) return;
-    const y = (el.children[0] as Sprite).position.y;
+    const own = el.children[0];
+    if (!own) return;
+    const y = (own as Sprite).position.y;
     let insertAt = idx;
     while (insertAt + 1 < siblings.length) {
       const next = siblings[insertAt + 1] as Container;
-      const nextY = (next.children[0] as Sprite).position.y;
+      const first = next.children[0];
+      // Overlay graphics (selection / attack border halves) are not tile views
+      // and carry no children: they stay on top of every tile.
+      if (!first) break;
+      const nextY = (first as Sprite).position.y;
       if (nextY > y) break;
       insertAt++;
     }
@@ -2037,7 +2043,7 @@ export class MapView {
     if (!tribe) return;
     const el = new Container();
     const plateColor = territoryColor(tribe, this.knownOwners.has(owner));
-    const label = this.pool.takeText(`${tile.building?.food ?? 0}/${GRANARY_CAPACITY}`, {
+    const label = this.pool.takeText(`${tile.building?.food ?? 0}/${this.map ? granaryCapacity(this.map, tile) : 0}`, {
       fontSize: VILLAGE_LABEL_FONT_SIZE,
       fill: villageLabelTextColor(tribe, this.knownOwners.has(owner)),
       fontFamily: FONT_REGULAR,

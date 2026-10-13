@@ -21,7 +21,7 @@ import { hexDistance, hexNeighbors } from './map/hex';
 import type { GameMap, MapTile } from './map/map-gen';
 import type { Player } from './players';
 import { START_RESOURCES, villageUpgradeCost } from './economy/resources';
-import { buildRoad } from './economy/roads';
+import { buildRoad, buildRoadIgnoringSkill } from './economy/roads';
 import {
   awardScore, awardTempleScores, CAPTURE_SCORE, COMBO_SCORE, EMPTY_STATS, KILL_SCORE, PIRATE_KILL_SCORE, type PlayerStats,
   SKILL_SCORE, UPGRADE_SCORE
@@ -969,6 +969,12 @@ export class Simulator {
       if (!buildBridgeIgnoringSkill(this.map, target, player)) return false;
       this.consumeUnitTurn(unit);
       this.emit({ type: GameEventType.BRIDGE_BUILT, q, r, playerIndex: player.index });
+      return true;
+    }
+    if (kind === BuilderExtraKind.ROAD) {
+      if (!buildRoadIgnoringSkill(this.map, target, player)) return false;
+      this.consumeUnitTurn(unit);
+      this.emit({ type: GameEventType.ROAD_BUILT, q, r, playerIndex: player.index });
       return true;
     }
     if (!buildBuildingIgnoringSkill(this.map, target, kind, player)) return false;

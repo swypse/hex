@@ -8,6 +8,10 @@
       {
         "name": "RELAY_ROOM",
         "class_name": "RelayRoom"
+      },
+      {
+        "name": "USER_DIRECTORY",
+        "class_name": "UserDirectory"
       }
     ]
   },
@@ -15,6 +19,10 @@
     {
       "tag": "v1",
       "new_sqlite_classes": ["RelayRoom"]
+    },
+    {
+      "tag": "v2",
+      "new_sqlite_classes": ["UserDirectory"]
     }
   ]
 }

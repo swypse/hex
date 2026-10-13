@@ -22,7 +22,9 @@ import { Modal } from '../kit/modal';
 import { Popup } from '../kit/popup';
 import { setLanguage } from '../../storage/settings';
 import { ensureCanvasResource } from '../../gfx/image-texture';
-import { AiDifficulty, FontSize, Language, Screen, StartModal } from '@enums';
+import { AiDifficulty, AuthStep, FontSize, Language, Screen, StartModal } from '@enums';
+import { AuthBar } from '../auth-bar';
+import { AuthDialog } from '../overlays/auth-dialog';
 import { clamp } from '../../util/math';
 
 const IMAGE_BASE = `${import.meta.env.BASE_URL}images/`;
@@ -179,6 +181,7 @@ export class StartScreen implements ScreenController {
   private index = 0;
   private aboutBtn: Button | null = null;
   private settingsBtn: Button | null = null;
+  private authBar: AuthBar | null = null;
   private modal: ModalView | null = null;
   private bgImg: Sprite | null = null;
   private bg: Graphics | null = null;
@@ -256,7 +259,12 @@ export class StartScreen implements ScreenController {
       fontSize: FontSize.SMALL,
       onClick: () => this.openModal(StartModal.SETTINGS)
     });
-    this.root.addChild(this.aboutBtn, this.settingsBtn);
+    this.authBar = new AuthBar(
+      () => this.openModal(StartModal.LOGIN),
+      () => this.openModal(StartModal.REGISTER),
+      () => this.layout(),
+    );
+    this.root.addChild(this.aboutBtn, this.settingsBtn, this.authBar);
     if (this.scroll) {
       this.scroll.content.addChild(this.title, ...this.buttons, this.hint);
     } else {
@@ -354,6 +362,7 @@ export class StartScreen implements ScreenController {
     if (this.hint) this.hint.position.set(w / 2, glyphTop + hintCenter);
     if (this.aboutBtn) this.aboutBtn.position.set(12, h - this.aboutBtn.height - 12);
     if (this.settingsBtn) this.settingsBtn.position.set(w - this.settingsBtn.width - 12, h - this.settingsBtn.height - 12);
+    if (this.authBar) this.authBar.position.set(w - this.authBar.width - 12, 12);
     this.paintGradient();
     this.placeBackgroundImage();
     this.scroll?.resize();
@@ -383,6 +392,13 @@ export class StartScreen implements ScreenController {
       const panel = new SettingsPanel(this.host.app, () => this.closeModal());
       panel.mount(this.root!);
       this.modal = panel;
+      return;
+    }
+    if (kind === StartModal.LOGIN || kind === StartModal.REGISTER) {
+      const step = kind === StartModal.LOGIN ? AuthStep.LOGIN : AuthStep.REGISTER;
+      const dialog = new AuthDialog(this.host.app, step, () => this.closeModal());
+      dialog.mount(this.root!);
+      this.modal = dialog;
       return;
     }
     const opts = kind === StartModal.ABOUT
@@ -417,6 +433,7 @@ export class StartScreen implements ScreenController {
     this.buttons = [];
     this.aboutBtn = null;
     this.settingsBtn = null;
+    this.authBar = null;
     this.bgImg = null;
     this.bg = null;
     this.host = null;

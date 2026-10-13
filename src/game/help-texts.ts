@@ -1,7 +1,7 @@
 import { type GameMap, type MapTile } from './map/map-gen';
 import { BUILDING_COSTS, BUILDING_NAMES, buildingYield } from './economy/buildings';
 import { UNIVERSITY_UPKEEP, villageIncome } from './economy/capture';
-import { AGRONOMY_FOOD, FARM_FOOD, STARVATION_DAMAGE } from './economy/food';
+import { AGRONOMY_FOOD, FARM_FOOD, granaryCapacity, GRANARY_CAPACITY_PER_FARM, STARVATION_DAMAGE } from './economy/food';
 import { villageUpgradeCost } from './economy/resources';
 import { buildingsInVillage, claimRadius, villageBuildingLimit, unitsInVillage, villageCapacity } from './economy/village';
 import { SHIP_UPGRADE_COST } from './units/ship';
@@ -146,7 +146,7 @@ export function buildingHelpLines(map: GameMap, tile: MapTile): string[] {
     }
     case BuildingKind.GRANARY: {
       return [
-        t('help.building.granary.store', { food: b.food ?? 0 }),
+        t('help.building.granary.store', { food: b.food ?? 0, cap: granaryCapacity(map, tile), perFarm: GRANARY_CAPACITY_PER_FARM }),
         t('help.building.granary.skill', { money: BUILDING_COSTS.granary.money, wood: BUILDING_COSTS.granary.wood, stone: BUILDING_COSTS.granary.stone }),
         t('help.building.granary.place'),
       ];

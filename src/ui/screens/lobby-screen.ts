@@ -12,8 +12,9 @@ import { ButtonGroup } from '../kit/button-group';
 import { makeLabel } from '../../gfx/label';
 import { BLOCK_GAP, TITLE_TO_CONTENT } from '../kit/screen-layout';
 import { TextInputOverlay } from '../kit/text-input-overlay';
-import { positionTribes, TRIBE_GAP, TRIBE_ROW_STEP } from '../kit/tribe-layout';
+import { positionTribes, TRIBE_GAP, TRIBE_ROW_STEP, TRIBE_STARS_HEIGHT } from '../kit/tribe-layout';
 import { makeTribeOption } from '../kit/tribe-option';
+import { useResultsStore } from '../../results/results-store';
 import { isTouchDevice } from '../kit/touch';
 import { ScreenScroll } from '../kit/vertical-scroll';
 
@@ -43,6 +44,7 @@ export class LobbyScreen implements ScreenController {
   private createBtn: Button | null = null;
   private joinBtn: Button | null = null;
   private unsub: (() => void) | null = null;
+  private unsubResults: (() => void) | null = null;
   private onResize: (() => void) | null = null;
   private onKeyDown: ((e: KeyboardEvent) => void) | null = null;
   private lastWidth = 0;
@@ -59,6 +61,7 @@ export class LobbyScreen implements ScreenController {
     }
     this.render();
     this.unsub = useGameStore.subscribe(() => this.render());
+    this.unsubResults = useResultsStore.subscribe(() => this.render());
     this.lastWidth = host.app.screen.width;
     this.onResize = () => {
       const width = this.host?.app.screen.width ?? this.lastWidth;
@@ -270,7 +273,7 @@ export class LobbyScreen implements ScreenController {
       const opt = makeTribeOption(tr.name, `${tr.code}-icon.png`, () => {
         this.tribe = tr.id;
         this.render();
-      }, tr.id === this.tribe, tr.color);
+      }, tr.id === this.tribe, tr.color, useResultsStore.getState().starsFor(tr.id));
       tribeOpts.push(opt.el);
       if (opt.labelHeight > tribeLabelH) tribeLabelH = opt.labelHeight;
       this.viewContent.addChild(opt.el);
@@ -543,7 +546,7 @@ export class LobbyScreen implements ScreenController {
         if (!pickable) return;
         if (isHost) gameController.pickHostTribe(t.id);
         else gameController.pickClientTribe(t.id);
-      }, t.id === ownTribeId, t.color);
+      }, t.id === ownTribeId, t.color, useResultsStore.getState().starsFor(t.id));
       if (!pickable) {
         opt.el.eventMode = 'none';
         opt.el.alpha = 0.45;
@@ -552,7 +555,7 @@ export class LobbyScreen implements ScreenController {
       this.viewContent.addChild(opt.el);
     });
     const tribeRows = positionTribes(cx, y, tribeOpts, TRIBE_GAP * 2);
-    y += 70 + (tribeRows - 1) * TRIBE_ROW_STEP;
+    y += 70 + TRIBE_STARS_HEIGHT + (tribeRows - 1) * TRIBE_ROW_STEP;
 
     if (isHost) {
       if (s.connection === ConnectionState.ERROR) {
@@ -662,6 +665,8 @@ export class LobbyScreen implements ScreenController {
 
   destroy(): void {
     if (this.unsub) this.unsub();
+    this.unsubResults?.();
+    this.unsubResults = null;
     if (this.onResize) window.removeEventListener('resize', this.onResize);
     if (this.onKeyDown) window.removeEventListener('keydown', this.onKeyDown);
     this.unsub = null;

@@ -6,6 +6,7 @@ import { Button } from '@/ui/kit/button';
 import { ButtonGroup } from '@/ui/kit/button-group';
 import { LobbyScreen } from '@/ui/screens/lobby-screen';
 import { GameMode, LobbyRole, Screen } from '@enums';
+import { TRIBE_ROW_STEP } from '../src/ui/kit/tribe-layout';
 import { BitmapText, Container, Graphics, Sprite } from 'pixi.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -63,12 +64,12 @@ function textsOf(c: Container): string[] {
 
 // The picker always draws the tribes as two centered rows (top row gets the
 // larger share). Within a row the 88px step comes from TRIBE_GAP * 2 (32px gap
-// + 56px circle); the two rows sit TRIBE_ROW_STEP (88px) apart.
+// + 56px circle); the two rows sit TRIBE_ROW_STEP apart.
 function expectTribeGridTwoRows(options: Container[]): void {
   expect(options).toHaveLength(TRIBES.length);
   const rowYs = [...new Set(options.map((o) => Math.round(o.position.y)))].sort((a, b) => a - b);
   expect(rowYs).toHaveLength(2);
-  expect(rowYs[1]! - rowYs[0]!).toBeCloseTo(88, 5);
+  expect(rowYs[1]! - rowYs[0]!).toBeCloseTo(TRIBE_ROW_STEP, 5);
   for (const ry of rowYs) {
     const row = options.filter((o) => Math.round(o.position.y) === ry);
     const xs = row.map((o) => o.position.x).sort((a, b) => a - b);

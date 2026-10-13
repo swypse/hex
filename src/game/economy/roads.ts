@@ -111,6 +111,16 @@ export function canBuildRoadHere(
 
 export function buildRoad(map: GameMap, tile: MapTile, player: Player): boolean {
   if (!canBuildRoad(map, tile, player)) return false;
+  return payAndPlaceRoad(map, tile, player);
+}
+
+/** Places a road at its cost without the Roads skill: for the Villagers
+ *  builder, whose reachable cells `builderBuildable` already limits. */
+export function buildRoadIgnoringSkill(map: GameMap, tile: MapTile, player: Player): boolean {
+  return canBuildRoadHere(map, tile, player) && payAndPlaceRoad(map, tile, player);
+}
+
+function payAndPlaceRoad(map: GameMap, tile: MapTile, player: Player): boolean {
   if (!payAt(map, player, tile, ROAD_COST, villagesJoinedBy(map, player.index, tile))) return false;
   tile.roadOwner = player.index;
   return true;

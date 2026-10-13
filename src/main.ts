@@ -1,5 +1,7 @@
 import { Application } from 'pixi.js';
 import { gameController } from './controller/game-controller';
+import { installResultRecorder } from './controller/result-recorder';
+import { useAuthStore } from './auth/auth-store';
 import { initErrorReporter } from './error-reporter';
 import { readJoinCode, setPendingJoin } from './net/join-link';
 import { preventCanvasContextMenu } from './prevent-canvas-context-menu';
@@ -73,6 +75,9 @@ async function boot(): Promise<void> {
   }
   new ScreenManager(app);
   initNavigation();
+  // Restore the session even when the app opens straight on a later screen.
+  void useAuthStore.getState().restore();
+  installResultRecorder();
   // The start screen is up: use its idle time to prepare what a game needs.
   void preloadStartupWork();
 }

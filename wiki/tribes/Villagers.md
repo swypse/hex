@@ -1,6 +1,6 @@
 # Villagers
 
-The Villagers are the builders' tribe: they start with extra money and have the Builder, which constructs sawmills, mines, ports and bridges without learning the skills first.
+The Villagers are the builders' tribe: they start with extra money and have the Builder, which constructs sawmills, mines, ports, bridges and roads without learning the skills first.
 
 ## Overview
 
@@ -16,13 +16,13 @@ tribe and needs no skill. It has its own artwork and spawn-popup icon; the tribe
 
 ## Builder
 
-Villager that raises sawmills, mines, ports and bridges without their skills. A slow, weak fighter; its value is the economy it unlocks early.
+Villager that raises sawmills, mines, ports, bridges and roads without their skills. A slow, weak fighter; its value is the economy it unlocks early.
 
 | Move | Attack | Defense | Range | HP | Spawn cost | Upkeep (money / food) | Board score |
 |------|--------|---------|-------|----|------------|-----------------------|-------------|
 | 8 | 10 | 0 | 1 | 40 | 15 money | 2 / 3 | 7 |
 
-- **Building.** Consumes its turn to build a sawmill, mine, port or bridge on its own cell or an adjacent owned cell.
-- **No skill needed.** No building skill is required (Forestry, Smithery, Water, Bridges); the usual building costs apply, and placement rules (terrain, the village's building slots) are unchanged.
+- **Building.** Consumes its turn to build a sawmill, mine, port, bridge or road on its own cell or an adjacent owned cell.
+- **No skill needed.** No building skill is required (Forestry, Smithery, Water, Bridges, Roads); the usual building costs apply, and placement rules (terrain, the village's building slots, a road must join your road network or a village) are unchanged.
 - **Not at sea.** It cannot build while aboard a ship.
 - **Veteran bonus.** The AI gives a builder veteran the +10 HP bonus.

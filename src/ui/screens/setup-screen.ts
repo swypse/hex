@@ -14,6 +14,8 @@ import { BLOCK_GAP, TITLE_TO_CONTENT } from '../kit/screen-layout';
 import { THEME } from '../../gfx/theme';
 import { TRIBE_GAP, TRIBE_ROW_STEP, tribeSlots } from '../kit/tribe-layout';
 import { makeTribeOption, type TribeOption } from '../kit/tribe-option';
+import { useResultsStore } from '../../results/results-store';
+import { markDirty } from '../../gfx/render-gate';
 import { isTouchDevice } from '../kit/touch';
 import { ScreenScroll } from '../kit/vertical-scroll';
 import {
@@ -64,6 +66,7 @@ export class SetupScreen implements ScreenController {
   private modeTitle: BitmapText | null = null;
   private difficultyTitle: BitmapText | null = null;
   private tribeItems: TribeOption[] = [];
+  private unsubResults: (() => void) | null = null;
   private tribeDesc: BitmapText | null = null;
   private tribeDescH = 0;
   private enemyGroup: ButtonGroup | null = null;
@@ -104,10 +107,17 @@ export class SetupScreen implements ScreenController {
         },
         tr.id === this.tribe,
         tr.color,
+        useResultsStore.getState().starsFor(tr.id),
       );
       this.tribeItems.push(opt);
       this.scroll!.content.addChild(opt.el);
     }
+
+    // Bests may arrive after the screen opened (session restore, login).
+    this.unsubResults = useResultsStore.subscribe((state) => {
+      TRIBES.forEach((tr, i) => this.tribeItems[i]?.setStars(state.starsFor(tr.id)));
+      markDirty();
+    });
 
     this.enemyGroup = new ButtonGroup({
       items: ENEMY_OPTIONS.map((n) => ({
@@ -447,6 +457,8 @@ export class SetupScreen implements ScreenController {
   }
 
   destroy(): void {
+    this.unsubResults?.();
+    this.unsubResults = null;
     window.removeEventListener('keydown', this.onKeyDown);
     window.removeEventListener('resize', this.onResize);
     if (this.bgTweenRemove) this.bgTweenRemove();

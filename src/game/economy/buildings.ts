@@ -10,14 +10,15 @@ import { villageEnemyOccupied } from './capture';
 import type { Unit } from '../units/units';
 import { t } from '../../i18n';
 import { canBuildBridgeHere, BRIDGE_COST } from './bridges';
-import { BuilderExtraKind, BuildingKind, PortDirection, SkillId } from '@enums';
+import { canBuildRoadHere, ROAD_COST } from './roads';
+import { BuilderBuildStatus, BuilderExtraKind, BuildingKind, PortDirection, SkillId } from '@enums';
 import { droughtOverTile, halvedYield } from '../weather/weather';
 
 export type BuilderBuildKind = BuildingKind | BuilderExtraKind;
 /** The structures a builder unit can place from its build menu. */
-export type BuilderBuildableKind = BuildingKind.SAWMILL | BuildingKind.MINE | BuildingKind.PORT | BuilderExtraKind.BRIDGE;
+export type BuilderBuildableKind = BuildingKind.SAWMILL | BuildingKind.MINE | BuildingKind.PORT | BuilderExtraKind.BRIDGE | BuilderExtraKind.ROAD;
 
-const BUILDER_KINDS: BuilderBuildableKind[] = [BuildingKind.SAWMILL, BuildingKind.MINE, BuildingKind.PORT, BuilderExtraKind.BRIDGE];
+const BUILDER_KINDS: BuilderBuildableKind[] = [BuildingKind.SAWMILL, BuildingKind.MINE, BuildingKind.PORT, BuilderExtraKind.BRIDGE, BuilderExtraKind.ROAD];
 
 export const SAWMILL_COST = 10;
 export const MINE_COST = 15;
@@ -94,6 +95,7 @@ const BUILDER_BUILD_COSTS: Record<BuilderBuildableKind, Resources> = {
   mine: BUILDING_COSTS.mine,
   port: BUILDING_COSTS.port,
   bridge: BRIDGE_COST,
+  road: ROAD_COST,
 };
 
 /** Whether the given resources cover at least one builder-constructable kind. */
@@ -287,12 +289,32 @@ export function builderBuildable(map: GameMap, tile: MapTile, kind: BuilderBuild
     if (!t) return;
     const ok = kind === BuilderExtraKind.BRIDGE
       ? t.ownedBy === player.index && canBuildBridgeHere(map, t)
-      : canBuildKindIgnoringSkill(kind as BuildingKind, map, t, player);
+      : kind === BuilderExtraKind.ROAD
+        ? t.ownedBy === player.index && canBuildRoadHere(map, t, player)
+        : canBuildKindIgnoringSkill(kind as BuildingKind, map, t, player);
     if (ok) out.push(t);
   };
   consider(tile);
   for (const n of hexNeighbors(tile)) consider(neighborTile(map, n));
   return out;
+}
+
+/** Whether the builder standing on `tile` can build `kind` now: some reachable
+ *  cell passes the placement rules and its price (with the discount and the
+ *  road/port networks that cell would join) is covered. */
+export function builderBuildStatus(map: GameMap, tile: MapTile, kind: BuilderBuildKind, player: Player): BuilderBuildStatus {
+  const cells = builderBuildable(map, tile, kind, player);
+  if (cells.length === 0) return BuilderBuildStatus.NO_PLACE;
+  const affordable = cells.some((cell) => {
+    // Bridges and roads are network nodes: the networks they join may pay.
+    if (kind === BuilderExtraKind.BRIDGE || kind === BuilderExtraKind.ROAD) {
+      const cost = kind === BuilderExtraKind.BRIDGE ? BRIDGE_COST : ROAD_COST;
+      return canAffordAt(map, player, cell, cost, villagesJoinedBy(map, player.index, cell));
+    }
+    const joined = kind === BuildingKind.PORT ? villagesJoinedBy(map, player.index, cell) : [];
+    return canAffordAt(map, player, cell, buildingCostAt(map, player, cell, kind as BuildingKind), joined);
+  });
+  return affordable ? BuilderBuildStatus.AVAILABLE : BuilderBuildStatus.CANNOT_AFFORD;
 }
 
 /** Whether this player's own building on `tile` is damaged (not full hp). */

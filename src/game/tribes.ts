@@ -1,16 +1,8 @@
 import { t } from '../i18n';
 import { TRIBE_COLORS } from '../config';
-import { SkillId, UnitType } from '@enums';
+import { SkillId, Tribe, UnitType } from '@enums';
 
-export enum Tribe {
-  Villagers,
-  Warriors,
-  Barbarians,
-  Cats,
-  Forest,
-  Aqua,
-  Sand,
-}
+export { Tribe };
 
 export interface TribeInfo {
   id: Tribe;

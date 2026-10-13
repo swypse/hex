@@ -65,7 +65,7 @@ export const UNIT_PATTERNS: AiPattern[] = [
         if (unit.shipLevel !== undefined) continue;
         if (state.acted.has(unit.id) || state.moved.has(unit.id)) continue;
         if (t.settlement && t.settlement.owner === player.index && enemyCanReach(map, t, player.index)) continue;
-        const kinds: Exclude<BuilderBuildableKind, BuilderExtraKind.BRIDGE>[] = [];
+        const kinds: Exclude<BuilderBuildableKind, BuilderExtraKind>[] = [];
         if (!hasSkill(player, SkillId.SMITHERY)) kinds.push(BuildingKind.MINE);
         if (!hasSkill(player, SkillId.FORESTRY)) kinds.push(BuildingKind.SAWMILL);
         if (!kinds.includes(BuildingKind.MINE)) kinds.unshift(BuildingKind.MINE);

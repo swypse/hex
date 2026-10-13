@@ -27,7 +27,8 @@ import {
 } from '../src/game/economy/buildings';
 import {
   FARM_FOOD,
-  GRANARY_CAPACITY,
+  GRANARY_CAPACITY_PER_FARM,
+  granaryCapacity,
   STARVATION_DAMAGE,
   applyFood,
   farmYield,
@@ -152,12 +153,12 @@ describe('farms', () => {
     expect(buildingsInVillage(map, v)).toBe(0);
   });
 
-  it('yield 2 food, and Science does not raise it', () => {
+  it('yield 3 food, and Science does not raise it', () => {
     const { p } = setup();
     expect(farmYield(p)).toBe(FARM_FOOD);
     p.skills.push(SkillId.SCIENCE);
     expect(farmYield(p)).toBe(FARM_FOOD);
-    expect(FARM_FOOD).toBe(2);
+    expect(FARM_FOOD).toBe(3);
   });
 
   it('yield 0 food in winter, even with Science', () => {
@@ -208,17 +209,45 @@ describe('granaries', () => {
     expect(tileAt(map, 1, 0)!.building).toEqual({ kind: BuildingKind.GRANARY, level: 1, food: 0 });
   });
 
-  it('store the unused food of adjacent farms at round end, capped at 25', () => {
+  it('hold 10 food per adjacent own farm', () => {
+    const { map } = setup();
+    const g = tileAt(map, 1, 0)!;
+    g.building = { kind: BuildingKind.GRANARY, level: 1, food: 0 };
+    g.ownedBy = 0;
+    expect(granaryCapacity(map, g)).toBe(0);
+    tileAt(map, 1, -1)!.building = { kind: BuildingKind.FARM, level: 1 };
+    expect(granaryCapacity(map, g)).toBe(GRANARY_CAPACITY_PER_FARM);
+    tileAt(map, 0, 1)!.building = { kind: BuildingKind.FARM, level: 1 };
+    expect(granaryCapacity(map, g)).toBe(2 * GRANARY_CAPACITY_PER_FARM);
+    // A farm that is not adjacent does not count, nor does another player's.
+    tileAt(map, -2, 0)!.building = { kind: BuildingKind.FARM, level: 1 };
+    tileAt(map, 2, 0)!.building = { kind: BuildingKind.FARM, level: 1 };
+    tileAt(map, 2, 0)!.ownedBy = 1;
+    expect(granaryCapacity(map, g)).toBe(2 * GRANARY_CAPACITY_PER_FARM);
+  });
+
+  it('keep food above the capacity when an adjacent farm is gone, but store no more', () => {
+    const { map, p } = setup();
+    const g = tileAt(map, 1, 0)!;
+    g.building = { kind: BuildingKind.GRANARY, level: 1, food: 18 };
+    tileAt(map, 1, -1)!.building = { kind: BuildingKind.FARM, level: 1 };
+    tileAt(map, 0, 1)!.building = { kind: BuildingKind.FARM, level: 1 };
+    tileAt(map, 0, 1)!.building = null; // destroyed: capacity 10
+    applyFood(map, p); // the remaining farm feeds the village; its leftover does not fit
+    expect(g.building!.food).toBe(18);
+  });
+
+  it('store the unused food of adjacent farms at round end, capped at 10 per adjacent farm', () => {
     const { map, p } = setup();
     const g = tileAt(map, 1, 0)!;
     g.building = { kind: BuildingKind.GRANARY, level: 1, food: 0 };
     tileAt(map, 1, -1)!.building = { kind: BuildingKind.FARM, level: 1 };
     tileAt(map, 0, 1)!.building = { kind: BuildingKind.FARM, level: 1 };
     applyFood(map, p);
-    expect(g.building!.food).toBe(3); // 2 farms (4) minus the village (1)
-    g.building!.food = 22;
+    expect(g.building!.food).toBe(5); // 2 farms (6) minus the village (1)
+    g.building!.food = 18;
     applyFood(map, p);
-    expect(g.building!.food).toBe(GRANARY_CAPACITY);
+    expect(g.building!.food).toBe(2 * GRANARY_CAPACITY_PER_FARM);
   });
 
   it('only receive what the village units did not eat; farms away from granaries are eaten first', () => {
@@ -229,8 +258,9 @@ describe('granaries', () => {
     tileAt(map, -2, 0)!.building = { kind: BuildingKind.FARM, level: 1 }; // far away
     addUnit(map, UnitType.WARRIOR, 0, 1); // 1
     applyFood(map, p);
-    expect(g.building!.food).toBe(2); // the far farm (2) fed the village and the unit; the near farm is stored
-    addUnit(map, UnitType.SWORDSMAN, -1, 1); // upkeep 5 > 4 from the farms: nothing is stored, the granary is drawn
+    expect(g.building!.food).toBe(3); // the far farm (3) fed the village and the unit; the near farm is stored
+    addUnit(map, UnitType.SWORDSMAN, -1, 1); // 3
+    addUnit(map, UnitType.SWORDSMAN, -1, 0); // upkeep 8 > 6 from the farms: nothing is stored, the granary is drawn
     applyFood(map, p);
     expect(g.building!.food).toBe(1);
   });
@@ -264,15 +294,15 @@ describe('village food balance and starvation', () => {
     addUnit(map, UnitType.SWORDSMAN, -1, 1); // 3
     addUnit(map, UnitType.WARRIOR, 1, -1, 0, null); // not raised by the village: free
     const f = villageFood(map, v, p);
-    expect(f).toMatchObject({ production: 2, upkeep: 5, balance: -3, starving: false });
-    expect(foodNetIncome(map, p)).toBe(-3);
+    expect(f).toMatchObject({ production: 3, upkeep: 5, balance: -2, starving: false });
+    expect(foodNetIncome(map, p)).toBe(-2);
   });
 
   it('an enemy standing on a village does not disable its farms', () => {
     const { map, p, village: v } = setup();
     tileAt(map, 1, 0)!.building = { kind: BuildingKind.FARM, level: 1 };
     v.unit = makeUnit('e', 1, UnitType.WARRIOR, 0, 0);
-    expect(villageFood(map, v, p).production).toBe(2);
+    expect(villageFood(map, v, p).production).toBe(3);
   });
 
   it('deficits are paid from the starting reserve', () => {
@@ -446,7 +476,7 @@ function setupNetwork(connect: boolean): { map: GameMap; p: Player; a: MapTile; 
 describe('food networks', () => {
   it('connected villages share farm food', () => {
     const { map, p, a } = setupNetwork(true);
-    expect(villageFood(map, a, p)).toMatchObject({ production: 2, upkeep: 2, networkSize: 2 }); // B's farm feeds both villages
+    expect(villageFood(map, a, p)).toMatchObject({ production: 3, upkeep: 2, networkSize: 2 }); // B's farm feeds both villages
     expect(applyFood(map, p)).toEqual([]);
     expect(a.settlement!.starving).toBe(false);
   });
@@ -509,7 +539,7 @@ describe('AI food planning', () => {
     expect(states).toHaveLength(2);
     const stateA = states.find((n) => n.villages.includes(a))!;
     expect(stateA).toMatchObject({ production: 0, upkeep: 4, balance: -4, pressure: FoodPressure.URGENT });
-    expect(states.find((n) => n !== stateA)).toMatchObject({ balance: 1 });
+    expect(states.find((n) => n !== stateA)).toMatchObject({ balance: 2 });
     expect(foodPressure(map, p, a)).toBe(FoodPressure.URGENT);
     expect(canSustainUnit(map, p, UnitType.WARRIOR, 6, tileAt(map, 3, 0)!)).toBe(true);
     expect(canSustainUnit(map, p, UnitType.WARRIOR, 6, a)).toBe(false);
@@ -563,7 +593,7 @@ describe('AI food planning', () => {
     addUnit(map, UnitType.SWORDSMAN, 0, 1);
     tileAt(map, 1, 0)!.building = { kind: BuildingKind.PORT, level: 1 };
     tileAt(map, 2, 0)!.building = { kind: BuildingKind.PORT, level: 1 };
-    expect(villageFood(map, a, p)).toMatchObject({ networkSize: 2, production: 2 });
+    expect(villageFood(map, a, p)).toMatchObject({ networkSize: 2, production: 3 });
   });
 
   it('falls back to roads when no farm can be built', () => {

@@ -152,7 +152,8 @@ describe('HudSelected village building constraints', () => {
     tileAt(map, 1, -1)!.ownedBy = 0;
     tileAt(map, 1, -1)!.building = { kind: BuildingKind.FARM, level: 1 };
     useGameStore.setState({ selection: { kind: SelectionKind.TILE, q: 1, r: 0 } });
-    expect(texts()).toContain('Stored food: 7/25 (collects what adjacent farms do not use)');
+    // One adjacent farm: capacity 10.
+    expect(texts()).toContain('Stored food: 7/10 (collects what adjacent farms do not use)');
   });
 
   it('lays the drop shadow beneath the info panel background', () => {
