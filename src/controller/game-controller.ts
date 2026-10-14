@@ -726,6 +726,11 @@ class GameController {
     return clamp01((1 - this.camera.zoom) / 0.5);
   }
 
+  /** Current camera pan (screen px); zero before the camera exists. */
+  cameraPan(): { x: number; y: number } {
+    return this.camera?.pan ?? { x: 0, y: 0 };
+  }
+
   private getCamera(): CameraController {
     if (!this.camera) {
       this.camera = new CameraController({

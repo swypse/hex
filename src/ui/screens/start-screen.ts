@@ -22,7 +22,8 @@ import { Modal } from '../kit/modal';
 import { Popup } from '../kit/popup';
 import { setLanguage } from '../../storage/settings';
 import { ensureCanvasResource } from '../../gfx/image-texture';
-import { AiDifficulty, AuthStep, FontSize, Language, Screen, StartModal } from '@enums';
+import { useAuthStore } from '../../auth/auth-store';
+import { AiDifficulty, AuthStatus, AuthStep, FontSize, Language, Screen, StartModal } from '@enums';
 import { AuthBar } from '../auth-bar';
 import { AuthDialog } from '../overlays/auth-dialog';
 import { clamp } from '../../util/math';
@@ -182,6 +183,9 @@ export class StartScreen implements ScreenController {
   private aboutBtn: Button | null = null;
   private settingsBtn: Button | null = null;
   private authBar: AuthBar | null = null;
+  /** Buttons blocked until the auth API answers. */
+  private gated: Button[] = [];
+  private unsubscribeAuth: (() => void) | null = null;
   private modal: ModalView | null = null;
   private bgImg: Sprite | null = null;
   private bg: Graphics | null = null;
@@ -240,6 +244,9 @@ export class StartScreen implements ScreenController {
       buttons.unshift(new Button({ label: t('start.rejoinMatch'), width: 240, onClick: () => gameController.rejoinGame() }));
     }
     this.buttons = buttons;
+    this.gated = buttons.filter((b) => b !== tutorial);
+    this.applyAuthGate();
+    this.unsubscribeAuth = useAuthStore.subscribe(() => this.applyAuthGate());
     this.buttons[0]!.selected = true;
 
     this.hint = makeLabel(t('start.hint'), { fontSize: FontSize.SMALL, fill: 0xeeeeee });
@@ -274,6 +281,12 @@ export class StartScreen implements ScreenController {
     this.layout();
     window.addEventListener('keydown', this.onKeyDown);
     window.addEventListener('resize', this.onResize);
+  }
+
+  private applyAuthGate(): void {
+    const busy = useAuthStore.getState().status === AuthStatus.UNKNOWN;
+    for (const b of this.gated) b.disabled = busy;
+    markDirty();
   }
 
   private onResize = (): void => this.layout();
@@ -422,6 +435,8 @@ export class StartScreen implements ScreenController {
       this.modal.destroy();
       this.modal = null;
     }
+    this.unsubscribeAuth?.();
+    this.unsubscribeAuth = null;
     window.removeEventListener('keydown', this.onKeyDown);
     window.removeEventListener('resize', this.onResize);
     this.scroll?.destroy();
@@ -431,6 +446,7 @@ export class StartScreen implements ScreenController {
     this.title = null;
     this.hint = null;
     this.buttons = [];
+    this.gated = [];
     this.aboutBtn = null;
     this.settingsBtn = null;
     this.authBar = null;

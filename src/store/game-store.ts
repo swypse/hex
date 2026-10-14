@@ -228,6 +228,20 @@ const SCREENS: Screen[] = [Screen.START, Screen.SETUP, Screen.LOBBY, Screen.GAME
 
 let suppressPush = false;
 
+/** Lets the visible screen consume a browser Back (e.g. a sub-step of the
+ *  setup screen). Returning true keeps the current screen: the history entry
+ *  that was popped is restored with a forward step. */
+let backInterceptor: (() => boolean) | null = null;
+
+export function setBackInterceptor(fn: (() => boolean) | null): void {
+  backInterceptor = fn;
+}
+
+/** True when the visible screen consumed a Back. */
+export function interceptBack(): boolean {
+  return backInterceptor?.() ?? false;
+}
+
 function pushHistory(screen: Screen): void {
   if (typeof window === 'undefined' || typeof window.history?.pushState !== 'function') return;
   try {
@@ -264,6 +278,14 @@ function onPopState(event: PopStateEvent): void {
   const raw = event.state?.screen;
   const target: Screen = SCREENS.includes(raw) ? raw : Screen.START;
   if (target === current) return;
+  if (interceptBack()) {
+    try {
+      window.history.forward();
+    } catch {
+      // history API unavailable
+    }
+    return;
+  }
   if (current === Screen.GAME && !store.gameOver) {
     store.setOverlay({ kind: OverlayKind.LEAVE });
     pushHistory(current);

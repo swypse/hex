@@ -1,4 +1,5 @@
-import type { GameResultInput, TribeBest } from '../../../src/results/result-types';
+import type { GameMode } from '../../../src/enums/game-mode.enum';
+import type { GameResultInput, TribeModeBest } from '../../../src/results/result-types';
 import type { SqlLike } from '../auth/sql-user-repository';
 import type { ResultRepository } from './result-repository';
 
@@ -32,16 +33,17 @@ export class SqlResultRepository implements ResultRepository {
     );
   }
 
-  async bestByTribe(userId: string): Promise<TribeBest[]> {
+  async bestByTribeMode(userId: string): Promise<TribeModeBest[]> {
     const rows = this.sql
       .exec(
-        `SELECT tribe, COUNT(*) AS games, MAX(score) AS max_score, MAX(stars) AS max_stars
-         FROM results WHERE user_id = ? GROUP BY tribe`,
+        `SELECT tribe, mode, COUNT(*) AS games, MAX(score) AS max_score, MAX(stars) AS max_stars
+         FROM results WHERE user_id = ? GROUP BY tribe, mode`,
         userId,
       )
       .toArray();
     return rows.map((r) => ({
       tribe: r.tribe as number,
+      mode: r.mode as GameMode,
       games: r.games as number,
       maxScore: r.max_score as number,
       maxStars: r.max_stars as number,

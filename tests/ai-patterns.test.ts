@@ -492,7 +492,8 @@ describe('AI patterns', () => {
       tile(0, 0, { owner: 1, level: 1, captureReady: false }, null, 1),
       tile(1, 0, null, warrior('ai1', 1, 1, 0)),
     );
-    const poor = player(100); // wood 5: an upgrade (2 wood) would leave less than a farm needs
+    const poor = player(100); // wood 3: an upgrade (2 wood) would leave less than a farm needs
+    poor.resources.wood = 3;
     expect(findPattern('economy-opening').evaluate(ctx(map, poor, new SeededRandom(1)))?.[0]?.type).not.toBe(AiActionType.UPGRADE);
   });
 

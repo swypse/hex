@@ -27,6 +27,7 @@ export function buildWall(map: GameMap, tile: MapTile, player: Player): boolean 
 }
 
 export function claimRadius(level: number): number {
+  if (level >= 10) return 4;
   if (level >= 5) return 3;
   return level === 1 ? 1 : 2;
 }

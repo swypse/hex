@@ -1,3 +1,4 @@
+import { StarField } from '../../gfx/star-field';
 import { Container, Graphics } from 'pixi.js';
 import { gameController } from '../../controller/game-controller';
 import { useGameStore } from '../../store/game-store';
@@ -29,6 +30,7 @@ function scoreHud(): HudScore {
 export class GameScreen implements ScreenController {
   private root: Container | null = null;
   private mapLayer: Container | null = null;
+  private stars: StarField | null = null;
   private mapMask: Graphics | null = null;
   private hud: Container | null = null;
   /** Everything shown once the game has loaded: map + HUD widgets. */
@@ -79,7 +81,9 @@ export class GameScreen implements ScreenController {
     this.hud.addChild(loading);
     this.content = content;
     this.root.addChild(this.mapLayer, this.hud);
-    host.screenLayer.addChild(this.root);
+    // Stars sit below the whole game root, so the map overlays them.
+    this.stars = new StarField(host.app, () => gameController.cameraPan());
+    host.screenLayer.addChild(this.stars.el, this.root);
     gameController.init(host.app, this.mapLayer!, host.overlayLayer);
 
     const gameWidgets: Widget[] = [
@@ -114,6 +118,7 @@ export class GameScreen implements ScreenController {
   private applyLoading(): void {
     if (!this.host) return;
     const loading = useGameStore.getState().texturesLoading;
+    this.stars?.setLoading(loading);
     if (this.mapLayer) this.mapLayer.visible = !loading;
     if (this.content) this.content.visible = !loading;
   }
@@ -138,6 +143,8 @@ export class GameScreen implements ScreenController {
     gameController.shutdown();
     for (const w of this.widgets) w.destroy();
     this.widgets = [];
+    this.stars?.destroy();
+    this.stars = null;
     this.root?.destroy({ children: true });
     this.root = null;
     this.mapLayer = null;

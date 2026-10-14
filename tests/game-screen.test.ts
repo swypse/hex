@@ -80,7 +80,7 @@ describe('GameScreen lifecycle', () => {
     const host = makeHost();
     const screen = new GameScreen();
     screen.mount(host);
-    const root = host.screenLayer.children[0] as Container;
+    const root = host.screenLayer.children[1] as Container; // [0] is the star field
     const mapLayer = root.children[0] as Container;
     const hud = root.children[1] as Container;
     const content = hud.children[0] as Container;
@@ -104,7 +104,7 @@ describe('GameScreen lifecycle', () => {
     const host = makeNarrowHost();
     const screen = new GameScreen();
     screen.mount(host);
-    const root = host.screenLayer.children[0] as Container;
+    const root = host.screenLayer.children[1] as Container; // [0] is the star field
     const mapLayer = root.children[0] as Container;
     const mask = mapLayer.mask as Graphics;
     const nested = mask.context.instructions.flatMap((i) => {

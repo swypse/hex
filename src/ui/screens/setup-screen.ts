@@ -2,17 +2,18 @@ import { gameController } from '@/controller/game-controller';
 import { type Tribe, tribeById, TRIBES } from '@/game/tribes';
 import { t } from '@/i18n';
 import { loadSettings } from '@/storage/settings';
-import { useGameStore } from '@/store/game-store';
+import { setBackInterceptor, useGameStore } from '@/store/game-store';
 import { mixColor } from '@/util';
-import { AiDifficulty, FontSize, GameMode, Screen } from '@enums';
+import { AiDifficulty, FontSize, GameMode, Screen, SetupStep, TextStyle } from '@enums';
 import { BitmapText, Container, FillGradient, Graphics, RendererType } from 'pixi.js';
 import { type ScreenController, type UIHost } from '../host';
 import { Button } from '../kit/button';
 import { ButtonGroup } from '../kit/button-group';
 import { makeLabel } from '../../gfx/label';
+import { makeStyledLabel } from '../../gfx/text-styles';
 import { BLOCK_GAP, TITLE_TO_CONTENT } from '../kit/screen-layout';
 import { THEME } from '../../gfx/theme';
-import { TRIBE_GAP, TRIBE_ROW_STEP, tribeSlots } from '../kit/tribe-layout';
+import { TRIBE_GAP, tribeSlots } from '../kit/tribe-layout';
 import { makeTribeOption, type TribeOption } from '../kit/tribe-option';
 import { useResultsStore } from '../../results/results-store';
 import { markDirty } from '../../gfx/render-gate';
@@ -26,10 +27,23 @@ import { clamp } from '../../util/math';
 const ENEMY_OPTIONS = [1, 2, 3, 4, 5, 6];
 const MODE_OPTIONS: GameMode[] = [GameMode.CAPTURE, GameMode.TURNS30];
 const DIFFICULTY_OPTIONS: AiDifficulty[] = [AiDifficulty.EASY, AiDifficulty.NORMAL, AiDifficulty.HARD];
-const SELECTOR_COUNT = 6;
+// Keyboard rows on the options step: enemies, mode, difficulty, start, back.
+const SELECTOR_COUNT = 5;
+const START_ROW = 3;
+const BACK_ROW = 4;
 // Horizontal margin kept clear on each side when laying out the tribe grid.
 const SIDE_MARGIN = 24;
 const RADIUS = 28;
+/** Step 1 grid: 4 tribes per row, wide gaps, large stars and a games line. */
+const GRID_COLUMNS = 4;
+const GRID_GAP = TRIBE_GAP * 3;
+const GRID_ROW_PAD = 20;
+/** Vertical margin above and below the tribe icons block. */
+const GRID_MARGIN_Y = 24;
+/** Extra space above the "Mode" heading. */
+const MODE_MARGIN_TOP = 16;
+const HERO_EXTRAS = { starSize: 28, nameSize: FontSize.NORMAL } as const;
+const GRID_OPTION_EXTRAS = { starSize: 20, showGames: true, nameSize: FontSize.NORMAL } as const;
 // Vertical gap between the tribe name labels and the description below them.
 const DESC_GAP = 24;
 
@@ -57,7 +71,11 @@ export class SetupScreen implements ScreenController {
   private root: Container | null = null;
   private host: UIHost | null = null;
   private scroll: ScreenScroll | null = null;
+  private step: SetupStep = SetupStep.TRIBE;
   private selector = 0;
+  /** Non-interactive icon of the chosen tribe on the options step. */
+  private hero: TribeOption | null = null;
+  private gamesLabel: BitmapText | null = null;
   private tribe: Tribe = TRIBES[0]!.id;
   private enemies = 3;
   private difficulty: AiDifficulty = loadSettings().aiDifficulty;
@@ -71,6 +89,9 @@ export class SetupScreen implements ScreenController {
   private tribeDescH = 0;
   private enemyGroup: ButtonGroup | null = null;
   private modeGroup: ButtonGroup | null = null;
+  /** Mode selector shown on the tribe step (mirrors `modeGroup`). */
+  private tribeModeGroup: ButtonGroup | null = null;
+  private tribeModeTitle: BitmapText | null = null;
   private difficultyGroup: ButtonGroup | null = null;
   private startBtn: Button | null = null;
   private backBtn: Button | null = null;
@@ -88,7 +109,7 @@ export class SetupScreen implements ScreenController {
 
     this.paintBackground();
 
-    this.tribeTitle = makeLabel(t('common.chooseTribe'), { fontSize: FontSize.NORMAL, fill: 0xffffff });
+    this.tribeTitle = makeStyledLabel(t('common.chooseTribe'), TextStyle.H1);
     this.tribeTitle.anchor.set(0.5, 0.5);
     this.enemiesTitle = makeLabel(t('setup.enemies'), { fontSize: FontSize.NORMAL, fill: 0xffffff });
     this.enemiesTitle.anchor.set(0.5, 0.5);
@@ -103,19 +124,22 @@ export class SetupScreen implements ScreenController {
         `${tr.code}-icon.png`,
         () => {
           this.setTribe(tr.id);
-          this.refresh();
+          this.enterOptions();
         },
         tr.id === this.tribe,
         tr.color,
-        useResultsStore.getState().starsFor(tr.id),
+        useResultsStore.getState().starsFor(tr.id, useGameStore.getState().mode) ?? 0,
+        GRID_OPTION_EXTRAS,
       );
+      opt.setGames(useResultsStore.getState().gamesFor(tr.id, useGameStore.getState().mode));
       this.tribeItems.push(opt);
       this.scroll!.content.addChild(opt.el);
     }
 
     // Bests may arrive after the screen opened (session restore, login).
     this.unsubResults = useResultsStore.subscribe((state) => {
-      TRIBES.forEach((tr, i) => this.tribeItems[i]?.setStars(state.starsFor(tr.id)));
+      this.refreshTribeStats();
+      if (this.step === SetupStep.OPTIONS) this.refresh();
       markDirty();
     });
 
@@ -130,16 +154,22 @@ export class SetupScreen implements ScreenController {
     });
     this.scroll!.content.addChild(this.enemyGroup);
 
-    this.modeGroup = new ButtonGroup({
-      items: MODE_OPTIONS.map((m) => ({
-        label: m === GameMode.CAPTURE ? t('mode.capture') : t('mode.turns30'),
-        onClick: () => {
-          useGameStore.getState().setMode(m);
-          this.refresh();
-        },
-      })),
-    });
-    this.scroll!.content.addChild(this.modeGroup);
+    const makeModeGroup = (): ButtonGroup =>
+      new ButtonGroup({
+        items: MODE_OPTIONS.map((m) => ({
+          label: m === GameMode.CAPTURE ? t('mode.capture') : t('mode.turns30'),
+          onClick: () => {
+            useGameStore.getState().setMode(m);
+            this.refresh();
+          },
+        })),
+      });
+    this.modeGroup = makeModeGroup();
+    this.tribeModeGroup = makeModeGroup();
+    this.tribeModeTitle = makeStyledLabel(t('common.mode'), TextStyle.H2);
+    this.tribeModeTitle.anchor.set(0.5, 0.5);
+    this.scroll!.content.addChild(this.tribeModeTitle);
+    this.scroll!.content.addChild(this.modeGroup, this.tribeModeGroup);
 
     this.difficultyGroup = new ButtonGroup({
       items: DIFFICULTY_OPTIONS.map((d) => ({
@@ -157,7 +187,7 @@ export class SetupScreen implements ScreenController {
       fontSize: FontSize.BIG,
       paddingX: 48,
       paddingY: 14,
-      onClick: () => gameController.startGame(this.tribe, this.enemies, useGameStore.getState().mode, this.difficulty),
+      onClick: () => this.start(),
     });
     this.hint = makeLabel(t('setup.hint'), { fontSize: FontSize.SMALL, fill: 0xeeeeee });
     this.hint.visible = !isTouchDevice();
@@ -168,8 +198,10 @@ export class SetupScreen implements ScreenController {
       label: t('common.back'),
       width: 96,
       fontSize: FontSize.SMALL,
-      onClick: () => useGameStore.getState().setScreen(Screen.START)
+      onClick: () => this.back(),
     });
+    this.gamesLabel = makeLabel('', { fontSize: FontSize.NORMAL, fill: 0xeeeeee });
+    this.gamesLabel.anchor.set(0.5, 0.5);
 
     this.scroll!.content.addChild(
       this.tribeTitle,
@@ -179,9 +211,12 @@ export class SetupScreen implements ScreenController {
       this.startBtn,
       this.backBtn,
       this.hint,
+      this.gamesLabel,
     );
     this.refresh();
 
+    // Browser Back on the options step returns to the tribe step.
+    setBackInterceptor(() => this.showTribeStep());
     window.addEventListener('keydown', this.onKeyDown);
     window.addEventListener('resize', this.onResize);
   }
@@ -193,32 +228,57 @@ export class SetupScreen implements ScreenController {
     this.paintBackground();
   };
 
+  private enterOptions(): void {
+    this.step = SetupStep.OPTIONS;
+    this.selector = START_ROW;
+    this.refresh();
+  }
+
+  /** Leaves the options step; false when already on the tribe step. */
+  private showTribeStep(): boolean {
+    if (this.step !== SetupStep.OPTIONS || !this.root) return false;
+    this.step = SetupStep.TRIBE;
+    this.refresh();
+    return true;
+  }
+
+  private back(): void {
+    if (!this.showTribeStep()) {
+      useGameStore.getState().setScreen(Screen.START);
+    }
+  }
+
+  private start(): void {
+    gameController.startGame(this.tribe, this.enemies, useGameStore.getState().mode, this.difficulty);
+  }
+
   private onKeyDown = (e: KeyboardEvent): void => {
-    const store = useGameStore.getState();
-    if (e.key === 'ArrowUp') {
+    const options = this.step === SetupStep.OPTIONS;
+    if (e.key === 'Backspace') {
       e.preventDefault();
-      this.selector = (this.selector - 1 + SELECTOR_COUNT) % SELECTOR_COUNT;
-      this.refresh();
-    } else if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      this.selector = (this.selector + 1) % SELECTOR_COUNT;
-      this.refresh();
+      this.back();
     } else if (e.key === 'ArrowLeft') {
       e.preventDefault();
       this.change(-1);
     } else if (e.key === 'ArrowRight') {
       e.preventDefault();
       this.change(1);
+    } else if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && !options) {
+      e.preventDefault();
+      this.cycleMode(e.key === 'ArrowUp' ? -1 : 1);
+    } else if (e.key === 'ArrowUp' && options) {
+      e.preventDefault();
+      this.selector = (this.selector - 1 + SELECTOR_COUNT) % SELECTOR_COUNT;
+      this.refresh();
+    } else if (e.key === 'ArrowDown' && options) {
+      e.preventDefault();
+      this.selector = (this.selector + 1) % SELECTOR_COUNT;
+      this.refresh();
     } else if (e.key === 'Enter') {
       e.preventDefault();
-      if (this.selector === SELECTOR_COUNT - 1) {
-        useGameStore.getState().setScreen(Screen.START);
-      } else {
-        gameController.startGame(this.tribe, this.enemies, store.mode, this.difficulty);
-      }
-    } else if (e.key === 'Backspace') {
-      e.preventDefault();
-      useGameStore.getState().setScreen(Screen.START);
+      if (!options) this.enterOptions();
+      else if (this.selector === BACK_ROW) this.back();
+      else this.start();
     }
   };
 
@@ -311,21 +371,41 @@ export class SetupScreen implements ScreenController {
     this.bgTweenRemove = () => ticker.remove(fn);
   }
 
+  private cycleMode(dir: number): void {
+    const i = MODE_OPTIONS.indexOf(useGameStore.getState().mode);
+    useGameStore.getState().setMode(MODE_OPTIONS[(i + dir + MODE_OPTIONS.length) % MODE_OPTIONS.length]!);
+    this.refresh();
+  }
+
+  /** Stars and games of every tribe in the selected mode. */
+  private refreshTribeStats(): void {
+    const results = useResultsStore.getState();
+    const mode = useGameStore.getState().mode;
+    TRIBES.forEach((tr, i) => {
+      // Unplayed tribes show empty stars.
+      this.tribeItems[i]?.setStars(results.starsFor(tr.id, mode) ?? 0);
+      this.tribeItems[i]?.setGames(results.gamesFor(tr.id, mode));
+    });
+    // Also drops the hero icon when returning to the tribe step.
+    this.refreshHero();
+    markDirty();
+  }
+
   private change(dir: number): void {
-    if (this.selector === SELECTOR_COUNT - 1) return;
-    if (this.selector === 0) {
+    if (this.step === SetupStep.TRIBE) {
       const i = TRIBES.findIndex((t) => t.id === this.tribe);
       this.setTribe(TRIBES[(i + dir + TRIBES.length) % TRIBES.length]!.id);
+    } else if (this.selector === 0) {
+      this.cycleMode(dir);
+      return;
     } else if (this.selector === 1) {
       const i = ENEMY_OPTIONS.indexOf(this.enemies);
       this.enemies = ENEMY_OPTIONS[(i + dir + ENEMY_OPTIONS.length) % ENEMY_OPTIONS.length]!;
     } else if (this.selector === 2) {
-      const store = useGameStore.getState();
-      const i = MODE_OPTIONS.indexOf(store.mode);
-      useGameStore.getState().setMode(MODE_OPTIONS[(i + dir + MODE_OPTIONS.length) % MODE_OPTIONS.length]!);
-    } else if (this.selector === 3) {
       const i = DIFFICULTY_OPTIONS.indexOf(this.difficulty);
       this.difficulty = DIFFICULTY_OPTIONS[(i + dir + DIFFICULTY_OPTIONS.length) % DIFFICULTY_OPTIONS.length]!;
+    } else {
+      return;
     }
     this.refresh();
   }
@@ -361,102 +441,158 @@ export class SetupScreen implements ScreenController {
     this.scroll!.content.addChild(desc);
   }
 
+  /** Rebuilds the non-interactive icon of the chosen tribe (options step). */
+  private refreshHero(): void {
+    if (this.hero) {
+      this.hero.el.destroy({ children: true });
+      this.hero = null;
+    }
+    const info = tribeById(this.tribe);
+    if (!info || this.step !== SetupStep.OPTIONS) return;
+    const mode = useGameStore.getState().mode;
+    const results = useResultsStore.getState();
+    const best = results.modeBest(info.id, mode);
+    const hero = makeTribeOption(info.name, `${info.code}-icon.png`, () => {}, true, info.color, best.games > 0 ? best.maxStars : 0, HERO_EXTRAS);
+    hero.el.eventMode = 'none';
+    this.hero = hero;
+    this.scroll!.content.addChild(hero.el);
+    this.gamesLabel!.text = t('setup.games', { n: best.games });
+  }
+
   private refresh(): void {
     if (!this.root) return;
+    const options = this.step === SetupStep.OPTIONS;
     const tribeIndex = TRIBES.findIndex((t) => t.id === this.tribe);
     const enemiesIndex = ENEMY_OPTIONS.indexOf(this.enemies);
     const modeIndex = MODE_OPTIONS.indexOf(useGameStore.getState().mode);
     const difficultyIndex = DIFFICULTY_OPTIONS.indexOf(this.difficulty);
     this.tribeItems.forEach((opt, i) => {
       opt.setSelected(i === tribeIndex);
+      opt.el.visible = !options;
     });
     this.enemyGroup?.buttons.forEach((b, i) => {
       b.selected = i === enemiesIndex;
     });
-    this.modeGroup?.buttons.forEach((b, i) => {
-      b.selected = i === modeIndex;
-    });
+    for (const group of [this.modeGroup, this.tribeModeGroup]) {
+      group?.buttons.forEach((b, i) => {
+        b.selected = i === modeIndex;
+      });
+    }
     this.difficultyGroup?.buttons.forEach((b, i) => {
       b.selected = i === difficultyIndex;
     });
-    this.backBtn!.selected = this.selector === SELECTOR_COUNT - 1;
-    this.startBtn!.selected = this.selector === SELECTOR_COUNT - 2;
-    this.tribeTitle!.style.fill = this.selector === 0 ? 0xffffff : 0x888888;
+    this.backBtn!.selected = options && this.selector === BACK_ROW;
+    this.startBtn!.selected = options && this.selector === START_ROW;
+    this.tribeTitle!.visible = !options;
+    for (const el of [this.enemiesTitle, this.modeTitle, this.difficultyTitle, this.enemyGroup, this.modeGroup, this.difficultyGroup, this.startBtn, this.gamesLabel]) {
+      if (el) el.visible = options;
+    }
+    if (this.tribeModeGroup) this.tribeModeGroup.visible = !options;
+    if (this.tribeModeTitle) this.tribeModeTitle.visible = !options;
+    this.modeTitle!.style.fill = this.selector === 0 ? 0xffffff : 0x888888;
     this.enemiesTitle!.style.fill = this.selector === 1 ? 0xffffff : 0x888888;
-    this.modeTitle!.style.fill = this.selector === 2 ? 0xffffff : 0x888888;
-    this.difficultyTitle!.style.fill = this.selector === 3 ? 0xffffff : 0x888888;
+    this.difficultyTitle!.style.fill = this.selector === 2 ? 0xffffff : 0x888888;
+    this.refreshTribeStats();
     this.layout();
   }
 
   private layout(): void {
     if (!this.root || !this.host) return;
-    const w = this.host.app.screen.width;
-    const h = this.host.app.screen.height;
+    if (this.step === SetupStep.TRIBE) this.layoutTribeStep();
+    else this.layoutOptionsStep();
+    this.scroll?.resize();
+    this.scroll?.refresh();
+  }
+
+  /** Vertically centres a column of `contentH` and returns the y mapper. */
+  private columnTop(contentH: number): number {
+    const h = this.host!.app.screen.height;
+    return clamp((h - contentH) / 2, 16, Math.max(16, h - contentH - 16));
+  }
+
+  private layoutTribeStep(): void {
+    const w = this.host!.app.screen.width;
     const cx = w / 2;
-    const titleHalf = this.tribeTitle?.height ? this.tribeTitle.height / 2 : 15;
-    const labelH = this.tribeItems[0]?.labelHeight ?? this.tribeItems[0]?.label.height ?? 16;
+    const titleH = this.tribeTitle!.height || 30;
+    // Names wrap onto two lines for some tribes: size rows by the tallest.
+    const labelH = Math.max(16, ...this.tribeItems.map((o) => o.labelHeight));
+    // Distance from a circle's centre to the bottom of its caption block.
+    const optionDrop = 34 + labelH;
+    const rowStep = optionDrop + RADIUS + GRID_ROW_PAD;
+    const grid = tribeSlots(this.tribeItems.length, GRID_GAP, GRID_COLUMNS, rowStep);
+    const modeH = this.tribeModeGroup?.buttonHeight ?? 36;
+    const modeTitleHalf = (this.tribeModeTitle?.height || 20) / 2;
+    const gridTop = TITLE_TO_CONTENT + GRID_MARGIN_Y + RADIUS;
+    const gridBottom = gridTop + (grid.rows - 1) * rowStep + optionDrop;
+    const modeTitleY = gridBottom + GRID_MARGIN_Y + MODE_MARGIN_TOP + modeTitleHalf;
+    const backTop = modeTitleY + TITLE_TO_CONTENT + modeH + BLOCK_GAP + 16;
+    const hintCentre = backTop + this.backBtn!.height + 16;
+    const hintH = this.hint?.height ?? 0;
+    const end = this.hint?.visible ? hintCentre + hintH / 2 : backTop + this.backBtn!.height;
+    // Rel y 0 is the title centre; the column starts half a title above it.
+    const top = this.columnTop(end + titleH / 2);
+    const y = (rel: number): number => rel + titleH / 2 + top;
+
+    this.tribeTitle!.position.set(cx, y(0));
+    this.tribeModeTitle?.position.set(cx, y(modeTitleY));
+    this.tribeModeGroup?.position.set(cx - this.tribeModeGroup.groupWidth / 2, y(modeTitleY + TITLE_TO_CONTENT));
+    this.tribeItems.forEach((item, i) => {
+      const s = grid.slots[i]!;
+      item.el.position.set(cx + s.x, y(gridTop) + s.y);
+    });
+    this.backBtn!.position.set(cx - this.backBtn!.width / 2, y(backTop));
+    if (this.hint) this.hint.position.set(cx, y(hintCentre));
+    if (this.tribeDesc) this.tribeDesc.visible = false;
+  }
+
+  private layoutOptionsStep(): void {
+    const w = this.host!.app.screen.width;
+    const cx = w / 2;
+    const titleHalf = this.enemiesTitle?.height ? this.enemiesTitle.height / 2 : 15;
+    const labelH = this.hero?.labelHeight ?? 16;
     const buttonH = this.enemyGroup?.buttonHeight ?? 36;
     const startH = this.startBtn?.height ?? 0;
     const backH = this.backBtn?.height ?? 0;
     const hintH = this.hint?.height ?? 0;
 
-    // Tribe grid is always two rows (top dominates), even on wide screens.
-    const grid = tribeSlots(this.tribeItems.length, TRIBE_GAP * 2);
-
     this.refreshTribeDesc(w);
 
-    // Block height measured from the title's centre to the bottom of its content.
-    const tribeDrop = TITLE_TO_CONTENT + RADIUS + (grid.rows - 1) * TRIBE_ROW_STEP + 34 + labelH;
     const buttonDrop = TITLE_TO_CONTENT + buttonH;
-
-    // All y positions below are relative to the tribe title's centre (cy0 = 0).
-    const cy0 = 0;
-    const tribeContentBottom = cy0 + tribeDrop;
-    const descTop = tribeContentBottom + DESC_GAP;
-    const descH = this.tribeDescH;
-    const cy1 = descTop + descH + BLOCK_GAP + titleHalf;
-    const bottomEnemies = cy1 + buttonDrop;
-    const cy2 = bottomEnemies + BLOCK_GAP + titleHalf;
-    const bottomMode = cy2 + buttonDrop;
-    const cy3 = bottomMode + BLOCK_GAP + titleHalf;
-    const bottomDifficulty = cy3 + buttonDrop;
-    const startTop = bottomDifficulty + 30;
+    // All y positions are relative to the top of the column (the icon's top edge).
+    const heroCentre = RADIUS + 4;
+    const heroBottom = heroCentre + 34 + labelH;
+    const gamesCentre = heroBottom + 14;
+    const descTop = gamesCentre + 8 + DESC_GAP;
+    const cy1 = descTop + this.tribeDescH + BLOCK_GAP + titleHalf;
+    const cy2 = cy1 + buttonDrop + BLOCK_GAP + titleHalf;
+    const cy3 = cy2 + buttonDrop + BLOCK_GAP + titleHalf;
+    const startTop = cy3 + buttonDrop + 30;
     const backTop = startTop + startH + 16;
     const hintCentre = backTop + backH + 16;
-    const glyphTop = cy0 - titleHalf;
     const end = this.hint?.visible ? hintCentre + hintH / 2 : backTop + backH;
-    const contentH = end - glyphTop;
-    const screenGlyphTop = clamp((h - contentH) / 2, 16, h - contentH - 16);
-    const y = (rel: number): number => rel - glyphTop + screenGlyphTop;
+    const top = this.columnTop(end);
+    const y = (rel: number): number => rel + top;
 
-    this.tribeTitle!.position.set(cx, y(cy0));
-    const tribeRow1Centre = TITLE_TO_CONTENT + RADIUS;
-    this.tribeItems.forEach((item, i) => {
-      const s = grid.slots[i]!;
-      item.el.position.set(cx + s.x, y(tribeRow1Centre) + s.y);
-    });
-    if (this.tribeDesc) this.tribeDesc.position.set(cx, y(descTop));
-
-    this.enemiesTitle!.position.set(cx, y(cy1));
-    const enemyTop = y(cy1) + TITLE_TO_CONTENT;
-    if (this.enemyGroup) this.enemyGroup.position.set(cx - this.enemyGroup.groupWidth / 2, enemyTop);
-
-    this.modeTitle!.position.set(cx, y(cy2));
-    const modeTop = y(cy2) + TITLE_TO_CONTENT;
-    if (this.modeGroup) this.modeGroup.position.set(cx - this.modeGroup.groupWidth / 2, modeTop);
-
-    this.difficultyTitle!.position.set(cx, y(cy3));
-    const diffTop = y(cy3) + TITLE_TO_CONTENT;
-    if (this.difficultyGroup) this.difficultyGroup.position.set(cx - this.difficultyGroup.groupWidth / 2, diffTop);
-
+    this.hero?.el.position.set(cx, y(heroCentre));
+    this.gamesLabel!.position.set(cx, y(gamesCentre));
+    if (this.tribeDesc) {
+      this.tribeDesc.visible = true;
+      this.tribeDesc.position.set(cx, y(descTop));
+    }
+    const place = (title: BitmapText | null, group: ButtonGroup | null, cy: number): void => {
+      title?.position.set(cx, y(cy));
+      group?.position.set(cx - group.groupWidth / 2, y(cy) + TITLE_TO_CONTENT);
+    };
+    place(this.modeTitle, this.modeGroup, cy1);
+    place(this.enemiesTitle, this.enemyGroup, cy2);
+    place(this.difficultyTitle, this.difficultyGroup, cy3);
     this.startBtn!.position.set(cx - this.startBtn!.width / 2, y(startTop));
     this.backBtn!.position.set(cx - this.backBtn!.width / 2, y(backTop));
     if (this.hint) this.hint.position.set(cx, y(hintCentre));
-    this.scroll?.resize();
-    this.scroll?.refresh();
   }
 
   destroy(): void {
+    setBackInterceptor(null);
     this.unsubResults?.();
     this.unsubResults = null;
     window.removeEventListener('keydown', this.onKeyDown);
@@ -473,8 +609,12 @@ export class SetupScreen implements ScreenController {
     this.tribeItems = [];
     this.tribeDesc?.destroy();
     this.tribeDesc = null;
+    this.hero = null;
+    this.gamesLabel = null;
     this.enemyGroup = null;
     this.modeGroup = null;
+    this.tribeModeGroup = null;
+    this.tribeModeTitle = null;
     this.difficultyGroup = null;
     this.tribeTitle = null;
     this.enemiesTitle = null;

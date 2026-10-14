@@ -5,11 +5,12 @@ import type { ResultsClient } from '../src/results/results-client';
 import { HttpResultsClient } from '../src/results/results-client';
 import { buildResult } from '../src/controller/result-recorder';
 import { GameMode, Tribe } from '@enums';
+import { foldTribeBest } from '../src/results/result-types';
 import { starRating } from '../src/game/game-mode';
 
 const BESTS = [
-  { tribe: Tribe.Cats, games: 3, maxScore: 700, maxStars: 2 },
-  { tribe: Tribe.Sand, games: 0, maxScore: 0, maxStars: 0 },
+  foldTribeBest(Tribe.Cats, [{ tribe: Tribe.Cats, mode: GameMode.CAPTURE, games: 3, maxScore: 700, maxStars: 2 }]),
+  foldTribeBest(Tribe.Sand, []),
 ];
 
 function setup(token: string | null = 'tok', client: Partial<ResultsClient> = {}) {
@@ -23,6 +24,14 @@ function setup(token: string | null = 'tok', client: Partial<ResultsClient> = {}
 }
 
 describe('results store', () => {
+  it('tolerates a worker that answers without per-mode bests', async () => {
+    const legacy = [{ tribe: Tribe.Cats, games: 3, maxScore: 700, maxStars: 2 }] as unknown as typeof BESTS;
+    const { store } = setup('tok', { best: async () => ({ ok: true as const, value: legacy }) });
+    await store.getState().refresh();
+    expect(store.getState().modeBest(Tribe.Cats, GameMode.CAPTURE)).toEqual({ games: 0, maxScore: 0, maxStars: 0 });
+    expect(store.getState().starsFor(Tribe.Cats)).toBe(2);
+  });
+
   it('shows stars only for tribes that were played', async () => {
     const { store } = setup();
     await store.getState().refresh();

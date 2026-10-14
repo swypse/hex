@@ -19,8 +19,9 @@ export default {
   // Setup screen
   'setup.enemies': 'Enemies',
   'setup.difficulty': 'AI difficulty',
+  'setup.games': 'Games played in this mode: {n}',
   'setup.start': 'Start',
-  'setup.hint': '↑/↓ navigate · ←/→ change · Enter start · Backspace back',
+  'setup.hint': '↑/↓ navigate · ←/→ change · Enter select · Backspace back',
   'mode.capture': 'Capture the map',
   'mode.turns30': '30 Turns',
   'difficulty.easy': 'Easy',
@@ -198,6 +199,7 @@ export default {
   'common.ok': 'OK',
   'common.confirm': 'Confirm',
   'common.back': 'Back',
+  'common.games': 'Games: {n}',
   'common.chooseTribe': 'Choose your tribe',
   'common.mode': 'Mode',
   'common.on': 'On',
@@ -395,9 +397,9 @@ export default {
   'skill.catapult.name': 'Catapult',
   'skill.catapult.desc': 'Allows spawning catapult units ([money:30] + [wood:20] + [ore:5]). Catapults can destroy enemy buildings: walls, villages, mines, sawmills, ports, temples and bridges.',
   'skill.agriculture.name': 'Agriculture',
-  'skill.agriculture.desc': 'Allows building farms on owned land tiles ([money:15] + [wood:5]). Each farm gives [food:3] per turn ([food:4] with Agronomy in a village with a university) to feed the units of its village and of all villages connected to it by roads or ports. Farms give no food in winter. Unused farm food is lost unless a granary stands next to the farm. Each farm costs [money:1] upkeep per turn.',
+  'skill.agriculture.desc': 'Allows building farms on owned land tiles ([money:10] + [wood:3]). Each farm gives [food:3] per turn ([food:4] with Agronomy in a village with a university) to feed the units of its village and of all villages connected to it by roads or ports. Farms give no food in winter. Unused farm food is lost unless a granary stands next to the farm. Each farm costs [money:1] upkeep per turn.',
   'skill.granary.name': 'Granary',
-  'skill.granary.desc': 'Allows building granaries next to farms ([money:20] + [wood:10] + [stone:10]). A granary stores the food its adjacent farms did not need (up to [food:10] per adjacent farm) and feeds connected villages short of food. Destroying it discards the stored food. Each granary costs [money:1] upkeep per turn.',
+  'skill.granary.desc': 'Allows building granaries next to farms ([money:20] + [wood:10] + [stone:10]). A granary stores the food its adjacent farms did not need (up to [food:15] per adjacent farm) and feeds connected villages short of food. Destroying it discards the stored food. Each granary costs [money:1] upkeep per turn.',
   'skill.riding.name': 'Riding',
   'skill.riding.desc': 'Allows spawning rider units ([money:6]).',
   'skill.bridges.name': 'Bridges',
@@ -668,6 +670,7 @@ export default {
   'error.toast': 'Something went wrong (details in the console).',
 
   // Account
+  'auth.loading': 'Connecting…',
   'auth.login': 'Log in',
   'auth.register': 'Register',
   'auth.logout': 'Log out',

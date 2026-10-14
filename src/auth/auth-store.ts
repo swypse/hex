@@ -45,13 +45,18 @@ export function createAuthStore(client: AuthClient, storage: StorageService) {
     restore() {
       restoring ??= (async () => {
         const token = readToken();
-        if (!token) return set({ status: AuthStatus.ANONYMOUS });
-        const res = await client.me(token);
+        // Without a token the call only probes reachability: any server reply
+        // (even 401) means online.
+        const res = await client.me(token ?? '');
+        if (!token) {
+          return set({ status: !res.ok && res.error === AuthError.NETWORK ? AuthStatus.OFFLINE : AuthStatus.ANONYMOUS });
+        }
         if (res.ok) {
           return set({ status: AuthStatus.AUTHENTICATED, user: res.value, token });
         }
         // Offline keeps the token for the next start; a rejected one is dropped.
-        if (res.error !== AuthError.NETWORK) writeToken(null);
+        if (res.error === AuthError.NETWORK) return set({ status: AuthStatus.OFFLINE });
+        writeToken(null);
         set({ status: AuthStatus.ANONYMOUS });
       })();
       return restoring;

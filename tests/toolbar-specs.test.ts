@@ -461,14 +461,14 @@ describe('toolbarSpecs', () => {
     const tile = map.tiles.find((t) => t.unit === null && t.terrain === TileType.GrasslandLand && !t.settlement)!;
     tile.ownedBy = 0;
     const players = useGameStore.getState().players;
-    giveResources(map, players[0]!, { wood: 5, stone: 2, money: 15, ore: 0, food: 20 });
+    giveResources(map, players[0]!, { wood: 3, stone: 2, money: 10, ore: 0, food: 20 });
     selectCell(tile);
     expect(toolbarSpecs().some((a) => a.key === 'farm')).toBe(false);
     players[0]!.skills.push(SkillId.AGRICULTURE);
     const spec = toolbarSpecs().find((a) => a.key === 'farm');
     expect(spec).toBeDefined();
     expect(spec!.disabled).toBe(false);
-    giveResources(map, players[0]!, { wood: 4 });
+    giveResources(map, players[0]!, { wood: 2 });
     expect(toolbarSpecs().find((a) => a.key === 'farm')!.disabled).toBe(true);
   });
 
@@ -491,7 +491,7 @@ describe('toolbarSpecs', () => {
     tile.building = { kind: BuildingKind.FARM, level: 1 };
     tile.unit = {
       id: 'raider', owner: 0, type: UnitType.WARRIOR, q: tile.q, r: tile.r,
-      hasMoved: true, hasAttacked: false, hasHealed: false,
+      hasMoved: false, hasAttacked: false, hasHealed: false,
       hp: UNIT_TYPES.warrior.maxHp, attack: 2, attackDistance: 1, spawnVillage: null,
     };
     select(tile);

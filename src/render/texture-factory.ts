@@ -22,6 +22,10 @@ import { tileMapByKey } from '../game/map/tile-index';
 
 const TEXTURE_BASE = `${import.meta.env.BASE_URL}textures/`;
 
+/** Pseudo-height of the visible sides of the map's bottom-edge water cells
+ *  (fraction of hexSize, two land steps). Visual only: elevation stays 0. */
+const WATER_EDGE_SIDE = 16 / 40;
+
 const FOG_LEFT_WALL = 0xd5bbdc;
 const FOG_RIGHT_WALL = 0xc2a4ca;
 
@@ -181,7 +185,9 @@ function composeHexTexture(
     walls: boolean;
     anchor: TileAnchor;
     sideColors?: { left: number; right: number };
-    brightness?: number
+    brightness?: number;
+    /** Walls hang below the top face, which stays at the sprite position (no elevation). */
+    sunken?: boolean;
   },
 ): TileTexture {
   const container = new Container();
@@ -248,7 +254,7 @@ function composeHexTexture(
     : Math.max(hexSize * HEX_TILT, imageBottom);
   const textureHeight = imageTop + wallBase;
   const anchor =
-    opts.anchor === TileAnchor.BASE ? (imageTop + height) / textureHeight : imageTop / textureHeight;
+    opts.anchor === TileAnchor.BASE && !opts.sunken ? (imageTop + height) / textureHeight : imageTop / textureHeight;
   return { texture, anchorY: anchor };
 }
 
@@ -458,11 +464,12 @@ export async function createTextures(
     opts?: {
       sideColors?: { left: number; right: number };
       brightness?: number;
+      sunken?: boolean;
     },
   ): TileTexture => {
     const brightness = opts?.brightness ?? 1;
     // A fog texture does not depend on the terrain under it: one per height.
-    const cacheKey = layer === TileLayer.FOG ? `fog|${heightPx}|${anchor}|${brightness}` : `${layer}|${terrain}|${heightPx}|${anchor}|${brightness}`;
+    const cacheKey = layer === TileLayer.FOG ? `fog|${heightPx}|${anchor}|${brightness}` : `${layer}|${terrain}|${heightPx}|${anchor}|${brightness}|${opts?.sunken ? 's' : ''}`;
     const cached = textureCache.get(cacheKey);
     if (cached) return cached;
     const tex = composeHexTexture(bakeApp, hexSize, heightPx, img, fill, {
@@ -470,6 +477,7 @@ export async function createTextures(
       anchor,
       sideColors: opts?.sideColors,
       brightness,
+      sunken: opts?.sunken,
     });
     textureCache.set(cacheKey, tex);
     return tex;
@@ -480,10 +488,18 @@ export async function createTextures(
   }
   const tileByKey = tileMapByKey(map);
   const findNeighbor = (q: number, r: number): MapTile | undefined => tileByKey.get(axialKey({ q, r }));
+  // A water cell with no neighbour below-left or below-right sits on the map's
+  // bottom, bottom-left or bottom-right edge: it gets equal-height vertical sides.
+  const edgeSideHeight = (tile: MapTile): number => {
+    if (!isWaterType(tile.terrain)) return 0;
+    const open = !findNeighbor(tile.q, tile.r + 1) || !findNeighbor(tile.q - 1, tile.r + 1);
+    return open ? WATER_EDGE_SIDE * hexSize : 0;
+  };
   const tileSpecs = map.tiles.map((tile) => ({
     key: axialKey(tile),
     terrain: tile.terrain,
     heightPx: tileElevation(tile, hexSize),
+    sideHeightPx: edgeSideHeight(tile),
     brightness: coastWaterBrightness(tile, findNeighbor),
   }));
   for (const spec of tileSpecs) {
@@ -492,9 +508,10 @@ export async function createTextures(
     const img = images.get(String(spec.terrain)) ?? null;
     tileTextures.set(
       spec.key,
-      getTileTexture(TileLayer.TILE, spec.terrain, spec.heightPx, img, bottom, TileAnchor.BASE, {
+      getTileTexture(TileLayer.TILE, spec.terrain, spec.heightPx || spec.sideHeightPx, img, bottom, TileAnchor.BASE, {
         sideColors: TERRAIN_SIDE_COLORS[spec.terrain],
         brightness: spec.brightness,
+        sunken: spec.sideHeightPx > 0,
       }),
     );
     fogTextures.set(

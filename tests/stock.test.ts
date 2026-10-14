@@ -25,7 +25,7 @@ function scene(connected: boolean): { map: GameMap; a: MapTile; b: MapTile; p: P
   const a = tileAt(map, 0, 0)!;
   const b = tileAt(map, 4, 0)!;
   for (const [v, name] of [[a, 'A'], [b, 'B']] as const) {
-    v.settlement = { owner: 0, level: 1, captureReady: false, name, stock: { wood: 0, stone: 0, ore: 0, food: 0 } };
+    v.settlement = { owner: 0, level: 2, captureReady: false, name, stock: { wood: 0, stone: 0, ore: 0, food: 0 } };
     v.ownedBy = 0;
     v.claimedByVillage = { q: v.q, r: v.r };
   }

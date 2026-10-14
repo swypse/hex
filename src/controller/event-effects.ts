@@ -36,6 +36,14 @@ const DEATH_PARTICLE_COUNT = 10;
 const DEATH_RISE = 200;
 const DEATH_MS = 3000;
 const DEATH_STAGGER_MS = 700;
+/** Above the overlay's unit mirrors (-1) and attack markers (-0.5), below hp bars (0). */
+const RAYS_OVERLAY_Z = -0.25;
+const RAYS_COUNT = 12;
+const RAYS_MS = 700;
+const RAYS_INNER = 8;
+const RAYS_OUTER = 52;
+const RAYS_COLOR = 0xffe680;
+export const RAYS_DAMAGE_COLOR = 0xff2a2a;
 /** Score points start this long after the damage number so the -N shows first. */
 const SCORE_FLY_DELAY_MS = 50;
 /** Lightning bolt visibility; the map and background flash inverted `LIGHTNING_FLASHES` times,
@@ -320,6 +328,61 @@ export class EventEffects {
         ticker.remove(fn);
         mapRoot.removeChild(el);
         el.destroy();
+      }
+    };
+    ticker.add(fn);
+  }
+
+  /** Golden rays radiating from the centre of `tile` (bonus claim): each ray
+   *  is a thin tapered wedge that slides outward, then fades. */
+  spawnRays(tile: MapTile, color = RAYS_COLOR): void {
+    const app = this.host.app();
+    const mapView = this.host.mapView();
+    if (!app || !mapView) return;
+    // Drawn in the screen-space overlay: village units are mirrored there above
+    // the map layer, so rays in the map container would sit under the unit.
+    const overlay = mapView.overlay;
+    const mapRoot = mapView.container;
+    const world = hexToPixel(tile, HEX_SIZE);
+    const anchor = { x: world.x, y: world.y - tileElevation(tile, HEX_SIZE) };
+    const el = new Container();
+    el.zIndex = RAYS_OVERLAY_Z;
+    const offset = Math.random() * Math.PI;
+    const rays: Graphics[] = [];
+    for (let i = 0; i < RAYS_COUNT; i++) {
+      const g = new Graphics();
+      // Pointing along +x: wide at the base, a point at the tip.
+      g.poly([0, -2.5, 18, 0, 0, 2.5]).fill(color);
+      g.rotation = offset + (i / RAYS_COUNT) * Math.PI * 2;
+      // Alternate long and short rays.
+      g.scale.set(i % 2 === 0 ? 1 : 0.65);
+      el.addChild(g);
+      rays.push(g);
+    }
+    overlay.addChild(el);
+
+    const start = performance.now();
+    const ticker = app.ticker;
+    const fn = (): void => {
+      if (el.destroyed) {
+        ticker.remove(fn);
+        return;
+      }
+      // Follow the cell through camera pan and zoom.
+      const pos = overlay.toLocal(anchor, mapRoot);
+      el.position.set(pos.x, pos.y);
+      const t = Math.min(1, (performance.now() - start) / RAYS_MS);
+      const eased = 1 - (1 - t) * (1 - t);
+      const dist = RAYS_INNER + (RAYS_OUTER - RAYS_INNER) * eased;
+      for (const g of rays) {
+        g.position.set(Math.cos(g.rotation) * dist, Math.sin(g.rotation) * dist);
+        g.alpha = t < 0.4 ? 1 : 1 - (t - 0.4) / 0.6;
+      }
+      markDirty();
+      if (t >= 1) {
+        ticker.remove(fn);
+        el.parent?.removeChild(el);
+        el.destroy({ children: true });
       }
     };
     ticker.add(fn);

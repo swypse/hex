@@ -34,6 +34,7 @@ import {
   farmYield,
   foodNetIncome,
   villageFood,
+  villageFoodUpkeep,
   canSustainUnit,
   foodNetworkStates,
   foodPressure,
@@ -45,7 +46,8 @@ function setup(): { map: GameMap; p: Player; village: MapTile } {
   const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
   const p = players[0]!;
   const village = tileAt(map, 0, 0)!;
-  village.settlement = { owner: 0, level: 1, captureReady: false };
+  // Level 2: the village eats 1 food (a level 1 village eats none).
+  village.settlement = { owner: 0, level: 2, captureReady: false };
   for (const t of map.tiles) {
     if (Math.abs(t.q) <= 2 && Math.abs(t.r) <= 2 && Math.abs(t.q + t.r) <= 2) {
       t.ownedBy = 0;
@@ -71,6 +73,12 @@ function addUnit(map: GameMap, type: UnitType, q: number, r: number, owner = 0, 
   u.spawnVillage = home;
   tileAt(map, q, r)!.unit = u;
 }
+
+describe('village food upkeep', () => {
+  it('is half the level rounded down: a level 1 village eats nothing', () => {
+    expect([1, 2, 3, 4, 5, 6].map(villageFoodUpkeep)).toEqual([0, 1, 1, 2, 2, 3]);
+  });
+});
 
 describe('food resource', () => {
   it('gives every capital 25 food at the start; money alone stays with the player', () => {
@@ -140,14 +148,14 @@ describe('farms', () => {
     expect(canBuildFarm(map, t, p)).toBe(true);
   });
 
-  it('cost 15 money and 5 wood (no stone) and do not use a village building slot', () => {
+  it('cost 10 money and 3 wood (no stone) and do not use a village building slot', () => {
     const { map, p, village: v } = setup();
     p.skills.push(SkillId.AGRICULTURE);
-    expect(BUILDING_COSTS.farm).toEqual({ money: 15, wood: 5, stone: 0, ore: 0, food: 0 });
+    expect(BUILDING_COSTS.farm).toEqual({ money: 10, wood: 3, stone: 0, ore: 0, food: 0 });
     const before = { money: p.resources.money, ...v.settlement!.stock! };
     expect(buildBuilding(map, tileAt(map, 1, 0)!, BuildingKind.FARM, p)).toBe(true);
-    expect(p.resources.money).toBe(before.money - 15);
-    expect(v.settlement!.stock!.wood).toBe(before.wood - 5);
+    expect(p.resources.money).toBe(before.money - 10);
+    expect(v.settlement!.stock!.wood).toBe(before.wood - 3);
     expect(v.settlement!.stock!.stone).toBe(before.stone);
     expect(tileAt(map, 1, 0)!.building).toEqual({ kind: BuildingKind.FARM, level: 1 });
     expect(buildingsInVillage(map, v)).toBe(0);
@@ -237,7 +245,7 @@ describe('granaries', () => {
     expect(g.building!.food).toBe(18);
   });
 
-  it('store the unused food of adjacent farms at round end, capped at 10 per adjacent farm', () => {
+  it('store the unused food of adjacent farms at round end, capped at 15 per adjacent farm', () => {
     const { map, p } = setup();
     const g = tileAt(map, 1, 0)!;
     g.building = { kind: BuildingKind.GRANARY, level: 1, food: 0 };
@@ -245,7 +253,7 @@ describe('granaries', () => {
     tileAt(map, 0, 1)!.building = { kind: BuildingKind.FARM, level: 1 };
     applyFood(map, p);
     expect(g.building!.food).toBe(5); // 2 farms (6) minus the village (1)
-    g.building!.food = 18;
+    g.building!.food = 28;
     applyFood(map, p);
     expect(g.building!.food).toBe(2 * GRANARY_CAPACITY_PER_FARM);
   });
@@ -461,7 +469,7 @@ describe('starving state on capture', () => {
 function setupNetwork(connect: boolean): { map: GameMap; p: Player; a: MapTile; b: MapTile } {
   const { map, p, village: a } = setup();
   const b = tileAt(map, 3, 0)!;
-  b.settlement = { owner: 0, level: 1, captureReady: false };
+  b.settlement = { owner: 0, level: 2, captureReady: false };
   for (const [q, r] of [[3, 0], [3, -1]] as const) {
     const t = tileAt(map, q, r)!;
     t.ownedBy = 0;
@@ -501,7 +509,7 @@ describe('food networks', () => {
   it('feeds the most developed village first and the hungriest unit first', () => {
     const { map, p, a, b } = setupNetwork(true);
     tileAt(map, 3, -1)!.building = null;
-    b.settlement!.level = 2;
+    b.settlement!.level = 3; // eats 1, like level 2
     setFood(map, 4);
     addUnit(map, UnitType.WARRIOR, 0, 1); // village A (level 1)
     addUnit(map, UnitType.WARRIOR, 2, 1, 0, { q: 3, r: 0 }); // village B (level 2), fed first
@@ -554,6 +562,7 @@ describe('AI food planning', () => {
     p.skills.push(SkillId.AGRICULTURE, SkillId.ROADS);
     tileAt(map, 1, 0)!.roadOwner = 0; // only (2,0) is missing
     addUnit(map, UnitType.SWORDSMAN, 0, 1);
+    addUnit(map, UnitType.SWORDSMAN, -1, 1); // a deficit bigger than one (cheap) farm covers
     const plan = planFoodFixes(map, p, foodNetworkStates(map, p));
     expect(plan.linkFirst.size).toBe(1);
     expect(plan.roads.map((r) => `${r.tile.q},${r.tile.r}`)).toContain('2,0');
@@ -625,10 +634,12 @@ describe('burning farms and granaries', () => {
     }
   });
 
-  it('works right after moving but not after attacking, and not for the owner or other buildings', () => {
+  it('needs a whole turn: not after moving or attacking, and not for the owner or other buildings', () => {
     const { tile, unit } = burnSetup();
-    unit.hasMoved = true;
     expect(canBurnBuilding(tile, unit)).toBe(true);
+    unit.hasMoved = true;
+    expect(canBurnBuilding(tile, unit)).toBe(false);
+    unit.hasMoved = false;
     unit.hasAttacked = true;
     expect(canBurnBuilding(tile, unit)).toBe(false);
     unit.hasAttacked = false;

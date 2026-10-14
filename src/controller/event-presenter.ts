@@ -29,7 +29,7 @@ import { attackSound } from '../sound/attack-sounds';
 import { AttackImpact, BonusKind, GameEventType, NetMode, SelectionKind, UnitFacing, UnitType, WeatherType } from '@enums';
 import { sleep } from '../util/sleep';
 import { tileAt } from '../game/map/tile-index';
-import { EventEffects } from './event-effects';
+import { EventEffects, RAYS_DAMAGE_COLOR } from './event-effects';
 
 const HEX_SIZE = 40;
 
@@ -314,16 +314,24 @@ export class EventPresenter {
           case GameEventType.VILLAGE_UPGRADED: {
             if (e.playerIndex === local) sfx.play('upgrade');
             const tile = tileAt(sim.map, e.q, e.r);
-            // No celebration animation; just re-render the upgraded village for
-            // the local player's own upgrades (another player's upgrade is
-            // their news, not ours).
+            // Re-render, bounce and ray the upgraded village for the local player's
+            // own upgrades (another player's upgrade is their news, not ours).
             if (e.playerIndex === local && tile && isExploredFor(tile, local)) {
               this.host.render();
+              this.host.mapView()?.dipBounceHex(e.q, e.r);
+              this.effects.spawnRays(tile);
             }
             break;
           }
-          case GameEventType.BUILT:
+          case GameEventType.BUILT: {
+            // The new building bounces its hex, like a selected cell.
+            const tile = tileAt(sim.map, e.q, e.r);
+            if (tile && isExploredFor(tile, local)) {
+              this.host.render();
+              this.host.mapView()?.bounceHex(e.q, e.r);
+            }
             break;
+          }
           case GameEventType.BUILDING_REPAIRED:
             this.host.render();
             break;
@@ -679,6 +687,8 @@ export class EventPresenter {
       } else {
         if (e.attackerDamage > 0 && targetTile && attackerVisible) this.effects.spawnHpText(targetTile, `-${e.attackerDamage}`, 0xff4444);
         if (e.targetDamage > 0 && attackerTile && targetVisible) this.effects.spawnHpText(attackerTile, `-${e.targetDamage}`, 0xff4444);
+        if (mapView && e.attackerDamage > 0 && targetTile && attackerVisible) this.hitUnit(targetTile);
+        if (mapView && e.targetDamage > 0 && attackerTile && targetVisible) this.hitUnit(attackerTile);
       }
       if (e.targetDied && targetTile && targetVisible) this.effects.spawnDeath(targetTile);
       if (e.attackerDied && attackerTile && attackerVisible) this.effects.spawnDeath(attackerTile);
@@ -688,6 +698,11 @@ export class EventPresenter {
       }
     }
     this.keepAttackerSelected(e);
+  }
+
+  /** Damage reaction: red rays around the unit's cell. */
+  private hitUnit(tile: MapTile): void {
+    this.effects.spawnRays(tile, RAYS_DAMAGE_COLOR);
   }
 
   /** A catapult volley against a structure tile: lob a cannonball at it when
@@ -812,6 +827,7 @@ export class EventPresenter {
 
     // Attacker's blow lands on the target first.
     if (e.attackerDamage > 0) {
+      this.hitUnit(targetTile);
       this.effects.spawnHpText(targetTile, `-${e.attackerDamage}`, 0xff4444);
       target.hp = Math.max(0, target.hp - e.attackerDamage);
       this.host.render();
@@ -824,6 +840,8 @@ export class EventPresenter {
     if (e.targetDamage > 0) {
       const counterFacing: UnitFacing = facing === UnitFacing.LEFT ? UnitFacing.RIGHT : UnitFacing.LEFT;
       mapView.faceUnitAtKey(targetKey, counterFacing);
+      // Persist it: the defender keeps looking at its attacker afterwards.
+      mapView.setUnitFacing(e.targetId, counterFacing);
       const targetPre = e.targetPre!;
       if (targetPre.type === UnitType.ARCHER && targetPre.shipLevel === undefined) {
         await this.effects.spawnArrowFromTo(targetTile, attackerTile);
@@ -838,6 +856,7 @@ export class EventPresenter {
       } else {
         await mapView.lungeUnit(targetKey, attackerKey, 10 / scale);
       }
+      this.hitUnit(attackerTile);
       this.effects.spawnHpText(attackerTile, `-${e.targetDamage}`, 0xff4444);
       attacker.hp = Math.max(0, attacker.hp - e.targetDamage);
       this.host.render();
@@ -1091,6 +1110,7 @@ export class EventPresenter {
       if (tile && isExploredFor(tile, local)) {
         const p = hexToPixel({ q: e.q, r: e.r }, HEX_SIZE);
         mapView.spawnBonusClaim(p.x, p.y - tileElevation(tile, HEX_SIZE));
+        this.effects.spawnRays(tile);
       }
     }
     if (e.playerIndex !== local) return;
@@ -1170,6 +1190,9 @@ export class EventPresenter {
     const village = tileAt(sim.map, e.q, e.r);
     if (e.oldOwner !== null && village) {
       this.showCaptureMessage(village, capturer);
+    }
+    if (e.oldOwner === null && village && isExploredFor(village, useGameStore.getState().localPlayerIndex)) {
+      this.effects.spawnRays(village);
     }
     if (e.ownerDied && e.oldOwner !== null) {
       const dead = sim.players[e.oldOwner]!;

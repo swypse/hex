@@ -133,6 +133,9 @@ export function villageBuildSignature(level: number, build?: SettlementBuild): s
   return `${level}|${colSig(build.l)}|${colSig(build.r)}|${colSig(build.lBack)}|${colSig(build.rBack)}`;
 }
 
+/** Villages above this level look the same as at it: the art stops growing. */
+export const VILLAGE_TEXTURE_MAX_LEVEL = 20;
+
 /** Fixed distance (art px) of the village ground line below the hex-center
  *  anchor, matching the level-1 centered look (height / 2). Holding the
  *  ground fixed means the bottom point of the village never moves relative
@@ -273,11 +276,13 @@ export class VillageBuildTextureService {
   }
 
   tileTexture(settlement: Settlement): TileTexture | null {
-    const level = settlement.level;
-    const signature = villageBuildSignature(level, settlement.build);
+    const level = Math.min(settlement.level, VILLAGE_TEXTURE_MAX_LEVEL);
+    const { frames, width, height } = villageBuildFrames(level, settlement.build);
+    // Keyed by the drawn frames, so changes that do not alter the picture
+    // (a level above the cap, variants of blocks never drawn) reuse the texture.
+    const signature = `${level}|${frames.map((f) => `${f.frameKey}@${f.x},${f.y}`).join(';')}`;
     const cached = this.cache.tileFor(signature);
     if (cached) return cached;
-    const { frames, width, height } = villageBuildFrames(level, settlement.build);
     if (frames.length === 0) return null;
     const blockTextures = frames.map((f) => this.frameTexture(f.frameKey));
     if (blockTextures.some((t) => t === null)) return null;

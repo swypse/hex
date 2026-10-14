@@ -1,6 +1,6 @@
 import { DurableObject } from 'cloudflare:workers';
 import type { Env } from '../relay-room';
-import type { GameResultInput, TribeBest } from '../../../src/results/result-types';
+import type { GameResultInput, TribeModeBest } from '../../../src/results/result-types';
 import { SqlResultRepository } from '../results/sql-result-repository';
 import type { ResultRepository } from '../results/result-repository';
 import { SqlUserRepository } from './sql-user-repository';
@@ -55,7 +55,7 @@ export class UserDirectory extends DurableObject<Env> implements UserRepository,
   saveResult(userId: string, result: GameResultInput, createdAt: number): Promise<void> {
     return this.#results.saveResult(userId, result, createdAt);
   }
-  bestByTribe(userId: string): Promise<TribeBest[]> {
-    return this.#results.bestByTribe(userId);
+  bestByTribeMode(userId: string): Promise<TribeModeBest[]> {
+    return this.#results.bestByTribeMode(userId);
   }
 }

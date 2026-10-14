@@ -9,26 +9,26 @@ import { UnitType } from '@enums';
 
 describe('map generation', () => {
   it('chooses radius by player count', () => {
-    expect(mapRadiusFor(2)).toBe(7);
-    expect(mapRadiusFor(3)).toBe(8);
-    expect(mapRadiusFor(4)).toBe(9);
-    expect(mapRadiusFor(5)).toBe(10);
-    expect(mapRadiusFor(6)).toBe(11);
-    expect(mapRadiusFor(7)).toBe(12);
+    expect(mapRadiusFor(2)).toBe(8);
+    expect(mapRadiusFor(3)).toBe(9);
+    expect(mapRadiusFor(4)).toBe(10);
+    expect(mapRadiusFor(5)).toBe(11);
+    expect(mapRadiusFor(6)).toBe(12);
+    expect(mapRadiusFor(7)).toBe(13);
     expect(() => mapRadiusFor(1)).toThrow();
     expect(() => mapRadiusFor(8)).toThrow();
   });
 
   it('generates a map of the base radius plus the water border', () => {
     const map = generateMap(2, 42);
-    expect(mapRadiusFor(2)).toBe(7);
-    expect(map.radius).toBe(9);
+    expect(mapRadiusFor(2)).toBe(8);
+    expect(map.radius).toBe(10);
     expect(generateMap(6, 42).radius).toBe(mapRadiusFor(6) + 2);
   });
 
   it('generates the expected number of tiles', () => {
     const map = generateMap(2, 42);
-    expect(map.tiles).toHaveLength(allTiles(9).length);
+    expect(map.tiles).toHaveLength(allTiles(10).length);
   });
 
   it('keeps starting villages at least 2 tiles from the map edge', () => {
@@ -68,7 +68,7 @@ describe('map generation', () => {
     }
   });
 
-  it('produces roughly 40% water and 10% mountains away from villages', () => {
+  it('produces roughly 30% water and 10% mountains away from villages', () => {
     const map = generateMap(3, 42);
     const radius = map.radius;
     const nearVillage = new Set<string>();
@@ -90,8 +90,8 @@ describe('map generation', () => {
           t.terrain === TileType.TaigaMountain ||
           t.terrain === TileType.RainforestMountain,
       ).length / wild.length;
-    expect(water).toBeGreaterThan(0.32);
-    expect(water).toBeLessThan(0.48);
+    expect(water).toBeGreaterThan(0.22);
+    expect(water).toBeLessThan(0.38);
     expect(mountain).toBeGreaterThan(0.09);
     expect(mountain).toBeLessThan(0.16);
   });

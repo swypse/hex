@@ -50,6 +50,16 @@ describe('auth store', () => {
     expect(offline.data['hex-auth-token-v1']).toBe('tok');
   });
 
+  it('is offline when the API is unreachable', async () => {
+    const down = fakeClient({ me: async () => ({ ok: false, error: AuthError.NETWORK }) });
+    const bare = createAuthStore(down, memoryStorage());
+    await bare.getState().restore();
+    expect(bare.getState().status).toBe(AuthStatus.OFFLINE);
+    const withToken = createAuthStore(down, memoryStorage({ 'hex-auth-token-v1': 'tok' }));
+    await withToken.getState().restore();
+    expect(withToken.getState().status).toBe(AuthStatus.OFFLINE);
+  });
+
   it('stores the token on login and clears it on logout', async () => {
     const storage = memoryStorage();
     const client = fakeClient();

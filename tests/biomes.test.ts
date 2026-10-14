@@ -70,7 +70,7 @@ describe('biomes', () => {
     );
   });
 
-  it('produces roughly 40% water and 10% mountains on a large map', () => {
+  it('produces roughly 30% water and 10% mountains on a large map', () => {
     const tiles = Array.from({ length: 1200 }, (_, i) => {
       const q = (i * 13) % 60;
       return {
@@ -82,8 +82,8 @@ describe('biomes', () => {
     generateTerrain(tiles, 123);
     const water = tiles.filter((t) => t.terrain === TileType.Water).length / tiles.length;
     const mountain = tiles.filter((t) => isMountain(t.terrain)).length / tiles.length;
-    expect(water).toBeGreaterThan(0.35);
-    expect(water).toBeLessThan(0.45);
+    expect(water).toBeGreaterThan(0.25);
+    expect(water).toBeLessThan(0.35);
     expect(mountain).toBeGreaterThan(0.09);
     expect(mountain).toBeLessThan(0.14);
   });

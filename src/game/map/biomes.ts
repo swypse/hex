@@ -78,6 +78,9 @@ function percentile(sorted: number[], p: number): number {
   return sorted[Math.floor((sorted.length - 1) * p)]!;
 }
 
+/** Share of the generated tiles that become water (the map's flooded border comes on top). */
+const WATER_SHARE = 0.3;
+
 export function generateTerrain(tiles: TerrainTile[], seed: number): void {
   const heightNoise = createPerlin(seed);
   const tempNoise = createPerlin(seed + 1);
@@ -92,7 +95,7 @@ export function generateTerrain(tiles: TerrainTile[], seed: number): void {
   }
 
   const heights = tiles.map((t) => t.height!).sort((a, b) => a - b);
-  const waterThreshold = percentile(heights, 0.4);
+  const waterThreshold = percentile(heights, WATER_SHARE);
   const mountainThreshold = percentile(heights, 0.9);
 
   const rainMedians = new Map<Biome, number>();

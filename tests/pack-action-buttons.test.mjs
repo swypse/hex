@@ -7,6 +7,7 @@ import {
   ACTION_BUTTON_ORDER,
   ACTION_BUTTON_COLS,
   ACTION_BUTTON_CELL,
+  ACTION_BUTTON_GUTTER,
   SOURCE_DIR_URL,
   ATLAS_URL,
 } from '../tools/packActionButtons.mjs';
@@ -33,16 +34,19 @@ describe('action button atlas generation', () => {
   it('returns non-overlapping 120x120 frames inside the atlas bounds', () => {
     const { frames, width, height } = generateActionButtonAtlas(SOURCE_DIR_URL, ACTION_BUTTON_COLS);
     const rows = Math.ceil(FILES.length / ACTION_BUTTON_COLS);
-    expect(width).toBe(ACTION_BUTTON_COLS * ACTION_BUTTON_CELL);
-    expect(height).toBe(rows * ACTION_BUTTON_CELL);
+    const stride = ACTION_BUTTON_CELL + ACTION_BUTTON_GUTTER * 2;
+    expect(width).toBe(ACTION_BUTTON_COLS * stride);
+    expect(height).toBe(rows * stride);
     const seen = new Set();
     for (const id of FILES) {
       const f = frames[id];
       expect(f).not.toBeUndefined();
       expect(f.w).toBe(ACTION_BUTTON_CELL);
       expect(f.h).toBe(ACTION_BUTTON_CELL);
-      expect(f.x).toBeGreaterThanOrEqual(0);
-      expect(f.y).toBeGreaterThanOrEqual(0);
+      expect(f.x).toBeGreaterThanOrEqual(ACTION_BUTTON_GUTTER);
+      expect(f.y).toBeGreaterThanOrEqual(ACTION_BUTTON_GUTTER);
+      expect(f.x + ACTION_BUTTON_CELL + ACTION_BUTTON_GUTTER).toBeLessThanOrEqual(width);
+      expect(f.y + ACTION_BUTTON_CELL + ACTION_BUTTON_GUTTER).toBeLessThanOrEqual(height);
       expect(f.x + ACTION_BUTTON_CELL).toBeLessThanOrEqual(width);
       expect(f.y + ACTION_BUTTON_CELL).toBeLessThanOrEqual(height);
     }

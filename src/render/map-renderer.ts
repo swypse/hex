@@ -17,6 +17,7 @@ import { attackBonus, berserkerRage } from '../game/units/abilities';
 import { isExploredFor } from '../game/map/explore';
 import { territoryColor } from '../game/discovery';
 import { villageCapacity, unitsInVillage } from '../game/economy/village';
+import { villageNetwork } from '../game/economy/stock';
 import { isVillageRoadConnected } from '../game/economy/roads';
 import { waterRouteEdges, portWaterClusterJumps } from '../game/economy/water-roads';
 import { tileElevation } from './elevation';
@@ -44,6 +45,8 @@ import { HpBarLayer, type HpBarSpec } from './hp-bar-layer';
 import { EdgeMarkerLayer } from './edge-marker-layer';
 const ICE_BOUNCE_MS = 150;
 /** Earthquake shake: how many up-down-back cycles each tile plays, and how long one takes. */
+/** Village jump height relative to the terrain bounce on upgrade. */
+const VILLAGE_JUMP_SCALE = 2;
 const QUAKE_SHAKE_CYCLES = 5;
 const QUAKE_SHAKE_CYCLE_MS = 110;
 const PIRATE_DEAL_DOT = 8;
@@ -158,7 +161,7 @@ export class MapView {
    *  a farm built/destroyed next to it swaps its texture. */
   private granaryFarms = new Map<string, number>();
   private granaryBounceKeys = new Set<string>();
-  private hexBounceSprites: { obj: Sprite | Graphics; baseY: number; delay: number }[] = [];
+  private hexBounceSprites: { obj: Sprite | Graphics; baseY: number; delay: number; ampScale?: number }[] = [];
   /** The current selected-hex border parts (top in the tile el, bottom in the
    *  container); they bounce together with the hex on selection. */
   private selectedBorderParts: { g: Graphics; baseY: number }[] = [];
@@ -437,7 +440,8 @@ export class MapView {
       }
       const kind = tile.building?.kind;
       const hasStockLabel = kind === BuildingKind.GRANARY || kind === BuildingKind.SAWMILL || kind === BuildingKind.MINE;
-      if (hasStockLabel && tile.ownedBy !== null && tile.ownedBy !== undefined && explored && !detailHidden) {
+      // Only your own stock is shown; enemy capacities stay hidden.
+      if (hasStockLabel && tile.ownedBy === localPlayerIndex && explored && !detailHidden) {
         granaryLabels.push({ tile, owner: tile.ownedBy, world: { x: p.x, y: y + this.hexSize * 0.35 + 5 } });
       }
       if (tile.settlement && tile.settlement.captureReady && tile.unit && tile.unit.owner !== tile.settlement.owner && explored) {
@@ -761,7 +765,9 @@ export class MapView {
       // The owner sees their stealthed stalker slightly dimmed.
       tv.unitSprite.alpha = tile.unit && tile.unit.owner === localPlayerIndex && tile.unit.isStealthed === true ? 0.6 : 1;
       if (tile.unit) {
-        this.faceUnitSprite(tv.unitSprite, this.unitFacings.get(tile.unit.id) ?? UnitFacing.RIGHT);
+        // A staged combat unit (`stage:<id>`) keeps the real unit's facing.
+        const realId = tile.unit.id.startsWith('stage:') ? tile.unit.id.slice('stage:'.length) : tile.unit.id;
+        this.faceUnitSprite(tv.unitSprite, this.unitFacings.get(realId) ?? UnitFacing.RIGHT);
       }
     }
 
@@ -1492,6 +1498,16 @@ export class MapView {
     // Selecting own village also lifts the hexes (and units) of the units it
     // raised, so it is clear at a glance which units belong to it.
     if (tile?.settlement && tile.settlement.owner === localPlayerIndex) {
+      // The villages joined to it by roads or port routes pulse a moment later too.
+      for (const v of villageNetwork(this.map, tile)) {
+        if (v === tile) continue;
+        const networkView = this.tileViews.get(axialKey(v));
+        if (!networkView) continue;
+        for (const s of this.hexSurfaceSprites(networkView)) {
+          sprites.push(s);
+          delayed.add(s);
+        }
+      }
       for (const t of this.map.tiles) {
         const sv = t.unit?.spawnVillage;
         if (!t.unit || t.unit.owner !== localPlayerIndex || !sv || sv.q !== tile.q || sv.r !== tile.r) continue;
@@ -1507,7 +1523,7 @@ export class MapView {
     }
     if (sprites.length === 0) return;
     const CLAIM_DELAY_MS = 80;
-    const entries: { obj: Sprite | Graphics; baseY: number; delay: number }[] = sprites.map((sprite) => ({
+    const entries: { obj: Sprite | Graphics; baseY: number; delay: number; ampScale?: number }[] = sprites.map((sprite) => ({
       obj: sprite,
       baseY: sprite.position.y,
       delay: delayed.has(sprite) ? CLAIM_DELAY_MS : 0,
@@ -1523,7 +1539,7 @@ export class MapView {
   /** Plays the selected-hex bounce on granaries whose texture just changed. */
   private bounceChangedGranaries(): void {
     if (this.granaryBounceKeys.size === 0) return;
-    const entries: { obj: Sprite | Graphics; baseY: number; delay: number }[] = [];
+    const entries: { obj: Sprite | Graphics; baseY: number; delay: number; ampScale?: number }[] = [];
     for (const key of this.granaryBounceKeys) {
       const tv = this.tileViews.get(key);
       if (!tv) continue;
@@ -1531,6 +1547,17 @@ export class MapView {
     }
     this.granaryBounceKeys.clear();
     if (entries.length > 0) this.runHexBounce(entries);
+  }
+
+  /** Village upgrade: the hex dips down, rises above its start, then settles back. */
+  dipBounceHex(q: number, r: number): void {
+    const tv = this.tileViews.get(axialKey({ q, r }));
+    if (!tv) return;
+    const sprites = this.hexSurfaceSprites(tv);
+    if (sprites.length === 0) return;
+    // The village moves further than the terrain, so it seems to jump on the hex.
+    const entries = sprites.map((sprite) => ({ obj: sprite, baseY: sprite.position.y, delay: 0, ampScale: sprite === tv.villageSprite ? VILLAGE_JUMP_SCALE : 1 }));
+    this.runHexBounce(entries, 300, -this.hexSize * 0.2, 1, true);
   }
 
   bounceHex(q: number, r: number): void {
@@ -1632,7 +1659,7 @@ export class MapView {
   /** Moves the entries up and back down once (or `repeats` times). With `shake`
    *  each cycle goes up, then below the start, then back to the start. */
   private runHexBounce(
-    entries: { obj: Sprite | Graphics; baseY: number; delay: number }[],
+    entries: { obj: Sprite | Graphics; baseY: number; delay: number; ampScale?: number }[],
     duration = 150,
     amp = this.hexSize * 0.2,
     repeats = 1,
@@ -1661,7 +1688,7 @@ export class MapView {
         }
         const t = (local % duration) / duration;
         const p = shake ? Math.sin(t * Math.PI * 2) : t < 0.5 ? t * 2 : 2 - t * 2;
-        e.obj.position.y = e.baseY - p * amp;
+        e.obj.position.y = e.baseY - p * amp * (e.ampScale ?? 1);
       }
       if (performance.now() >= endAt) this.stopHexBounce();
     };
@@ -1674,7 +1701,7 @@ export class MapView {
    *  a selected hex, staged 80ms per additional hex of distance from the
    *  stormcaller so the ripple visibly travels outward. */
   stormWaterPulse(tiles: MapTile[], origin: { q: number; r: number }): void {
-    const entries: { obj: Sprite | Graphics; baseY: number; delay: number }[] = [];
+    const entries: { obj: Sprite | Graphics; baseY: number; delay: number; ampScale?: number }[] = [];
     for (const tile of tiles) {
       const tv = this.tileViews.get(axialKey(tile));
       if (!tv) continue;
@@ -1705,7 +1732,7 @@ export class MapView {
       else rows.set(tile.r, [tile]);
     }
     const topRow = Math.min(...rows.keys());
-    const entries: { obj: Sprite | Graphics; baseY: number; delay: number }[] = [];
+    const entries: { obj: Sprite | Graphics; baseY: number; delay: number; ampScale?: number }[] = [];
     for (const tile of tiles) {
       const tv = this.tileViews.get(axialKey(tile));
       if (!tv) continue;
@@ -1730,7 +1757,7 @@ export class MapView {
    *  and unit) shakes up, down and back `cycles` times, each tile starting after
    *  its own random delay. Returns the animation's length in ms. */
   shakeTiles(tiles: { q: number; r: number }[], cycles = QUAKE_SHAKE_CYCLES, cycleMs = QUAKE_SHAKE_CYCLE_MS, maxDelayMs = 100): number {
-    const entries: { obj: Sprite | Graphics; baseY: number; delay: number }[] = [];
+    const entries: { obj: Sprite | Graphics; baseY: number; delay: number; ampScale?: number }[] = [];
     for (const tile of tiles) {
       const tv = this.tileViews.get(axialKey(tile));
       if (!tv) continue;
@@ -2057,22 +2084,20 @@ export class MapView {
   }
 
   /** The materials a granary, sawmill or mine holds, in the village name style:
-   *  white text (and icons) on a plate in the owner's tribe colour. */
+   *  white text (and icons) on a translucent black plate. */
   private addGranaryLabel(tile: MapTile, owner: number, world: { x: number; y: number }, players: Player[]): void {
     const tribe = players[owner] ? tribeById(players[owner]!.tribe) : undefined;
     if (!tribe) return;
     const parts = this.stockLabelParts(tile);
     if (parts.length === 0) return;
     const el = new Container();
-    const known = this.knownOwners.has(owner);
-    const plateColor = territoryColor(tribe, known);
     const iconSize = 14;
     const iconGap = 2;
     const partGap = 6;
     const items: { text: BitmapText; icon: Sprite | null; width: number }[] = parts.map((part) => {
       const text = this.pool.takeText(part.text, {
         fontSize: VILLAGE_LABEL_FONT_SIZE,
-        fill: villageLabelTextColor(tribe, known),
+        fill: 0xffffff,
         fontFamily: FONT_REGULAR,
       });
       text.anchor.set(0, 0.5);
@@ -2085,7 +2110,7 @@ export class MapView {
     const padX = 4;
     const bg = this.pool.takeGraphics();
     bg.zIndex = 0;
-    bg.roundRect(-contentW / 2 - padX, -contentH / 2 - 1, contentW + padX * 2, contentH + 2, 2).fill(plateColor);
+    bg.roundRect(-contentW / 2 - padX, -contentH / 2 - 1, contentW + padX * 2, contentH + 2, 2).fill({ color: 0x000000, alpha: 0.6 });
     el.sortableChildren = true;
     el.zIndex = OVERLAY_Z_VILLAGE_LABEL;
     el.addChild(bg);

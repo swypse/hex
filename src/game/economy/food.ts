@@ -18,14 +18,14 @@ export const FARM_FOOD = 3;
 export const AGRONOMY_FOOD = 1;
 export const AGRONOMY_WINTER_FOOD = 1;
 /** Food a granary can hold per own farm adjacent to it. */
-export const GRANARY_CAPACITY_PER_FARM = 10;
+export const GRANARY_CAPACITY_PER_FARM = 15;
 /** Hp a unit loses when it gets none of the food it needs; a partly fed unit
  *  loses the missing share of it (rounded). */
 export const STARVATION_DAMAGE = 10;
 
-/** Food a village itself eats each round: half its level, rounded up. */
+/** Food a village itself eats each round: half its level, rounded down (a level 1 village eats nothing). */
 export function villageFoodUpkeep(level: number): number {
-  return Math.ceil(level / 2);
+  return Math.floor(level / 2);
 }
 
 /** Order in which equally hungry units are fed (the hungriest go first). */
@@ -125,7 +125,7 @@ export function adjacentFarmCount(map: GameMap, tile: MapTile, ownerIndex: numbe
   return n;
 }
 
-/** Most food this granary can store: 10 per adjacent own farm. Losing a farm
+/** Most food this granary can store: 15 per adjacent own farm. Losing a farm
  *  does not destroy food already stored; the granary just takes in no more
  *  until it is below the new capacity. */
 export function granaryCapacity(map: GameMap, granary: MapTile): number {

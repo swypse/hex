@@ -59,8 +59,18 @@ function suite(name: string, make: () => ResultRepository, skip = false): void {
       await service.record('u1', result({ id: 'game-0003-aaaa', tribe: Tribe.Sand, score: 100, stars: 0, won: false }));
       await service.record('u2', result({ id: 'game-0004-aaaa', score: 9999, stars: 3 }));
       const bests = await service.bests('u1');
-      expect(bests.find((b) => b.tribe === Tribe.Cats)).toEqual({ tribe: Tribe.Cats, games: 2, maxScore: 900, maxStars: 2 });
-      expect(bests.find((b) => b.tribe === Tribe.Sand)).toEqual({ tribe: Tribe.Sand, games: 1, maxScore: 100, maxStars: 0 });
+      expect(bests.find((b) => b.tribe === Tribe.Cats)).toMatchObject({ games: 2, maxScore: 900, maxStars: 2 });
+      expect(bests.find((b) => b.tribe === Tribe.Sand)).toMatchObject({ games: 1, maxScore: 100, maxStars: 0 });
+    });
+
+    it('keeps separate games count and bests per mode', async () => {
+      await service.record('u1', result({ id: 'game-0001-aaaa', mode: GameMode.CAPTURE, score: 500, stars: 2 }));
+      await service.record('u1', result({ id: 'game-0002-aaaa', mode: GameMode.CAPTURE, score: 300, stars: 3 }));
+      await service.record('u1', result({ id: 'game-0003-aaaa', mode: GameMode.TURNS30, score: 900, stars: 1 }));
+      const cats = (await service.bests('u1')).find((b) => b.tribe === Tribe.Cats)!;
+      expect(cats.modes[GameMode.CAPTURE]).toEqual({ games: 2, maxScore: 500, maxStars: 3 });
+      expect(cats.modes[GameMode.TURNS30]).toEqual({ games: 1, maxScore: 900, maxStars: 1 });
+      expect(cats).toMatchObject({ games: 3, maxScore: 900, maxStars: 3 });
     });
 
     it('ignores a resubmitted game id', async () => {

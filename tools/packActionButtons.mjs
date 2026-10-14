@@ -11,6 +11,10 @@ export const MANIFEST_URL = new URL('../src/atlas-data/action-button-atlas-data.
 
 export const ACTION_BUTTON_COLS = 5;
 export const ACTION_BUTTON_CELL = 120;
+/** Transparent margin around every icon. Icons are drawn at ~20px (6x
+ *  minified, mipmapped), so neighbouring cells would bleed into the edges. */
+export const ACTION_BUTTON_GUTTER = 8;
+const STRIDE = ACTION_BUTTON_CELL + ACTION_BUTTON_GUTTER * 2;
 export const ACTION_BUTTON_ATLAS_FILE = 'action-buttons-atlas.png';
 
 /** Permanent, sorted order of the source icon base names (e.g. 'action-upgrade'). */
@@ -26,16 +30,16 @@ export function generateActionButtonAtlas(sourceDir = SOURCE_DIR_URL, cols = ACT
     .sort();
   const cells = order.length;
   const rows = Math.ceil(cells / cols);
-  const width = cols * ACTION_BUTTON_CELL;
-  const height = rows * ACTION_BUTTON_CELL;
+  const width = cols * STRIDE;
+  const height = rows * STRIDE;
   const rgba = Buffer.alloc(width * height * 4); // zero = fully transparent
   const frames = {};
 
   order.forEach((base, i) => {
     const col = i % cols;
     const row = Math.floor(i / cols);
-    const x = col * ACTION_BUTTON_CELL;
-    const y = row * ACTION_BUTTON_CELL;
+    const x = col * STRIDE + ACTION_BUTTON_GUTTER;
+    const y = row * STRIDE + ACTION_BUTTON_GUTTER;
     const src = readFileSync(new URL(`${base}.png`, sourceDir));
     const icon = decodePng(src);
     if (icon.width !== ACTION_BUTTON_CELL || icon.height !== ACTION_BUTTON_CELL) {

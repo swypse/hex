@@ -12,6 +12,8 @@ export * from './attack-impact.enum';
 export * from './auth-error.enum';
 export * from './auth-status.enum';
 export * from './auth-step.enum';
+export * from './setup-step.enum';
+export * from './text-style.enum';
 export * from './badge-anim-phase.enum';
 export * from './builder-build-status.enum';
 export * from './bonus-kind.enum';

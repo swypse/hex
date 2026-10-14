@@ -219,16 +219,14 @@ export class HudSelected implements Widget {
       };
       lines.push('');
       bolds.push(true);
-      if (settlement.owner !== null) {
+      if (settlement.owner === human.index) {
         const income = villageIncomeBreakdown(map, tile);
         // Result first, then the gross income (connection bonus included) less the upkeep actually charged,
         // so the bracket always adds up to the result.
-        const value = settlement.owner === human.index ? `${income.total} (${income.gross} - ${income.deducted})` : String(income.total);
+        const value = `${income.total} (${income.gross} - ${income.deducted})`;
         const pairs = [{ icon: 'gold-32', value }];
-        if (settlement.owner === human.index) {
-          const food = villageFood(map, tile, human);
-          pairs.push({ icon: 'food-32', value: `${food.balance} (${food.production} - ${food.upkeep})` });
-        }
+        const food = villageFood(map, tile, human);
+        pairs.push({ icon: 'food-32', value: `${food.balance} (${food.production} - ${food.upkeep})` });
         extraRows.set(lines.length, { name: '', pairs });
         lines.push('');
         bolds.push(false);
@@ -271,6 +269,8 @@ export class HudSelected implements Widget {
       const b = tile.building;
       const owner = tile.ownedBy !== null ? (s.players[tile.ownedBy] ?? null) : null;
       const y = buildingYield(map, tile, owner);
+      // Another player's building shows no yield, stock or capacity.
+      const own = tile.ownedBy === human.index;
       buildingLineIndex = lines.length;
       // The building line carries its hp and resource yield as icon + value
       // pairs, like the unit characteristics row, so damage and production
@@ -280,7 +280,7 @@ export class HudSelected implements Widget {
           ? BUILDING_NAMES[b.kind]
           : t('hud.selected.building', { name: BUILDING_NAMES[b.kind], level: b.level }),
         hp: buildingHp(b),
-        pairs: [
+        pairs: !own ? [] : [
           ...(y.wood > 0 ? [{ icon: 'wood-32', value: String(y.wood) }] : []),
           ...(y.stone > 0 ? [{ icon: 'stone-32', value: String(y.stone) }] : []),
           ...(y.ore > 0 ? [{ icon: 'ore-32', value: String(y.ore) }] : []),
@@ -290,16 +290,16 @@ export class HudSelected implements Widget {
       };
       lines.push('');
       bolds.push(true);
-      if (b.kind === BuildingKind.GRANARY) {
+      if (own && b.kind === BuildingKind.GRANARY) {
         const map = gameController.getMap();
         lines.push(t('hud.selected.granaryFood', { food: b.food ?? 0, cap: map ? granaryCapacity(map, tile) : 0 }));
         bolds.push(false);
       }
-      if (b.kind === BuildingKind.SAWMILL) {
+      if (own && b.kind === BuildingKind.SAWMILL) {
         lines.push(t('hud.selected.sawmillWood', { held: heldInBuilding(b, 'wood'), cap: buildingCapacity(b, 'wood') }));
         bolds.push(false);
       }
-      if (b.kind === BuildingKind.MINE) {
+      if (own && b.kind === BuildingKind.MINE) {
         lines.push(t('hud.selected.mineStock', {
           stone: heldInBuilding(b, 'stone'), ore: heldInBuilding(b, 'ore'),
           stoneCap: buildingCapacity(b, 'stone'), oreCap: buildingCapacity(b, 'ore'),

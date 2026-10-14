@@ -1,4 +1,5 @@
 import { Container } from 'pixi.js';
+import { spawnConfettiBurst } from '../../gfx/confetti';
 import { useGameStore } from '../../store/game-store';
 import { t } from '../../i18n';
 import { type UIHost } from '../host';
@@ -85,6 +86,11 @@ export class CenterMessage {
       this.el.addChild(popup.el);
       this.popup = popup;
       popup.finish();
+      // Achievements get a ribbon burst from the middle of the card.
+      if (iconFile && ACHIEVEMENT_ATLAS_KEYS.has(iconFile)) {
+        const b = popup.el.getBounds();
+        spawnConfettiBurst(this.host.app, this.el, b.x + b.width / 2, b.y + b.height / 2);
+      }
       this.armForceClose();
     }
 

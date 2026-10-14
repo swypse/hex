@@ -42,9 +42,9 @@ only it can spawn (no skill needed — the tribe is the gate). Details on each t
 
 ## Map
 
-- Hex grid. Playable radius by player count: 2 → 7, 3 → 8, 4 → 9, 5 → 10, 6 → 11, 7 → 12, plus a 2-hex water border.
+- Hex grid. Playable radius by player count: 2 → 8, 3 → 9, 4 → 10, 5 → 11, 6 → 12, 7 → 13, plus a 2-hex water border.
 - Perlin-noise terrain in 5 biomes (Grassland, Desert, Tundra, Taiga, Rainforest); terrain types land, forest, mountain
-  and water.
+  and water (30% of the generated tiles, the border comes on top).
 - Each player starts with a capital (with a warrior) and a nearby free (neutral) village. Villages are at least 3 hexes
   apart and every village has at least one free tile around it.
 - A free village becomes capturable when an enemy unit stands on it (red triangle).
@@ -54,7 +54,7 @@ only it can spawn (no skill needed — the tribe is the gate). Details on each t
 **Fog of war** is tracked per player (AI included). Unexplored tiles are gray; units on them are invisible.
 
 - A unit that moves reveals, for every cell it visits, all tiles within its attack distance (at least the neighbours).
-- A village reveals `territory radius + 1` hexes (level 1 → 2, 2-4 → 3, 5+ → 4) at game start, on upgrade and on
+- A village reveals `territory radius + 1` hexes (level 1 → 2, 2-4 → 3, 5-9 → 4, 10+ → 5) at game start, on upgrade and on
   capture. Own tiles are explored at the start.
 - The camera follows enemy actions only on explored cells.
 
@@ -162,7 +162,7 @@ Pirates never become veterans.
   capacity (`1 + level`) is full.
 - **Upgrade** — `2×level` wood + `level` stone + `2×level` money (level 1: 2 wood + 1 stone + 2 money). Raises income,
   capacity and territory.
-- **Territory radius** — level 1 → 1, 2-4 → 2, 5+ → 3.
+- **Territory radius** — level 1 → 1, 2-4 → 2, 5-9 → 3, 10+ → 4.
 - **Building slots** — a village supports as many buildings as its level. Farms and granaries use no slot.
 - **Wall** — 20 money + 15 stone + 5 ore, needs *Defense*. A walled village gives its units +3 defense and must be
   breached by siege before it can be downgraded.
@@ -221,8 +221,8 @@ village slot (farms and granaries need none). No building produces money. Buildi
 | Port          | 10 wood + 30 money + 2 ore    | Water         | owned water tile next to your own land                       | creates and upgrades ships                                                    |
 | Temple        | 10 stone + 30 money           | Water temples | water tile                                                   | grows +1 level every 2 turns (max 4); 10/15/20/25 score at game end           |
 | Forest temple | 10 stone + 30 money           | Forest temple | forest tile                                                  | same as temple; protects against earthquakes                                  |
-| Farm          | 15 money + 5 wood             | Agriculture   | own empty land tile (no forest/mountain/water; road is fine), no enemy unit | +3 food per round; 0 in winter (see [Food](#food))             |
-| Granary       | 20 money + 10 wood + 10 stone | Granary       | own empty land tile next to one of your farms, no enemy unit | stores unused food of adjacent farms, up to 10 per adjacent farm              |
+| Farm          | 10 money + 3 wood             | Agriculture   | own empty land tile (no forest/mountain/water; road is fine), no enemy unit | +3 food per round; 0 in winter (see [Food](#food))             |
+| Granary       | 20 money + 10 wood + 10 stone | Granary       | own empty land tile next to one of your farms, no enemy unit | stores unused food of adjacent farms, up to 15 per adjacent farm              |
 | University    | 40 money + 10 stone + 5 ore   | Science       | own empty land tile (no forest/mountain/water) of a level 5+ village; one per village; uses a slot | unlocks Geology, Agronomy, Engineering, Medicine; 2 money upkeep |
 
 A builder ([Villagers](tribes/Villagers.md)) can place a sawmill, mine, port, bridge or road without the skill.
@@ -261,7 +261,7 @@ The resource bar always shows money and its income; wood, stone, ore and food sh
 
 ## Food
 
-Each village eats `ceil(level / 2)` food a round. Each unit raised by a village (its home village) also eats: warrior,
+Each village eats `floor(level / 2)` food a round (a level 1 village eats nothing). Each unit raised by a village (its home village) also eats: warrior,
 archer, rider 1; shield 2; swordsman, knight, catapult and every special unit 3. Farms yield 3 (4 with Agronomy in a
 village with a university; 0 in winter, 1 with Agronomy there; halved in a drought).
 
@@ -269,7 +269,7 @@ At the end of each round (after income), for every player and food network:
 
 1. Villages are fed one by one, the most developed first (level, then name); each village eats first, then its units,
    hungriest first. They eat from the network's farms — those **not** adjacent to a granary first.
-2. Food left on a farm adjacent to a granary is stored there (the emptiest first; a granary holds **10 per adjacent farm**; overflow lost; if an adjacent farm is destroyed the stored
+2. Food left on a farm adjacent to a granary is stored there (the emptiest first; a granary holds **15 per adjacent farm**; overflow lost; if an adjacent farm is destroyed the stored
    food stays, but nothing more is stored until it is below the new capacity).
    Other leftover farm food is lost.
 3. Anything still short is taken from the network's granaries (fullest first), then from the food its villages hold
@@ -279,7 +279,7 @@ At the end of each round (after income), for every player and food network:
    round everything is fed.
 
 Farms and granaries are land improvements. Catapults destroy them; an enemy unit standing on one can **burn** it
-(Burn farm / Burn granary: destroyed at once, the unit's turn is spent). An enemy on a road can **destroy** the road (a
+(Burn farm / Burn granary: destroyed at once; it takes the unit's whole turn, so the unit must not have moved yet). An enemy on a road can **destroy** the road (a
 bridge on it too; the unit's turn is spent; a farm or granary on the same tile must be burned first), cutting food
 networks. A destroyed or burned granary loses its food. The AI also cuts roads that are the only link between two
 enemy villages.

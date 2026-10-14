@@ -117,7 +117,7 @@ describe('HudSelected village building constraints', () => {
   });
 
   it('shows the food balance of an own village and a red starvation line when it starves', () => {
-    mount(1, 0, 0);
+    mount(2, 0, 0);
     expect(texts().some((s) => s.includes('(0 - 1)'))).toBe(true);
     expect(texts().some((s) => s.startsWith('Starving!'))).toBe(false);
     const village = tileAt(gameController.getMap()!, 0, 0)!;
@@ -152,8 +152,8 @@ describe('HudSelected village building constraints', () => {
     tileAt(map, 1, -1)!.ownedBy = 0;
     tileAt(map, 1, -1)!.building = { kind: BuildingKind.FARM, level: 1 };
     useGameStore.setState({ selection: { kind: SelectionKind.TILE, q: 1, r: 0 } });
-    // One adjacent farm: capacity 10.
-    expect(texts()).toContain('Stored food: 7/10 (collects what adjacent farms do not use)');
+    // One adjacent farm: capacity 15.
+    expect(texts()).toContain('Stored food: 7/15 (collects what adjacent farms do not use)');
   });
 
   it('shows what a selected sawmill and mine hold and their capacity', () => {

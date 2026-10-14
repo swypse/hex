@@ -33,6 +33,8 @@ export class AuthBar extends Container {
       const name = makeLabel(user.name, { fontSize: FontSize.SMALL, fill: 0xffffff });
       if (name.width > NAME_MAX_WIDTH) name.scale.set(NAME_MAX_WIDTH / name.width);
       items.push(name, new Button({ ...small, label: t('auth.logout'), onClick: () => void useAuthStore.getState().logout() }));
+    } else if (status === AuthStatus.UNKNOWN) {
+      items.push(makeLabel(t('auth.loading'), { fontSize: FontSize.SMALL, fill: 0xeeeeee }));
     } else if (status === AuthStatus.ANONYMOUS) {
       items.push(
         new Button({ ...small, label: t('auth.login'), onClick: this.onLogin }),

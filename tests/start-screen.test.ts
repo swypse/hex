@@ -3,6 +3,8 @@ import { BitmapText, Container, ImageSource, Sprite, Text, Texture } from 'pixi.
 import { StartScreen } from '../src/ui/screens/start-screen';
 import { gameController } from '../src/controller/game-controller';
 import { type UIHost } from '../src/ui/host';
+import { useAuthStore } from '../src/auth/auth-store';
+import { AuthStatus } from '@enums';
 
 class FakeImage {
   src = '';
@@ -201,6 +203,7 @@ describe('StartScreen rejoin match button', () => {
         removeItem: () => {},
       },
     });
+    useAuthStore.setState({ status: AuthStatus.ANONYMOUS });
     screen = new StartScreen();
     screen.mount(host);
     root = (screen as unknown as { root: Container }).root!;
@@ -219,6 +222,17 @@ describe('StartScreen rejoin match button', () => {
   it('hides the button with an expired match', () => {
     mountWithMatch(JSON.stringify({ role: 'client', code: 'ABC234', name: 'Guest', relayUrl: '', savedAt: Date.now() - 46 * 60 * 1000 }));
     expect(buttonByLabel(root, 'Rejoin match')).toBeNull();
+  });
+
+  it('blocks the menu buttons while the auth API has not answered', () => {
+    mountWithMatch(JSON.stringify({ role: 'client', code: 'ABC234', name: 'Guest', relayUrl: '', savedAt: Date.now() }));
+    useAuthStore.setState({ status: AuthStatus.UNKNOWN });
+    const rejoinSpy = vi.spyOn(gameController, 'rejoinGame').mockImplementation(() => {});
+    (buttonByLabel(root, 'Rejoin match') as { trigger(): void }).trigger();
+    expect(rejoinSpy).not.toHaveBeenCalled();
+    useAuthStore.setState({ status: AuthStatus.OFFLINE });
+    (buttonByLabel(root, 'Rejoin match') as { trigger(): void }).trigger();
+    expect(rejoinSpy).toHaveBeenCalledTimes(1);
   });
 
   it('triggers rejoinGame when pressed', () => {

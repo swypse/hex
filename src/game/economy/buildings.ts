@@ -69,7 +69,7 @@ export const BUILDING_COSTS: Record<BuildingKind, Resources> = {
   port: { wood: 10, stone: 0, money: 30, ore: 2, food: 0 },
   temple: { wood: 0, stone: 10, money: 30, ore: 0, food: 0 },
   forestTemple: { wood: 0, stone: 10, money: 30, ore: 0, food: 0 },
-  farm: { wood: 5, stone: 0, money: 15, ore: 0, food: 0 },
+  farm: { wood: 3, stone: 0, money: 10, ore: 0, food: 0 },
   granary: { wood: 10, stone: 10, money: 20, ore: 0, food: 0 },
   university: { wood: 0, stone: 10, money: 40, ore: 5, food: 0 },
 };
@@ -220,14 +220,14 @@ export function raidPriority(kind: BuildingKind): number {
   return i < 0 ? 0 : ENEMY_BUILDING_RAID_ORDER.length - i;
 }
 
-/** Whether `unit`, standing on an enemy farm or granary, may burn it: the unit
- *  must not have attacked or healed yet (moving onto the tile is fine). */
+/** Whether `unit`, standing on an enemy farm or granary, may burn it: the action
+ *  takes the whole turn, so the unit must not have moved, attacked or healed. */
 export function canBurnBuilding(tile: MapTile, unit: Unit): boolean {
   if (tile.unit !== unit) return false;
   if (!isFoodBuilding(tile.building)) return false;
   if (tile.ownedBy === null || tile.ownedBy === undefined || tile.ownedBy === unit.owner) return false;
   if (unit.owner < 0 || unit.shipLevel !== undefined) return false;
-  if (unit.hasAttacked || unit.hasHealed) return false;
+  if (unit.hasMoved || unit.hasAttacked || unit.hasHealed) return false;
   return (unit.stunTurns ?? 0) < 1;
 }
 
