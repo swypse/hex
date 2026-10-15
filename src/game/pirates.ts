@@ -1,5 +1,6 @@
 import { GameEventType, UnitType } from '@enums';
 import { performAttack } from './units/combat';
+import { isStunned } from './units/abilities';
 import { type GameEvent } from './events';
 import { hexDistance, hexNeighbors } from './map/hex';
 import type { GameMap, MapTile } from './map/map-gen';
@@ -65,6 +66,11 @@ export class Pirates {
     for (const u of pirates) {
       if (acted.has(u.id)) continue;
       acted.add(u.id);
+      // A stunned pirate skips this one action; the stun is then spent.
+      if (isStunned(u)) {
+        u.stunTurns = 0;
+        continue;
+      }
       this.pirateAct(u);
     }
   }

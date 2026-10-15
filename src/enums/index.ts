@@ -30,6 +30,7 @@ export * from './compass-direction.enum';
 export * from './connection-state.enum';
 export * from './disconnect-choice.enum';
 export * from './font-size.enum';
+export * from './button-style.enum';
 export * from './food-pressure.enum';
 export * from './game-event-type.enum';
 export * from './game-mode.enum';

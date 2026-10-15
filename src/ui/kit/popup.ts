@@ -2,23 +2,27 @@ import { Application, Container, Graphics, BitmapText, type FederatedPointerEven
 import { Button } from './button';
 import { makeLabel } from '../../gfx/label';
 import { THEME } from '../../gfx/theme';
-import { FontSize, PopupPosition } from '@enums';
+import { ButtonStyle, FontSize, PopupPosition } from '@enums';
 import { clamp } from '../../util/math';
 import { easeOutCubic } from '../../util/easing';
 
 const PAD_H = 20;
 const PAD_TOP = 16;
 const PAD_BOTTOM = 16;
-const TITLE_GAP = 10;
-const FOOTER_GAP = 18;
+const TITLE_GAP = 28;
+const FOOTER_GAP = 34;
 const BUTTON_GAP = 12;
 const CARD_RADIUS = 10;
 const BACKDROP_COLOR = 0x000000;
 const BACKDROP_ALPHA = 0.6;
-const CARD_COLOR = THEME.dialogBg;
-const SHADOW_OFFSET_X = 10;
-const SHADOW_OFFSET_Y = 10;
-const SHADOW_ALPHA = 0.5;
+const CARD_COLOR = 0x23273f;
+/** Soft shadow: stacked rounded rects growing by `SHADOW_SPREAD` each, dropped `SHADOW_OFFSET_Y`. */
+const SHADOW_OFFSET_Y = 6;
+const SHADOW_LAYERS = 4;
+const SHADOW_SPREAD = 3;
+const SHADOW_LAYER_ALPHA = 0.1;
+const CARD_BORDER_ALPHA = 0.12;
+const DIVIDER_ALPHA = 0.12;
 const ANIM_MS = 140;
 const DEFAULT_WIDTH = 420;
 const MIN_CARD_HEIGHT = 80;
@@ -163,7 +167,7 @@ export class Popup {
     if (interactive) this.card.on('pointertap', () => opts.onTap?.());
     this.bg = new Graphics();
     this.titleText = opts.title
-      ? makeLabel(opts.title, { fontSize: FontSize.NORMAL, fill: 0xffffff, fontWeight: '700', wordWrap: true, wordWrapWidth: Math.max(120, this.contentWidth) })
+      ? makeLabel(opts.title, { fontSize: FontSize.NORMAL, fill: 0xffffff, wordWrap: true, wordWrapWidth: Math.max(120, this.contentWidth) })
       : null;
 
     this.viewport = new Container();
@@ -319,9 +323,20 @@ export class Popup {
     const footerY = this.cardHeight - PAD_BOTTOM - buttonsH;
 
     this.bg.clear().roundRect(0, 0, this.cardWidth, this.cardHeight, CARD_RADIUS).fill(CARD_COLOR);
-    this.shadow.clear().roundRect(0, 0, this.cardWidth, this.cardHeight, CARD_RADIUS).fill({ color: 0x000000, alpha: SHADOW_ALPHA });
+    this.bg.roundRect(0, 0, this.cardWidth, this.cardHeight, CARD_RADIUS).stroke({ color: 0xffffff, alpha: CARD_BORDER_ALPHA, width: 1, alignment: 1 });
+    if (this.titleText) {
+      const dividerY = PAD_TOP + this.titleText.height + TITLE_GAP / 2;
+      this.bg.rect(PAD_H, dividerY, this.cardWidth - PAD_H * 2, 1).fill({ color: 0xffffff, alpha: DIVIDER_ALPHA });
+    }
+    this.shadow.clear();
+    for (let i = SHADOW_LAYERS; i >= 1; i--) {
+      const e = i * SHADOW_SPREAD;
+      this.shadow
+        .roundRect(-e, -e, this.cardWidth + e * 2, this.cardHeight + e * 2, CARD_RADIUS + e)
+        .fill({ color: 0x000000, alpha: SHADOW_LAYER_ALPHA });
+    }
     const cardTop = this.positionTop ? this.topY : (this.app.screen.height - this.cardHeight) / 2;
-    const shadowX = this.app.screen.width / 2 - this.cardWidth / 2 + SHADOW_OFFSET_X;
+    const shadowX = this.app.screen.width / 2 - this.cardWidth / 2;
     const shadowY = cardTop + SHADOW_OFFSET_Y;
     this.shadow.position.set(shadowX, shadowY);
     this.card.pivot.set(this.cardWidth / 2, this.cardHeight / 2);
@@ -363,6 +378,7 @@ export class Popup {
       this.disableScrollListeners();
     }
 
+    this.buttons.forEach((b, i) => b.adoptStyle(i === 0 ? ButtonStyle.POPUP : ButtonStyle.POPUP_OUTLINE));
     this.footer.removeChildren();
     this.buttons.forEach((b) => this.footer.addChild(b));
     let bx = (this.cardWidth - buttons.width) / 2;

@@ -782,6 +782,8 @@ export class Simulator {
               : target.ownedBy !== null ? target.ownedBy ?? PIRATE_OWNER
                 : PIRATE_OWNER;
       const outcome = performSiege(attacker, target, this.rng, missChanceFor(attackerPlayer));
+      // Hitting a building gives a stealthed stalker away.
+      if (attacker.isStealthed) this.revealStalker(attacker);
       this.emit({
         type: GameEventType.SIEGE,
         attackerId: unitId,

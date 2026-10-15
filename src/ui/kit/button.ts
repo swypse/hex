@@ -1,15 +1,24 @@
-import { Container, Graphics, BitmapText, type Sprite } from 'pixi.js';
+import { Container, Graphics, BitmapText, Rectangle, type Sprite } from 'pixi.js';
 import { makeIcon32 } from '../../gfx/icons32';
 import { makeLabel } from '../../gfx/label';
 import { TEXT_BUTTON, THEME } from '../../gfx/theme';
 import { sfx } from '../../sound/sfx';
-import { FontSize } from '@enums';
+import { ButtonStyle, FontSize } from '@enums';
 import { clamp } from '../../util/math';
 
 const SHADOW_OFFSET_X = 4;
 const SHADOW_OFFSET_Y = 4;
 /** Gap between a button's icon and its text. */
 const ICON_GAP = 6;
+/** MENU style: accent bar width and how far the label slides when active. */
+const MENU_BAR_WIDTH = 4;
+const MENU_SLIDE = 8;
+/** Flat popup / segment styles. */
+const FLAT_RADIUS = 6;
+const SEGMENT_INSET = 2;
+const ACCENT = 0x5297ff;
+const ACCENT_HOVER = 0x74adff;
+const IDLE_SEGMENT_TINT = 0xb0b8d8;
 
 /** Corner radii in order top-left, top-right, bottom-right, bottom-left. */
 export type ButtonCorners = readonly [number, number, number, number];
@@ -22,6 +31,8 @@ interface ButtonOpts {
   disabled?: boolean;
   selected?: boolean;
   fontSize?: FontSize;
+  /** Default SOLID. */
+  style?: ButtonStyle;
   width?: number;
   paddingX?: number;
   paddingY?: number;
@@ -68,6 +79,10 @@ export class Button extends Container {
   private readonly h: number;
   private readonly onClick: () => void;
   private readonly shadow: boolean;
+  private readonly paddingX: number;
+  private style: ButtonStyle;
+  /** MENU style: current label nudge. */
+  private slide = 0;
   private readonly corners: ButtonCorners;
   private _disabled = false;
   private _selected = false;
@@ -77,8 +92,13 @@ export class Button extends Container {
     super();
     this.onClick = opts.onClick;
     const paddingX = opts.paddingX ?? TEXT_BUTTON.paddingX;
+    this.paddingX = paddingX;
+    this.style = opts.style ?? ButtonStyle.SOLID;
     const paddingY = opts.paddingY ?? TEXT_BUTTON.paddingY;
-    this.text = makeLabel(opts.label.toUpperCase(), { fontSize: opts.fontSize ?? TEXT_BUTTON.fontSize });
+    this.text = makeLabel(opts.label.toUpperCase(), {
+      fontSize: opts.fontSize ?? TEXT_BUTTON.fontSize,
+      ...(this.style === ButtonStyle.TEXT && { fill: 0xffffff }),
+    });
     if (opts.icon) {
       this.icon = makeIcon32(opts.icon, this.text.height);
       this.icon.anchor.set(0, 0.5);
@@ -106,6 +126,50 @@ export class Button extends Container {
 
   private render(fill: number): void {
     this.bg.clear();
+    const idle = fill === THEME.button;
+    const pressed = fill === THEME.buttonPressed;
+    switch (this.style) {
+      case ButtonStyle.TEXT:
+        this.hitArea = new Rectangle(0, 0, this.w, this.h);
+        // Keyboard selection shows as an underline.
+        if (this._selected) this.bg.rect(this.text.x, this.text.y + this.text.height, this.text.width, 1).fill(0xffffff);
+        return;
+      case ButtonStyle.MENU: {
+        this.hitArea = new Rectangle(0, 0, this.w, this.h);
+        if (!idle) {
+          this.bg.rect(0, 0, this.w, this.h).fill({ color: 0xffffff, alpha: pressed ? 0.22 : 0.12 });
+          this.bg.rect(0, 0, MENU_BAR_WIDTH, this.h).fill(THEME.highlight);
+        }
+        this.slide = idle ? 0 : MENU_SLIDE;
+        this.layoutContent();
+        return;
+      }
+      case ButtonStyle.POPUP: {
+        const color = idle ? ACCENT : pressed ? THEME.buttonPressed : ACCENT_HOVER;
+        this.bg.roundRect(0, 0, this.w, this.h, FLAT_RADIUS).fill(color);
+        return;
+      }
+      case ButtonStyle.POPUP_OUTLINE: {
+        // Always filled so the whole rect is hittable; transparent when idle.
+        const alpha = idle ? 0 : pressed ? 0.18 : 0.1;
+        this.bg.roundRect(0, 0, this.w, this.h, FLAT_RADIUS).fill({ color: 0xffffff, alpha });
+        this.bg.roundRect(0, 0, this.w, this.h, FLAT_RADIUS).stroke({ color: 0xffffff, alpha: 0.4, width: 1.5, alignment: 1 });
+        return;
+      }
+      case ButtonStyle.SEGMENT: {
+        this.hitArea = new Rectangle(0, 0, this.w, this.h);
+        const inner = [SEGMENT_INSET, SEGMENT_INSET, this.w - SEGMENT_INSET * 2, this.h - SEGMENT_INSET * 2] as const;
+        if (this._selected) {
+          this.bg.roundRect(...inner, FLAT_RADIUS - 1).fill(pressed ? THEME.buttonPressed : ACCENT);
+        } else if (!idle || this._hover) {
+          this.bg.roundRect(...inner, FLAT_RADIUS - 1).fill({ color: 0xffffff, alpha: pressed ? 0.16 : 0.08 });
+        }
+        this.text.tint = this._selected ? 0xffffff : IDLE_SEGMENT_TINT;
+        return;
+      }
+      default:
+        break;
+    }
     const uniform = this.shadow && this.corners[0] === this.corners[1] && this.corners[1] === this.corners[2] && this.corners[2] === this.corners[3];
     if (uniform) {
       const r = this.corners[0]!;
@@ -179,10 +243,28 @@ export class Button extends Container {
 
   /** Centres the icon + text group in the button. */
   private layoutContent(): void {
-    const x = (this.w - this.contentWidth()) / 2;
+    const x = this.style === ButtonStyle.MENU ? this.paddingX + this.slide : (this.w - this.contentWidth()) / 2;
     const iconW = this.icon ? this.icon.width + ICON_GAP : 0;
     if (this.icon) this.icon.position.set(x, this.h / 2);
     this.text.position.set(x + iconW, (this.h - this.text.height) / 2);
+  }
+
+  /** Layout box height; `height` is the drawn bounds, which for transparent styles is just the text. */
+  get boxHeight(): number {
+    return this.h;
+  }
+
+  /** Layout box width (see `boxHeight`). */
+  get boxWidth(): number {
+    return this.w;
+  }
+
+  /** Adopts a style only if the button still has the default one, so callers that
+   *  picked a style explicitly are left alone. */
+  adoptStyle(style: ButtonStyle): void {
+    if (this.style !== ButtonStyle.SOLID) return;
+    this.style = style;
+    this.redraw();
   }
 
   get disabled(): boolean {

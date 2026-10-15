@@ -685,8 +685,8 @@ export class EventPresenter {
       if (e.missed) {
         if (targetTile && attackerVisible) this.effects.spawnHpText(targetTile, t('msg.miss'), 0xffa500);
       } else {
-        if (e.attackerDamage > 0 && targetTile && attackerVisible) this.effects.spawnHpText(targetTile, `-${e.attackerDamage}`, 0xff4444);
-        if (e.targetDamage > 0 && attackerTile && targetVisible) this.effects.spawnHpText(attackerTile, `-${e.targetDamage}`, 0xff4444);
+        if (e.attackerDamage > 0 && targetTile && attackerVisible) this.effects.spawnHpText(targetTile, `-${e.attackerDamage}`, 0xff4444, attackerTile);
+        if (e.targetDamage > 0 && attackerTile && targetVisible) this.effects.spawnHpText(attackerTile, `-${e.targetDamage}`, 0xff4444, targetTile);
         if (mapView && e.attackerDamage > 0 && targetTile && attackerVisible) this.hitUnit(targetTile);
         if (mapView && e.targetDamage > 0 && attackerTile && targetVisible) this.hitUnit(attackerTile);
       }
@@ -828,7 +828,7 @@ export class EventPresenter {
     // Attacker's blow lands on the target first.
     if (e.attackerDamage > 0) {
       this.hitUnit(targetTile);
-      this.effects.spawnHpText(targetTile, `-${e.attackerDamage}`, 0xff4444);
+      this.effects.spawnHpText(targetTile, `-${e.attackerDamage}`, 0xff4444, attackerTile);
       target.hp = Math.max(0, target.hp - e.attackerDamage);
       this.host.render();
     }
@@ -857,7 +857,7 @@ export class EventPresenter {
         await mapView.lungeUnit(targetKey, attackerKey, 10 / scale);
       }
       this.hitUnit(attackerTile);
-      this.effects.spawnHpText(attackerTile, `-${e.targetDamage}`, 0xff4444);
+      this.effects.spawnHpText(attackerTile, `-${e.targetDamage}`, 0xff4444, targetTile);
       attacker.hp = Math.max(0, attacker.hp - e.targetDamage);
       this.host.render();
     }
@@ -907,7 +907,7 @@ export class EventPresenter {
     mapView.faceUnitAtKey(attackerKey, facing);
     this.host.render();
 
-    if (e.attackerDamage > 0 && targetVisible) this.effects.spawnHpText(targetTile, `-${e.attackerDamage}`, 0xff4444);
+    if (e.attackerDamage > 0 && targetVisible) this.effects.spawnHpText(targetTile, `-${e.attackerDamage}`, 0xff4444, attackerTile);
     if (targetVisible) this.effects.spawnDeath(targetTile);
     await sleep(COMBAT_DEATH_GAP_MS);
 

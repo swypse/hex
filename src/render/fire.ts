@@ -34,6 +34,8 @@ type FireParticleState = Omit<FireParticle, 'g'>;
 interface FireOverlayItem {
   el: Container;
   world: { x: number; y: number };
+  /** Set so the host scales `el` with the map zoom (map-bound size). */
+  scaled?: boolean;
 }
 
 /** Services a fire-particle layer needs from the host map view. */
@@ -44,6 +46,8 @@ export interface FireEffectsOptions {
   /** Registry the effect containers register into, so the host repositions
    *  them with the camera and releases them on overlay rebuilds. */
   overlayItems: FireOverlayItem[];
+  /** Current map zoom; effects are drawn at this scale so they grow and shrink with the map. */
+  getScale: () => number;
   /** Returns a pooled `Graphics` for each particle. */
   takeGraphics: () => Graphics;
 }
@@ -157,7 +161,8 @@ export class FireEffects {
     }
     this.effects.push({ el, particles, key });
     this.opts.overlay.addChild(el);
-    this.opts.overlayItems.push({ el, world: { x, y } });
+    el.scale.set(this.opts.getScale());
+    this.opts.overlayItems.push({ el, world: { x, y }, scaled: true });
   }
 
   private place(p: FireParticle): void {

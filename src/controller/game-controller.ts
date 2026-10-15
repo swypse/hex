@@ -828,6 +828,7 @@ class GameController {
     this.mapView.syncHpBarPositions(camera.pan, scale);
     for (const item of this.overlayItems) {
       item.el.position.set(camera.pan.x + item.world.x * scale, camera.pan.y + item.world.y * scale);
+      if (item.scaled) item.el.scale.set(scale);
     }
     if (this.app) {
       const viewport: Viewport = {

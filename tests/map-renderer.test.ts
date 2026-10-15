@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Application, BitmapText, Container, Graphics, ImageSource, Sprite, Texture } from 'pixi.js';
 import { MapView } from '../src/render/map-renderer';
-import { captureMarkerPoints } from '../src/render/capture-marker';
 import { FIRE_SIZE_MIN, FIRE_SIZE_MAX } from '../src/render/fire';
 import { type GameMap, type MapTile } from '../src/game/map/map-gen';
 import { type Selection } from '../src/game/units/selection';
@@ -2198,53 +2197,7 @@ describe('MapView bottles', () => {
   });
 });
 
-describe('captureMarkerPoints', () => {
-  it('keeps the top-edge triangle visible, vertex on the edge pointing up at the village', () => {
-    // Resting: vertex on the top edge (y=0) pointing UP at the village above,
-    // base 20px below on-screen so the triangle body is visible.
-    const rest = captureMarkerPoints(CaptureMarkerSide.TOP, 100, 0, 800, 600);
-    expect(rest[3]).toBe(0); // vertex on the top edge
-    expect(rest[1]).toBe(20); // base inside the screen
-    expect(Math.min(rest[1], rest[3], rest[5])).toBe(0); // vertex is the top-most point
-    expect(rest[2]).toBe(100); // vertex sits at the village screen x
-    // Slid: vertex moved 10px out past the edge; base still on-screen (10px).
-    const slid = captureMarkerPoints(CaptureMarkerSide.TOP, 100, 10, 800, 600);
-    expect(slid[3]).toBe(-10);
-    expect(slid[1]).toBe(10);
-    expect(slid[2]).toBe(100);
-  });
-
-  it('keeps the bottom-edge triangle visible, vertex pointing down at the village', () => {
-    const rest = captureMarkerPoints(CaptureMarkerSide.BOTTOM, 100, 0, 800, 600);
-    expect(rest[3]).toBe(600); // vertex on the bottom edge
-    expect(rest[1]).toBe(580); // base inside the screen
-    expect(Math.max(rest[1], rest[3], rest[5])).toBe(600); // vertex is the bottom-most point
-    expect(rest[2]).toBe(100);
-    const slid = captureMarkerPoints(CaptureMarkerSide.BOTTOM, 100, 10, 800, 600);
-    expect(slid[3]).toBe(610);
-    expect(slid[1]).toBe(590);
-  });
-
-  it('keeps left/right triangles visible, vertex pointing toward the village', () => {
-    const l = captureMarkerPoints(CaptureMarkerSide.LEFT, 50, 0, 800, 600);
-    expect(l[2]).toBe(0); // vertex on the left edge
-    expect(l[0]).toBe(20); // base inside the screen
-    expect(Math.min(l[0], l[2], l[4])).toBe(0); // vertex is the left-most point
-    expect(l[3]).toBe(50); // vertex sits at the village screen y
-    const lSlid = captureMarkerPoints(CaptureMarkerSide.LEFT, 50, 10, 800, 600);
-    expect(lSlid[2]).toBe(-10);
-    expect(lSlid[0]).toBe(10);
-
-    const r = captureMarkerPoints(CaptureMarkerSide.RIGHT, 50, 0, 800, 600);
-    expect(r[2]).toBe(800); // vertex on the right edge
-    expect(r[0]).toBe(780); // base inside the screen
-    expect(Math.max(r[0], r[2], r[4])).toBe(800); // vertex is the right-most point
-    expect(r[3]).toBe(50);
-    const rSlid = captureMarkerPoints(CaptureMarkerSide.RIGHT, 50, 10, 800, 600);
-    expect(rSlid[2]).toBe(810);
-    expect(rSlid[0]).toBe(790);
-  });
-});
+;
 
 interface TileViewShape {
   bonusSprite: Sprite | null;

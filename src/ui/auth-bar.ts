@@ -4,7 +4,7 @@ import { markDirty } from '../gfx/render-gate';
 import { makeLabel } from '../gfx/label';
 import { t } from '../i18n';
 import { Button } from './kit/button';
-import { AuthStatus, FontSize } from '@enums';
+import { AuthStatus, ButtonStyle, FontSize } from '@enums';
 
 const GAP = 8;
 const NAME_MAX_WIDTH = 160;
@@ -27,23 +27,24 @@ export class AuthBar extends Container {
   private rebuild(): void {
     this.removeChildren().forEach((c) => c.destroy({ children: true }));
     const { status, user } = useAuthStore.getState();
-    const small = { fontSize: FontSize.SMALL, width: 96 };
+    const textOnly = { fontSize: FontSize.SMALL, style: ButtonStyle.TEXT };
     const items: Container[] = [];
     if (status === AuthStatus.AUTHENTICATED && user) {
       const name = makeLabel(user.name, { fontSize: FontSize.SMALL, fill: 0xffffff });
       if (name.width > NAME_MAX_WIDTH) name.scale.set(NAME_MAX_WIDTH / name.width);
-      items.push(name, new Button({ ...small, label: t('auth.logout'), onClick: () => void useAuthStore.getState().logout() }));
+      items.push(name, new Button({ ...textOnly, label: t('auth.logout'), onClick: () => void useAuthStore.getState().logout() }));
     } else if (status === AuthStatus.UNKNOWN) {
       items.push(makeLabel(t('auth.loading'), { fontSize: FontSize.SMALL, fill: 0xeeeeee }));
     } else if (status === AuthStatus.ANONYMOUS) {
       items.push(
-        new Button({ ...small, label: t('auth.login'), onClick: this.onLogin }),
-        new Button({ ...small, label: t('auth.register'), onClick: this.onRegister }),
+        new Button({ ...textOnly, label: t('auth.login'), onClick: this.onLogin }),
+        new Button({ ...textOnly, label: t('auth.register'), onClick: this.onRegister }),
       );
     }
+    const height = Math.max(...items.map((i) => i.height));
     let x = 0;
     for (const item of items) {
-      item.position.set(x, item instanceof Button ? 0 : 6);
+      item.position.set(x, (height - item.height) / 2);
       x += item.width + GAP;
       this.addChild(item);
     }

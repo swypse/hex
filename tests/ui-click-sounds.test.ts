@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Text } from 'pixi.js';
 import { Button } from '../src/ui/kit/button';
 import { IconButton } from '../src/ui/kit/icon-button';
-import { makeCheckbox } from '../src/ui/kit/checkbox';
+import { makeSwitch } from '../src/ui/kit/switch';
 import { sfx } from '../src/sound/sfx';
 
 class FakeImage {
@@ -59,9 +59,9 @@ describe('UI click sounds', () => {
     btn.destroy({ children: true });
   });
 
-  it('plays a click when a checkbox is flipped by the user', () => {
+  it('plays a click when a switch is flipped by the user', () => {
     const onToggle = vi.fn();
-    const cb = makeCheckbox(false, onToggle);
+    const cb = makeSwitch(false, onToggle);
     cb.el.emit('pointertap', {} as never);
     expect(onToggle).toHaveBeenCalledWith(true);
     expect(spy).toHaveBeenCalledWith('click');

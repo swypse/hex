@@ -18,7 +18,7 @@ class FakeImage {
 
 function makeHost(width = 1280, height = 800): UIHost {
   return {
-    app: { screen: { width, height } },
+    app: { screen: { width, height }, ticker: { add: (fn: (t: { deltaMS: number }) => void) => fn({ deltaMS: 1000 }), remove: () => {} } },
     screenLayer: new Container(),
     overlayLayer: new Container(),
   } as unknown as UIHost;
@@ -61,32 +61,6 @@ describe('StartScreen background images', () => {
   function loadAll(): void {
     for (const inst of FakeImage.instances) inst.onload?.call(inst);
   }
-
-  it('positions main-bg centered at the bottom edge, 100px below the screen', () => {
-    const screen = new StartScreen();
-    screen.mount(host);
-    const load = FakeImage.instances.find((i) => i.src.includes('main-bg.png'))!;
-    load.onload!.call(load);
-
-    const bg = sprites((screen as unknown as { root: Container }).root!).find((s) => s.anchor.x === 0.5);
-    expect(bg).toBeDefined();
-    expect(bg!.anchor.y).toBe(1);
-    // Anchored at the screen's bottom-centre, then dropped 100px lower.
-    expect(bg!.position.x).toBeCloseTo(640, 5);
-    expect(bg!.position.y).toBeCloseTo(800 + 100, 5);
-    screen.destroy();
-  });
-
-  it('adds the single background image as the first child, behind the menu', () => {
-    const screen = new StartScreen();
-    screen.mount(host);
-    loadAll();
-    const root = (screen as unknown as { root: Container }).root!;
-    const bgs = sprites(root);
-    expect(bgs.length).toBe(1);
-    expect(root.children.indexOf(bgs[0]!)).toBeLessThan(root.children.length - 1);
-    screen.destroy();
-  });
 
   it('shows a Tutorial button alongside Single player and Multiplayer', () => {
     const screen = new StartScreen();

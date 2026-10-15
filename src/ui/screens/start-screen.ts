@@ -5,34 +5,42 @@ import { saveRepository } from '../../storage/save-game';
 import { activeMatchStore } from '../../storage/active-match';
 import { loadSettings, setAiDifficulty, setSoundEnabled, welcomeDismissed, setWelcomeDismissed } from '../../storage/settings';
 import { isTouchDevice } from '../kit/touch';
+import { MenuStars } from '../../gfx/menu-stars';
+import { KeyHints, placeKeyHints } from '../kit/key-hints';
 import { markDirty } from '../../gfx/render-gate';
 import { type ScreenController, type UIHost } from '../host';
 import { ScreenScroll } from '../kit/vertical-scroll';
 
-/** Half the logo's display height (97px wide on the 194x170 source aspect).
- *  Layout reserves it statically so the menu column never jumps when the logo
- *  image finishes loading (the sprite's height is 0 until then). */
-const TITLE_HALF = (97 * 170) / 194 / 2;
+/** Logo display size: the 194x170 hex-terra.png at its native size. Layout
+ *  reserves it statically so the menu column never jumps when the logo image
+ *  finishes loading (the sprite's height is 0 until then). */
+const TITLE_WIDTH = 194;
+const TITLE_HEIGHT = 170;
+const TITLE_HALF = TITLE_HEIGHT / 2;
+/** Menu column: row width, row gap and how far below the logo the first row sits. */
+const MENU_WIDTH = 300;
+const ROW_GAP = 6;
+const MENU_TOP_GAP = 40;
+const ROW_PAD_Y = 10;
+const ROW_PAD_X = 20;
+/** Below this width the column is centred instead of hugging the left. */
+const COMPACT_WIDTH = 640;
+const DIVIDER_GAP = 18;
+const FOOTER_GAP = 14;
 import { t } from '../../i18n';
 import { Button } from '../kit/button';
 import { ButtonGroup } from '../kit/button-group';
 import { makeLabel } from '../../gfx/label';
-import { makeCheckbox } from '../kit/checkbox';
+import { makeSwitch } from '../kit/switch';
 import { Modal } from '../kit/modal';
 import { Popup } from '../kit/popup';
 import { setLanguage } from '../../storage/settings';
 import { ensureCanvasResource } from '../../gfx/image-texture';
 import { useAuthStore } from '../../auth/auth-store';
-import { AiDifficulty, AuthStatus, AuthStep, FontSize, Language, Screen, StartModal } from '@enums';
+import { AiDifficulty, AuthStatus, AuthStep, ButtonStyle, FontSize, Language, Screen, StartModal } from '@enums';
 import { AuthBar } from '../auth-bar';
 import { AuthDialog } from '../overlays/auth-dialog';
 import { clamp } from '../../util/math';
-
-const IMAGE_BASE = `${import.meta.env.BASE_URL}images/`;
-
-const MAIN_BG = {
-  file: 'main-bg.png',
-} as const;
 
 /** Popup-backed dialog the start screen can show (settings / about). */
 interface ModalView {
@@ -40,6 +48,14 @@ interface ModalView {
 
   hide(onDone: () => void): void;
 }
+
+/** Shared options of the main-menu rows. */
+const MENU_ROW = {
+  style: ButtonStyle.MENU,
+  width: MENU_WIDTH,
+  paddingX: ROW_PAD_X,
+  paddingY: ROW_PAD_Y,
+} as const;
 
 class SettingsPanel {
   readonly el: Container;
@@ -57,7 +73,7 @@ class SettingsPanel {
     this.el = popup.el;
 
     const content = popup.content;
-    const blockGap = 10;
+    const blockGap = 22;
     let y = 0;
 
     const difficultyLabel = makeLabel(t('settings.difficulty'), { fontSize: FontSize.SMALL, fill: 0xeeeeee });
@@ -90,40 +106,10 @@ class SettingsPanel {
     content.addChild(difficultyGroup);
     y += difficultyGroup.buttonHeight + blockGap;
 
-    const soundLabel = makeLabel(t('settings.sound'), { fontSize: FontSize.SMALL, fill: 0xeeeeee });
-    soundLabel.position.set(0, y);
-    content.addChild(soundLabel);
-    y += soundLabel.height + 8;
-
-    const soundGroup = new ButtonGroup({
-      items: [
-        {
-          label: t('common.on'),
-          onClick: () => {
-            setSoundEnabled(true);
-            soundGroup.buttons.forEach((b, i) => {
-              b.selected = i === 0;
-            });
-          },
-        },
-        {
-          label: t('common.off'),
-          onClick: () => {
-            setSoundEnabled(false);
-            soundGroup.buttons.forEach((b, i) => {
-              b.selected = i === 1;
-            });
-          },
-        },
-      ],
-    });
-    const soundOn = loadSettings().soundOn;
-    soundGroup.buttons.forEach((b, i) => {
-      b.selected = i === 0 ? soundOn : !soundOn;
-    });
-    soundGroup.position.set(0, y);
-    content.addChild(soundGroup);
-    y += soundGroup.buttonHeight + blockGap;
+    const soundSwitch = makeSwitch(loadSettings().soundOn, (on) => setSoundEnabled(on), { label: t('settings.sound') });
+    soundSwitch.el.position.set(0, y);
+    content.addChild(soundSwitch.el);
+    y += soundSwitch.el.height + blockGap;
 
     const langLabel = makeLabel(t('settings.language'), { fontSize: FontSize.SMALL, fill: 0xeeeeee });
     langLabel.position.set(0, y);
@@ -152,9 +138,9 @@ class SettingsPanel {
     content.addChild(langGroup);
     y += langGroup.buttonHeight + blockGap;
 
-    const welcomeCheck = makeCheckbox(welcomeDismissed(), (checked) => setWelcomeDismissed(checked), { label: t('settings.dontShowWelcome') });
-    welcomeCheck.el.position.set(0, y);
-    content.addChild(welcomeCheck.el);
+    const welcomeSwitch = makeSwitch(welcomeDismissed(), (checked) => setWelcomeDismissed(checked), { label: t('settings.dontShowWelcome') });
+    welcomeSwitch.el.position.set(0, y);
+    content.addChild(welcomeSwitch.el);
   }
 
   mount(container: Container): void {
@@ -177,7 +163,9 @@ export class StartScreen implements ScreenController {
   private host: UIHost | null = null;
   private scroll: ScreenScroll | null = null;
   private title: Sprite | null = null;
-  private hint: BitmapText | null = null;
+  private hints: KeyHints | null = null;
+  private divider: Graphics | null = null;
+  private stars: MenuStars | null = null;
   private buttons: Button[] = [];
   private index = 0;
   private aboutBtn: Button | null = null;
@@ -187,7 +175,6 @@ export class StartScreen implements ScreenController {
   private gated: Button[] = [];
   private unsubscribeAuth: (() => void) | null = null;
   private modal: ModalView | null = null;
-  private bgImg: Sprite | null = null;
   private bg: Graphics | null = null;
 
   mount(host: UIHost): void {
@@ -196,14 +183,11 @@ export class StartScreen implements ScreenController {
     host.screenLayer.addChild(this.root);
 
     this.addGradientBackground();
-    this.addBackgroundImage();
+    this.stars = new MenuStars(host.app, this.root);
     this.scroll = new ScreenScroll(host.app, this.root);
 
     this.title = new Sprite();
     this.title.anchor.set(0.5, 0.5);
-    // The 194x170 hex-terra.png is baked at 2x; display it at 97px wide and
-    // scale the height to keep the aspect ratio.
-    const TITLE_WIDTH = 97;
     const img = new Image();
     img.onload = () => {
       if (!this.title || this.title.destroyed) return;
@@ -218,51 +202,46 @@ export class StartScreen implements ScreenController {
     };
     img.src = `${import.meta.env.BASE_URL}textures/hex-terra.png`;
 
-    const single = new Button({
-      label: t('start.single'),
-      width: 240,
-      onClick: () => useGameStore.getState().setScreen(Screen.SETUP),
-    });
-    const multi = new Button({
-      label: t('start.multi'),
-      width: 240,
-      onClick: () => useGameStore.getState().setScreen(Screen.LOBBY),
-    });
-    const tutorial = new Button({
-      label: t('start.tutorial'),
-      width: 240,
-      onClick: () => {
-        void gameController.startTutorial();
-      },
-    });
-    const buttons: Button[] = [single, multi, tutorial];
+    interface Row {
+      label: string;
+      onClick: () => void;
+      /** Blocked until the auth API answers. */
+      gated: boolean;
+    }
+    const rows: Row[] = [
+      { label: t('start.single'), gated: true, onClick: () => useGameStore.getState().setScreen(Screen.SETUP) },
+      { label: t('start.multi'), gated: true, onClick: () => useGameStore.getState().setScreen(Screen.LOBBY) },
+      { label: t('start.tutorial'), gated: false, onClick: () => void gameController.startTutorial() },
+    ];
     if (saveRepository.hasSave()) {
-      buttons.unshift(new Button({ label: t('start.resume'), width: 240, onClick: () => gameController.resumeGame() }));
+      rows.unshift({ label: t('start.resume'), gated: true, onClick: () => gameController.resumeGame() });
     }
     // A reloaded client re-enters the running match (freshly saved match only).
     if (activeMatchStore.loadFresh()) {
-      buttons.unshift(new Button({ label: t('start.rejoinMatch'), width: 240, onClick: () => gameController.rejoinGame() }));
+      rows.unshift({ label: t('start.rejoinMatch'), gated: true, onClick: () => gameController.rejoinGame() });
     }
-    this.buttons = buttons;
-    this.gated = buttons.filter((b) => b !== tutorial);
+    this.buttons = rows.map((r) => new Button({ ...MENU_ROW, label: r.label, onClick: r.onClick }));
+    this.gated = this.buttons.filter((_, i) => rows[i]!.gated);
     this.applyAuthGate();
     this.unsubscribeAuth = useAuthStore.subscribe(() => this.applyAuthGate());
     this.buttons[0]!.selected = true;
 
-    this.hint = makeLabel(t('start.hint'), { fontSize: FontSize.SMALL, fill: 0xeeeeee });
-    this.hint.visible = !isTouchDevice();
-    this.hint.alpha = 0.7;
-    this.hint.anchor.set(0.5, 0.5);
+    this.divider = new Graphics();
+    this.hints = new KeyHints([
+      { key: '↑↓', label: t('common.keySelect') },
+      { key: 'Enter', label: t('common.keyConfirm') },
+    ]);
+    this.hints.visible = !isTouchDevice();
 
     this.aboutBtn = new Button({
       label: t('start.about'),
-      width: 96,
+      style: ButtonStyle.TEXT,
       fontSize: FontSize.SMALL,
       onClick: () => this.openModal(StartModal.ABOUT)
     });
     this.settingsBtn = new Button({
       label: t('start.settings'),
-      width: 110,
+      style: ButtonStyle.TEXT,
       fontSize: FontSize.SMALL,
       onClick: () => this.openModal(StartModal.SETTINGS)
     });
@@ -271,12 +250,9 @@ export class StartScreen implements ScreenController {
       () => this.openModal(StartModal.REGISTER),
       () => this.layout(),
     );
-    this.root.addChild(this.aboutBtn, this.settingsBtn, this.authBar);
-    if (this.scroll) {
-      this.scroll.content.addChild(this.title, ...this.buttons, this.hint);
-    } else {
-      this.root.addChild(this.title, ...this.buttons, this.hint);
-    }
+    this.root.addChild(this.authBar, this.hints);
+    const column = this.scroll?.content ?? this.root;
+    column.addChild(this.title, ...this.buttons, this.divider, this.settingsBtn, this.aboutBtn);
 
     this.layout();
     window.addEventListener('keydown', this.onKeyDown);
@@ -307,32 +283,13 @@ export class StartScreen implements ScreenController {
       start: { x: 0, y: 0 },
       end: { x: 0, y: h },
       colorStops: [
-        { offset: 0, color: 0xff61e7 },
-        { offset: 0.58, color: 0x0a2c5a },
-        { offset: 1, color: 0x0a2c5a },
+        { offset: 0, color: 0x1b1147 },
+        { offset: 0.6, color: 0x0b1a42 },
+        { offset: 1, color: 0x06122e },
       ],
       textureSpace: 'global',
     });
     this.bg.clear().rect(0, 0, w, h).fill(gradient);
-  }
-
-  private addBackgroundImage(): void {
-    const sprite = new Sprite();
-    // Centre the image on its bottom edge so it hangs below the screen.
-    sprite.anchor.set(0.5, 1);
-    sprite.eventMode = 'none';
-    this.root!.addChild(sprite);
-    this.bgImg = sprite;
-    const img = new Image();
-    img.onload = () => {
-      if (sprite.destroyed) return;
-      sprite.texture = Texture.from(img);
-      ensureCanvasResource(sprite.texture);
-      this.layout();
-      // Async visual change outside any store/interaction: request a frame.
-      markDirty();
-    };
-    img.src = IMAGE_BASE + MAIN_BG.file;
   }
 
   private onKeyDown = (e: KeyboardEvent): void => {
@@ -353,43 +310,37 @@ export class StartScreen implements ScreenController {
     if (!this.root || !this.host) return;
     const w = this.host.app.screen.width;
     const h = this.host.app.screen.height;
-    const titleHalf = TITLE_HALF;
-    const n = this.buttons.length;
-    const topPad = 24;
-    const bottomPad = 24;
-    // Offsets measured from the title glyph's top edge.
-    const firstBtnTop = titleHalf + 90;
-    const lastBtnTop = firstBtnTop + Math.max(0, n - 1) * 64;
-    const hintCenter = lastBtnTop + 70;
-    const hintHeight = 14;
-    const columnBottom = hintCenter + hintHeight / 2;
-    let glyphTop = (h - columnBottom) / 2;
-    glyphTop = clamp(glyphTop, topPad, h - columnBottom - bottomPad);
+    const compact = w < COMPACT_WIDTH;
+    const colW = Math.min(MENU_WIDTH, w - 32);
+    const colX = compact ? (w - colW) / 2 : Math.max(40, w * 0.1);
+    const hintsH = this.hints?.visible ? this.hints.height + 24 : 0;
 
-    this.title!.position.set(w / 2, glyphTop + titleHalf);
-    let y = glyphTop + firstBtnTop;
+    // Column offsets from the logo's top edge.
+    const firstRowTop = TITLE_HEIGHT + MENU_TOP_GAP;
+    const rowsHeight = this.buttons.reduce((sum, b) => sum + b.boxHeight + ROW_GAP, 0);
+    const dividerTop = firstRowTop + rowsHeight + DIVIDER_GAP - ROW_GAP;
+    const footerTop = dividerTop + FOOTER_GAP;
+    const footerH = Math.max(this.settingsBtn?.boxHeight ?? 0, this.aboutBtn?.boxHeight ?? 0);
+    const columnBottom = footerTop + footerH;
+    const topPad = 56;
+    const free = h - hintsH;
+    const glyphTop = Math.max(topPad, (free - columnBottom) / 2);
+
+    this.title!.position.set(colX + TITLE_WIDTH / 2, glyphTop + TITLE_HALF);
+    let y = glyphTop + firstRowTop;
     for (const b of this.buttons) {
-      b.position.set(w / 2 - 120, y);
-      y += 64;
+      b.position.set(colX, y);
+      y += b.boxHeight + ROW_GAP;
     }
-    if (this.hint) this.hint.position.set(w / 2, glyphTop + hintCenter);
-    if (this.aboutBtn) this.aboutBtn.position.set(12, h - this.aboutBtn.height - 12);
-    if (this.settingsBtn) this.settingsBtn.position.set(w - this.settingsBtn.width - 12, h - this.settingsBtn.height - 12);
-    if (this.authBar) this.authBar.position.set(w - this.authBar.width - 12, 12);
+    this.divider?.clear().rect(0, 0, colW, 1).fill({ color: 0xffffff, alpha: 0.25 });
+    this.divider?.position.set(colX, glyphTop + dividerTop);
+    this.settingsBtn?.position.set(colX, glyphTop + footerTop);
+    this.aboutBtn?.position.set(colX + (this.settingsBtn?.width ?? 0) + 20, glyphTop + footerTop);
+    if (this.hints) placeKeyHints(this.hints, w, h);
+    if (this.authBar) this.authBar.position.set(w - this.authBar.width - 16, 14);
     this.paintGradient();
-    this.placeBackgroundImage();
     this.scroll?.resize();
     this.scroll?.refresh();
-  }
-
-  private placeBackgroundImage(): void {
-    const sprite = this.bgImg;
-    if (!sprite || sprite.texture === Texture.EMPTY || !this.host) return;
-    const texture = sprite.texture;
-    sprite.width = texture.width;
-    sprite.height = texture.height;
-    const screen = this.host.app.screen;
-    sprite.position.set(screen.width / 2, screen.height + 100);
   }
 
   private move(dir: number): void {
@@ -439,18 +390,20 @@ export class StartScreen implements ScreenController {
     this.unsubscribeAuth = null;
     window.removeEventListener('keydown', this.onKeyDown);
     window.removeEventListener('resize', this.onResize);
+    this.stars?.destroy();
+    this.stars = null;
     this.scroll?.destroy();
     this.scroll = null;
     this.root?.destroy({ children: true });
     this.root = null;
     this.title = null;
-    this.hint = null;
+    this.hints = null;
+    this.divider = null;
     this.buttons = [];
     this.gated = [];
     this.aboutBtn = null;
     this.settingsBtn = null;
     this.authBar = null;
-    this.bgImg = null;
     this.bg = null;
     this.host = null;
   }

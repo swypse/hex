@@ -41,6 +41,8 @@ const fakeCanvasContext = () => ({
   createLinearGradient: () => ({ addColorStop: noop }),
   createRadialGradient: () => ({ addColorStop: noop }),
   createPattern: () => ({}),
+  fillRect: noop,
+  clearRect: noop,
   getImageData: () => ({ data: new Uint8ClampedArray(4), width: 1, height: 1 }),
   putImageData: noop,
   setTransform: noop,

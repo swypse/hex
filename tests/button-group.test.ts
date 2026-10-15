@@ -54,9 +54,7 @@ describe('ButtonGroup', () => {
     expect(fillOf(group.buttons[1]! as unknown as { bg: { context: { fillStyle: { color: number } } } })).toBe(
       THEME.buttonSelected,
     );
-    expect(fillOf(group.buttons[0]! as unknown as { bg: { context: { fillStyle: { color: number } } } })).toBe(
-      THEME.button,
-    );
+    expect(group.buttons[0]!.selected).toBe(false);
   });
 
   it('moves the highlight when the active button changes', () => {
@@ -66,8 +64,6 @@ describe('ButtonGroup', () => {
     expect(fillOf(group.buttons[2]! as unknown as { bg: { context: { fillStyle: { color: number } } } })).toBe(
       THEME.buttonSelected,
     );
-    expect(fillOf(group.buttons[0]! as unknown as { bg: { context: { fillStyle: { color: number } } } })).toBe(
-      THEME.button,
-    );
+    expect(group.buttons[0]!.selected).toBe(false);
   });
 });

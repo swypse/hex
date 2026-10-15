@@ -23,6 +23,7 @@ import { waterRouteEdges, portWaterClusterJumps } from '../game/economy/water-ro
 import { tileElevation } from './elevation';
 import { DamageBadgeLayer } from './damage-badge';
 import { FireEffects } from './fire';
+import { roadStripOutline } from './road-path';
 import { IMAGE_H, IMAGE_HEX_CENTER_Y, IMAGE_HEX_W, type TextureSet, type TileTexture } from './texture-factory';
 import { villageTextureFor, villageOwnerTribe } from './village-texture';
 import { acquireVillageBuildTexture, releaseVillageBuildTexture } from './village-build-texture';
@@ -83,6 +84,9 @@ const HP_BAR_ANCHOR_OFFSET = 40;
 export interface OverlayItem {
   el: Container;
   world: { x: number; y: number };
+  /** Scale the element with the map zoom (map-bound size) instead of keeping a
+   *  constant on-screen size. */
+  scaled?: boolean;
 }
 
 /** Permanent selected-hex border: black, 50% alpha, 6px, aligned outside. */
@@ -220,6 +224,7 @@ export class MapView {
       app,
       overlay: this.overlay,
       overlayItems: this.overlayItems,
+      getScale: () => this.container.scale.x,
       takeGraphics: () => this.pool.takeGraphics(),
     });
     this.edgeLayer = new EdgeMarkerLayer({
@@ -901,7 +906,7 @@ export class MapView {
     const edgeMidY = (seg: { ay: number; by: number }): number =>
       (seg.ay + seg.by) / 2 - tileElevation(tile, this.hexSize);
 
-    const orangeEdges: { x: number; y: number }[] = [];
+    const orangeEdges: { x: number; y: number; edge: number }[] = [];
     if (owner !== undefined && owner !== null && !isBridge && !isPort && explored) {
       for (let e = 0; e < 6; e++) {
         const n = this.tileIndex.get(axialKey(hexEdgeNeighbor(tile, e)));
@@ -911,17 +916,17 @@ export class MapView {
           (n?.building && n.building.kind === BuildingKind.PORT && n.ownedBy === owner);
         if (!connected) continue;
         const seg = hexEdge(tile, e, this.hexSize);
-        orangeEdges.push({ x: (seg.ax + seg.bx) / 2, y: edgeMidY(seg) });
+        orangeEdges.push({ x: (seg.ax + seg.bx) / 2, y: edgeMidY(seg), edge: e });
       }
     }
 
-    const waterEdges: { x: number; y: number }[] = [];
+    const waterEdges: { x: number; y: number; edge: number }[] = [];
     if (explored && this.waterRouteNeighbors.has(axialKey(tile))) {
       const route = this.waterRouteNeighbors.get(axialKey(tile))!;
       for (let e = 0; e < 6; e++) {
         if (!route.includes(axialKey(hexEdgeNeighbor(tile, e)))) continue;
         const seg = hexEdge(tile, e, this.hexSize);
-        waterEdges.push({ x: (seg.ax + seg.bx) / 2, y: edgeMidY(seg) });
+        waterEdges.push({ x: (seg.ax + seg.bx) / 2, y: edgeMidY(seg), edge: e });
       }
     }
 
@@ -946,23 +951,13 @@ export class MapView {
     // tinted to the road colour.
     const dots = this.ensureDotsTileTexture();
     const halfW = 2;
-    const drawStrip = (ex: number, ey: number, color: number): void => {
-      const dx = p.x - ex;
-      const dy = cy - ey;
-      const len = Math.hypot(dx, dy) || 1;
-      const nx = -dy / len;
-      const ny = dx / len;
-      const quad = [
-        p.x + nx * halfW, cy + ny * halfW,
-        p.x - nx * halfW, cy - ny * halfW,
-        ex - nx * halfW, ey - ny * halfW,
-        ex + nx * halfW, ey + ny * halfW,
-      ];
-      if (dots) g.poly(quad).fill({ texture: dots, color, textureSpace: 'global' });
-      else g.poly(quad).fill(color);
+    const drawStrip = (ex: number, ey: number, edge: number, color: number): void => {
+      const outline = roadStripOutline(ex, ey, p.x, cy, halfW, { q: tile.q, r: tile.r, edge });
+      if (dots) g.poly(outline).fill({ texture: dots, color, textureSpace: 'global' });
+      else g.poly(outline).fill(color);
     };
-    for (const e of orangeEdges) drawStrip(e.x, e.y, THEME.map.road);
-    for (const e of waterEdges) drawStrip(e.x, e.y, THEME.map.waterRoad);
+    for (const e of orangeEdges) drawStrip(e.x, e.y, e.edge, THEME.map.road);
+    for (const e of waterEdges) drawStrip(e.x, e.y, e.edge, THEME.map.waterRoad);
   }
 
   /** Sprite texture of a non-port building. */

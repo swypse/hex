@@ -1,7 +1,7 @@
-import { Container } from 'pixi.js';
-import { Button, type ButtonCorners } from './button';
+import { Container, Graphics } from 'pixi.js';
+import { Button } from './button';
 import { THEME } from '../../gfx/theme';
-import { FontSize } from '@enums';
+import { ButtonStyle, FontSize } from '@enums';
 
 interface ButtonGroupItem {
   label: string;
@@ -17,9 +17,12 @@ interface ButtonGroupOpts {
   widths?: number[];
 }
 
-/** A flush row of buttons acting as a single control: no gaps and no drop
- *  shadows, with the group's outer corners rounded only on the first and last
- *  buttons (inner corners are square). */
+const TRACK_COLOR = 0x14172a;
+const TRACK_ALPHA = 0.85;
+const TRACK_RADIUS = THEME.radius + 4;
+
+/** A segmented control: a dark rounded track with flush segments; the selected
+ *  segment is a raised accent pill. */
 export class ButtonGroup extends Container {
   readonly buttons: Button[] = [];
   /** Uniform row height of the buttons (measured unselected, so selection
@@ -30,38 +33,28 @@ export class ButtonGroup extends Container {
 
   constructor(opts: ButtonGroupOpts) {
     super();
-    const n = opts.items.length;
-    const r = THEME.radius;
+    const track = new Graphics();
+    this.addChild(track);
     let x = 0;
     let h = 0;
-    opts.items.forEach((item, i) => {
-      const first = i === 0;
-      const last = i === n - 1;
-      const corners: ButtonCorners =
-        n === 1
-          ? [r, r, r, r]
-          : first
-            ? [r, 0, 0, r]
-            : last
-              ? [0, r, r, 0]
-              : [0, 0, 0, 0];
+    for (const [i, item] of opts.items.entries()) {
       const b = new Button({
         label: item.label,
+        style: ButtonStyle.SEGMENT,
         fontSize: GROUP_FONT_SIZE,
         width: opts.widths?.[i],
-        shadow: false,
-        corners,
         onClick: item.onClick,
       });
       b.position.set(x, 0);
       this.addChild(b);
       this.buttons.push(b);
-      x += b.width;
-      h = Math.max(h, b.height);
-    });
+      x += b.boxWidth;
+      h = Math.max(h, b.boxHeight);
+    }
     this.groupW = x;
     this.groupH = h;
     this.buttonHeight = h;
+    track.roundRect(0, 0, x, h, TRACK_RADIUS).fill({ color: TRACK_COLOR, alpha: TRACK_ALPHA });
   }
 
   /** Total width of the flush row (buttons are positioned on the group origin). */

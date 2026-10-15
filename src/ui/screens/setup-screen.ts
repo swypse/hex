@@ -4,10 +4,12 @@ import { t } from '@/i18n';
 import { loadSettings } from '@/storage/settings';
 import { setBackInterceptor, useGameStore } from '@/store/game-store';
 import { mixColor } from '@/util';
-import { AiDifficulty, FontSize, GameMode, Screen, SetupStep, TextStyle } from '@enums';
+import { AiDifficulty, ButtonStyle, FontSize, GameMode, Screen, SetupStep, TextStyle } from '@enums';
 import { BitmapText, Container, FillGradient, Graphics, RendererType } from 'pixi.js';
 import { type ScreenController, type UIHost } from '../host';
 import { Button } from '../kit/button';
+import { KeyHints, placeKeyHints } from '../kit/key-hints';
+import { MenuStars } from '../../gfx/menu-stars';
 import { ButtonGroup } from '../kit/button-group';
 import { makeLabel } from '../../gfx/label';
 import { makeStyledLabel } from '../../gfx/text-styles';
@@ -95,7 +97,8 @@ export class SetupScreen implements ScreenController {
   private difficultyGroup: ButtonGroup | null = null;
   private startBtn: Button | null = null;
   private backBtn: Button | null = null;
-  private hint: BitmapText | null = null;
+  private hints: KeyHints | null = null;
+  private stars: MenuStars | null = null;
   private bg: Graphics | null = null;
   private bgShader: TribeBackgroundShader | null = null;
   private bgTweenRemove: (() => void) | null = null;
@@ -108,6 +111,8 @@ export class SetupScreen implements ScreenController {
     this.scroll = new ScreenScroll(host.app, this.root);
 
     this.paintBackground();
+    // Stars sit above the gradient (child 0) and below the scroll pad and content.
+    this.stars = new MenuStars(host.app, this.root, 1);
 
     this.tribeTitle = makeStyledLabel(t('common.chooseTribe'), TextStyle.H1);
     this.tribeTitle.anchor.set(0.5, 0.5);
@@ -189,14 +194,18 @@ export class SetupScreen implements ScreenController {
       paddingY: 14,
       onClick: () => this.start(),
     });
-    this.hint = makeLabel(t('setup.hint'), { fontSize: FontSize.SMALL, fill: 0xeeeeee });
-    this.hint.visible = !isTouchDevice();
-    this.hint.alpha = 0.7;
-    this.hint.anchor.set(0.5, 0.5);
+    this.hints = new KeyHints([
+      { key: '↑↓', label: t('common.keySelect') },
+      { key: '←→', label: t('common.keyChange') },
+      { key: 'Enter', label: t('common.keyConfirm') },
+      { key: 'Backspace', label: t('common.keyBack') },
+    ]);
+    this.hints.visible = !isTouchDevice();
+    this.root.addChild(this.hints);
 
     this.backBtn = new Button({
       label: t('common.back'),
-      width: 96,
+      style: ButtonStyle.TEXT,
       fontSize: FontSize.SMALL,
       onClick: () => this.back(),
     });
@@ -210,7 +219,6 @@ export class SetupScreen implements ScreenController {
       this.difficultyTitle,
       this.startBtn,
       this.backBtn,
-      this.hint,
       this.gamesLabel,
     );
     this.refresh();
@@ -500,6 +508,7 @@ export class SetupScreen implements ScreenController {
     if (!this.root || !this.host) return;
     if (this.step === SetupStep.TRIBE) this.layoutTribeStep();
     else this.layoutOptionsStep();
+    if (this.hints) placeKeyHints(this.hints, this.host.app.screen.width, this.host.app.screen.height);
     this.scroll?.resize();
     this.scroll?.refresh();
   }
@@ -526,9 +535,7 @@ export class SetupScreen implements ScreenController {
     const gridBottom = gridTop + (grid.rows - 1) * rowStep + optionDrop;
     const modeTitleY = gridBottom + GRID_MARGIN_Y + MODE_MARGIN_TOP + modeTitleHalf;
     const backTop = modeTitleY + TITLE_TO_CONTENT + modeH + BLOCK_GAP + 16;
-    const hintCentre = backTop + this.backBtn!.height + 16;
-    const hintH = this.hint?.height ?? 0;
-    const end = this.hint?.visible ? hintCentre + hintH / 2 : backTop + this.backBtn!.height;
+    const end = backTop + this.backBtn!.boxHeight;
     // Rel y 0 is the title centre; the column starts half a title above it.
     const top = this.columnTop(end + titleH / 2);
     const y = (rel: number): number => rel + titleH / 2 + top;
@@ -540,8 +547,7 @@ export class SetupScreen implements ScreenController {
       const s = grid.slots[i]!;
       item.el.position.set(cx + s.x, y(gridTop) + s.y);
     });
-    this.backBtn!.position.set(cx - this.backBtn!.width / 2, y(backTop));
-    if (this.hint) this.hint.position.set(cx, y(hintCentre));
+    this.backBtn!.position.set(cx - this.backBtn!.boxWidth / 2, y(backTop));
     if (this.tribeDesc) this.tribeDesc.visible = false;
   }
 
@@ -552,8 +558,7 @@ export class SetupScreen implements ScreenController {
     const labelH = this.hero?.labelHeight ?? 16;
     const buttonH = this.enemyGroup?.buttonHeight ?? 36;
     const startH = this.startBtn?.height ?? 0;
-    const backH = this.backBtn?.height ?? 0;
-    const hintH = this.hint?.height ?? 0;
+    const backH = this.backBtn?.boxHeight ?? 0;
 
     this.refreshTribeDesc(w);
 
@@ -568,8 +573,7 @@ export class SetupScreen implements ScreenController {
     const cy3 = cy2 + buttonDrop + BLOCK_GAP + titleHalf;
     const startTop = cy3 + buttonDrop + 30;
     const backTop = startTop + startH + 16;
-    const hintCentre = backTop + backH + 16;
-    const end = this.hint?.visible ? hintCentre + hintH / 2 : backTop + backH;
+    const end = backTop + backH;
     const top = this.columnTop(end);
     const y = (rel: number): number => rel + top;
 
@@ -587,8 +591,7 @@ export class SetupScreen implements ScreenController {
     place(this.enemiesTitle, this.enemyGroup, cy2);
     place(this.difficultyTitle, this.difficultyGroup, cy3);
     this.startBtn!.position.set(cx - this.startBtn!.width / 2, y(startTop));
-    this.backBtn!.position.set(cx - this.backBtn!.width / 2, y(backTop));
-    if (this.hint) this.hint.position.set(cx, y(hintCentre));
+    this.backBtn!.position.set(cx - this.backBtn!.boxWidth / 2, y(backTop));
   }
 
   destroy(): void {
@@ -601,6 +604,8 @@ export class SetupScreen implements ScreenController {
     this.bgTweenRemove = null;
     this.bgShader?.destroy();
     this.bgShader = null;
+    this.stars?.destroy();
+    this.stars = null;
     this.scroll?.destroy();
     this.scroll = null;
     this.root?.destroy({ children: true });
@@ -622,7 +627,7 @@ export class SetupScreen implements ScreenController {
     this.difficultyTitle = null;
     this.startBtn = null;
     this.backBtn = null;
-    this.hint = null;
+    this.hints = null;
     this.bg = null;
   }
 }

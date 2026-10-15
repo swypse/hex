@@ -36,6 +36,17 @@ const DEATH_PARTICLE_COUNT = 10;
 const DEATH_RISE = 200;
 const DEATH_MS = 3000;
 const DEATH_STAGGER_MS = 700;
+/** Damage number: text size grows with the damage (each step is a baked `FontSize`).
+ *  With an attacker it is thrown from the victim along the attack direction on an
+ *  arc while fading out; otherwise (starvation, weather, traps) it just floats up. */
+const DAMAGE_SIZE_STEPS = [
+  { from: 20, size: FontSize.BIG },
+  { from: 8, size: FontSize.NORMAL },
+  { from: 0, size: FontSize.SMALL },
+] as const;
+const DAMAGE_ARC_SPREAD = 38;
+const DAMAGE_ARC_HEIGHT = 30;
+const DAMAGE_MS = 1000;
 /** Above the overlay's unit mirrors (-1) and attack markers (-0.5), below hp bars (0). */
 const RAYS_OVERLAY_Z = -0.25;
 const RAYS_COUNT = 12;
@@ -74,13 +85,30 @@ export class EventEffects {
     const local = useGameStore.getState().localPlayerIndex;
     if (playerIndex !== local && !isExploredFor(tile, local)) return;
     // Let the -N damage number appear first.
-    setTimeout(() => this.floatUp(tile, [{ text: `+${amount}`, color: 0xffd700 }], true), SCORE_FLY_DELAY_MS);
+    setTimeout(() => this.floatUp(tile, [{ text: `+${amount}`, color: 0xffd700 }], { background: true }), SCORE_FLY_DELAY_MS);
   }
 
-  spawnHpText(tile: MapTile, text: string, color: number): void {
+  /** Floating hp text at `tile`; for damage, `from` is the attacker's tile the number is thrown away from. */
+  spawnHpText(tile: MapTile, text: string, color: number, from?: MapTile): void {
     const local = useGameStore.getState().localPlayerIndex;
     if (!isExploredFor(tile, local)) return;
+    const damage = /^-(\d+)$/.exec(text);
+    if (damage) {
+      const amount = Number(damage[1]);
+      const size = DAMAGE_SIZE_STEPS.find((step) => amount >= step.from)!.size;
+      this.floatUp(tile, [{ text, color }], { fontSize: size, throwDir: from ? this.throwDirection(from, tile) : null });
+      return;
+    }
     this.spawnFloatText(tile, text, color);
+  }
+
+  /** Unit screen vector from `from` to `to` (null when they coincide). */
+  private throwDirection(from: MapTile, to: MapTile): { x: number; y: number } | null {
+    const camera = this.host.camera();
+    const a = this.tileScreenPos(camera, from);
+    const b = this.tileScreenPos(camera, to);
+    const len = Math.hypot(b.x - a.x, b.y - a.y);
+    return len > 0 ? { x: (b.x - a.x) / len, y: (b.y - a.y) / len } : null;
   }
 
   spawnFloatText(tile: MapTile, text: string, color: number): void {
@@ -93,12 +121,17 @@ export class EventEffects {
       .filter(({ key }) => (income[key] ?? 0) > 0)
       .map(({ key, icon }) => ({ icon, text: String(income[key]), color: 0xffffff }));
     if (parts.length === 0) return;
-    if (delayMs > 0) setTimeout(() => this.floatUp(tile, parts, true), delayMs);
-    else this.floatUp(tile, parts, true);
+    if (delayMs > 0) setTimeout(() => this.floatUp(tile, parts, { background: true }), delayMs);
+    else this.floatUp(tile, parts, { background: true });
   }
 
-  /** Lifts a row of optional-icon + text parts up from `tile` and fades it out. */
-  private floatUp(tile: MapTile, parts: { text: string; color: number; icon?: string }[], withBackground = false): void {
+  /** Lifts a row of optional-icon + text parts up from `tile` and fades it out
+   *  (`throwDir`: flies off along that screen direction on an arc instead). */
+  private floatUp(
+    tile: MapTile,
+    parts: { text: string; color: number; icon?: string }[],
+    { background: withBackground = false, fontSize = FontSize.SMALL, throwDir = null }: { background?: boolean; fontSize?: FontSize; throwDir?: { x: number; y: number } | null } = {},
+  ): void {
     const app = this.host.app();
     const mapRoot = this.host.mapRoot();
     if (!app || !mapRoot) return;
@@ -119,7 +152,7 @@ export class EventEffects {
       const label = new BitmapText({
         text: part.text,
         // Plated badges (income, score) use the regular weight; plain hp numbers stay bold.
-        style: { fontFamily: sizedFontFamily(withBackground ? FONT_REGULAR : FONT_BLACK, FontSize.SMALL), fontSize: FontSize.SMALL, fill: part.color },
+        style: { fontFamily: sizedFontFamily(withBackground ? FONT_REGULAR : FONT_BLACK, fontSize), fontSize, fill: part.color },
       });
       label.anchor.set(0, 0.5);
       label.position.set(x, 0);
@@ -142,7 +175,7 @@ export class EventEffects {
     mapRoot.addChild(el);
 
     const FLOAT_RISE = 44;
-    const FLOAT_MS = 900;
+    const FLOAT_MS = throwDir ? DAMAGE_MS : 900;
     const tickStart = performance.now();
     const ticker = app.ticker;
     const fn = (): void => {
@@ -154,8 +187,16 @@ export class EventEffects {
       const t = Math.min(1, (performance.now() - tickStart) / FLOAT_MS);
       // Re-read the camera each frame so the number stays glued to its hex.
       const at = this.tileScreenPos(camera, tile);
-      el.position.set(at.x, at.y - FLOAT_RISE * t);
-      el.alpha = t < 0.5 ? 1 : 1 - (t - 0.5) / 0.5;
+      if (throwDir) {
+        // Thrown along the attack vector, lofted on an arc.
+        const dx = throwDir.x * DAMAGE_ARC_SPREAD * t;
+        const dy = throwDir.y * DAMAGE_ARC_SPREAD * t - DAMAGE_ARC_HEIGHT * 4 * t * (1 - t);
+        el.position.set(at.x + dx * camera.scale, at.y + dy * camera.scale);
+        el.alpha = t < 0.35 ? 1 : 1 - (t - 0.35) / 0.65;
+      } else {
+        el.position.set(at.x, at.y - FLOAT_RISE * t);
+        el.alpha = t < 0.5 ? 1 : 1 - (t - 0.5) / 0.5;
+      }
       if (t >= 1) {
         ticker.remove(fn);
         mapRoot.removeChild(el);
@@ -286,8 +327,8 @@ export class EventEffects {
     const world = hexToPixel(tile, HEX_SIZE);
     const el = new Container();
     el.zIndex = 12;
-    // World-anchored (follows pan/zoom); unit scale keeps the on-screen size at spawn.
-    el.scale.set(1 / this.host.camera().scale);
+    // Map-bound: parented to the camera-transformed container at unit scale, so
+    // the particles grow and shrink with the map zoom.
     const particles: { g: Graphics; x0: number; swing: number; phase: number; opacity: number; delay: number }[] = [];
     for (let i = 0; i < DEATH_PARTICLE_COUNT; i++) {
       const g = new Graphics();

@@ -248,18 +248,17 @@ describe('LobbyScreen host keyboard navigation', () => {
   });
 
   it('centers the human player and AI opponent buttons', () => {
-    const groups = uiNodes(screen).filter((c) => c instanceof ButtonGroup) as Container[];
-    const firstDigit = (g: Container): string =>
-      textsOf(g.children[0] as Container).find((t) => /^\d$/.test(t)) ?? '';
+    const groups = uiNodes(screen).filter((c) => c instanceof ButtonGroup) as ButtonGroup[];
+    const firstDigit = (g: ButtonGroup): string =>
+      textsOf(g.buttons[0]!).find((t) => /^\d$/.test(t)) ?? '';
     const humanGroup = groups.find((g) => firstDigit(g) === '2')!;
     const aiGroup = groups.find((g) => firstDigit(g) === '0')!;
     expect(humanGroup).toBeDefined();
     expect(aiGroup).toBeDefined();
-    expect(humanGroup.children.length).toBe(6);
-    expect(aiGroup.children.length).toBe(6);
-    const centered = (g: Container): boolean => {
-      const groupW = g.children.reduce((acc, b) => acc + (b as Container).width, 0);
-      return Math.abs(g.position.x + groupW / 2 - 640) < 0.5;
+    expect(humanGroup.buttons.length).toBe(6);
+    expect(aiGroup.buttons.length).toBe(6);
+    const centered = (g: ButtonGroup): boolean => {
+      return Math.abs(g.position.x + g.groupWidth / 2 - 640) < 0.5;
     };
     expect(centered(humanGroup)).toBe(true);
     expect(centered(aiGroup)).toBe(true);

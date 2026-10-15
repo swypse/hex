@@ -1,12 +1,38 @@
-import { Application, Container, Graphics } from 'pixi.js';
+import { Application, Container, FillGradient, Graphics } from 'pixi.js';
 import { hexToPixel } from '../game/map/hex';
 import { type GameMap } from '../game/map/map-gen';
 import { isExploredFor } from '../game/map/explore';
-import { captureMarkerPoints, CAPTURE_EDGE_MARKER_ALPHA, CAPTURE_EDGE_MARKER_SIZE, CAPTURE_EDGE_MARKER_SLIDE, CAPTURE_EDGE_PULSE_MS } from './capture-marker';
+import {
+  CAPTURE_EDGE_GLOW_ALPHA,
+  CAPTURE_EDGE_GLOW_DEPTH,
+  CAPTURE_EDGE_GLOW_MIN_ALPHA,
+  CAPTURE_EDGE_GLOW_PULSE_SCALE,
+  CAPTURE_EDGE_GLOW_RADIUS,
+  CAPTURE_EDGE_PULSE_MS,
+} from './capture-marker';
 import { type Viewport } from './tile-signature';
-import { THEME } from '../gfx/theme';
 import { CaptureMarkerSide } from '@enums';
 import { clamp } from '../util/math';
+
+let glowGradient: FillGradient | null = null;
+
+/** Radial red gradient shared by every glow: `CAPTURE_EDGE_GLOW_ALPHA` at the
+ *  centre, transparent at the rim. Local texture space, so it fits any circle. */
+function glowFill(): FillGradient {
+  glowGradient ??= new FillGradient({
+    type: 'radial',
+    center: { x: 0.5, y: 0.5 },
+    innerRadius: 0,
+    outerCenter: { x: 0.5, y: 0.5 },
+    outerRadius: 0.5,
+    colorStops: [
+      { offset: 0, color: `rgba(235, 31, 0, ${CAPTURE_EDGE_GLOW_ALPHA})` },
+      { offset: 1, color: 'rgba(235, 31, 0, 0)' },
+    ],
+    textureSpace: 'local',
+  });
+  return glowGradient;
+}
 
 export interface EdgeMarkerLayerDeps {
   app: Application;
@@ -16,7 +42,7 @@ export interface EdgeMarkerLayerDeps {
   isCameraBusy: () => boolean;
 }
 
-/** Arrows on the screen edges that point at off-screen villages ready to be captured. */
+/** Red glows centred on the screen edge, level with off-screen villages ready to be captured. */
 export class EdgeMarkerLayer {
   readonly container = new Container();
   private parts: { g: Graphics; side: CaptureMarkerSide; along: number; W: number; H: number }[] = [];
@@ -61,15 +87,13 @@ export class EdgeMarkerLayer {
       const dx = sx < 0 ? -sx : sx > W ? sx - W : 0;
       const dy = sy < 0 ? -sy : sy > H ? sy - H : 0;
       const side: CaptureMarkerSide = dx >= dy ? (sx < 0 ? CaptureMarkerSide.LEFT : CaptureMarkerSide.RIGHT) : sy < 0 ? CaptureMarkerSide.TOP : CaptureMarkerSide.BOTTOM;
-      // The marker sits exactly on the village's own screen coordinate along
-      // the chosen edge: its x for top/bottom edges and its y for left/right
-      // edges, so it points precisely at the off-screen village.
-      const halfLen = CAPTURE_EDGE_MARKER_SIZE / 2;
-      let along: number;
-      if (side === CaptureMarkerSide.LEFT || side === CaptureMarkerSide.RIGHT) along = clamp(sy, halfLen, H - halfLen);
-      else along = clamp(sx, halfLen, W - halfLen);
+      // The glow's centre sits exactly on the village's own screen coordinate
+      // along the chosen edge: its x for top/bottom edges and its y for
+      // left/right edges, so it points precisely at the off-screen village.
+      const along = side === CaptureMarkerSide.LEFT || side === CaptureMarkerSide.RIGHT ? clamp(sy, 0, H) : clamp(sx, 0, W);
       const g = new Graphics();
-      g.alpha = CAPTURE_EDGE_MARKER_ALPHA;
+      g.circle(0, 0, CAPTURE_EDGE_GLOW_RADIUS).fill(glowFill());
+      g.position.set(...edgePoint(side, along, W, H));
       this.container.addChild(g);
       parts.push({ g, side, along, W, H });
     }
@@ -78,27 +102,29 @@ export class EdgeMarkerLayer {
       this.stopPulse();
       return;
     }
-    // The slide animation is continuous: rebuilding the marker set must not
+    // The pulse animation is continuous: rebuilding the marker set must not
     // restart its phase clock, or the marker would visibly jump back on every
     // unrelated map update. Just (re)draw at the current phase instead.
     this.redraw();
     this.startPulse();
   }
 
-  private draw(slide: number): void {
-    const white = 0xffffff;
+  /** Breathes every glow: `k` runs 0..1 (a full in-out per pulse). */
+  private draw(k: number): void {
+    const scale = 1 + (CAPTURE_EDGE_GLOW_PULSE_SCALE - 1) * k;
+    const alpha = CAPTURE_EDGE_GLOW_MIN_ALPHA + (1 - CAPTURE_EDGE_GLOW_MIN_ALPHA) * (1 - k);
     for (const part of this.parts) {
-      part.g.clear();
-      const pts = captureMarkerPoints(part.side, part.along, slide, part.W, part.H, CAPTURE_EDGE_MARKER_SIZE);
-      part.g.poly(pts).fill(THEME.map.selected).stroke({ width: 2, color: white, alignment: 0 });
+      // Squashed to half along the axis facing into the screen: a half-width glow hugging the edge.
+      const horizontalEdge = part.side === CaptureMarkerSide.TOP || part.side === CaptureMarkerSide.BOTTOM;
+      part.g.scale.set(horizontalEdge ? scale : scale * CAPTURE_EDGE_GLOW_DEPTH, horizontalEdge ? scale * CAPTURE_EDGE_GLOW_DEPTH : scale);
+      part.g.alpha = alpha;
     }
   }
 
   /** Draw the markers at the animation phase in effect right now. */
   private redraw(): void {
     const t = ((performance.now() - (this.pulseStart ?? performance.now())) % CAPTURE_EDGE_PULSE_MS) / CAPTURE_EDGE_PULSE_MS;
-    const slide = CAPTURE_EDGE_MARKER_SLIDE * (0.5 - 0.5 * Math.cos(t * Math.PI * 2));
-    this.draw(slide);
+    this.draw(0.5 - 0.5 * Math.cos(t * Math.PI * 2));
   }
 
   private startPulse(): void {
@@ -114,8 +140,7 @@ export class EdgeMarkerLayer {
         return;
       }
       const t = ((performance.now() - this.pulseStart!) % CAPTURE_EDGE_PULSE_MS) / CAPTURE_EDGE_PULSE_MS;
-      const slide = CAPTURE_EDGE_MARKER_SLIDE * (0.5 - 0.5 * Math.cos(t * Math.PI * 2));
-      this.draw(slide);
+      this.draw(0.5 - 0.5 * Math.cos(t * Math.PI * 2));
     };
     ticker.add(fn);
     this.stopPulseFn = () => ticker.remove(fn);
@@ -127,5 +152,19 @@ export class EdgeMarkerLayer {
       this.stopPulseFn = null;
     }
     this.pulseStart = null;
+  }
+}
+
+/** Screen point on the given edge at `along` px from the top/left corner. */
+function edgePoint(side: CaptureMarkerSide, along: number, W: number, H: number): [number, number] {
+  switch (side) {
+    case CaptureMarkerSide.TOP:
+      return [along, 0];
+    case CaptureMarkerSide.BOTTOM:
+      return [along, H];
+    case CaptureMarkerSide.LEFT:
+      return [0, along];
+    case CaptureMarkerSide.RIGHT:
+      return [W, along];
   }
 }

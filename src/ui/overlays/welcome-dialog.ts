@@ -3,7 +3,7 @@ import { useGameStore } from '../../store/game-store';
 import { type UIHost } from '../host';
 import { t } from '../../i18n';
 import { Modal } from '../kit/modal';
-import { makeCheckbox } from '../kit/checkbox';
+import { makeSwitch } from '../kit/switch';
 import { setWelcomeDismissed } from '../../storage/settings';
 import { GameMode } from '@enums';
 
@@ -14,14 +14,14 @@ function welcomeLines(mode: GameMode): string[] {
   return [intro, objective, howTo];
 }
 
-/** A "don't show again" checkbox row that persists to the settings. */
+/** A "don't show again" switch row that persists to the settings. */
 function makeDontShowRow(): Container {
   const row = new Container();
-  const checkbox = makeCheckbox(false, (checked) => setWelcomeDismissed(checked), {
+  const toggle = makeSwitch(false, (checked) => setWelcomeDismissed(checked), {
     label: t('welcome.dontShow'),
   });
-  checkbox.el.position.set(0, 1);
-  row.addChild(checkbox.el);
+  toggle.el.position.set(0, 1);
+  row.addChild(toggle.el);
   return row;
 }
 
