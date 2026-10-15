@@ -16,11 +16,9 @@ const CARD_RADIUS = 10;
 const BACKDROP_COLOR = 0x000000;
 const BACKDROP_ALPHA = 0.6;
 const CARD_COLOR = 0x23273f;
-/** Soft shadow: stacked rounded rects growing by `SHADOW_SPREAD` each, dropped `SHADOW_OFFSET_Y`. */
-const SHADOW_OFFSET_Y = 6;
-const SHADOW_LAYERS = 4;
-const SHADOW_SPREAD = 3;
-const SHADOW_LAYER_ALPHA = 0.1;
+/** Flat shadow: one unblurred card-sized rect shifted by `SHADOW_OFFSET` on x and y. */
+const SHADOW_OFFSET = 6;
+const SHADOW_ALPHA = 0.35;
 const CARD_BORDER_ALPHA = 0.12;
 const DIVIDER_ALPHA = 0.12;
 const ANIM_MS = 140;
@@ -329,15 +327,12 @@ export class Popup {
       this.bg.rect(PAD_H, dividerY, this.cardWidth - PAD_H * 2, 1).fill({ color: 0xffffff, alpha: DIVIDER_ALPHA });
     }
     this.shadow.clear();
-    for (let i = SHADOW_LAYERS; i >= 1; i--) {
-      const e = i * SHADOW_SPREAD;
-      this.shadow
-        .roundRect(-e, -e, this.cardWidth + e * 2, this.cardHeight + e * 2, CARD_RADIUS + e)
-        .fill({ color: 0x000000, alpha: SHADOW_LAYER_ALPHA });
-    }
+    this.shadow
+      .roundRect(0, 0, this.cardWidth, this.cardHeight, CARD_RADIUS)
+      .fill({ color: 0x000000, alpha: SHADOW_ALPHA });
     const cardTop = this.positionTop ? this.topY : (this.app.screen.height - this.cardHeight) / 2;
-    const shadowX = this.app.screen.width / 2 - this.cardWidth / 2;
-    const shadowY = cardTop + SHADOW_OFFSET_Y;
+    const shadowX = this.app.screen.width / 2 - this.cardWidth / 2 + SHADOW_OFFSET;
+    const shadowY = cardTop + SHADOW_OFFSET;
     this.shadow.position.set(shadowX, shadowY);
     this.card.pivot.set(this.cardWidth / 2, this.cardHeight / 2);
     this.card.position.set(this.app.screen.width / 2, cardTop + this.cardHeight / 2);
