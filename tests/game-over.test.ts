@@ -186,7 +186,7 @@ describe('GameOver screen', () => {
   });
 
   it('hides the quick-capture row when the win is too slow', () => {
-    const r = mount({ turn: 27 });
+    const r = mount({ turn: 51 });
     expect(allTexts(r).some((t) => t === 'Quick capture')).toBe(false);
   });
 
@@ -197,12 +197,12 @@ describe('GameOver screen', () => {
   });
 
   it('fills stars for higher ratings', () => {
-    // 3 players, 3★ needs >= 1100 total and turn <= 25; 2★ needs >= 850.
+    // 3 players, 3★ needs >= 1100 total and turn <= 50; 2★ needs >= 850.
     expect(collectStarLabels(mount({ score: 3000, turn: 10 }))).toEqual([
       'action-star', 'action-star', 'action-star',
     ]);
     // High score but past the quick-capture budget keeps the 3rd star empty.
-    expect(collectStarLabels(mount({ score: 3000, turn: 27 }))).toEqual([
+    expect(collectStarLabels(mount({ score: 3000, turn: 51 }))).toEqual([
       'action-star', 'action-star', 'action-star-empty',
     ]);
   });

@@ -10,7 +10,7 @@ import { shadeColor } from '../util/color';
 import { tileElevation } from './elevation';
 import { ensureCanvasResource } from '../gfx/image-texture';
 import { countIceTiles } from '../game/map/ice';
-import { ensureTerrainAtlas, terrainFrameTexture, terrainTileTexture, TERRAIN_TILE_FILES, TERRAIN_FOG_FILE } from './terrain-atlas';
+import { ensureTerrainAtlas, terrainFrameTexture, terrainTileTexture, TERRAIN_TILE_FILES, TERRAIN_FOG_FILE, TERRAIN_CRACKED_ICE_FILE } from './terrain-atlas';
 import { buildingTileTexture, ensureBuildingsAtlas } from './buildings-atlas';
 import { ensureTribeAtlas, tribeTileTexture } from './tribe-atlas';
 import { ensureActionButtonAtlas, actionButtonFrameTexture } from '../gfx/action-button-icons';
@@ -98,6 +98,8 @@ export interface TextureSet {
   season?: Season;
   /** Number of ice tiles on the map when baked (0 when absent). */
   iceTiles?: number;
+  /** Whether the ice was baked cracked (false when absent). */
+  crackedIce?: boolean;
   /** Render textures baked for this set; freed by destroyTextureSet. */
   ownedTextures?: Texture[];
   tileTextures: Map<string, TileTexture>;
@@ -279,12 +281,16 @@ function loadImageTexture(url: string): Promise<Texture | null> {
   });
 }
 
-async function loadTileImages(season: Season): Promise<Map<string, Texture>> {
+async function loadTileImages(season: Season, crackedIce: boolean): Promise<Map<string, Texture>> {
   await ensureTerrainAtlas();
   const map = new Map<string, Texture>();
   for (const [key, frameKey] of Object.entries(TERRAIN_TILE_FILES)) {
     const tex = terrainTileTexture(frameKey, season);
     if (tex) map.set(key, tex);
+  }
+  if (crackedIce) {
+    const cracked = terrainFrameTexture(TERRAIN_CRACKED_ICE_FILE);
+    if (cracked) map.set(String(TileType.Ice), cracked);
   }
   const fog = terrainFrameTexture(TERRAIN_FOG_FILE);
   if (fog) map.set('fog', fog);
@@ -423,6 +429,8 @@ export async function createTextures(
   activeTribes: ReadonlySet<Tribe> = new Set(TRIBES.map((t) => t.id)),
   /** Season whose terrain tile variants are baked. */
   season: Season = Season.SPRING,
+  /** Draw ice cracked (last winter turn, it melts next). */
+  crackedIce = false,
 ): Promise<TextureSet> {
   // Every texture baked with generateTexture lives on the GPU until destroyed;
   // collect them so destroyTextureSet can free them when the set is replaced.
@@ -448,7 +456,7 @@ export async function createTextures(
     await yieldToMain();
     sliceEnd = performance.now() + SLICE_BUDGET_MS;
   };
-  const images = await loadTileImages(season);
+  const images = await loadTileImages(season, crackedIce);
   await ensureBuildingsAtlas();
   const tileTextures = new Map<string, TileTexture>();
   const fogTextures = new Map<string, TileTexture>();
@@ -627,6 +635,7 @@ export async function createTextures(
   return {
     season,
     iceTiles,
+    crackedIce,
     ownedTextures: owned,
     tileTextures,
     fogTextures,

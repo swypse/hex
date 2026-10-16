@@ -28,6 +28,8 @@ export interface FireTurnReport extends WeatherEffectReport {
   ignited: Axial[];
   /** Tiles whose fire ended on its own (forest turned to land, building or bridge lost). */
   burnedOut: Axial[];
+  /** Forests that burned down to plain land this round (a subset of burnedOut). */
+  cleared: Axial[];
 }
 
 /** Buildings lightning and fire can burn (temples are spared). */
@@ -74,7 +76,7 @@ export function applyLightning(map: GameMap, strike: WeatherEvent, rng: () => nu
  *  forest ages and is lost after its burn time; then each forest next to a tile
  *  that was burning catches fire with `spreadChance`. */
 export function applyFireTurn(map: GameMap, rng: () => number): FireTurnReport {
-  const report: FireTurnReport = { units: [], buildings: [], ignited: [], burnedOut: [] };
+  const report: FireTurnReport = { units: [], buildings: [], ignited: [], burnedOut: [], cleared: [] };
   const burning = map.tiles.filter((t) => t.fire);
   if (burning.length === 0) return report;
   const byKey = tileMapByKey(map);
@@ -96,6 +98,7 @@ export function applyFireTurn(map: GameMap, rng: () => number): FireTurnReport {
     } else if (forest) {
       if (tile.fire!.age >= FIRE_RULES.forestBurnTurns) {
         tile.terrain = forestToLand(tile.terrain);
+        report.cleared.push({ q: tile.q, r: tile.r });
         out = true;
       }
     } else {

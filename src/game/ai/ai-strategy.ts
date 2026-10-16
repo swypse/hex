@@ -10,6 +10,8 @@ import { hexDistance } from '../map/hex';
 import { type GameMap } from '../map/map-gen';
 import { type Player } from '../players';
 import { hasSkill } from '../skills';
+import { walkDistance, walkDistances } from './ai-walk';
+import { attackDamage } from '../units/combat';
 
 export function goalTargetKey(g: AiGoalState): string {
   return g.target ? `${g.target.q},${g.target.r}` : '';
@@ -48,25 +50,55 @@ function enemyVillageVisible(map: GameMap, player: Player): boolean {
   return false;
 }
 
-function chooseArmyTarget(map: GameMap, player: Player): { q: number; r: number } | null {
-  let best: { q: number; r: number } | null = null;
-  let bestDist = Infinity;
+/** Hexes around a village in which visible enemy units count as its garrison. */
+const TARGET_GARRISON_RADIUS = 2;
+/** Score penalty per point of attack force defending a candidate target. */
+const TARGET_GARRISON_WEIGHT = 0.15;
+/** Score bonus per village level (higher level pays more). */
+const TARGET_LEVEL_BONUS = 2;
+/** Score bonus for a free (unowned) village: no garrison, no retaliation. */
+const TARGET_FREE_BONUS = 4;
+
+/** Attack force of the visible enemy units standing near `target`. */
+function garrisonPower(map: GameMap, player: Player, target: { q: number; r: number }): number {
+  let total = 0;
   for (const t of map.tiles) {
-    if (!t.settlement) continue;
-    if (t.settlement.owner === player.index) continue;
+    if (!t.unit || t.unit.owner === player.index || t.unit.owner < 0) continue;
+    if (t.unit.isStealthed === true || !isExploredFor(t, player.index)) continue;
+    if (hexDistance(t, target) <= TARGET_GARRISON_RADIUS) total += attackDamage(t.unit);
+  }
+  return total;
+}
+
+/** The next village to go for: reachable on foot from the player's units and
+ *  villages, cheap to walk to, weakly held and valuable (free villages and high
+ *  levels preferred). Returns null when nothing explored is reachable. */
+export function chooseArmyTarget(map: GameMap, player: Player): { q: number; r: number } | null {
+  const sources = map.tiles.filter((t) => (t.unit?.owner === player.index) || (t.settlement?.owner === player.index));
+  if (sources.length === 0) return null;
+  const field = walkDistances(map, player, sources);
+  let best: { q: number; r: number } | null = null;
+  let bestScore = -Infinity;
+  for (const t of map.tiles) {
+    if (!t.settlement || t.settlement.owner === player.index) continue;
     if (t.settlement.owner === null && !isExploredFor(t, player.index)) continue;
-    let d = Infinity;
-    for (const u of map.tiles) {
-      if (!u.unit || u.unit.owner !== player.index) continue;
-      const dist = hexDistance(u, t);
-      if (dist < d) d = dist;
-    }
-    if (d < bestDist) {
-      bestDist = d;
+    const dist = walkDistance(field, t);
+    if (dist === Infinity) continue;
+    const score = -dist - garrisonPower(map, player, t) * TARGET_GARRISON_WEIGHT + t.settlement.level * TARGET_LEVEL_BONUS + (t.settlement.owner === null ? TARGET_FREE_BONUS : 0);
+    if (score > bestScore) {
+      bestScore = score;
       best = { q: t.q, r: t.r };
     }
   }
   return best;
+}
+
+/** True when no own unit or village can walk to `target` any more. */
+function targetUnreachable(map: GameMap, player: Player, target: { q: number; r: number }): boolean {
+  const sources = map.tiles.filter((t) => (t.unit?.owner === player.index) || (t.settlement?.owner === player.index));
+  if (sources.length === 0) return false;
+  const field = walkDistances(map, player, [target]);
+  return !sources.some((t) => walkDistance(field, t) < Infinity);
 }
 
 function goalExpired(map: GameMap, player: Player, situation: AiSituation, g: AiGoalState): boolean {
@@ -79,11 +111,15 @@ function goalExpired(map: GameMap, player: Player, situation: AiSituation, g: Ai
       if (!g.target) return false;
       const tile = map.tiles.find((t) => t.q === g.target!.q && t.r === g.target!.r && t.settlement);
       if (!tile || !tile.settlement) return true;
-      return tile.settlement.owner === player.index;
+      if (tile.settlement.owner === player.index) return true;
+      return targetUnreachable(map, player, g.target);
     default:
       return false;
   }
 }
+
+/** Score a running primary plan (economy / army) gets over the alternative before it is replaced. */
+const PLAN_HYSTERESIS = 30;
 
 function weightedPrimaryScore(
   map: GameMap,
@@ -93,6 +129,7 @@ function weightedPrimaryScore(
   difficulty: AiDifficultyProfile,
   rng: SeededRandom,
   weights: { economy: number; army: number; score: number },
+  currentPrimary: AiGoalId | null,
 ): AiGoalId {
   const production = productionBuildings(map, player);
   let economyScore = (70 - production * 20 + situation.freeVillages.length * 5) * weights.economy + rng.next() * 20;
@@ -105,6 +142,9 @@ function weightedPrimaryScore(
     armyScore += 20 * weights.score;
   }
   if (production >= difficulty.strategy.economyCap) economyScore -= 40;
+  // Commitment: the running plan keeps a head start, so noise cannot flip it back and forth.
+  if (currentPrimary === AiGoalId.ECONOMY) economyScore += PLAN_HYSTERESIS;
+  if (currentPrimary === AiGoalId.ARMY) armyScore += PLAN_HYSTERESIS;
   if (economyScore >= armyScore) return AiGoalId.ECONOMY;
   return AiGoalId.ARMY;
 }
@@ -138,11 +178,16 @@ export function updateStrategy(
   }
 
   const current = next.find((g) => g.id === AiGoalId.ECONOMY || g.id === AiGoalId.ARMY);
+  // An army plan that had no target yet picks one as soon as a village is known.
+  if (current?.id === AiGoalId.ARMY && !current.target) {
+    current.target = chooseArmyTarget(map, player);
+    if (current.target) current.phase = 'choose';
+  }
   const picked = weightedPrimaryScore(map, player, situation, mode, difficulty, rng, {
     economy: personality.goalWeights.economy,
     army: personality.goalWeights.army,
     score: personality.goalWeights.score,
-  });
+  }, current?.id ?? null);
   if (mode === GameMode.TURNS30 && situation.ownPower < situation.enemyPower * 0.8) {
     next = next.filter((g) => g.id !== AiGoalId.ECONOMY && g.id !== AiGoalId.ARMY);
     if (!hasGoalTyped(next, AiGoalId.ARMY)) next.push(makeGoal(AiGoalId.ARMY, 'choose', null));
@@ -266,6 +311,8 @@ export function deriveDirectives(
       }
     }
   }
+  // The play style shifts how much is kept back while a plan runs.
+  if (strategy.goals.length > 0) d.moneyReserve = Math.max(0, d.moneyReserve + personality.reserveDelta);
   if (situation.endangered) d.moneyReserve = 0;
   return d;
 }

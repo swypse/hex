@@ -16,9 +16,10 @@ import { type AiSituation } from './ai-situation';
 import { isShip, shipAttackDistance, shipMovePoints } from '../units/ship';
 import { TRIBE_SPECIAL_UNIT } from '../tribes';
 import { flagsFor } from './ai-flags';
+import { personalityFor } from './ai-personality';
 import { berserkerRage } from '../units/abilities';
 import { counterScore, effectiveCost } from '../balance/balance';
-import { AiStance, GarrisonGuardKind, SkillId, SpawnPreference, UnitType } from '@enums';
+import { AiActionType, AiStance, GarrisonGuardKind, SkillId, SpawnPreference, UnitType } from '@enums';
 import { tileAt } from '../map/tile-index';
 
 export interface AiPatternContext {
@@ -60,6 +61,11 @@ export const STUN_MIN_DAMAGE = 15;
 function enemyReach(unit: Unit): { move: number; attack: number } {
   if (isShip(unit)) return { move: shipMovePoints(unit) / 10, attack: shipAttackDistance(unit) };
   return { move: movePoints(unit) / 10, attack: UNIT_ATTACK_DISTANCE[unit.type] };
+}
+
+function enemyReachSum(unit: Unit): number {
+  const r = enemyReach(unit);
+  return r.move + r.attack;
 }
 
 /** Turns of enemy movement the garrison logic looks ahead. Taking a village
@@ -232,6 +238,14 @@ const SPAWN_ORDER: Record<SpawnPreference, UnitType[]> = {
   naval: [UnitType.CATAPULT, UnitType.ARCHER, UnitType.SHIELD, UnitType.WARRIOR, UnitType.RIDER, UnitType.SWORDSMAN, UnitType.KNIGHT, UnitType.STALKER, UnitType.BUILDER, UnitType.BANNER, UnitType.BERSERKER, UnitType.TRAPPER, UnitType.STORMCALLER, UnitType.STUNNER],
 };
 
+/** Spawn priority for `prefer`: for offense the player's play style puts its favourite types first. */
+function spawnOrder(player: Player, prefer: SpawnPreference): UnitType[] {
+  const base = SPAWN_ORDER[prefer];
+  if (prefer !== SpawnPreference.OFFENSE) return base;
+  const first = personalityFor(player).offenseTypes;
+  return first.length === 0 ? base : [...first, ...base.filter((type) => !first.includes(type))];
+}
+
 /** Land units that can walk onto an emptied enemy village after the ranged
  *  units shot its garrison down (a capture needs a unit standing on the tile). */
 const FINISHER_TYPES = new Set<UnitType>([UnitType.KNIGHT, UnitType.RIDER, UnitType.SWORDSMAN, UnitType.WARRIOR, UnitType.SHIELD, UnitType.BERSERKER]);
@@ -275,8 +289,15 @@ function visibleEnemyComposition(map: GameMap, playerIndex: number): Map<UnitTyp
  *  shield) are made on purpose against them. */
 export function spawnWouldBeKilled(map: GameMap, village: MapTile, playerIndex: number, type: UnitType): boolean {
   const ghost = makeUnit(playerIndex, type, village.q, village.r);
-  const ghostTile: MapTile = { ...village, unit: ghost };
-  const hp = unitMaxHp(ghost);
+  return incomingDamage(map, village, playerIndex, ghost, true) >= unitMaxHp(ghost);
+}
+
+/** Summed damage the visible enemy land units that can reach `village` would
+ *  deal to `unit` standing there (village defense bonus included; order,
+ *  misses and counters ignored). With `stopAtDeath` the sum ends as soon as it
+ *  reaches the unit's hp. */
+function incomingDamage(map: GameMap, village: MapTile, playerIndex: number, unit: Unit, stopAtDeath = false): number {
+  const tile: MapTile = { ...village, unit };
   let damage = 0;
   for (const t of map.tiles) {
     const enemy = t.unit;
@@ -284,10 +305,45 @@ export function spawnWouldBeKilled(map: GameMap, village: MapTile, playerIndex: 
     if (enemy.isStealthed === true || !isExploredFor(t, playerIndex)) continue;
     const reach = enemyReach(enemy);
     if (hexDistance(village, t) > reach.move + reach.attack) continue;
-    damage += resolveCombat(map, enemy, ghostTile).attackerDamage;
-    if (damage >= hp) return true;
+    damage += resolveCombat(map, enemy, tile).attackerDamage;
+    if (stopAtDeath && damage >= unit.hp) break;
   }
-  return false;
+  return damage;
+}
+
+/** Hp `unit` would have left standing on `village` after the enemy's next
+ *  turn (<= 0: it dies). A real unit counts at its current hp, so a 1-hp unit
+ *  never "holds" a village an enemy can reach. */
+export function holdMargin(map: GameMap, village: MapTile, playerIndex: number, unit: Unit): number {
+  return unit.hp - incomingDamage(map, village, playerIndex, unit);
+}
+
+/** Whether `unit` would survive the enemy's next turn on its own `village`. */
+export function unitHoldsVillage(map: GameMap, village: MapTile, playerIndex: number, unit: Unit): boolean {
+  return holdMargin(map, village, playerIndex, unit) > 0;
+}
+
+/** Weight of the retaliation a defender deals relative to the hp it keeps. */
+const DEFENDER_COUNTER_WEIGHT = 0.5;
+
+/** Defense-spawn score of `type` on `village`: hp left after the enemy's turn
+ *  plus the counter damage it would deal to the enemies that can reach it. */
+function defenderScore(map: GameMap, village: MapTile, playerIndex: number, type: UnitType): number {
+  const ghost = makeUnit(playerIndex, type, village.q, village.r);
+  const tile: MapTile = { ...village, unit: ghost };
+  let damage = 0;
+  let counter = 0;
+  for (const t of map.tiles) {
+    const enemy = t.unit;
+    if (!enemy || enemy.owner === playerIndex || enemy.owner < 0 || isShip(enemy)) continue;
+    if (enemy.isStealthed === true || !isExploredFor(t, playerIndex)) continue;
+    const reach = enemyReach(enemy);
+    if (hexDistance(village, t) > reach.move + reach.attack) continue;
+    const res = resolveCombat(map, enemy, tile);
+    damage += res.attackerDamage;
+    counter += res.counterDamage;
+  }
+  return unitMaxHp(ghost) - damage + counter * DEFENDER_COUNTER_WEIGHT;
 }
 
 /** Best affordable, unlocked unit type for `prefer`. Behind `AiFlags.composition`
@@ -305,7 +361,7 @@ export function bestSpawnableUnitType(
   allowed?: (type: UnitType) => boolean,
 ): UnitType | null {
   const candidates: UnitType[] = [];
-  for (const type of SPAWN_ORDER[prefer]) {
+  for (const type of spawnOrder(player, prefer)) {
     if (allowed && !allowed(type)) continue;
     if (TRIBE_SPECIAL_UNIT[player.tribe] !== type && Object.values(TRIBE_SPECIAL_UNIT).includes(type)) continue;
     if (type === UnitType.RIDER && !hasSkill(player, SkillId.RIDING)) continue;
@@ -321,6 +377,26 @@ export function bestSpawnableUnitType(
     if (affordable) candidates.push(type);
   }
   if (candidates.length === 0) return null;
+  // A village an enemy can reach is held by the unit that survives and hits back
+  // best, not by a fixed type order (an archer next to a knight just dies).
+  if (map && village && prefer === SpawnPreference.DEFENSE) {
+    const threatened = map.tiles.some((t) => t.unit && t.unit.owner !== player.index && t.unit.owner >= 0 && !isShip(t.unit) && t.unit.isStealthed !== true && isExploredFor(t, player.index) && hexDistance(village, t) <= enemyReachSum(t.unit));
+    if (threatened) {
+      let bestType = candidates[0]!;
+      let bestScore = -Infinity;
+      for (const type of candidates) {
+        const score = defenderScore(map, village, player.index, type);
+        if (score > bestScore) {
+          bestScore = score;
+          bestType = type;
+        }
+      }
+      return bestType;
+    }
+  }
+  if (map && (prefer === SpawnPreference.OFFENSE || prefer === SpawnPreference.DEFENSE) && candidates.includes(UnitType.KNIGHT) && knightsWanted(map, player)) {
+    return UnitType.KNIGHT;
+  }
   if (map && prefer === SpawnPreference.OFFENSE && flagsFor(player).finishers && armyNeedsFinisher(map, player)) {
     const finisher = candidates.find((type) => FINISHER_TYPES.has(type));
     if (finisher) return finisher;
@@ -488,3 +564,58 @@ export function attackersForTile(
     .sort((a, b) => Number(a.unit.attackDistance <= 1) - Number(b.unit.attackDistance <= 1));
 }
 
+
+/** Attack steps for a gang-up on `target`: each attacker moves into range if
+ *  needed and strikes. A garrison joining from its own village without moving
+ *  may take a lethal counter: it holds, or a spawn covers the village. */
+export function gangAttackActions(
+  map: GameMap,
+  player: Player,
+  target: MapTile,
+  attackers: { unit: Unit; moveTo: MapTile | null }[],
+  state: AiPlannerState,
+): AiAction[] {
+  const actions: AiAction[] = [];
+  for (const a of attackers) {
+    const garrisonGuard = a.moveTo ? null : guardGarrisonAttack(map, player, a.unit, target, state);
+    if (garrisonGuard?.kind === GarrisonGuardKind.HOLD) continue;
+    if (a.moveTo) actions.push({ type: AiActionType.MOVE, unitId: a.unit.id, q: a.moveTo.q, r: a.moveTo.r });
+    actions.push({ type: AiActionType.ATTACK, unitId: a.unit.id, q: target.q, r: target.r });
+    if (garrisonGuard?.guardType) {
+      const home = map.tiles.find((x) => x.unit === a.unit);
+      if (home) actions.push({ type: AiActionType.SPAWN, q: home.q, r: home.r, unitType: garrisonGuard.guardType });
+    }
+  }
+  return actions;
+}
+
+/** Score bonus for the enemy village the AI hit recently, so attacks and hunts
+ *  keep converging on it instead of wandering to other targets. */
+export const HIT_VILLAGE_BONUS = 80;
+/** Turns after which a hit village is forgotten. */
+const HIT_VILLAGE_MEMORY = 3;
+
+export function isHitVillage(player: Player, tile: { q: number; r: number }, turn: number): boolean {
+  const h = player.hitVillage;
+  return flagsFor(player).attackPlan && !!h && h.q === tile.q && h.r === tile.r && turn - h.turn <= HIT_VILLAGE_MEMORY;
+}
+
+/** Enemy land catapults in sight: a knight kills one per hit and chains to the next. */
+export function visibleEnemyCatapults(map: GameMap, playerIndex: number): number {
+  let n = 0;
+  for (const t of map.tiles) {
+    const u = t.unit;
+    if (!u || u.owner === playerIndex || u.owner < 0 || u.type !== UnitType.CATAPULT || u.shipLevel !== undefined) continue;
+    if (u.isStealthed !== true && isExploredFor(t, playerIndex)) n += 1;
+  }
+  return n;
+}
+
+/** Knights are raised against visible enemy catapults, up to two per catapult. */
+export function knightsWanted(map: GameMap, player: Player): boolean {
+  const catapults = visibleEnemyCatapults(map, player.index);
+  if (catapults === 0) return false;
+  let knights = 0;
+  for (const t of map.tiles) if (t.unit?.owner === player.index && t.unit.type === UnitType.KNIGHT) knights += 1;
+  return knights < Math.max(2, catapults * 2);
+}

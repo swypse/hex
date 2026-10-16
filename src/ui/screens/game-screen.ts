@@ -14,6 +14,7 @@ import { HudTurn } from '../hud/hud-turn';
 import { HudResourcePanel } from '../hud/hud-resource-panel';
 import { HudSelected } from '../hud/hud-selected';
 import { HudAchievements } from '../hud/hud-achievements';
+import { HudContextMenu } from '../hud/hud-context-menu';
 import { HudToolbar } from '../hud/hud-toolbar';
 import { HudWatchExit } from '../hud/hud-watch-exit';
 import { HudPerf } from '../hud/hud-perf';
@@ -26,6 +27,14 @@ function scoreHud(): HudScore {
   hud.onTap = () => useGameStore.getState().setOverlay({ kind: OverlayKind.STATS });
   return hud;
 }
+
+/** Screen direction each arrow key selects toward. */
+const ARROW_DIRECTIONS: Record<string, { dx: number; dy: number }> = {
+  ArrowLeft: { dx: -1, dy: 0 },
+  ArrowRight: { dx: 1, dy: 0 },
+  ArrowUp: { dx: 0, dy: -1 },
+  ArrowDown: { dx: 0, dy: 1 },
+};
 
 export class GameScreen implements ScreenController {
   private root: Container | null = null;
@@ -40,8 +49,36 @@ export class GameScreen implements ScreenController {
   private unsub: (() => void) | null = null;
   private cheatBuffer = '';
 
+  /** Hotkeys: Enter ends the turn, Shift+S / Shift+A open skills / achievements,
+   *  arrows select the nearest own unit that way. Returns true when handled. */
+  private handleHotkey(e: KeyboardEvent): boolean {
+    const target = e.target as HTMLElement | null;
+    if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) return false;
+    const store = useGameStore.getState();
+    if (store.overlay !== null || store.texturesLoading) return false;
+    const arrow = ARROW_DIRECTIONS[e.key];
+    if (arrow && !e.shiftKey) {
+      gameController.selectUnitInDirection(arrow.dx, arrow.dy);
+      return true;
+    }
+    if (e.key === 'Enter' && !e.shiftKey && !e.repeat) {
+      gameController.endTurn();
+      return true;
+    }
+    if (e.shiftKey && !e.repeat && (e.code === 'KeyS' || e.code === 'KeyA')) {
+      store.setOverlay({ kind: e.code === 'KeyS' ? OverlayKind.SKILL : OverlayKind.ACHIEVEMENTS });
+      return true;
+    }
+    return false;
+  }
+
   private onKeyDown = (e: KeyboardEvent): void => {
     if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (this.handleHotkey(e)) {
+      e.preventDefault();
+      return;
+    }
+    if (e.shiftKey) return;
     if (e.key.length !== 1) return;
     if (!/[a-z]/i.test(e.key)) return;
     this.cheatBuffer = advanceCheatBuffer(this.cheatBuffer, e.key);
@@ -99,6 +136,7 @@ export class GameScreen implements ScreenController {
       new HudSelected(),
       new HudAchievements(),
       new HudToolbar(),
+      new HudContextMenu(),
       new HudPerf(),
     ];
     for (const w of gameWidgets) w.mount(host, content);

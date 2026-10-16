@@ -37,6 +37,7 @@ import { TOOLBAR_HEIGHT, TURN_BAR_HEIGHT } from './layout';
 import { BuffId, BuildingKind, FontSize, OverlayKind, SkillId, TutorialStepId, UnitType } from '@enums';
 import { earthquakeProtected, stormProtected, weatherEffectsAt, WEATHER_RULES } from '../../game/weather/weather';
 import { tileAt } from '../../game/map/tile-index';
+import { suggestedSkillActions } from './suggested-skills';
 
 /** Overlay kinds that open a help dialog from a row of the selection panel. */
 type HelpKind =
@@ -359,7 +360,7 @@ export class HudSelected implements Widget {
       bolds.push(false);
     }
 
-    const actions = this.suggestedSkillActions(tile, human);
+    const actions = suggestedSkillActions(tile, human);
 
     // Nothing to show (no unit, village, building, note or helper action): hide
     // the panel entirely, collapsed icon included.
@@ -633,72 +634,6 @@ export class HudSelected implements Widget {
       this.update();
     });
     this.el.addChild(holder);
-  }
-
-  private suggestedSkillActions(tile: MapTile, human: Player): { id: SkillId; label: string }[] {
-    const actions: { id: SkillId; label: string }[] = [];
-    const map = gameController.getMap();
-    const push = (id: SkillId, label: string): void => {
-      actions.push({ id, label });
-    };
-
-    if (isMountainType(tile.terrain)) {
-      if (!hasSkill(human, SkillId.CLIMBING)) push(SkillId.CLIMBING, t('ui.openclimbing'));
-      else if (!hasSkill(human, SkillId.SMITHERY)) push(SkillId.SMITHERY, t('ui.opensmithery'));
-    } else if (isWaterType(tile.terrain)) {
-      if (!hasSkill(human, SkillId.WATER)) push(SkillId.WATER, t('ui.openwater'));
-      else {
-        if (!hasSkill(human, SkillId.WATER_TEMPLES)) push(SkillId.WATER_TEMPLES, t('ui.openwatertemples'));
-        if (!hasSkill(human, SkillId.NAVIGATION)) push(SkillId.NAVIGATION, t('ui.opennavigation'));
-      }
-    } else {
-      const nearForest = isForestType(tile.terrain) || hexNeighbors(tile).some((n) => {
-        const t = map ? tileAt(map, n.q, n.r) : undefined;
-        return t !== undefined && isForestType(t.terrain);
-      });
-      if (nearForest && !hasSkill(human, SkillId.FORESTRY)) {
-        push(SkillId.FORESTRY, t('ui.openforestry'));
-      } else if (isForestType(tile.terrain) && hasSkill(human, SkillId.FORESTRY) && !hasSkill(human, SkillId.FOREST_TEMPLE)) {
-        push(SkillId.FOREST_TEMPLE, t('ui.openforesttemples'));
-      }
-    }
-
-    // Unlock hints for the next building skill whose chain is already open.
-    if (map) {
-      if (isMountainType(tile.terrain) && hasSkill(human, SkillId.SCIENCE) && !hasSkill(human, SkillId.GEOLOGY)) {
-        push(SkillId.GEOLOGY, t('ui.opengeology'));
-      }
-      if (isWaterType(tile.terrain) && hasSkill(human, SkillId.RIDING) && !hasSkill(human, SkillId.BRIDGES) && canBuildBridgeHere(map, tile)) {
-        push(SkillId.BRIDGES, t('ui.openbridges'));
-      }
-      if (!isWaterType(tile.terrain) && hasSkill(human, SkillId.FORESTRY) && !hasSkill(human, SkillId.ROADS) && canBuildRoadHere(map, tile, human)) {
-        push(SkillId.ROADS, t('ui.openroads'));
-      }
-    }
-    // Food buildings: hint at Agriculture on any own empty land tile, and at
-    // Granary next to one of your farms.
-    if (map && canPlaceFoodBuilding(tile, human)) {
-      if (!hasSkill(human, SkillId.AGRICULTURE)) push(SkillId.AGRICULTURE, t('ui.openagriculture'));
-      else if (
-        !hasSkill(human, SkillId.GRANARY) &&
-        hexNeighbors(tile).some((n) => {
-          const nt = tileAt(map, n.q, n.r);
-          return nt !== undefined && nt.building?.kind === BuildingKind.FARM && nt.ownedBy === human.index;
-        })
-      ) {
-        push(SkillId.GRANARY, t('ui.opengranary'));
-      }
-    }
-    if (
-      tile.settlement &&
-      tile.settlement.owner === human.index &&
-      !tile.settlement.wall &&
-      hasSkill(human, SkillId.SHIELDS) &&
-      !hasSkill(human, SkillId.DEFENSE)
-    ) {
-      push(SkillId.DEFENSE, t('ui.opendefense'));
-    }
-    return actions;
   }
 
   destroy(): void {

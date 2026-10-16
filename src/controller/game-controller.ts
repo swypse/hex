@@ -6,11 +6,12 @@ import { attackableTargets } from '@/game/units/combat';
 import { type GameEvent } from '@/game/events';
 import { initialExplorationFor, isExploredFor } from '@/game/map/explore';
 import { shouldPromptWatch } from '@/game/game-mode';
-import { axialKey, hexDistance, hexToPixel } from '@/game/map/hex';
+import { axialKey, hexCorners, hexDistance, hexToPixel } from '@/game/map/hex';
+import { tileElevation } from '@/render/elevation';
 import { countIceTiles } from '@/game/map/ice';
-import { type GameMap, generateMap } from '@/game/map/map-gen';
+import { type GameMap, type MapTile, generateMap } from '@/game/map/map-gen';
 import { buildPlayers } from '@/game/players';
-import { seasonForTurn } from '@/game/season';
+import { iceCracksAt, seasonForTurn } from '@/game/season';
 import { cycleSelection, reachableTargets } from '@/game/units/selection';
 import { type Command, Simulator } from '@/game/simulator';
 import { hasSkill } from '@/game/skills';
@@ -147,7 +148,7 @@ class GameController {
     if (this.sim) {
       this.applyFitToScreen();
       useGameStore.getState().setTexturesLoading(true);
-      const bake = createTextures(app, this.sim.map, HEX_SIZE * this.getCamera().qualityFactor, new Set(this.sim.players.map((p) => p.tribe)), seasonForTurn(this.sim.turn)).then((textures) => {
+      const bake = createTextures(app, this.sim.map, HEX_SIZE * this.getCamera().qualityFactor, new Set(this.sim.players.map((p) => p.tribe)), seasonForTurn(this.sim.turn), iceCracksAt(this.sim.turn)).then((textures) => {
         if (token === this.initToken) useGameStore.getState().setTexturesLoading(false);
         if (token !== this.initToken || !this.mapRoot) return;
         this.replaceTextures(textures);
@@ -175,12 +176,12 @@ class GameController {
   /** Whether the baked terrain textures no longer match the sim's season / ice. */
   private terrainTexturesStale(): boolean {
     if (!this.sim || !this.textures) return false;
-    return (this.textures.season ?? Season.SPRING) !== seasonForTurn(this.sim.turn) || (this.textures.iceTiles ?? 0) !== countIceTiles(this.sim.map);
+    return (this.textures.season ?? Season.SPRING) !== seasonForTurn(this.sim.turn) || (this.textures.iceTiles ?? 0) !== countIceTiles(this.sim.map) || (this.textures.crackedIce ?? false) !== iceCracksAt(this.sim.turn);
   }
 
   private bakeTerrain(season: Season): ReturnType<typeof createTextures> {
     const hexSize = HEX_SIZE * this.getCamera().qualityFactor;
-    return createTextures(this.app!, this.sim!.map, hexSize, new Set(this.sim!.players.map((p) => p.tribe)), season);
+    return createTextures(this.app!, this.sim!.map, hexSize, new Set(this.sim!.players.map((p) => p.tribe)), season, iceCracksAt(this.sim!.turn));
   }
 
   /** Season change that freezes or thaws water: bakes the new terrain in the
@@ -222,6 +223,30 @@ class GameController {
     }
   }
 
+  /** Rebakes the terrain textures right away after the map's terrain changed
+   *  outside a season change (a forest burned down), so the tile shows its new
+   *  look at once. A season rebake already in flight bakes the same map. */
+  async refreshTerrain(): Promise<void> {
+    if (!this.app || !this.sim || !this.textures || !this.mapView || this.seasonRebake) return;
+    this.seasonRebake = true;
+    const token = this.initToken;
+    const epoch = this.lossEpoch;
+    try {
+      const textures = await this.bakeTerrain(seasonForTurn(this.sim.turn));
+      if (token !== this.initToken || !this.app || !this.mapRoot || epoch !== this.lossEpoch) {
+        destroyTextureSet(textures, { contextLost: epoch !== this.lossEpoch });
+        return;
+      }
+      this.replaceTextures(textures);
+      this.render();
+    } catch (e) {
+      console.error('[terrain] texture refresh failed', e);
+    } finally {
+      this.seasonRebake = false;
+      if (token === this.initToken) this.syncTerrainTextures();
+    }
+  }
+
   /** Rebakes the terrain textures when the displayed season or the set of ice
    *  tiles no longer matches what they were baked for. The store's turn (not
    *  sim.turn) drives the season so it follows the presented turn; the ice
@@ -231,12 +256,13 @@ class GameController {
     if (this.seasonRebake) return;
     const season = seasonForTurn(useGameStore.getState().turn);
     const ice = countIceTiles(this.sim.map);
-    if ((this.textures.season ?? Season.SPRING) === season && (this.textures.iceTiles ?? 0) === ice) return;
+    const cracked = iceCracksAt(useGameStore.getState().turn);
+    if ((this.textures.season ?? Season.SPRING) === season && (this.textures.iceTiles ?? 0) === ice && (this.textures.crackedIce ?? false) === cracked) return;
     this.seasonRebake = true;
     const token = this.initToken;
     const epoch = this.lossEpoch;
     const hexSize = HEX_SIZE * this.getCamera().qualityFactor;
-    void createTextures(this.app, this.sim.map, hexSize, new Set(this.sim.players.map((p) => p.tribe)), season)
+    void createTextures(this.app, this.sim.map, hexSize, new Set(this.sim.players.map((p) => p.tribe)), season, cracked)
       .then((textures) => {
         if (token !== this.initToken || !this.app || !this.mapRoot) {
           destroyTextureSet(textures);
@@ -263,6 +289,7 @@ class GameController {
     this.unsubSeason?.();
     this.unsubSeason = null;
     this.cancelDamagePreviewHold();
+    useGameStore.getState().setContextMenu(null);
     this.damagePreviewShown = false;
     this.mapView?.hideDamagePreview();
     this.suppressNextTap = false;
@@ -549,7 +576,7 @@ class GameController {
       // A bake that straddles another loss is blank: bake again (a few times).
       for (let attempt = 0; attempt < 3; attempt++) {
         const epoch = this.lossEpoch;
-        const textures = await createTextures(this.app, this.sim.map, hexSize, new Set(this.sim.players.map((p) => p.tribe)), seasonForTurn(this.sim.turn));
+        const textures = await createTextures(this.app, this.sim.map, hexSize, new Set(this.sim.players.map((p) => p.tribe)), seasonForTurn(this.sim.turn), iceCracksAt(this.sim.turn));
         if (token !== this.initToken || !this.app || !this.mapRoot) return;
         if (epoch !== this.lossEpoch || this.glContextLost()) {
           destroyTextureSet(textures, { contextLost: true });
@@ -666,7 +693,7 @@ class GameController {
       // screen was already mounted `init` did not run, so bake here.
       const inFlight = this.initBake;
       if (inFlight) await inFlight;
-      else this.replaceTextures(await createTextures(this.app, map, HEX_SIZE * this.getCamera().qualityFactor, new Set(this.sim!.players.map((p) => p.tribe)), seasonForTurn(this.sim!.turn)));
+      else this.replaceTextures(await createTextures(this.app, map, HEX_SIZE * this.getCamera().qualityFactor, new Set(this.sim!.players.map((p) => p.tribe)), seasonForTurn(this.sim!.turn), iceCracksAt(this.sim!.turn)));
     }
     this.render();
     this.centerOnStartVillage();
@@ -731,6 +758,21 @@ class GameController {
     return this.camera?.pan ?? { x: 0, y: 0 };
   }
 
+  /** Current camera zoom scale (world px -> screen px); 1 before the camera exists. */
+  cameraScale(): number {
+    return this.camera?.scale ?? 1;
+  }
+
+  /** Screen position of the top corner of a hex's top face (raised by its elevation); null before the camera exists. */
+  tileTopScreen(q: number, r: number): { x: number; y: number } | null {
+    if (!this.camera) return null;
+    const tile = this.sim ? tileAt(this.sim.map, q, r) : undefined;
+    const corner = hexCorners({ q, r }, HEX_SIZE)[5]!;
+    const lift = tile ? tileElevation(tile, HEX_SIZE) : 0;
+    const { pan, scale } = this.camera;
+    return { x: pan.x + corner.x * scale, y: pan.y + (corner.y - lift) * scale };
+  }
+
   private getCamera(): CameraController {
     if (!this.camera) {
       this.camera = new CameraController({
@@ -758,6 +800,7 @@ class GameController {
         camera: () => this.getCamera(),
         render: () => this.render(),
         runSeasonTransition: (tiles) => this.runSeasonTransition(tiles),
+        refreshTerrain: () => this.refreshTerrain(),
         syncKnownTribes: (notify) => this.syncKnownTribes(notify),
         enqueue: (task) => this.enqueue(task),
         bringCellIntoView: (q, r) => this.bringCellIntoView(q, r),
@@ -926,6 +969,43 @@ class GameController {
     this.sendCommand({ type: CommandType.CAPTURE, q: selection.q, r: selection.r, unitId: tile.unit.id });
   }
 
+  /** Keyboard arrow: selects the own unit nearest to the selected hex (or the
+   *  screen centre) in direction (`dx`, `dy`) on screen. Pans the camera when it
+   *  is off screen. No unit that way keeps the selection. */
+  selectUnitInDirection(dx: number, dy: number): void {
+    if (!this.sim || !this.app) return;
+    const store = useGameStore.getState();
+    if (store.gameOver || store.paused || store.aiActive) return;
+    const camera = this.getCamera();
+    const sel = store.selection;
+    const origin = sel
+      ? hexToPixel(sel, HEX_SIZE)
+      : { x: (this.app.screen.width / 2 - camera.pan.x) / camera.scale, y: (this.mapHeight() / 2 - camera.pan.y) / camera.scale };
+    let best: { tile: MapTile; score: number } | null = null;
+    for (const tile of this.sim.map.tiles) {
+      const unit = tile.unit;
+      if (!unit || unit.owner !== store.localPlayerIndex || (sel && tile.q === sel.q && tile.r === sel.r)) continue;
+      const p = hexToPixel(tile, HEX_SIZE);
+      const rx = p.x - origin.x;
+      const ry = p.y - origin.y;
+      const along = rx * dx + ry * dy;
+      if (along <= 0) continue;
+      const across = Math.abs(rx * dy - ry * dx);
+      // Prefer units straight ahead: sideways offset counts double.
+      const score = along + across * 2;
+      if (!best || score < best.score) best = { tile, score };
+    }
+    if (!best) return;
+    this.actions.cancelPlacement();
+    store.setContextMenu(null);
+    store.setSelection({ kind: SelectionKind.UNIT, q: best.tile.q, r: best.tile.r });
+    sfx.play('click');
+    this.mapView?.bounceUnit(best.tile.q, best.tile.r);
+    const world = hexToPixel(best.tile, HEX_SIZE);
+    if (!camera.isWorldPointVisible(world, 0)) void this.centerOnTile(best.tile.q, best.tile.r);
+    this.render();
+  }
+
   async handleMapClick(q: number, r: number): Promise<void> {
     if (!this.sim || !this.app) return;
     const store = useGameStore.getState();
@@ -1059,7 +1139,10 @@ class GameController {
     if (!press) return;
     const tile = pickTileAt(press.x, press.y, HEX_SIZE, this.sim.map.tiles);
     const victim = damagePreviewVictim(this.sim.map, store.selection, store.localPlayerIndex, tile);
-    if (!victim || !victim.unit) return;
+    if (!victim || !victim.unit) {
+      if (tile) this.openContextMenu(tile);
+      return;
+    }
     const selection = store.selection!;
     const attacker = tileAt(this.sim.map, selection.q, selection.r)?.unit;
     if (!attacker) return;
@@ -1067,6 +1150,22 @@ class GameController {
     this.damagePreviewShown = true;
     this.mapView.showDamagePreview(attacker, victim, () => this.render());
     this.render();
+  }
+
+  /** Long-press / right-click on a hex: selects it (when not yet selected) and
+   *  opens its context menu. The menu widget hides itself when empty. */
+  private openContextMenu(tile: MapTile): void {
+    const store = useGameStore.getState();
+    if (store.aiActive || store.gameOver || store.paused) return;
+    if (store.currentPlayerIndex !== store.localPlayerIndex) return;
+    if (!isExploredFor(tile, store.localPlayerIndex)) return;
+    this.suppressNextTap = true;
+    const sel = store.selection;
+    if (!sel || sel.q !== tile.q || sel.r !== tile.r) {
+      store.setSelection(cycleSelection(null, tile));
+      this.render();
+    }
+    store.setContextMenu({ q: tile.q, r: tile.r });
   }
 
   private cancelDamagePreviewHold(): void {
@@ -1318,9 +1417,19 @@ class GameController {
       });
       this.mapView.container.on('pointermove', (e) => {
         camera.handlePointerMove(e.pointerId, { x: e.global.x, y: e.global.y });
-        if (camera.isDragging) this.hideDamagePreview();
+        if (camera.isDragging) {
+          this.hideDamagePreview();
+          useGameStore.getState().setContextMenu(null);
+        }
       });
       this.mapView.container.on('pointerdown', (e) => {
+        if (e.button === 2) {
+          const local = this.mapView!.container.toLocal(e.global);
+          const tile = pickTileAt(local.x, local.y, HEX_SIZE, this.sim!.map.tiles);
+          if (tile) this.openContextMenu(tile);
+          return;
+        }
+        useGameStore.getState().setContextMenu(null);
         camera.handlePointerDown(e.pointerId, { x: e.global.x, y: e.global.y });
         this.beginDamagePreviewHold(e);
       });

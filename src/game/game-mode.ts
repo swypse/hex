@@ -10,9 +10,9 @@ export const GAME_MODE_NAMES: Record<GameMode, string> = {
 };
 
 /** Capture-mode turns a game may last before the quick-capture bonus is lost:
- *  `10 + 5 × players`. */
+ *  `20 + 10 × players`. */
 export function quickCaptureTurnsCount(playerCount: number): number {
-  return 10 + 5 * playerCount;
+  return 20 + 10 * playerCount;
 }
 
 /** Bonus points awarded to the winner when capture mode ends within

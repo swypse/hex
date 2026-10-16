@@ -25,6 +25,9 @@ import { type AiDifficultyProfile, profileFor } from './ai-difficulty';
 import { isShip } from '../units/ship';
 import { updateStrategy, deriveDirectives } from './ai-strategy';
 import { flagsFor } from './ai-flags';
+import { stepVetoed } from './ai-review';
+import { SEASON_SAFETY_PATTERN, seasonVetoed } from './ai-season';
+import { personalityFor } from './ai-personality';
 import { OPERATION_PATTERN, updateOperation } from './ai-operations';
 import { MARCH_PATTERN } from './ai-march';
 import { AiActionType, AiPace, AiPickMode, AiStance, BuildingKind, FoodPressure, GameMode, GarrisonGuardKind, Season, SkillId, SpawnPreference, UnitType } from '@enums';
@@ -43,7 +46,7 @@ const GEOLOGY_STONE_BELOW = 20;
  *  regressed the AI (44% win rate, fewer enemy villages captured) because it
  *  pulled units away from easy solo kills to wait for the group instead. */
 function buildPatterns() {
-  return AI_PATTERNS.flatMap((p) => (p.id === 'explore-frontier' ? [OPENING_PATTERN, OPERATION_PATTERN, p, MARCH_PATTERN] : [p])).map(withStoneGate);
+  return [SEASON_SAFETY_PATTERN, ...AI_PATTERNS].flatMap((p) => (p.id === 'explore-frontier' ? [OPENING_PATTERN, OPERATION_PATTERN, p, MARCH_PATTERN] : [p])).map(withStoneGate);
 }
 
 /** A pattern whose step would spend money while a mine is still missing
@@ -609,7 +612,7 @@ function bestAvailableAction(
       }
     }
   } else if (!situation?.navalThreat) {
-    const order = flagsFor(player).militarySkills ? MILITARY_SKILL_ORDER : AI_SKILL_ORDER;
+    const order = personalityFor(player).skillOrder ?? (flagsFor(player).militarySkills ? MILITARY_SKILL_ORDER : AI_SKILL_ORDER);
     for (const id of order) {
       if (state.opened.has(id)) continue;
       if (canOpenSkill(player, id, map)) {
@@ -821,8 +824,10 @@ export function* planAiActionsSteps(
     }
     const ctx: AiPatternContext = { map, player, rng, state, situation, difficulty, directives, operation, turn };
     let next: AiAction[] | null = null;
+    const review = difficulty.lookahead && flagsFor(player).lookahead;
     for (const pattern of patterns) {
       next = pattern.evaluate(ctx);
+      if (next && (seasonVetoed(map, turn, next) || (review && stepVetoed(map, player, next, state)))) next = null;
       if (next) break;
     }
     if (!next) {
@@ -830,6 +835,11 @@ export function* planAiActionsSteps(
       next = bestAvailableAction(map, player, rng, state, situation, difficulty, directives, source);
     }
     if (!next) break;
+    if (seasonVetoed(map, turn, next) || (review && stepVetoed(map, player, next, state))) {
+      // The fallback pick is unsafe too: keep its unit where it stands.
+      for (const a of next) if (a.type === AiActionType.MOVE) state.moved.add(a.unitId);
+      continue;
+    }
     // A failed action cancels the rest of its step (e.g. the attack after a
     // failed move), but every action is still marked used so the planner
     // cannot pick the same doomed step again.
@@ -837,6 +847,10 @@ export function* planAiActionsSteps(
     for (const a of next) {
       actions.push(a);
       markUsed(state, a);
+      if (a.type === AiActionType.ATTACK || a.type === AiActionType.STUN) {
+        const hit = map.tiles.find((t) => t.q === a.q && t.r === a.r);
+        if (hit?.settlement && hit.settlement.owner !== player.index) player.hitVillage = { q: a.q, r: a.r, turn };
+      }
       if (execute && !failed && !execute(a)) failed = true;
     }
     if (execute) yield;

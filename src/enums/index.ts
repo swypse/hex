@@ -5,6 +5,7 @@ export * from './ai-engine.enum';
 export * from './ai-goal-id.enum';
 export * from './ai-operation-phase.enum';
 export * from './ai-pace.enum';
+export * from './attack-rank.enum';
 export * from './ai-personality-id.enum';
 export * from './ai-pick-mode.enum';
 export * from './ai-stance.enum';

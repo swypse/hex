@@ -1,9 +1,10 @@
 import { planAiActions } from '@/game/ai/ai';
 import { AI_DIFFICULTY_PROFILES, profileFor } from '@/game/ai/ai-difficulty';
-import { personalityFor } from '@/game/ai/ai-personality';
+import { AI_PERSONALITIES, personalityFor } from '@/game/ai/ai-personality';
+import { bestSpawnableUnitType } from '@/game/ai/ai-patterns';
 import { analyzeSituation } from '@/game/ai/ai-situation';
 import {
-  deriveDirectives, ensurePlayerStrategy, goalTargetKey, productionBuildings, updateStrategy
+  chooseArmyTarget, deriveDirectives, ensurePlayerStrategy, goalTargetKey, productionBuildings, updateStrategy
 } from '@/game/ai/ai-strategy';
 import { type AiStrategyState } from '@/game/ai/ai-types';
 import { type GameMap, type MapTile, type Settlement } from '@/game/map/map-gen';
@@ -11,7 +12,7 @@ import { type Player } from '@/game/players';
 import { TileType } from '@/game/map/tile-types';
 import { type Unit } from '@/game/units/units';
 import { SeededRandom } from '@/util';
-import { AiActionType, AiGoalId, AiPace, BuildingKind, GameMode, SpawnPreference, UnitType } from '@enums';
+import { AiActionType, AiGoalId, AiPace, AiPersonalityId, BuildingKind, SkillId, GameMode, SpawnPreference, UnitType } from '@enums';
 import { describe, expect, it } from 'vitest';
 
 function aiPlayer(name: string): Player {
@@ -82,10 +83,10 @@ describe('AI strategy types & personalities', () => {
     expect(a1.id).toBe(a2.id);
   });
 
-  it('covers all three personality ids across many names', () => {
+  it('covers every personality id across many names', () => {
     const ids = new Set<string>();
     for (let i = 0; i < 60; i++) ids.add(personalityFor(aiPlayer(`p${i}`)).id);
-    expect(ids.size).toBe(3);
+    expect(ids.size).toBe(4);
   });
 
   it('exposes the SpawnPreference union through aiTypes', () => {
@@ -285,5 +286,58 @@ describe('planAiActions with strategy', () => {
       const actions = planAiActions(map, p, new SeededRandom(turn), GameMode.CAPTURE);
       expect(actions.length).toBeGreaterThanOrEqual(0);
     }
+  });
+});
+
+describe('army target commitment', () => {
+  const mode = GameMode.CAPTURE;
+
+  it('chooseArmyTarget skips unreachable villages', () => {
+    const p = aiPlayer('Ragnar');
+    const map = twoVillageMap();
+    // Cut-off, higher-level enemy village with no explored land link to ours.
+    map.tiles.push(makeTile(0, 9, 0, { owner: 0, level: 3, captureReady: false }));
+    expect(chooseArmyTarget(map, p)).toEqual({ q: 4, r: 0 });
+  });
+
+  it('chooseArmyTarget prefers the weakly held village over a guarded nearer one', () => {
+    const p = aiPlayer('Ragnar');
+    const map = twoVillageMap();
+    // Guard the near village (4,0) with two enemy warriors; add an unguarded one two hexes farther.
+    map.tiles.push(makeTile(4, 1, 0, null, makeWarrior('g2', 0, 4, 1)), makeTile(3, 1, 0, null, makeWarrior('g3', 0, 3, 1)));
+    map.tiles.push(makeTile(2, 1), makeTile(1, 1), makeTile(0, 1), makeTile(-1, 1), makeTile(-1, 2), makeTile(0, 2, 0, { owner: 0, level: 1, captureReady: false }));
+    expect(chooseArmyTarget(map, p)).toEqual({ q: 0, r: 2 });
+  });
+
+  it('an army goal without a target picks one once a village is known', () => {
+    const p = aiPlayer('Ragnar');
+    p.strategy = { personalityId: 'balanced', nextPlanTurn: 0, goals: [{ id: AiGoalId.ARMY, phase: 'choose', target: null }] };
+    const map = twoVillageMap();
+    const profile = profileFor(p);
+    const state = updateStrategy(map, p, analyzeSituation(map, p, mode, profile), mode, profile, 0, new SeededRandom(3));
+    const army = state.goals.find((g) => g.id === AiGoalId.ARMY);
+    if (army) expect(army.target).not.toBeNull();
+  });
+});
+
+describe('personality profiles', () => {
+  it('differ in the knobs they tune', () => {
+    const all = Object.values(AI_PERSONALITIES);
+    expect(new Set(all.map((p) => p.retreatHpRatio)).size).toBeGreaterThan(2);
+    expect(new Set(all.map((p) => p.reserveDelta)).size).toBeGreaterThan(2);
+    expect(AI_PERSONALITIES.aggressive.goalWeights.army).toBeGreaterThan(AI_PERSONALITIES.builder.goalWeights.army);
+    expect(AI_PERSONALITIES.builder.goalWeights.economy).toBeGreaterThan(AI_PERSONALITIES.aggressive.goalWeights.economy);
+  });
+
+  it('offense spawns start from the profile\'s favourite types', () => {
+    const rich = (name: string): Player => ({ ...aiPlayer(name), skills: [SkillId.SWORDSMAN, SkillId.RIDING, SkillId.KNIGHTS], resources: { wood: 50, stone: 50, money: 200, ore: 50, food: 20 } });
+    const named = (id: AiPersonalityId): string => {
+      for (let i = 0; i < 200; i++) if (personalityFor(aiPlayer(`n${i}`)).id === id) return `n${i}`;
+      throw new Error('no name');
+    };
+    const raider = bestSpawnableUnitType(rich(named(AiPersonalityId.RAIDER)), SpawnPreference.OFFENSE);
+    const aggressive = bestSpawnableUnitType(rich(named(AiPersonalityId.AGGRESSIVE)), SpawnPreference.OFFENSE);
+    expect(raider).toBe(UnitType.RIDER);
+    expect(aggressive).toBe(UnitType.KNIGHT);
   });
 });

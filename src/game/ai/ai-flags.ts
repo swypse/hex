@@ -34,6 +34,15 @@ export interface AiFlags {
   /** Idle units go for enemy buildings in reach, most valuable first (granary, university, farm,
    *  mine, sawmill): catapults siege them, other units burn farms and granaries. */
   raidBuildings: boolean;
+  /** Planned steps get a one-step safety review (empty-village and lethal-tile moves are rejected) on difficulties that use it. */
+  lookahead: boolean;
+  /** Units near an enemy village gather, then strike it together instead of one by one. Off by
+   *  default: two 80-game benches (7-hex/2-unit and 5-hex/3-unit variants) both came out worse
+   *  (wins 43%/48% vs 57%/53%, fewer enemy villages captured, more own villages lost). */
+  siege: boolean;
+  /** Group attacks are planned: ordered by role, only as many units as the kill needs, one unit held to take
+   *  the village, and the recently hit village is favoured by attacks and hunts. */
+  attackPlan: boolean;
 }
 
 /** Shipped defaults. `multiSpecial` stays off: a 160-game benchmark showed no gain (44% wins,
@@ -41,9 +50,9 @@ export interface AiFlags {
  *  the solo-hunt/naval patterns so it only ever claims units those left idle — an earlier
  *  placement ahead of them regressed the AI (44% wins, fewer enemy villages captured) by pulling
  *  units off easy solo kills to wait for the group. */
-const DEFAULT_AI_FLAGS: AiFlags = { militarySkills: true, berserkerHold: true, stunnerHunt: true, multiSpecial: false, operations: true, composition: false, stoneFocus: true, march: true, finishers: true, raidBuildings: true };
-export const ALL_AI_FLAGS_ON: AiFlags = { militarySkills: true, berserkerHold: true, stunnerHunt: true, multiSpecial: true, operations: true, composition: true, stoneFocus: true, march: true, finishers: true, raidBuildings: true };
-export const ALL_AI_FLAGS_OFF: AiFlags = { militarySkills: false, berserkerHold: false, stunnerHunt: false, multiSpecial: false, operations: false, composition: false, stoneFocus: false, march: false, finishers: false, raidBuildings: false };
+const DEFAULT_AI_FLAGS: AiFlags = { militarySkills: true, berserkerHold: true, stunnerHunt: true, multiSpecial: false, operations: true, composition: false, stoneFocus: true, march: true, finishers: true, raidBuildings: true, lookahead: true, siege: false, attackPlan: true };
+export const ALL_AI_FLAGS_ON: AiFlags = { militarySkills: true, berserkerHold: true, stunnerHunt: true, multiSpecial: true, operations: true, composition: true, stoneFocus: true, march: true, finishers: true, raidBuildings: true, lookahead: true, siege: false, attackPlan: true };
+export const ALL_AI_FLAGS_OFF: AiFlags = { militarySkills: false, berserkerHold: false, stunnerHunt: false, multiSpecial: false, operations: false, composition: false, stoneFocus: false, march: false, finishers: false, raidBuildings: false, lookahead: false, siege: false, attackPlan: false };
 
 export function flagsFor(player: Pick<Player, 'aiFlags'>): AiFlags {
   return player.aiFlags ? { ...DEFAULT_AI_FLAGS, ...player.aiFlags } : DEFAULT_AI_FLAGS;

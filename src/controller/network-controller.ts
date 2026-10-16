@@ -15,7 +15,7 @@ import { Tribe } from '../game/tribes';
 import { beginMatchState, useGameStore } from '../store/game-store';
 import { loadSettings, welcomeDismissed } from '../storage/settings';
 import { SeededRandom } from '../util/random';
-import { seasonForTurn } from '../game/season';
+import { iceCracksAt, seasonForTurn } from '../game/season';
 import { createTextures, type TextureSet } from '../render/texture-factory';
 import { activeMatchStore } from '../storage/active-match';
 import { ClientMessageType, CommandType, ConnectionState, GameMode, HostMessageType, LobbyRole, NetMode, OverlayKind, PauseReason, Screen, SelectionKind } from '@enums';
@@ -412,7 +412,7 @@ export class NetworkController {
     const app = this.host.app();
     if (app) {
       this.host.applyFitToScreen();
-      this.host.setTextures(await createTextures(app, map, 40 * this.host.cameraQualityFactor(), new Set((this.host.sim()?.players ?? []).map((p) => p.tribe)), seasonForTurn(this.host.sim()?.turn ?? 1)));
+      this.host.setTextures(await createTextures(app, map, 40 * this.host.cameraQualityFactor(), new Set((this.host.sim()?.players ?? []).map((p) => p.tribe)), seasonForTurn(this.host.sim()?.turn ?? 1), iceCracksAt(this.host.sim()?.turn ?? 1)));
     }
     this.host.render();
     this.host.centerOnStartVillage();

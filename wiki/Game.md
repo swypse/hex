@@ -14,7 +14,7 @@ Contents: [Modes](#game-modes) · [Multiplayer](#multiplayer) · [Tribes](#tribe
 Chosen on the setup screen.
 
 1. **Capture the map** — a player wins by owning all non-free villages; the game ends once that player's turn ends
-   (the round completes, not at the final capture). Capturing the map within `10 + 5 × players` turns (quick capture)
+   (the round completes, not at the final capture). Capturing the map within `20 + 10 × players` turns (quick capture)
    gives a `players × 20` point bonus.
 2. **30 Turns** — the game ends at turn 30; the highest score wins.
 

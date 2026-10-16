@@ -9,7 +9,7 @@ import { isExploredFor } from '../../map/explore';
 import { type AiAction } from '../ai-types';
 import { AiActionType, SkillId, SpawnPreference, UnitType } from '@enums';
 
-import { type AiPattern, berserkerShouldPress, bestSpawnableUnitType, enemyCanAttackNext, enemyCanReach, isSupportUnit, key, landEnemyCanReach, nearestEnemyDistanceFrom, spawnWouldBeKilled } from '../ai-pattern-helpers';
+import { type AiPattern, berserkerShouldPress, bestSpawnableUnitType, enemyCanAttackNext, enemyCanReach, isSupportUnit, key, landEnemyCanReach, nearestEnemyDistanceFrom, spawnWouldBeKilled, unitHoldsVillage } from '../ai-pattern-helpers';
 
 export const DEFENSE_PATTERNS: AiPattern[] = [
   {
@@ -107,7 +107,7 @@ export const DEFENSE_PATTERNS: AiPattern[] = [
           let bestDist = -Infinity;
           for (const c of reachableTargets(map, unit, undefined, canClimb, canDock, player.index)) {
             if (state.occupied.has(key(c.q, c.r))) continue;
-            if (c.settlement && c.settlement.owner === unit.owner) {
+            if (c.settlement && c.settlement.owner === unit.owner && unitHoldsVillage(map, c, player.index, unit)) {
               best = c;
               break;
             }
@@ -147,6 +147,8 @@ export const DEFENSE_PATTERNS: AiPattern[] = [
           if (attackableTargets(map, unit, player.index).length > 0 && !landEnemyCanReach(map, v, player.index, 1)) continue;
           const reach = reachableTargets(map, unit, undefined, canClimb, canDock, player.index);
           if (!reach.some((c) => c.q === v.q && c.r === v.r)) continue;
+          // A unit the enemy would kill there only feeds it the village: keep it out.
+          if (!unitHoldsVillage(map, v, player.index, unit)) continue;
           const dist = hexDistance(unit, v);
           if (!best || dist < best.dist) best = { unit, dist };
         }

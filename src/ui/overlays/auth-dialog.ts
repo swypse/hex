@@ -90,8 +90,10 @@ export class AuthDialog {
     };
     const field = (labelKey: string, value: string, onChange: (v: string) => void, type: 'text' | 'password' = 'text'): void => {
       text(t(labelKey));
+      const index = this.inputs.length;
       const input = new TextInputOverlay({
         x: 0, y, width: popup.contentWidth, height: FIELD_HEIGHT, value, type, onChange,
+        onTab: (back) => this.inputs[(index + (back ? -1 : 1) + this.inputs.length) % this.inputs.length]?.focus(),
         origin: () => popup.contentScreenOrigin(),
       });
       this.inputs.push(input);

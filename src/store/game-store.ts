@@ -55,6 +55,8 @@ interface GameStore {
   currentPlayerIndex: number;
   aiActive: boolean;
   selection: Selection | null;
+  /** Hex whose long-press / right-click context menu is open (always the selected hex). */
+  contextMenu: { q: number; r: number } | null;
   overlay: OverlayState;
   mode: GameMode;
   gameOver: boolean;
@@ -91,6 +93,7 @@ interface GameStore {
   setCurrentPlayerIndex: (index: number) => void;
   setAiActive: (active: boolean) => void;
   setSelection: (selection: Selection | null) => void;
+  setContextMenu: (tile: { q: number; r: number } | null) => void;
   setOverlay: (overlay: OverlayState) => void;
   setMode: (mode: GameMode) => void;
   setGameOver: (over: boolean) => void;
@@ -123,6 +126,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   currentPlayerIndex: 0,
   aiActive: false,
   selection: null,
+  contextMenu: null,
   overlay: null,
   mode: GameMode.CAPTURE,
   gameOver: false,
@@ -177,6 +181,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   setCurrentPlayerIndex: (index) => set({ currentPlayerIndex: index }),
   setAiActive: (active) => set({ aiActive: active }),
   setSelection: (selection) => set({ selection }),
+  setContextMenu: (contextMenu) => set({ contextMenu }),
   setOverlay: (overlay) => set({ overlay }),
   setMode: (mode) => set({ mode }),
   setGameOver: (over) => set({ gameOver: over }),

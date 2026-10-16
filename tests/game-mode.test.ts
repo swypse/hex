@@ -53,17 +53,17 @@ describe('gameMode', () => {
   });
 
   it('computes quick-capture turns and bonus', () => {
-    expect(quickCaptureTurnsCount(2)).toBe(20);
-    expect(quickCaptureTurnsCount(3)).toBe(25);
-    expect(quickCaptureTurnsCount(4)).toBe(30);
+    expect(quickCaptureTurnsCount(2)).toBe(40);
+    expect(quickCaptureTurnsCount(3)).toBe(50);
+    expect(quickCaptureTurnsCount(4)).toBe(60);
     expect(quickCaptureScore(2)).toBe(40);
     expect(quickCaptureScore(4)).toBe(80);
   });
 
   it('rates capture games by score and the quick-capture turns budget', () => {
-    // 3 players: 3★ needs >= 1100 and turn <= 25; 2★ needs >= 850.
+    // 3 players: 3★ needs >= 1100 and turn <= 50; 2★ needs >= 850.
     expect(starRating(1200, 3, GameMode.CAPTURE, 10)).toBe(3);
-    expect(starRating(1200, 3, GameMode.CAPTURE, 26)).toBe(2);
+    expect(starRating(1200, 3, GameMode.CAPTURE, 51)).toBe(2);
     expect(starRating(900, 3, GameMode.CAPTURE, 10)).toBe(2);
     expect(starRating(100, 3, GameMode.CAPTURE, 10)).toBe(1);
   });

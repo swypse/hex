@@ -5,7 +5,7 @@ import { type AttackUnitPre, type GameEvent } from '../game/events';
 import { type MapTile } from '../game/map/map-gen';
 import { type Player } from '../game/players';
 import { tribeById } from '../game/tribes';
-import { canAttack, canMove, HEAL_AMOUNT, PIRATE_OWNER, type Unit, UNIT_TYPES } from '../game/units/units';
+import { canAttack, canMove, HEAL_AMOUNT, PIRATE_HP, PIRATE_OWNER, type Unit, UNIT_TYPES } from '../game/units/units';
 import { isWaterType } from '../game/map/tile-types';
 import { claimingVillage, villageWaterTiles } from '../game/units/storm';
 import { isExploredFor } from '../game/map/explore';
@@ -124,6 +124,8 @@ export interface EventHost {
   camera(): CameraController;
   render(): void;
   runSeasonTransition(tiles: { q: number; r: number }[]): Promise<void>;
+  /** Rebakes the terrain textures now (terrain changed outside a season change). */
+  refreshTerrain(): Promise<void>;
   syncKnownTribes(notify: boolean): void;
   enqueue(task: () => Promise<void>): Promise<void>;
   bringCellIntoView(q: number, r: number): Promise<void>;
@@ -395,10 +397,19 @@ export class EventPresenter {
           case GameEventType.TRAP_PLACED:
             this.host.render();
             break;
-          case GameEventType.FIRE_TURN:
+          case GameEventType.FIRE_TURN: {
             await this.presentWeatherDamage(e.units, e.buildings);
             this.host.render();
+            // A forest that burned down is land now: smoke rises and the tile
+            // takes its new texture at once.
+            const cleared = (e.cleared ?? []).map((c) => tileAt(sim.map, c.q, c.r)).filter((ct): ct is MapTile => !!ct);
+            const seen = cleared.filter((ct) => isExploredFor(ct, local));
+            if (cleared.length > 0) {
+              for (const ct of seen) this.effects.spawnMuzzleSmokeAt(ct);
+              await this.host.refreshTerrain();
+            }
             break;
+          }
           case GameEventType.FIRE_EXTINGUISHED:
             this.host.render();
             break;
@@ -465,6 +476,16 @@ export class EventPresenter {
             break;
           }
           case GameEventType.SEASON_CHANGED: {
+            // Pirate ships lost to freezing are already gone from the sim: keep
+            // them on their cells until the water has turned to ice.
+            const stagedShips = new Map<string, Unit | null>();
+            for (const p of e.removed) {
+              const pt = tileAt(sim.map, p.q, p.r);
+              if (pt && isExploredFor(pt, local)) {
+                stagedShips.set(axialKey(p), this.stageUnit({ type: UnitType.PIRATE, owner: PIRATE_OWNER, hp: PIRATE_HP }, `pirate-${p.q},${p.r}`, p.q, p.r));
+              }
+            }
+            if (stagedShips.size > 0) this.host.mapView()?.setUnitOverrides(stagedShips);
             this.host.render();
             const store = useGameStore.getState();
             // Water that froze and ice that thawed bounce top row to bottom.
@@ -475,6 +496,10 @@ export class EventPresenter {
               return ct && isExploredFor(ct, local);
             });
             await this.host.runSeasonTransition(changed);
+            if (stagedShips.size > 0) {
+              this.host.mapView()?.setUnitOverrides(this.presenceOverrides(events, i + 1));
+              this.host.render();
+            }
             // Units lost to melting ice (and pirate ships lost to freezing)
             // are already gone from the sim: play their death burst in place.
             const lost = [...e.killed, ...e.removed.map((p) => ({ q: p.q, r: p.r }))];

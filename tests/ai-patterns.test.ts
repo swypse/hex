@@ -42,7 +42,7 @@ function knight(id: string, owner: number, q: number, r: number): Unit {
 
 function player(money: number, skills: Player['skills'] = []): Player {
   return {
-    index: 1, tribe: Tribe.Villagers, isHuman: false, name: 'AI',
+    index: 1, tribe: Tribe.Villagers, isHuman: false, name: 'Bal',
     resources: { wood: 5, stone: 5, money, ore: 5, food: 20 },
     score: 0, kills: 0, skills, isActive: true,
   };
@@ -282,7 +282,7 @@ describe('AI patterns', () => {
     map.tiles.push(
       tile(0, 0, null, warrior('ai1', 1, 0, 0)),
       tile(2, 0, null, warrior('ai2', 1, 2, 0)),
-      tile(1, 0, null, warrior('enemy', 0, 1, 0, 1)),
+      tile(1, 0, null, warrior('enemy', 0, 1, 0, 50)),
     );
     const actions = findPattern('focus-fire').evaluate(ctx(map, player(100), new SeededRandom(1)));
     expect(actions).not.toBeNull();
@@ -420,7 +420,7 @@ describe('AI patterns', () => {
     map.tiles.push(
       tile(0, 0, null, warrior('ai1', 1, 0, 0)),
       tile(2, 0, null, warrior('ai2', 1, 2, 0)),
-      tile(1, 0, null, warrior('enemy', 0, 1, 0, 10)),
+      tile(1, 0, null, warrior('enemy', 0, 1, 0, 50)),
     );
     const actions = findPattern('focus-fire').evaluate(ctx(map, player(100), new SeededRandom(1)));
     expect(actions).not.toBeNull();
@@ -610,7 +610,8 @@ describe('AI patterns', () => {
     );
     const result = guardGarrisonAttack(map, player(100, [SkillId.ARCHER]), garrison, map.tiles[1]!);
     expect(result.kind).toBe(GarrisonGuardKind.ATTACK);
-    if (result.kind === GarrisonGuardKind.ATTACK) expect(result.guardType).toBe(UnitType.ARCHER);
+    // Next to a knight the replacement is the sturdier warrior, not the archer it would just lose.
+    if (result.kind === GarrisonGuardKind.ATTACK) expect(result.guardType).toBe(UnitType.WARRIOR);
   });
 
   it('guardGarrisonAttack leaves a garrison free to attack when the counter cannot kill it', () => {

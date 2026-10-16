@@ -73,6 +73,7 @@ describe('fire turn', () => {
     expect(tile.terrain).toBe(TileType.GrasslandLand);
     expect(tile.fire).toBeNull();
     expect(last.burnedOut).toEqual([{ q: 0, r: 0 }]);
+    expect(last.cleared).toEqual([{ q: 0, r: 0 }]);
   });
 
   it('burns a building for 1 damage a round until it is destroyed', () => {

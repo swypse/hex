@@ -195,3 +195,59 @@ describe('raid-enemy-buildings', () => {
     expect(pattern('raid-enemy-buildings').evaluate(ctx(map, aiPlayer()))).toBeNull();
   });
 });
+
+describe('raid-enemy-buildings: roads and marching', () => {
+  /** Enemy (player 0) villages at (2,-3) and (2,3) joined by one road along q=2; AI village at (-4,0). */
+  function roadScene(): GameMap {
+    const map = baseMap();
+    for (const [q, r] of [[2, -3], [2, 3]] as const) {
+      const v = tileAt(map, q, r)!;
+      v.settlement = { owner: 0, level: 1, captureReady: false };
+      v.ownedBy = 0;
+    }
+    for (let r = -2; r <= 2; r++) {
+      const t = tileAt(map, 2, r)!;
+      t.roadOwner = 0;
+      t.ownedBy = 0;
+    }
+    for (const t of map.tiles) t.exploredBy = [0, AI];
+    return map;
+  }
+
+  it('a unit within reach steps onto a road that is the only link between two villages', () => {
+    const map = roadScene();
+    const w = put(map, AI, UnitType.WARRIOR, 1, 0);
+    const actions = pattern('raid-enemy-buildings').evaluate(ctx(map, aiPlayer()))!;
+    expect(actions).toHaveLength(1);
+    expect(actions[0]).toMatchObject({ type: AiActionType.MOVE, unitId: w.id, q: 2 });
+  });
+
+  it('a distant unit marches toward the cut road', () => {
+    const map = roadScene();
+    const w = put(map, AI, UnitType.WARRIOR, -3, 0);
+    const actions = pattern('raid-march').evaluate(ctx(map, aiPlayer()))!;
+    expect(actions).toHaveLength(1);
+    expect(actions[0]).toMatchObject({ type: AiActionType.MOVE, unitId: w.id });
+    const dest = actions[0] as { q: number; r: number };
+    expect(dest.q).toBeGreaterThan(-3);
+  });
+
+  it('only a catapult marches on a mine', () => {
+    const map = baseMap();
+    for (const t of map.tiles) t.exploredBy = [0, AI];
+    const mine = tileAt(map, 4, 0)!;
+    mine.ownedBy = 0;
+    mine.building = { kind: BuildingKind.MINE, level: 1 };
+    put(map, AI, UnitType.WARRIOR, -3, 0);
+    expect(pattern('raid-march').evaluate(ctx(map, aiPlayer()))).toBeNull();
+    const cat = put(map, AI, UnitType.CATAPULT, -3, 1);
+    const actions = pattern('raid-march').evaluate(ctx(map, aiPlayer()))!;
+    expect(actions[0]).toMatchObject({ type: AiActionType.MOVE, unitId: cat.id });
+  });
+
+  it('does nothing when the flag is off', () => {
+    const map = roadScene();
+    put(map, AI, UnitType.WARRIOR, -3, 0);
+    expect(pattern('raid-march').evaluate(ctx(map, aiPlayer([], { raidBuildings: false })))).toBeNull();
+  });
+});

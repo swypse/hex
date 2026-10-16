@@ -3,6 +3,7 @@ import type { Axial } from './hex';
 import type { GameMap, MapTile } from './map-gen';
 import { revertShip } from '../units/ship';
 import { TileType } from './tile-types';
+import { tileMapByKey } from './tile-index';
 import { UnitType } from '@enums';
 
 export function countIceTiles(map: GameMap): number {
@@ -34,6 +35,11 @@ function canFreeze(map: GameMap, byKey: Map<string, MapTile>, tile: MapTile): bo
     const t = byKey.get(`${n.q},${n.r}`);
     return t !== undefined && t.terrain !== TileType.Water && t.terrain !== TileType.Ice;
   });
+}
+
+/** Whether this water tile will freeze when winter starts. */
+export function willFreeze(map: GameMap, tile: MapTile): boolean {
+  return canFreeze(map, tileMapByKey(map), tile);
 }
 
 /** Winter: coast water tiles turn to ice. Ships on them land as land units,

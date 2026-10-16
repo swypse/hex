@@ -28,6 +28,10 @@ export interface Player {
   strategy?: AiStrategyState;
   /** Current squad operation (AI only), rebuilt at the start of each AI turn. */
   operation?: AiOperation | null;
+  /** Enemy village the AI is besieging (kept across turns so the group stays committed). */
+  /** Enemy village the AI hit most recently: later attacks and hunts favour it. */
+  hitVillage?: { q: number; r: number; turn: number } | null;
+  siege?: { q: number; r: number; since: number } | null;
   /** Turn from which the stormcaller's Call lightning is available again (unset: ready). */
   lightningReadyTurn?: number;
 }

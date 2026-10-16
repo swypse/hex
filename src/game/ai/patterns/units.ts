@@ -11,7 +11,8 @@ import { coastExposedTile, isMelee, isNavalEnemy } from '../ai-situation';
 import { TRAP_COST, trapCells } from '../../units/traps';
 import { AiActionType, BuilderExtraKind, BuildingKind, SkillId, UnitType } from '@enums';
 
-import { type AiPattern, berserkerShouldPress, enemyCanAttackNext, enemyCanReach, friendlyUnitsWithin, frontierTile, isSupportUnit, key, nearestEnemyDistanceFrom } from '../ai-pattern-helpers';
+import { personalityFor } from '../ai-personality';
+import { type AiPattern, berserkerShouldPress, enemyCanAttackNext, enemyCanReach, friendlyUnitsWithin, frontierTile, HIT_VILLAGE_BONUS, isHitVillage, isSupportUnit, key, nearestEnemyDistanceFrom, unitHoldsVillage } from '../ai-pattern-helpers';
 
 export const UNIT_PATTERNS: AiPattern[] = [
   {
@@ -163,7 +164,7 @@ export const UNIT_PATTERNS: AiPattern[] = [
         const unit = t.unit;
         if (!unit || unit.owner !== player.index) continue;
         if (state.acted.has(unit.id) || state.moved.has(unit.id)) continue;
-        if (unit.hp > unitMaxHp(unit) / 2) continue;
+        if (unit.hp > unitMaxHp(unit) * personalityFor(player).retreatHpRatio) continue;
         if (berserkerShouldPress(map, player, unit)) continue;
         if (t.settlement && t.settlement.owner === player.index) continue;
         if (!enemyCanAttackNext(map, t, player.index)) continue;
@@ -171,7 +172,7 @@ export const UNIT_PATTERNS: AiPattern[] = [
         let bestDist = -Infinity;
         for (const c of reachableTargets(map, unit, undefined, canClimb, canDock, player.index)) {
           if (state.occupied.has(key(c.q, c.r))) continue;
-          if (c.settlement && c.settlement.owner === unit.owner) {
+          if (c.settlement && c.settlement.owner === unit.owner && unitHoldsVillage(map, c, player.index, unit)) {
             best = c;
             break;
           }
@@ -216,7 +217,7 @@ export const UNIT_PATTERNS: AiPattern[] = [
   {
     id: 'hunt-idle-enemy',
     priority: 78,
-    evaluate({ map, player, state, situation, difficulty }): AiAction[] | null {
+    evaluate({ map, player, state, situation, difficulty, turn = 0 }): AiAction[] | null {
       if (!situation || situation.enemies.length === 0) return null;
       // When endangered, reinforcement (higher priority) recalls the closest
       // free unit to the village; units already engaging a threat keep pressing
@@ -241,6 +242,7 @@ export const UNIT_PATTERNS: AiPattern[] = [
           // Naval enemies cannot be reached by land chases; ships handle them
           // in their own naval-hunt pattern.
           if (isNavalEnemy(e.unit)) continue;
+          const bonus = enemyTile.settlement && isHitVillage(player, enemyTile, turn) ? HIT_VILLAGE_BONUS : 0;
           const strikes = (tile: MapTile): boolean =>
             attackableTargets(map, { ...unit, q: tile.q, r: tile.r }, player.index).some(
               (a) => a.q === enemyTile.q && a.r === enemyTile.r,
@@ -254,7 +256,7 @@ export const UNIT_PATTERNS: AiPattern[] = [
           if (strikes(t)) {
             const kills = attackDamage(unit) >= enemyTile.unit.hp;
             if (!kills && difficulty?.checkTrades && !tradeIsFavorable(unit, enemyTile)) continue;
-            const score = (kills ? 500 : 300) - hexDistance(t, enemyTile);
+            const score = (kills ? 500 : 300) - hexDistance(t, enemyTile) + bonus;
             if (!best || score > best.score) {
               best = { action: [{ type: AiActionType.ATTACK, unitId: unit.id, q: enemyTile.q, r: enemyTile.r }], score };
             }
@@ -275,7 +277,7 @@ export const UNIT_PATTERNS: AiPattern[] = [
             if (nd >= startDist) continue;
             const moveDist = hexDistance(t, c);
             if (strikes(c) && isGood(c)) {
-              const score = (canKill ? 500 : 300) - nd * 10 - moveDist;
+              const score = (canKill ? 500 : 300) - nd * 10 - moveDist + bonus;
               if (!best || score > best.score) {
                 best = {
                   action: [
@@ -286,7 +288,7 @@ export const UNIT_PATTERNS: AiPattern[] = [
                 };
               }
             } else {
-              const score = 200 - nd * 10 - moveDist;
+              const score = 200 - nd * 10 - moveDist + bonus;
               if (!best || score > best.score) {
                 best = { action: [{ type: AiActionType.MOVE, unitId: unit.id, q: c.q, r: c.r }], score };
               }

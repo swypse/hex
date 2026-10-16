@@ -13,3 +13,8 @@ export function seasonForTurn(turn: number): Season {
   const idx = Math.floor((Math.max(1, turn) - 1) / SEASON_LENGTH) % SEASONS.length;
   return SEASONS[idx]!;
 }
+
+/** Last winter turn: the ice is about to melt, so it is drawn cracked. */
+export function iceCracksAt(turn: number): boolean {
+  return seasonForTurn(turn) === Season.WINTER && seasonTurn(turn) === SEASON_LENGTH;
+}

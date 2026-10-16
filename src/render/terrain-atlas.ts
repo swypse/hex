@@ -27,6 +27,9 @@ export const TERRAIN_TILE_FILES: Record<TileType, string> = {
   [TileType.Ice]: 'ice',
 };
 
+/** Atlas frame key of the ice tile shown on the last winter turn, before it melts. */
+export const TERRAIN_CRACKED_ICE_FILE = 'ice-cracked';
+
 /** Atlas frame key of the fog overlay tile. */
 export const TERRAIN_FOG_FILE = 'fog';
 

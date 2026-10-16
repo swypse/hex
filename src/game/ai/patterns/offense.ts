@@ -12,9 +12,11 @@ import { canUpgradeShip } from '../../units/ship';
 import { extinguishCells } from '../../weather/fire';
 import { isForestType } from '../../map/tile-types';
 import { flagsFor } from '../ai-flags';
+import { planGangAttack } from '../ai-attack-plan';
+import { ENTER_VILLAGE_PATTERN } from '../ai-enter-village';
 import { AiActionType, AiStance, GarrisonGuardKind, SkillId, UnitType } from '@enums';
 
-import { type AiPattern, STALKER_STEALTH_RADIUS, STUN_MIN_DAMAGE, attackersForTile, enemyCanReach, guardGarrisonAttack, isSupportUnit, key, nearestEnemyDistanceFrom } from '../ai-pattern-helpers';
+import { type AiPattern, STALKER_STEALTH_RADIUS, STUN_MIN_DAMAGE, attackersForTile, enemyCanReach, gangAttackActions, guardGarrisonAttack, isHitVillage, isSupportUnit, key, nearestEnemyDistanceFrom, unitHoldsVillage } from '../ai-pattern-helpers';
 
 export const OFFENSE_PATTERNS: AiPattern[] = [
   {
@@ -219,15 +221,16 @@ export const OFFENSE_PATTERNS: AiPattern[] = [
       return actions.length > 0 ? actions : null;
     },
   },
+  ENTER_VILLAGE_PATTERN,
   {
     id: 'focus-fire',
     priority: 190,
-    evaluate({ map, player, state }): AiAction[] | null {
+    evaluate({ map, player, state, turn = 0 }): AiAction[] | null {
       // Gang up on a single enemy: every idle unit that can attack it now — or
       // reach it with a move first — attacks it. Killable targets win, otherwise
       // the enemy that can be hit by the most units / combined damage is chosen.
       let best:
-        | { t: MapTile; attackers: { unit: Unit; moveTo: MapTile | null }[]; killable: boolean; total: number }
+        | { t: MapTile; attackers: { unit: Unit; moveTo: MapTile | null }[]; killable: boolean; total: number; hit: boolean }
         | null = null;
       for (const t of map.tiles) {
         const enemy = t.unit;
@@ -237,29 +240,20 @@ export const OFFENSE_PATTERNS: AiPattern[] = [
         if (attackers.length < 2) continue;
         const total = attackers.reduce((s, a) => s + attackDamage(a.unit), 0);
         const killable = total >= enemy.hp;
+        const hit = isHitVillage(player, t, turn);
         const better =
           best === null ||
           (killable && !best.killable) ||
           (killable === best.killable &&
-            (attackers.length > best.attackers.length || (attackers.length === best.attackers.length && total > best.total)));
-        if (better) best = { t, attackers, killable, total };
+            (hit !== best.hit
+              ? hit
+              : attackers.length > best.attackers.length || (attackers.length === best.attackers.length && total > best.total)));
+        if (better) best = { t, attackers, killable, total, hit };
       }
       if (!best) return null;
-      const actions: AiAction[] = [];
-      for (const a of best.attackers) {
-        // A garrison that joins from its own village without moving first may
-        // take a lethal counter: it must not unless a spawn covers the village,
-        // or hold entirely when it cannot be replaced.
-        const garrisonGuard = a.moveTo ? null : guardGarrisonAttack(map, player, a.unit, best.t, state);
-        if (garrisonGuard?.kind === GarrisonGuardKind.HOLD) continue;
-        if (a.moveTo) actions.push({ type: AiActionType.MOVE, unitId: a.unit.id, q: a.moveTo.q, r: a.moveTo.r });
-        actions.push({ type: AiActionType.ATTACK, unitId: a.unit.id, q: best.t.q, r: best.t.r });
-        if (garrisonGuard?.guardType) {
-          const home = map.tiles.find((x) => x.unit === a.unit);
-          if (home) actions.push({ type: AiActionType.SPAWN, q: home.q, r: home.r, unitType: garrisonGuard.guardType });
-        }
-      }
-      return actions;
+      return flagsFor(player).attackPlan
+        ? planGangAttack(map, player, best.t, best.attackers, state)
+        : gangAttackActions(map, player, best.t, best.attackers, state);
     },
   },
   {
@@ -500,6 +494,8 @@ export const OFFENSE_PATTERNS: AiPattern[] = [
           // loops when the unit is the only one left).
           if (attackableTargets(map, unit, player.index).length > 0) continue;
           if (hexDistance(t, v) > (d.enemyTurns * movePoints(unit)) / 10) continue;
+          // Never feed a unit the enemy would kill there into the village.
+          if (v.settlement && !unitHoldsVillage(map, v, player.index, unit)) continue;
           const reach = reachableTargets(map, unit, undefined, canClimb, canDock, player.index).filter(
             (c) =>
               !state.occupied.has(key(c.q, c.r)) &&

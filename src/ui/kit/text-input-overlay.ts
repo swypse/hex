@@ -17,6 +17,8 @@ interface TextInputOpts {
    *  inside a moved container (e.g. a popup), as the HTML input is placed in
    *  screen coordinates. Default: the parent is at the screen origin. */
   origin?: () => { x: number; y: number };
+  /** Tab / Shift+Tab pressed while editing; the caller moves focus. */
+  onTab?: (backwards: boolean) => void;
 }
 
 export class TextInputOverlay {
@@ -84,6 +86,12 @@ export class TextInputOverlay {
       this.opts.onChange(v);
     });
     input.addEventListener('keydown', (e) => {
+      if (e.key === 'Tab' && this.opts.onTab) {
+        e.preventDefault();
+        e.stopPropagation();
+        this.opts.onTab(e.shiftKey);
+        return;
+      }
       if (e.key === 'Enter') {
         input.blur();
         e.stopPropagation();
