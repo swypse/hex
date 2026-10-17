@@ -109,6 +109,7 @@ class GameController {
   private watchingLoopRunning = false;
   /** Set when the WebGL context has been lost but not yet recovered. */
   private contextLost = false;
+  private gpuDeviceLost = false;
   /** Bumped on every GL context loss; a bake that straddles one is blank. */
   private lossEpoch = 0;
   private damagePreviewHold: HoldTimer | null = null;
@@ -547,8 +548,21 @@ class GameController {
     markDirty();
   }
 
-  /** Whether the GL context is currently reported as lost by Pixi. */
+  /** The WebGPU device was lost (no `webglcontextlost` event exists for it). */
+  noteGpuDeviceLost(): void {
+    this.gpuDeviceLost = true;
+    this.noteContextLost();
+  }
+
+  /** Pixi created a new WebGPU device after a loss: the generated textures are blank, rebuild them. */
+  noteGpuDeviceRestored(): void {
+    this.gpuDeviceLost = false;
+    void this.recoverFromContextLoss();
+  }
+
+  /** Whether the GL context (or the WebGPU device) is currently reported as lost. */
   private glContextLost(): boolean {
+    if (this.gpuDeviceLost) return true;
     const r = this.app?.renderer as
       | { context?: { isLost?: boolean }; gl?: { isContextLost?: () => boolean } }
       | undefined;

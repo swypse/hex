@@ -58,6 +58,26 @@ async function boot(): Promise<void> {
   app.canvas.addEventListener('webglcontextrestored', () => {
     void gameController.recoverFromContextLoss();
   });
+  // WebGPU has no webglcontextlost/-restored events. A lost device is replaced by
+  // Pixi (which re-uploads image-backed textures), but every generateTexture()
+  // sprite stays blank, so watch the device and rebuild once the new one is up.
+  console.info('[gfx] renderer:', app.renderer.name);
+  if (app.renderer.name === 'webgpu') {
+    const watchDevice = (): void => {
+      const device = (app.renderer as unknown as { gpu?: { device?: { lost: Promise<{ reason?: string }> } } }).gpu?.device;
+      void device?.lost.then((info) => {
+        if (info?.reason !== 'destroyed') gameController.noteGpuDeviceLost();
+      });
+    };
+    app.renderer.runners.contextChange.add({
+      // Added after init, so every call is a new device replacing a lost one.
+      contextChange: () => {
+        watchDevice();
+        gameController.noteGpuDeviceRestored();
+      },
+    });
+    watchDevice();
+  }
   // Some mobile browsers (notably iOS Safari) drop the context during a long
   // background without reliably firing `webglcontextrestored` on return. Rebuild
   // the generated textures whenever the page becomes visible and the context

@@ -87,6 +87,8 @@ const controller = gameController as unknown as {
   recoverFromContextLoss(): Promise<void>;
   recoverOnForeground(): void;
   noteContextLost(): void;
+  noteGpuDeviceLost(): void;
+  noteGpuDeviceRestored(): void;
   shutdown(): void;
 };
 
@@ -208,6 +210,43 @@ describe('WebGL context loss recovery', () => {
 
     expect(controller.mapView).toBe(before);
 
+    screen.destroy();
+  });
+
+  it('rebuilds when a lost WebGPU device is replaced', async () => {
+    await gameController.startGame(TRIBES[0]!.id, 1, GameMode.CAPTURE);
+    const screen = new GameScreen();
+    screen.mount(makeHost(makeApp()));
+    await new Promise((r) => setTimeout(r, 50));
+    const before = controller.mapView!;
+    const texturesBefore = controller.textures!;
+
+    controller.noteGpuDeviceLost();
+    controller.noteGpuDeviceRestored();
+    await new Promise((r) => setTimeout(r, 50));
+
+    expect(controller.mapView).not.toBe(before);
+    expect(controller.textures).not.toBe(texturesBefore);
+    expect(useGameStore.getState().texturesLoading).toBe(false);
+    screen.destroy();
+  });
+
+  it('keeps waiting while the WebGPU device is still lost, then recovers on foreground', async () => {
+    await gameController.startGame(TRIBES[0]!.id, 1, GameMode.CAPTURE);
+    const screen = new GameScreen();
+    screen.mount(makeHost(makeApp()));
+    await new Promise((r) => setTimeout(r, 50));
+    const before = controller.mapView!;
+
+    controller.noteGpuDeviceLost();
+    // The new device is not up yet: a foreground event must not bake onto the dead one.
+    const pending = controller.recoverFromContextLoss();
+    await new Promise((r) => setTimeout(r, 20));
+    expect(controller.mapView).toBe(before);
+    controller.noteGpuDeviceRestored();
+    await pending;
+    await new Promise((r) => setTimeout(r, 50));
+    expect(controller.mapView).not.toBe(before);
     screen.destroy();
   });
 });
