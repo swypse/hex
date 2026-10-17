@@ -1,5 +1,5 @@
 import { SeededRandom } from '@/util';
-import { AchievementId, VeteranBonus, AiActionType, AiEngine, BuilderExtraKind, BuildingKind, CommandType, GameEventType, GameMode, Season, SkillId, UnitType, WeatherType } from '@enums';
+import { AchievementId, VeteranBonus, VillageUpgradeBonus, AiActionType, AiEngine, BuilderExtraKind, BuildingKind, CommandType, GameEventType, GameMode, Season, SkillId, UnitType, WeatherType } from '@enums';
 import { awardAchievementScores, currentlyMetIds, evaluateAchievements } from './achievements';
 import { planAiActions, planAiActionsSteps } from './ai/ai';
 import type { AiAction } from './ai/ai-types';
@@ -39,7 +39,7 @@ import { LIGHTNING_COOLDOWN_TURNS, LIGHTNING_COST, lightningReady, lightningStri
 import { TileType } from './map/tile-types';
 import { canPlaceTrapOn, TRAP_COST, trapAlive, trapDamage } from './units/traps';
 import { applyVeteranBonus, canAttack, canDisband, canHeal, canMove, disbandCost, aiVeteranBonus, needsVeteranBonus, recordKill, canDealWithPirate, hasPirateDeal, healUnit, HEAL_AMOUNT, MEDICINE_HEAL_BONUS, movePoints, PIRATE_DEAL_COST, PIRATE_OWNER, type Unit } from './units/units';
-import { buildWall as applyWall, canBuildWall, tileHasUniversity, upgradeVillage } from './economy/village';
+import { aiUpgradeBonus, buildWall as applyWall, canBuildWall, tileHasUniversity, upgradeVillage, villageUpgradeChoices } from './economy/village';
 import { randomSeed } from '../util/random';
 import { Bonuses } from './bonuses';
 import { Environment } from './environment';
@@ -61,7 +61,7 @@ export type Command =
   | { type: CommandType.BUILD_WALL; q: number; r: number }
   | { type: CommandType.BUILD_ROAD; q: number; r: number }
   | { type: CommandType.BUILD_BRIDGE; q: number; r: number }
-  | { type: CommandType.UPGRADE_VILLAGE; q: number; r: number }
+  | { type: CommandType.UPGRADE_VILLAGE; q: number; r: number; bonus?: VillageUpgradeBonus }
   | { type: CommandType.UPGRADE_SHIP; unitId: string }
   | { type: CommandType.OPEN_SKILL; skill: SkillId }
   | { type: CommandType.HEAL; unitId: string }
@@ -276,7 +276,7 @@ export class Simulator {
         ok = this.doBuildBridge(cmd.q, cmd.r);
         break;
       case CommandType.UPGRADE_VILLAGE:
-        ok = this.doUpgradeVillage(cmd.q, cmd.r);
+        ok = this.doUpgradeVillage(cmd.q, cmd.r, cmd.bonus);
         break;
       case CommandType.UPGRADE_SHIP:
         ok = this.doUpgradeShip(cmd.unitId);
@@ -1068,16 +1068,28 @@ export class Simulator {
     return false;
   }
 
-  private doUpgradeVillage(q: number, r: number): boolean {
+  private doUpgradeVillage(q: number, r: number, bonus?: VillageUpgradeBonus): boolean {
     const tile = tileAt(this.map, q, r);
     if (!tile?.settlement || tile.settlement.owner !== this.currentPlayerIndex) return false;
     const player = this.currentPlayer;
+    const choices = villageUpgradeChoices(tile.settlement.level);
+    // A pick the village does not offer is refused; none means the AI's choice (or the first option).
+    if (bonus !== undefined && choices.length > 0 && !choices.includes(bonus)) return false;
+    const pick = bonus ?? (player.isHuman ? undefined : aiUpgradeBonus(this.map, tile));
     const cost = villageUpgradeCost(tile.settlement.level);
     if (!payAt(this.map, player, tile, cost)) return false;
-    upgradeVillage(this.map, tile, this.rng);
+    const result = upgradeVillage(this.map, tile, this.rng, pick);
     awardScore(player, UPGRADE_SCORE);
     this.statsOf(player).villageUpgrades += 1;
-    this.emit({ type: GameEventType.VILLAGE_UPGRADED, q, r, level: tile.settlement.level, playerIndex: player.index });
+    if (result.money > 0) {
+      player.resources.money += result.money;
+      this.emitScoreFly(player.index, result.money, tile);
+    }
+    this.emit({ type: GameEventType.VILLAGE_UPGRADED, q, r, level: tile.settlement.level, playerIndex: player.index, bonus: result.bonus ?? undefined });
+    if (result.spawned) {
+      this.emit({ type: GameEventType.SPAWNED, unitType: UnitType.SWORDSMAN, q, r, playerIndex: player.index });
+      if (!player.isHuman) this.pickVeteranBonusForAi(result.spawned);
+    }
     this.emitScoreFly(player.index, UPGRADE_SCORE, tile);
     return true;
   }
@@ -1353,7 +1365,7 @@ export class Simulator {
     let ok = false;
     switch (a.type) {
       case AiActionType.UPGRADE:
-        ok = this.doUpgradeVillage(a.q, a.r);
+        ok = this.doUpgradeVillage(a.q, a.r, a.bonus);
         break;
       case AiActionType.MOVE:
         ok = this.doMove(a.unitId, a.q, a.r);

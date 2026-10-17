@@ -3,7 +3,7 @@ import { t } from '../../i18n';
 import { seasonForTurn, seasonTurn, SEASON_LENGTH } from '../../game/season';
 import { useGameStore } from '../../store/game-store';
 import { type UIHost, type Widget } from '../host';
-import { makeLabel } from '../../gfx/label';
+import { BODY_LINE_HEIGHT, makeLabel } from '../../gfx/label';
 import { Popup, POPUP_BODY_SIZE } from '../kit/popup';
 import { SCORE_PAD, SCORE_TEXT_Y } from './layout';
 import { FontSize } from '@enums';
@@ -61,7 +61,7 @@ export class HudSeason implements Widget {
         t('season.popup.winter'),
         t('season.popup.spring'),
       ].join('\n\n'),
-      { fontSize: POPUP_BODY_SIZE, fill: 0xeeeeee, wordWrap: true, wordWrapWidth: popup.contentWidth },
+      { fontSize: POPUP_BODY_SIZE, fill: 0xeeeeee, lineHeight: BODY_LINE_HEIGHT, wordWrap: true, wordWrapWidth: popup.contentWidth },
     );
     body.position.set(0, 0);
     popup.content.addChild(body);

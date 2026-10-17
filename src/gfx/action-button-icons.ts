@@ -37,6 +37,7 @@ export const ACTION_BUTTON_ICON_FILES: Record<string, string> = {
   skills: 'action-skills',
   achievements: 'action-cup',
   'end-turn': 'action-end-turn',
+  'log-out': 'action-log-out',
 };
 
 const atlas = createIconAtlas({ file: ACTION_BUTTON_ATLAS_FILE, cell: ACTION_BUTTON_ATLAS_CELL, frames: ACTION_BUTTON_ATLAS_FRAMES, tag: 'actionButtonIcons' });

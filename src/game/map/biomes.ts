@@ -1,6 +1,7 @@
 import { hexToPixel } from './hex';
 import { TileType } from './tile-types';
 import { createPerlin } from './perlin';
+import { Tribe } from '@enums';
 
 export enum Biome {
   Grassland,
@@ -41,6 +42,24 @@ export const BIOME_MOUNTAIN: Record<Biome, TileType> = {
   [Biome.Taiga]: TileType.TaigaMountain,
   [Biome.Rainforest]: TileType.RainforestMountain,
 };
+
+/** Biomes a tribe wants for its start, best first. Tribes without an entry take any. */
+export const TRIBE_BIOMES: Partial<Record<Tribe, Biome[]>> = {
+  [Tribe.Sand]: [Biome.Desert],
+  [Tribe.Barbarians]: [Biome.Tundra],
+  [Tribe.Villagers]: [Biome.Grassland],
+  [Tribe.Warriors]: [Biome.Taiga],
+  [Tribe.Aqua]: [Biome.Rainforest, Biome.Grassland],
+  [Tribe.Forest]: [Biome.Rainforest, Biome.Grassland],
+};
+
+/** How well a biome suits a tribe: 1 for its first choice, less for later ones, 0 otherwise. */
+export function biomeAffinity(tribe: Tribe | undefined, biome: Biome | undefined): number {
+  const prefs = tribe === undefined ? undefined : TRIBE_BIOMES[tribe];
+  if (!prefs || biome === undefined) return 0;
+  const i = prefs.indexOf(biome);
+  return i < 0 ? 0 : 1 - i * 0.3;
+}
 
 const TEMP_COLD = 0.45;
 const TEMP_WARM = 0.55;

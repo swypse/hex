@@ -129,7 +129,7 @@ function payAndPlaceRoad(map: GameMap, tile: MapTile, player: Player): boolean {
 export function isVillageRoadConnected(
   map: GameMap,
   villageTile: MapTile,
-  waterJumps: Map<string, Set<string>> = portWaterClusterJumps(map),
+  waterJumps?: Map<string, Set<string>>,
 ): boolean {
   const owner = villageTile.settlement?.owner;
   if (owner === null || owner === undefined) return false;

@@ -54,7 +54,7 @@ only it can spawn (no skill needed — the tribe is the gate). Details on each t
 **Fog of war** is tracked per player (AI included). Unexplored tiles are gray; units on them are invisible.
 
 - A unit that moves reveals, for every cell it visits, all tiles within its attack distance (at least the neighbours).
-- A village reveals `territory radius + 1` hexes (level 1 → 2, 2-4 → 3, 5-9 → 4, 10+ → 5) at game start, on upgrade and on
+- A village reveals `territory radius + 1` hexes at game start, on upgrade and on
   capture. Own tiles are explored at the start.
 - The camera follows enemy actions only on explored cells.
 
@@ -160,9 +160,19 @@ Pirates never become veterans.
 
 - **Spawning** — pay the unit's cost in an owned village; blocked if the village tile is occupied or the village's unit
   capacity (`1 + level`) is full.
-- **Upgrade** — `2×level` wood + `level` stone + `2×level` money (level 1: 2 wood + 1 stone + 2 money). Raises income,
-  capacity and territory.
-- **Territory radius** — level 1 → 1, 2-4 → 2, 5-9 → 3, 10+ → 4.
+- **Upgrade** — `2×level` wood + `level` stone + `2×level` money (level 1: 2 wood + 1 stone + 2 money). Raises income and
+  capacity; works while an enemy unit stands on the village. Some upgrades let the player pick a bonus:
+  - level 5 → 6: **expand territory** (+1 radius) or **+5 money** (territory stays);
+  - level 9 → 10: **expand territory** or a **veteran swordsman**;
+  - level 10 and up: **more income** (the usual raise) or a **veteran swordsman** (income stays where it was, so it can
+    be below the village level).
+- **Veteran swordsman** — raised on the village for free (no money, no resources, no *Swordsman* skill, capacity not
+  checked); the owner picks its veteran bonus (the AI picks at once). A unit standing on the village (an enemy
+  capturing it, say) is pushed to an adjacent free land cell, or lost when there is none, and an enemy pushed off loses
+  its capture progress — a last chance to hold a village. The AI takes it when an enemy stands on or is about to reach
+  the village.
+- **Territory radius** — level 1 → 1, level 2 → 2, then +1 for each *expand territory* pick (levels 5→6 and 9→10).
+  Old saves keep the radius their level gave (2-4 → 2, 5-9 → 3, 10+ → 4).
 - **Building slots** — a village supports as many buildings as its level. Farms and granaries use no slot.
 - **Wall** — 20 money + 15 stone + 5 ore, needs *Defense*. A walled village gives its units +3 defense and must be
   breached by siege before it can be downgraded.

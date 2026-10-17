@@ -2,7 +2,7 @@ import { type Application, type BitmapText, type Container } from 'pixi.js';
 import { authClient, useAuthStore } from '../../auth/auth-store';
 import type { AuthResult } from '../../auth/auth-types';
 import { isValidCode, isValidEmail, isValidName, isValidPassword, normalizeEmail } from '../../auth/auth-validation';
-import { makeLabel } from '../../gfx/label';
+import { BODY_LINE_HEIGHT, makeLabel } from '../../gfx/label';
 import { t } from '../../i18n';
 import { Button } from '../kit/button';
 import { Popup } from '../kit/popup';
@@ -82,7 +82,7 @@ export class AuthDialog {
 
     let y = 0;
     const text = (value: string, fill = 0xeeeeee): BitmapText => {
-      const label = makeLabel(value, { fontSize: FontSize.SMALL, fill, wordWrap: true, wordWrapWidth: popup.contentWidth });
+      const label = makeLabel(value, { fontSize: FontSize.SMALL, fill, lineHeight: BODY_LINE_HEIGHT, wordWrap: true, wordWrapWidth: popup.contentWidth });
       label.position.set(0, y);
       popup.content.addChild(label);
       y += label.height + 6;

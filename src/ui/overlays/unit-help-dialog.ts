@@ -16,7 +16,7 @@ import { hasBridge } from '../../game/economy/bridges';
 import { useGameStore } from '../../store/game-store';
 import { type UIHost } from '../host';
 import { Button } from '../kit/button';
-import { makeLabel } from '../../gfx/label';
+import { BODY_LINE_HEIGHT, makeLabel } from '../../gfx/label';
 import { makeIcon } from '../kit/icon';
 import { Popup } from '../kit/popup';
 import { PopupDialog } from './popup-dialog';
@@ -98,6 +98,7 @@ export class UnitHelpDialog extends PopupDialog {
         const bullet = makeLabel(line, {
           fontSize: FontSize.SMALL,
           fill: 0xeeeeee,
+          lineHeight: BODY_LINE_HEIGHT,
           wordWrap: true,
           wordWrapWidth: popup.contentWidth,
         });
@@ -114,6 +115,7 @@ export class UnitHelpDialog extends PopupDialog {
     const desc = makeLabel(unitHelpDescription(unit), {
       fontSize: FontSize.SMALL,
       fill: 0xeeeeee,
+      lineHeight: BODY_LINE_HEIGHT,
       wordWrap: true,
       wordWrapWidth: popup.contentWidth,
     });
@@ -137,6 +139,7 @@ export class UnitHelpDialog extends PopupDialog {
       const bullet = makeLabel(line, {
         fontSize: FontSize.SMALL,
         fill: 0xeeeeee,
+        lineHeight: BODY_LINE_HEIGHT,
         wordWrap: true,
         wordWrapWidth: popup.contentWidth,
       });

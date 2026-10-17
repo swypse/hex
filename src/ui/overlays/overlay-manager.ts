@@ -10,6 +10,7 @@ import { StalkerRevealDialog } from './stalker-reveal-dialog';
 import { SpawnDialog } from './spawn-dialog';
 import { SkillTree } from './skill-tree';
 import { UnitHelpDialog } from './unit-help-dialog';
+import { VillageUpgradeDialog } from './village-upgrade-dialog';
 import { GameOver } from './game-over';
 import { GameStats } from './game-stats';
 import { AchievementsDialog } from './achievements-dialog';
@@ -63,6 +64,7 @@ export class OverlayManager {
     disconnect: { make: () => new DisconnectDialog(), mounted: null, hiding: false },
     watchingprompt: { make: () => new WatchPromptDialog(), mounted: null, hiding: false },
     stunchoice: { make: () => new StunChoiceDialog(), mounted: null, hiding: false },
+    villageupgrade: { make: () => new VillageUpgradeDialog(), mounted: null, hiding: false },
     builderbuild: { make: () => new BuilderBuildDialog(), mounted: null, hiding: false },
   };
   private unsub: (() => void) | null = null;
@@ -142,6 +144,9 @@ export class OverlayManager {
           break;
         case OverlayKind.STUN_CHOICE:
           active.add('stunchoice');
+          break;
+        case OverlayKind.VILLAGE_UPGRADE:
+          active.add('villageupgrade');
           break;
         case OverlayKind.BUILDER_BUILD:
           active.add('builderbuild');

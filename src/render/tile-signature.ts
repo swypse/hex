@@ -23,6 +23,17 @@ export function granaryFarmCount(map: GameMap, tile: MapTile): number {
   return clamp(adjacentFarmCount(map, tile, tile.ownedBy), 1, 6);
 }
 
+const NEIGHBOR_KEYS = new Map<string, string[]>();
+
+/** Keys of a tile's six neighbours, cached by tile key: the signature pass runs
+ *  over every tile on each render, and building the keys dominated it. */
+function neighborKeys(tile: Axial): string[] {
+  const key = axialKey(tile);
+  let keys = NEIGHBOR_KEYS.get(key);
+  if (!keys) NEIGHBOR_KEYS.set(key, (keys = hexNeighbors(tile).map((n) => axialKey(n))));
+  return keys;
+}
+
 export function tileSignature(
   tile: MapTile,
   map: GameMap,
@@ -36,16 +47,13 @@ export function tileSignature(
   const s = tile.settlement;
   const u = tile.unit;
   const hidden = u ? hiddenUnitIds.has(u.id) || (u.owner !== localPlayerIndex && u.isStealthed === true) : false;
-  const neighborOf = (n: Axial): MapTile | undefined =>
-    tileIndex ? tileIndex.get(axialKey(n)) : map.tiles.find((x) => x.q === n.q && x.r === n.r);
-  const neighborOwners = hexNeighbors(tile).map((n) => {
-    const t = neighborOf(n);
-    return t ? (t.ownedBy ?? '-') : 'x';
-  }).join(',');
-  const neighborRoads = hexNeighbors(tile).map((n) => {
-    const t = neighborOf(n);
-    return t ? (t.roadOwner ?? '-') : 'x';
-  }).join(',');
+  let neighborOwners = '';
+  let neighborRoads = '';
+  for (const n of neighborKeys(tile)) {
+    const t = tileIndex ? tileIndex.get(n) : map.tiles.find((x) => axialKey(x) === n);
+    neighborOwners += `${t ? (t.ownedBy ?? '-') : 'x'},`;
+    neighborRoads += `${t ? (t.roadOwner ?? '-') : 'x'},`;
+  }
   return [
     explored ? '1' : '0',
     tile.terrain,

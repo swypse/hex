@@ -8,6 +8,7 @@ import { makeIconChip } from '../kit/tribe-chip';
 import { ACHIEVEMENT_ATLAS_KEYS } from '../../gfx/achievement-icons';
 import { makeAchievementChip } from '../kit/tribe-chip';
 import { Popup, POPUP_BODY_SIZE } from '../kit/popup';
+import { OverlayKind } from '@enums';
 
 const MESSAGE_MS = 1400;
 const YOUR_TURN_MS = 800;
@@ -40,7 +41,9 @@ export class CenterMessage {
 
   private render(): void {
     if (!this.el || !this.host) return;
-    const message = useGameStore.getState().centerMessage;
+    const state = useGameStore.getState();
+    // Messages wait while the skill tree covers the map and show once it closes.
+    const message = state.overlay?.kind === OverlayKind.SKILL ? null : state.centerMessage;
     if (message === null) {
       this.clearTimers();
       if (this.current !== null || this.popup) {

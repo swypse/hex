@@ -4,7 +4,8 @@ import { stormEligible } from '@/game/units/storm';
 import { canDisband, type Unit } from '@/game/units/units';
 import { sfx } from '@/sound/sfx';
 import { useGameStore } from '@/store/game-store';
-import { BuildingKind, CommandType, OverlayKind, SelectionKind, SkillId, UnitType, type VeteranBonus } from '@enums';
+import { BuildingKind, CommandType, OverlayKind, SelectionKind, SkillId, UnitType, type VeteranBonus, type VillageUpgradeBonus } from '@enums';
+import { villageUpgradeChoices } from '@/game/economy/village';
 import { tileAt } from '@/game/map/tile-index';
 
 export interface UnitActionsHost {
@@ -37,12 +38,21 @@ export class UnitActions {
     this.host.render();
   }
 
-  upgradeSelectedVillage(): void {
+  /** Upgrades the selected village. On levels that offer a bonus the player picks it first
+   *  (a dialog), unless `bonus` is given. */
+  upgradeSelectedVillage(bonus?: VillageUpgradeBonus): void {
     const store = useGameStore.getState();
     if (store.aiActive) return;
     const selection = store.selection;
     if (!selection) return;
-    this.sendCommand({ type: CommandType.UPGRADE_VILLAGE, q: selection.q, r: selection.r });
+    const tile = this.sim ? tileAt(this.sim.map, selection.q, selection.r) : undefined;
+    const level = tile?.settlement?.level;
+    if (bonus === undefined && level !== undefined && villageUpgradeChoices(level).length > 0) {
+      store.setOverlay({ kind: OverlayKind.VILLAGE_UPGRADE, q: selection.q, r: selection.r });
+      return;
+    }
+    store.setOverlay(null);
+    this.sendCommand({ type: CommandType.UPGRADE_VILLAGE, q: selection.q, r: selection.r, bonus });
   }
 
   upgradeSelectedVillageFromToolbar(): void {

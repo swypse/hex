@@ -1,6 +1,6 @@
 import type { Axial } from './map/hex';
 import type { WeatherBuildingHit, WeatherEvent, WeatherUnitHit } from './weather/weather';
-import { AchievementId, BonusKind, BottleEffect, BuildingKind, GameEventType, Season, SiegeTargetKind, SkillId, UnitType } from '@enums';
+import { AchievementId, BonusKind, BottleEffect, BuildingKind, GameEventType, Season, SiegeTargetKind, SkillId, UnitType, VillageUpgradeBonus } from '@enums';
 
 
 
@@ -19,7 +19,7 @@ export type GameEvent =
   | { type: GameEventType.SIEGE; attackerId: string; attackerIndex: number; targetIndex: number; targetTile: Axial; missed: boolean; destroyed: SiegeTargetKind | null; buildingHp?: number }
   | { type: GameEventType.SPAWNED; unitType: UnitType; q: number; r: number; playerIndex: number }
   | { type: GameEventType.CAPTURED; q: number; r: number; oldOwner: number | null; newOwner: number; ownerDied: boolean }
-  | { type: GameEventType.VILLAGE_UPGRADED; q: number; r: number; level: number; playerIndex: number }
+  | { type: GameEventType.VILLAGE_UPGRADED; q: number; r: number; level: number; playerIndex: number; bonus?: VillageUpgradeBonus }
   | { type: GameEventType.WALL_BUILT; q: number; r: number; playerIndex: number }
   | { type: GameEventType.BUILT; kind: BuildingKind; q: number; r: number; playerIndex: number }
   | { type: GameEventType.BUILDING_REPAIRED; q: number; r: number; playerIndex: number }

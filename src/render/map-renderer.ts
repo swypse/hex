@@ -1767,7 +1767,7 @@ export class MapView {
 
   /** Points the terrain sprites of `tiles` at the textures of another bake
    *  (the new season) without rebuilding the view. */
-  swapTileTextures(tiles: { q: number; r: number }[], textures: TextureSet): void {
+  swapTileTextures(tiles: { q: number; r: number }[], textures: Pick<TextureSet, 'tileTextures'>): void {
     for (const tile of tiles) {
       const key = axialKey(tile);
       const tv = this.tileViews.get(key);
@@ -1775,6 +1775,23 @@ export class MapView {
       if (!tv || !tex || tv.terrainSprite.destroyed) continue;
       tv.terrainSprite.texture = tex.texture;
       tv.terrainSprite.anchor.set(0.5, tex.anchorY);
+    }
+  }
+
+  /** Points every tile's terrain and fog sprite at the live set's current
+   *  terrain textures (after they were swapped in place). */
+  refreshTerrainSprites(): void {
+    for (const [key, tv] of this.tileViews) {
+      const tex = this.textures.tileTextures.get(key);
+      if (tex && !tv.terrainSprite.destroyed) {
+        tv.terrainSprite.texture = tex.texture;
+        tv.terrainSprite.anchor.set(0.5, tex.anchorY);
+      }
+      const fog = this.textures.fogTextures.get(key);
+      if (fog && !tv.fogSprite.destroyed) {
+        tv.fogSprite.texture = fog.texture;
+        tv.fogSprite.anchor.set(0.5, fog.anchorY);
+      }
     }
   }
 
@@ -2138,7 +2155,7 @@ export class MapView {
     const capacity = villageCapacity(tile.settlement!.level);
     const count = unitsInVillage(map, tile);
     const tribe = tribeById(players[owner]!.tribe)!;
-    const connected = this.textures.villageConnectedTexture !== null && isVillageRoadConnected(map, tile, this.waterJumps);
+    const connected = this.textures.villageConnectedTexture !== null && isVillageRoadConnected(map, tile);
     const icon = connected ? new Sprite(this.textures.villageConnectedTexture!) : null;
     const iconSize = 16;
     const gap = 4;

@@ -113,6 +113,39 @@ describe('gameStore', () => {
     expect(store().centerMessageQueue).toEqual([]);
   });
 
+  it('drops a queued duplicate and re-queues the message at the back', () => {
+    const store = () => useGameStore.getState();
+    store().setCenterMessage('shown');
+    store().setCenterMessage('Your turn', 'a.png');
+    store().setCenterMessage('other', 'b.png');
+    store().setCenterMessage('Your turn', 'c.png');
+    expect(store().centerMessageQueue).toEqual(['other', 'Your turn']);
+    expect(store().centerIconQueue).toEqual(['b.png', 'c.png']);
+    useGameStore.setState({ centerMessage: null, centerMessageQueue: [], centerIconFile: null, centerIconQueue: [], centerChipStyle: null, centerChipQueue: [], centerMeetQueue: [] });
+  });
+
+  it('collapses queued "you meet" messages into one', () => {
+    const store = () => useGameStore.getState();
+    const format = (names: string[]) => `You meet ${names.join(', ')}`;
+    store().setCenterMessage('busy');
+    store().queueMetTribes(['Cats'], 'cats-icon.png', format);
+    store().setCenterMessage('between');
+    store().queueMetTribes(['Aqua', 'Cats'], 'aqua-icon.png', format);
+    expect(store().centerMessageQueue).toEqual(['You meet Cats, Aqua', 'between']);
+    expect(store().centerIconQueue[0]).toBe('cats-icon.png');
+    store().setCenterMessage(null);
+    expect(store().centerMessage).toBe('You meet Cats, Aqua');
+    useGameStore.setState({ centerMessage: null, centerMessageQueue: [], centerIconFile: null, centerIconQueue: [], centerChipStyle: null, centerChipQueue: [], centerMeetQueue: [] });
+  });
+
+  it('shows met tribes at once when nothing is on screen', () => {
+    const store = () => useGameStore.getState();
+    store().queueMetTribes(['Cats', 'Aqua'], 'cats-icon.png', (names) => `You meet ${names.join(', ')}`);
+    expect(store().centerMessage).toBe('You meet Cats, Aqua');
+    expect(store().centerIconFile).toBe('cats-icon.png');
+    useGameStore.setState({ centerMessage: null, centerMessageQueue: [], centerIconFile: null, centerIconQueue: [], centerChipStyle: null, centerChipQueue: [], centerMeetQueue: [] });
+  });
+
   it('keeps the center icon file in sync with the queued center messages', () => {
     const store = () => useGameStore.getState();
     store().setCenterMessage('You meet Cats!', 'cats-icon.png');
@@ -211,5 +244,19 @@ describe('browser back from the game screen', () => {
     expect(useGameStore.getState().overlay).toEqual({ kind: OverlayKind.LEAVE });
     confirmLeaveGame();
     expect(useGameStore.getState().screen).toBe(Screen.START);
+  });
+
+  it('Back closes an open skill tree instead of asking to leave, and a second Back asks', () => {
+    const { back } = installFakeWindow();
+    initNavigation();
+    const s = useGameStore.getState();
+    s.setScreen(Screen.SETUP);
+    s.setScreen(Screen.GAME);
+    s.setOverlay({ kind: OverlayKind.SKILL });
+    back();
+    expect(useGameStore.getState().screen).toBe(Screen.GAME);
+    expect(useGameStore.getState().overlay).toBeNull();
+    back();
+    expect(useGameStore.getState().overlay).toEqual({ kind: OverlayKind.LEAVE });
   });
 });

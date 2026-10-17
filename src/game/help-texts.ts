@@ -4,7 +4,7 @@ import { UNIVERSITY_UPKEEP, villageIncome } from './economy/capture';
 import { AGRONOMY_FOOD, FARM_FOOD, granaryCapacity, GRANARY_CAPACITY_PER_FARM, STARVATION_DAMAGE } from './economy/food';
 import { buildingCapacity, heldInBuilding } from './economy/building-stock';
 import { villageUpgradeCost } from './economy/resources';
-import { buildingsInVillage, claimRadius, villageBuildingLimit, unitsInVillage, villageCapacity } from './economy/village';
+import { buildingsInVillage, settlementRadius, villageBuildingLimit, unitsInVillage, villageCapacity } from './economy/village';
 import { SHIP_UPGRADE_COST } from './units/ship';
 import { BRIDGE_COST } from './economy/bridges';
 import { BRIDGE_SCORE } from './score';
@@ -21,7 +21,7 @@ export function settlementHelpLines(map: GameMap, tile: MapTile): string[] {
   const s = tile.settlement;
   if (!s) return [];
   const stationed = unitsInVillage(map, tile);
-  const radius = claimRadius(s.level);
+  const radius = settlementRadius(s);
   const income = villageIncome(map, tile);
   const cost = villageUpgradeCost(s.level);
   const limits = [1, 2, 3, 4].map((l) => villageBuildingLimit(l));

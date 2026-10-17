@@ -393,7 +393,7 @@ export class NetworkController {
       ...clients.map((p) => ({ name: p.name, tribe: p.tribeId! })),
     ];
     const players = buildMultiplayerPlayers(humans, this.hostConfig.aiCount, new SeededRandom(randomSeed()), loadSettings().aiDifficulty);
-    const map = generateMap(players.length, randomSeed());
+    const map = generateMap(players.length, randomSeed(), players.map((p) => p.tribe));
     for (const p of players) {
       initialExplorationFor(map, p.index);
       exploreVillageSights(map, p.index);

@@ -34,7 +34,7 @@ import { localizeVillageName } from '@/i18n/lists';
 import type { HostMessage } from '@/net/peer-session';
 import { MapView, type OverlayItem, ZOOM_DETAIL_HIDE } from '@/render/map-renderer';
 import { markDirty } from '@/gfx/render-gate';
-import { createTextures, destroyTextureSet } from '@/render/texture-factory';
+import { adoptTerrainTextures, createTerrainTextures, createTextures, destroyTextureSet, suppressPixiWarnings, type TerrainTextures, type TextureSet } from '@/render/texture-factory';
 import { pickTileAt } from '@/render/tile-pick';
 import { type Viewport } from '@/render/tile-signature';
 import { bonusEligibleFor } from '@/game/map/bonus';
@@ -179,9 +179,23 @@ class GameController {
     return (this.textures.season ?? Season.SPRING) !== seasonForTurn(this.sim.turn) || (this.textures.iceTiles ?? 0) !== countIceTiles(this.sim.map) || (this.textures.crackedIce ?? false) !== iceCracksAt(this.sim.turn);
   }
 
-  private bakeTerrain(season: Season): ReturnType<typeof createTextures> {
+  private bakeTerrain(season: Season, cracked = iceCracksAt(this.sim!.turn)): Promise<TerrainTextures> {
     const hexSize = HEX_SIZE * this.getCamera().qualityFactor;
-    return createTextures(this.app!, this.sim!.map, hexSize, new Set(this.sim!.players.map((p) => p.tribe)), season, iceCracksAt(this.sim!.turn));
+    return createTerrainTextures(this.app!, this.sim!.map, hexSize, season, cracked);
+  }
+
+  /** Puts a freshly baked terrain part into the live texture set and points the
+   *  live view's sprites at it: no view rebuild, so no dropped frames. */
+  private applyTerrain(terrain: TerrainTextures): void {
+    if (!this.textures) return;
+    const superseded = adoptTerrainTextures(this.textures, terrain);
+    this.mapView?.refreshTerrainSprites();
+    // Freed a moment later so animations still holding an old sprite texture draw it safely.
+    setTimeout(() => {
+      suppressPixiWarnings(() => {
+        for (const tex of superseded) if (!tex.destroyed) tex.destroy(true);
+      }, 'was destroyed while still bound to a shader');
+    }, TEXTURE_RELEASE_DELAY_MS);
   }
 
   /** Season change that freezes or thaws water: bakes the new terrain in the
@@ -198,19 +212,19 @@ class GameController {
     try {
       const textures = await this.bakeTerrain(seasonForTurn(this.sim.turn));
       if (token !== this.initToken || !this.app || !this.mapRoot) {
-        destroyTextureSet(textures);
+        destroyTextureSet(textures as TextureSet);
         return;
       }
       if (epoch !== this.lossEpoch) {
-        destroyTextureSet(textures, { contextLost: true });
+        destroyTextureSet(textures as TextureSet, { contextLost: true });
         return;
       }
       await this.mapView?.seasonIceWave(tiles, (row) => this.mapView?.swapTileTextures(row, textures));
       if (token !== this.initToken || epoch !== this.lossEpoch) {
-        destroyTextureSet(textures, { contextLost: epoch !== this.lossEpoch });
+        destroyTextureSet(textures as TextureSet, { contextLost: epoch !== this.lossEpoch });
         return;
       }
-      this.replaceTextures(textures);
+      this.applyTerrain(textures);
       this.render();
     } catch (e) {
       console.error('[season] ice transition failed', e);
@@ -234,10 +248,10 @@ class GameController {
     try {
       const textures = await this.bakeTerrain(seasonForTurn(this.sim.turn));
       if (token !== this.initToken || !this.app || !this.mapRoot || epoch !== this.lossEpoch) {
-        destroyTextureSet(textures, { contextLost: epoch !== this.lossEpoch });
+        destroyTextureSet(textures as TextureSet, { contextLost: epoch !== this.lossEpoch });
         return;
       }
-      this.replaceTextures(textures);
+      this.applyTerrain(textures);
       this.render();
     } catch (e) {
       console.error('[terrain] texture refresh failed', e);
@@ -262,19 +276,19 @@ class GameController {
     const token = this.initToken;
     const epoch = this.lossEpoch;
     const hexSize = HEX_SIZE * this.getCamera().qualityFactor;
-    void createTextures(this.app, this.sim.map, hexSize, new Set(this.sim.players.map((p) => p.tribe)), season, cracked)
+    void createTerrainTextures(this.app, this.sim.map, hexSize, season, cracked)
       .then((textures) => {
         if (token !== this.initToken || !this.app || !this.mapRoot) {
-          destroyTextureSet(textures);
+          destroyTextureSet(textures as TextureSet);
           return;
         }
         // The context dropped while baking: the result is blank. Keep the old
         // set; context-loss recovery rebuilds everything.
         if (epoch !== this.lossEpoch) {
-          destroyTextureSet(textures, { contextLost: true });
+          destroyTextureSet(textures as TextureSet, { contextLost: true });
           return;
         }
-        this.replaceTextures(textures);
+        this.applyTerrain(textures);
         this.render();
       })
       .catch((e) => console.error('[season] texture rebake failed', e))
@@ -442,13 +456,15 @@ class GameController {
     const current = this.deriveKnownTribes();
     const firstSync = this.knownTribeIds.size === 0;
     if (notify && !firstSync) {
-      const newly = [...current].filter((id) => !this.knownTribeIds.has(id));
-      newly.forEach((tribeId, i) => {
-        const tribe = tribeById(tribeId);
-        if (!tribe) return;
-        if (i === 0) this.centerOnMetTribe(tribeId);
-        setTimeout(() => useGameStore.getState().setCenterMessage(t('msg.meetTribe', { tribe: tribe.name }), `${tribe.code}-icon.png`), i * 1100);
-      });
+      const met = [...current].filter((id) => !this.knownTribeIds.has(id)).map((id) => tribeById(id)).filter((tr): tr is NonNullable<typeof tr> => !!tr);
+      if (met.length > 0) {
+        this.centerOnMetTribe(met[0]!.id);
+        useGameStore.getState().queueMetTribes(
+          met.map((tr) => tr.name),
+          `${met[0]!.code}-icon.png`,
+          (names) => (names.length === 1 ? t('msg.meetTribe', { tribe: names[0]! }) : t('msg.meetTribes', { tribes: names.join(', ') })),
+        );
+      }
     }
     this.knownTribeIds = new Set<number>([...this.knownTribeIds, ...current]);
   }
@@ -672,7 +688,7 @@ class GameController {
     store.setTutorialHighlightSkills([]);
     store.setTutorialHighlightEndTurn(false);
     const players = buildPlayers(tribe, enemyCount, new SeededRandom(randomSeed()), difficulty);
-    const map = generateMap(players.length, randomSeed());
+    const map = generateMap(players.length, randomSeed(), players.map((p) => p.tribe));
     for (const p of players) {
       initialExplorationFor(map, p.index);
       exploreVillageSights(map, p.index);

@@ -1,7 +1,7 @@
 import type { Container } from 'pixi.js';
 import { FontSize } from '@enums';
 import { type UIHost } from '../host';
-import { makeLabel } from '../../gfx/label';
+import { BODY_LINE_HEIGHT, makeLabel } from '../../gfx/label';
 import { Popup } from '../kit/popup';
 
 /** Wrapped grey hint text at the top of a popup body; returns its height. */
@@ -9,6 +9,7 @@ export function addPopupHint(popup: Popup, text: string): number {
   const label = makeLabel(text, {
     fontSize: FontSize.SMALL,
     fill: 0xcccccc,
+    lineHeight: BODY_LINE_HEIGHT,
     wordWrap: true,
     wordWrapWidth: popup.contentWidth,
   });

@@ -20,4 +20,5 @@ export enum OverlayKind {
   DISBAND = 'disband',
   VETERAN_BONUS = 'veteranBonus',
   WATCHING_PROMPT = 'watchingPrompt',
+  VILLAGE_UPGRADE = 'villageUpgrade',
 }

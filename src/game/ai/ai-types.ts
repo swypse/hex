@@ -1,5 +1,5 @@
 import { type BuilderBuildKind } from '../economy/buildings';
-import { AiActionType, AiGoalId, AiOperationPhase, AiPace, BuildingKind, SkillId, SpawnPreference, UnitType } from '@enums';
+import { AiActionType, AiGoalId, AiOperationPhase, AiPace, BuildingKind, SkillId, SpawnPreference, UnitType, VillageUpgradeBonus } from '@enums';
 
 
 
@@ -27,7 +27,7 @@ export interface AiDirectives {
 }
 
 export type AiAction =
-  | { type: AiActionType.UPGRADE; q: number; r: number }
+  | { type: AiActionType.UPGRADE; q: number; r: number; bonus?: VillageUpgradeBonus }
   | { type: AiActionType.MOVE; unitId: string; q: number; r: number }
   | { type: AiActionType.ATTACK; unitId: string; q: number; r: number }
   | { type: AiActionType.STUN; unitId: string; q: number; r: number }

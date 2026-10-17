@@ -3,6 +3,9 @@ import { THEME } from './theme';
 import { fontFamilyForWeight, sizedFontFamily } from './bitmap-fonts';
 import { FontSize } from '@enums';
 
+/** Line height of multi-line body text in popups (multiple of the font size). */
+export const BODY_LINE_HEIGHT = 1.45;
+
 export function makeLabel(
   text: string,
   opts: {
@@ -13,6 +16,8 @@ export function makeLabel(
     anchor?: [number, number];
     wordWrap?: boolean;
     wordWrapWidth?: number;
+    /** Line height as a multiple of the font size (see `BODY_LINE_HEIGHT`). */
+    lineHeight?: number;
     /** Bakes the glyphs this many times larger and scales the label back down,
      *  so text inside a container that gets magnified stays sharp. */
     bake?: number;
@@ -29,6 +34,7 @@ export function makeLabel(
     fontSize,
     fill: opts.fill ?? THEME.text,
   };
+  if (opts.lineHeight) style.lineHeight = Math.round(fontSize * opts.lineHeight);
   if (opts.wordWrap) {
     style.wordWrap = true;
     style.wordWrapWidth = (opts.wordWrapWidth ?? 200) * bake;

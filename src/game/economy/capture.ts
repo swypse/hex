@@ -1,6 +1,6 @@
 import { type GameMap, type MapTile } from '../map/map-gen';
 import { type Unit, unitMaintenance } from '../units/units';
-import { villageCapacity, unitsInVillage, exploreVillageSight } from './village';
+import { villageCapacity, unitsInVillage, exploreVillageSight, settlementIncomeLevel } from './village';
 import { isVillageRoadConnected } from './roads';
 import { START_STOCK } from './resources';
 import { payerVillage, readStock, stockOf } from './stock';
@@ -73,7 +73,7 @@ export function villageEnemyOccupied(villageTile: MapTile): boolean {
 }
 
 export interface VillageIncomeBreakdown {
-  /** 3 + 2 × level, before any upkeep. */
+  /** 3 + 2 × income level, before any upkeep. */
   raw: number;
   /** Upkeep of the units the village raised. */
   units: number;
@@ -90,7 +90,7 @@ export interface VillageIncomeBreakdown {
 }
 
 export function villageIncomeBreakdown(map: GameMap, villageTile: MapTile): VillageIncomeBreakdown {
-  const raw = 3 + villageTile.settlement!.level * 2;
+  const raw = 3 + settlementIncomeLevel(villageTile.settlement!) * 2;
   const units = villageMaintenance(map, villageTile);
   const structures = villageStructureUpkeep(map, villageTile);
   const connection = isVillageRoadConnected(map, villageTile) ? VILLAGE_CONNECTION_BONUS : 0;

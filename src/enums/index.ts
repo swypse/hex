@@ -70,3 +70,4 @@ export * from './village-block-variant.enum';
 export * from './village-build-side.enum';
 export * from './weather-type.enum';
 export * from './word-kind.enum';
+export * from './village-upgrade-bonus.enum';

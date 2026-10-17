@@ -35,6 +35,7 @@ type OverlayState =
   | { kind: OverlayKind.THORN_TRAP }
   | { kind: OverlayKind.DISBAND; unitId: string }
   | { kind: OverlayKind.VETERAN_BONUS; unitId: string }
+  | { kind: OverlayKind.VILLAGE_UPGRADE; q: number; r: number }
   | { kind: OverlayKind.WATCHING_PROMPT };
 
 interface LobbyState {
@@ -70,6 +71,8 @@ interface GameStore {
   centerIconQueue: (string | null)[];
   centerChipStyle: IconChipStyle | null;
   centerChipQueue: (IconChipStyle | null)[];
+  /** Per queued message: the tribe names of a collapsible "you meet" message, else null. */
+  centerMeetQueue: (string[] | null)[];
   localPlayerIndex: number;
   netMode: NetMode;
   lobby: LobbyState | null;
@@ -102,6 +105,8 @@ interface GameStore {
   setExpectedTurns: (turns: number) => void;
   setBonusAwarded: (awarded: boolean) => void;
   setCenterMessage: (message: string | null, iconFile?: string | null, chipStyle?: IconChipStyle | null) => void;
+  /** Announces newly met tribes in one message. Tribes met while an earlier "you meet" message is still queued join it. */
+  queueMetTribes: (names: string[], iconFile: string | null, format: (names: string[]) => string) => void;
   setLocalPlayerIndex: (index: number) => void;
   setNetMode: (mode: NetMode) => void;
   setLobby: (lobby: LobbyState | null) => void;
@@ -140,6 +145,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   centerIconQueue: [],
   centerChipStyle: null,
   centerChipQueue: [],
+  centerMeetQueue: [],
   localPlayerIndex: 0,
   netMode: NetMode.SINGLE,
   lobby: null,
@@ -169,6 +175,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         centerIconQueue: [],
         centerChipStyle: null,
         centerChipQueue: [],
+        centerMeetQueue: [],
         paused: null,
         pausedName: '',
       });
@@ -202,17 +209,45 @@ export const useGameStore = create<GameStore>((set, get) => ({
           centerIconQueue: next === null ? [] : s.centerIconQueue.slice(1),
           centerChipStyle: nextStyle,
           centerChipQueue: next === null ? [] : s.centerChipQueue.slice(1),
+          centerMeetQueue: next === null ? [] : (s.centerMeetQueue ?? []).slice(1),
         };
       }
       if (s.centerMessage !== null) {
+        // The same message is never shown twice: a copy already queued is
+        // dropped and the new one goes to the back of the queue.
+        const keep = s.centerMessageQueue.map((m, i) => (m === message ? -1 : i)).filter((i) => i >= 0);
         return {
-          centerMessageQueue: [...s.centerMessageQueue, message],
-          centerIconQueue: [...s.centerIconQueue, iconFile],
-          centerChipQueue: [...s.centerChipQueue, chipStyle],
+          centerMessageQueue: [...keep.map((i) => s.centerMessageQueue[i]!), message],
+          centerIconQueue: [...keep.map((i) => s.centerIconQueue[i] ?? null), iconFile],
+          centerChipQueue: [...keep.map((i) => s.centerChipQueue[i] ?? null), chipStyle],
+          centerMeetQueue: [...keep.map((i) => s.centerMeetQueue?.[i] ?? null), null],
         };
       }
       return { centerMessage: message, centerIconFile: iconFile ?? null, centerChipStyle: chipStyle };
     }),
+  queueMetTribes: (names, iconFile, format) => {
+    if (names.length === 0) return;
+    set((s) => {
+      const meet = s.centerMeetQueue ?? [];
+      const at = s.centerMessageQueue.findIndex((_, i) => meet[i]);
+      if (s.centerMessage !== null && at >= 0) {
+        const merged = [...meet[at]!, ...names.filter((n) => !meet[at]!.includes(n))];
+        const queue = [...s.centerMessageQueue];
+        queue[at] = format(merged);
+        const metQueue = s.centerMessageQueue.map((_, i) => meet[i] ?? null);
+        metQueue[at] = merged;
+        return { centerMessageQueue: queue, centerMeetQueue: metQueue };
+      }
+      const message = format(names);
+      if (s.centerMessage === null) return { centerMessage: message, centerIconFile: iconFile, centerChipStyle: null };
+      return {
+        centerMessageQueue: [...s.centerMessageQueue, message],
+        centerIconQueue: [...s.centerIconQueue, iconFile],
+        centerChipQueue: [...s.centerChipQueue, null],
+        centerMeetQueue: [...s.centerMessageQueue.map((_, i) => meet[i] ?? null), names],
+      };
+    });
+  },
   setLocalPlayerIndex: (index) => set({ localPlayerIndex: index }),
   setNetMode: (netMode) => set({ netMode }),
   setLobby: (lobby) => set({ lobby }),
@@ -232,6 +267,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
 const SCREENS: Screen[] = [Screen.START, Screen.SETUP, Screen.LOBBY, Screen.GAME];
 
 let suppressPush = false;
+
+/** View overlays the browser Back closes, rather than asking to leave the game. */
+const BACK_CLOSES_OVERLAY = new Set<OverlayKind>([OverlayKind.SKILL, OverlayKind.STATS, OverlayKind.ACHIEVEMENTS]);
 
 /** Lets the visible screen consume a browser Back (e.g. a sub-step of the
  *  setup screen). Returning true keeps the current screen: the history entry
@@ -289,6 +327,12 @@ function onPopState(event: PopStateEvent): void {
     } catch {
       // history API unavailable
     }
+    return;
+  }
+  // Back closes an open view overlay (the skill tree...) instead of leaving the game.
+  if (current === Screen.GAME && store.overlay && BACK_CLOSES_OVERLAY.has(store.overlay.kind)) {
+    store.setOverlay(null);
+    pushHistory(current);
     return;
   }
   if (current === Screen.GAME && !store.gameOver) {

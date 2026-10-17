@@ -1,6 +1,7 @@
 import { describe, expect, it, afterEach, vi } from 'vitest';
 import { Container, Sprite, BitmapText } from 'pixi.js';
 import { CenterMessage } from '../src/ui/overlays/center-message';
+import { OverlayKind } from '@enums';
 import { useGameStore } from '../src/store/game-store';
 import { t } from '../src/i18n';
 import { type UIHost } from '../src/ui/host';
@@ -77,6 +78,22 @@ describe('CenterMessage', () => {
 
     msg.destroy();
     expect(root.children.length).toBe(0);
+  });
+
+  it('holds the message while the skill tree is open and shows it once closed', () => {
+    installCanvas();
+    useGameStore.setState({ centerMessage: 'Waiting', overlay: { kind: OverlayKind.SKILL } });
+    const root = new Container();
+    const msg = new CenterMessage();
+    msg.mount(makeHost(), root);
+    const el = root.children[0] as Container;
+    expect(el.children.length).toBe(0);
+    expect(useGameStore.getState().centerMessage).toBe('Waiting');
+
+    useGameStore.setState({ overlay: null });
+    const popupRoot = (root.children[0] as Container).children[0] as Container;
+    expect(allTexts(popupRoot).some((tx) => String(tx.text) === 'Waiting')).toBe(true);
+    msg.destroy();
   });
 
   it('shows the tribe icon above the text for a meet-tribe message', () => {

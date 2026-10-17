@@ -2,13 +2,13 @@ import { allTiles, axialKey, hexDistance, hexNeighbors, ringOf, tilesInRange } f
 import { generateVillageNames } from '../names';
 import { START_STOCK, type Stock } from '../economy/resources';
 import { isForestType, isLandType, isMountainType, isWaterType, TileType } from './tile-types';
-import { Biome, BIOME_FOREST, BIOME_LAND, BIOME_MOUNTAIN, generateTerrain } from './biomes';
+import { Biome, BIOME_FOREST, BIOME_LAND, BIOME_MOUNTAIN, biomeAffinity, generateTerrain } from './biomes';
 import { SeededRandom } from '../../util/random';
 import { makeUnit, type Unit } from '../units/units';
 import { claimTileForVillage } from '../economy/claim';
 import { placeBonuses, type Bonus } from './bonus';
 import type { WeatherEvent } from '../weather/weather';
-import { BridgeDir, BuildingKind, Season, TerrainFeature, UnitType, VillageBlockVariant } from '@enums';
+import { BridgeDir, BuildingKind, Season, TerrainFeature, type Tribe, UnitType, VillageBlockVariant } from '@enums';
 
 const WATER_BORDER = 2;
 const FREE_VILLAGE_MAX_DIST = 7;
@@ -32,6 +32,11 @@ export interface Settlement {
   captureReady: boolean;
   name?: string;
   capital?: boolean;
+  /** Territory radius; unset on old saves (then derived from the level, see `settlementRadius`). */
+  radius?: number;
+  /** Level the village income is paid for; unset means its level. A veteran swordsman taken
+   *  instead of an income raise leaves it behind the level. */
+  incomeLevel?: number;
   /** Built wall: units inside gain bonus defense. */
   wall?: boolean;
   /** True after a turn end in which the village could not feed its units. */
@@ -306,7 +311,61 @@ function angleDiff(a: number, b: number): number {
   return Math.min(d, 2 * Math.PI - d);
 }
 
-export function generateMap(playerCount: number, seed: number): GameMap {
+/** Land tiles of a start sector, the area a player's start village is picked from. */
+function sectorTiles(tiles: { q: number; r: number }[], sector: number, playerCount: number, radius: number): { q: number; r: number }[] {
+  const target = sectorCenterAngle(sector, playerCount);
+  return tiles.filter(
+    (t) => angleDiff(angleOf(t), target) < Math.PI / playerCount && !(t.q === 0 && t.r === 0) && hexDistance({ q: 0, r: 0 }, t) <= radius - 2,
+  );
+}
+
+/** Which sector each player starts in (index = player). Players are matched to
+ *  the sectors whose biomes suit their tribe best; the identity assignment when
+ *  no tribes are given or nobody has a preference. */
+function assignSectors(
+  tileMap: Map<string, MapTile>,
+  tiles: { q: number; r: number }[],
+  playerCount: number,
+  radius: number,
+  tribes: readonly Tribe[] | undefined,
+): number[] {
+  const identity = Array.from({ length: playerCount }, (_, i) => i);
+  if (!tribes || tribes.length < playerCount) return identity;
+  // fit[p][s]: mean affinity of player p's tribe for the land of sector s.
+  const fit = identity.map((p) =>
+    identity.map((s) => {
+      const land = sectorTiles(tiles, s, playerCount, radius).map((t) => tileMap.get(axialKey(t))!).filter((t) => !isWaterType(t.terrain));
+      if (land.length === 0) return 0;
+      return land.reduce((sum, t) => sum + biomeAffinity(tribes[p], t.biome), 0) / land.length;
+    }),
+  );
+  if (!fit.some((row) => row.some((v) => v > 0))) return identity;
+  let best = identity;
+  let bestScore = -1;
+  const used = new Array<boolean>(playerCount).fill(false);
+  const current: number[] = [];
+  const search = (p: number, score: number): void => {
+    if (p === playerCount) {
+      if (score > bestScore + 1e-9) {
+        bestScore = score;
+        best = [...current];
+      }
+      return;
+    }
+    for (let s = 0; s < playerCount; s++) {
+      if (used[s]) continue;
+      used[s] = true;
+      current[p] = s;
+      search(p + 1, score + fit[p]![s]!);
+      used[s] = false;
+    }
+  };
+  // Exhaustive for the player counts the game offers; fall back to the given order beyond that.
+  if (playerCount <= 7) search(0, 0);
+  return best;
+}
+
+export function generateMap(playerCount: number, seed: number, tribes?: readonly Tribe[]): GameMap {
   const radius = mapRadiusFor(playerCount) + WATER_BORDER;
   const rng = new SeededRandom(seed);
   const villageNames = generateVillageNames(playerCount * 2, rng);
@@ -343,22 +402,26 @@ export function generateMap(playerCount: number, seed: number): GameMap {
   const isTooCloseToAnyVillage = (t: { q: number; r: number }): boolean =>
     placedVillages.some((v) => hexDistance(t, v) < 4);
 
+  const sectorOf = assignSectors(tileMap, tiles, playerCount, radius, tribes);
   for (let p = 0; p < playerCount; p++) {
-    const target = sectorCenterAngle(p, playerCount);
-    const inSector = tiles.filter(
-      (t) =>
-        angleDiff(angleOf(t), target) < Math.PI / playerCount &&
-        !(t.q === 0 && t.r === 0) &&
-        hexDistance({ q: 0, r: 0 }, t) <= radius - 2,
-    );
+    const inSector = sectorTiles(tiles, sectorOf[p]!, playerCount, radius);
     const pickFrom = (arr: { q: number; r: number }[]): { q: number; r: number } => {
       const pool = arr.length > 0 ? arr : inSector;
       return pool[Math.floor(rng.next() * pool.length)]!;
     };
+    // A start village on land of its tribe's biome, when the sector has any.
+    const suited = (arr: { q: number; r: number }[]): { q: number; r: number }[] => {
+      if (!tribes) return arr;
+      const fit = arr.filter((t) => {
+        const tile = tileMap.get(axialKey(t))!;
+        return !isWaterType(tile.terrain) && biomeAffinity(tribes[p], tile.biome) > 0;
+      });
+      return fit.length > 0 ? fit : arr;
+    };
     let candidates = inSector.filter(
       (t) => !reserved.has(axialKey(t)) && !isTooCloseToAnyVillage(t),
     );
-    const start = pickFrom(candidates);
+    const start = pickFrom(suited(candidates));
     for (const n of hexNeighbors(start)) reserved.add(axialKey(n));
     placedVillages.push(start);
 
@@ -366,7 +429,7 @@ export function generateMap(playerCount: number, seed: number): GameMap {
       (t) => !reserved.has(axialKey(t)) && !isTooCloseToAnyVillage(t),
     );
     const nearFree = candidates.filter((t) => hexDistance(t, start) <= FREE_VILLAGE_MAX_DIST);
-    const free = pickFrom(nearFree.length > 0 ? nearFree : candidates);
+    const free = pickFrom(suited(nearFree.length > 0 ? nearFree : candidates));
     for (const n of hexNeighbors(free)) reserved.add(axialKey(n));
     placedVillages.push(free);
 

@@ -93,6 +93,9 @@ export interface TileTexture {
   anchorY: number;
 }
 
+/** Terrain part of a TextureSet: what changes with the season, ice and burned forests. */
+export type TerrainTextures = Pick<TextureSet, 'season' | 'iceTiles' | 'crackedIce' | 'ownedTextures' | 'tileTextures' | 'fogTextures'>;
+
 export interface TextureSet {
   /** Season the terrain tile textures were baked for (spring when absent). */
   season?: Season;
@@ -431,6 +434,8 @@ export async function createTextures(
   season: Season = Season.SPRING,
   /** Draw ice cracked (last winter turn, it melts next). */
   crackedIce = false,
+  /** Bake only the terrain and fog tiles (see createTerrainTextures). */
+  terrainOnly = false,
 ): Promise<TextureSet> {
   // Every texture baked with generateTexture lives on the GPU until destroyed;
   // collect them so destroyTextureSet can free them when the set is replaced.
@@ -457,7 +462,7 @@ export async function createTextures(
     sliceEnd = performance.now() + SLICE_BUDGET_MS;
   };
   const images = await loadTileImages(season, crackedIce);
-  await ensureBuildingsAtlas();
+  if (!terrainOnly) await ensureBuildingsAtlas();
   const tileTextures = new Map<string, TileTexture>();
   const fogTextures = new Map<string, TileTexture>();
   const fogImage = images.get('fog') ?? null;
@@ -535,6 +540,9 @@ export async function createTextures(
       ),
     );
     await maybeYield();
+  }
+  if (terrainOnly) {
+    return { season, iceTiles, crackedIce, ownedTextures: owned, tileTextures, fogTextures } as unknown as TextureSet;
   }
   const unitTextures = {} as Record<Tribe, Record<UnitType, TileTexture>>;
   const glowFor = new LazyGlowMap((base) => makeUnitGlowTexture(bakeApp, base));
@@ -682,6 +690,37 @@ export async function createTextures(
  *  still bound to a shader…` from `BindGroup.onResourceChange`. That guard is
  *  benign (Pixi nulls the stale reference) and unavoidable from app code, so
  *  teardown silences it at the console boundary instead of leaking noise. */
+/** Bakes only the terrain and fog tile textures for the map as it is now, so a
+ *  season, ice or forest change can be applied to a live view without baking
+ *  (or rebuilding) everything else. */
+export function createTerrainTextures(
+  app: Application,
+  map: GameMap,
+  hexSize: number,
+  season: Season,
+  crackedIce: boolean,
+): Promise<TerrainTextures> {
+  return createTextures(app, map, hexSize, new Set(), season, crackedIce, true);
+}
+
+/** Moves a freshly baked terrain part into the live set. The superseded terrain
+ *  textures are returned so the caller can free them once nothing draws them. */
+export function adoptTerrainTextures(live: TextureSet, terrain: TerrainTextures): Texture[] {
+  const superseded = new Set<Texture>();
+  for (const t of live.tileTextures.values()) superseded.add(t.texture);
+  for (const t of live.fogTextures.values()) superseded.add(t.texture);
+  live.tileTextures = terrain.tileTextures;
+  live.fogTextures = terrain.fogTextures;
+  live.season = terrain.season;
+  live.iceTiles = terrain.iceTiles;
+  live.crackedIce = terrain.crackedIce;
+  const fresh = new Set(terrain.ownedTextures ?? []);
+  // Old terrain textures leave the owned list (they are freed on their own);
+  // the new ones join it so destroyTextureSet still frees them with the set.
+  live.ownedTextures = [...(live.ownedTextures ?? []).filter((t) => !superseded.has(t)), ...fresh];
+  return [...superseded].filter((t) => !fresh.has(t));
+}
+
 export function suppressPixiWarnings(fn: () => void, subset: string): void {
   const original = console.warn;
   console.warn = (...args: unknown[]): void => {
