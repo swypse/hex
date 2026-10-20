@@ -2,6 +2,7 @@ import { DEFAULT_AI_DIFFICULTY } from '@/game/ai/ai-difficulty';
 import { builderBuildable } from '@/game/economy/buildings';
 import { CheatController, type CheatHost } from './cheat-controller';
 import { UnitActions, type UnitActionsHost } from './unit-actions';
+import { TradeActions } from './trade-actions';
 import { attackableTargets } from '@/game/units/combat';
 import { type GameEvent } from '@/game/events';
 import { initialExplorationFor, isExploredFor } from '@/game/map/explore';
@@ -120,6 +121,7 @@ class GameController {
   private damagePreviewWindowCancel: ((e: PointerEvent) => void) | null = null;
   readonly cheats = new CheatController(this.cheatHost());
   readonly actions = new UnitActions(this.unitActionsHost());
+  readonly trade = new TradeActions(this.unitActionsHost());
 
   init(app: Application, root: Container, edgeLayerTarget: Container | null = null): void {
     if (this.mapRoot) return;
@@ -370,6 +372,7 @@ class GameController {
     store.setExpectedTurns(this.sim.expectedTurns);
     store.setBonusAwarded(this.sim.bonusAwarded);
     this.promptVeteranBonus();
+    this.trade.promptNextProposal();
   }
 
   /** Asks the local player to pick the bonus of a veteran of theirs that is waiting for one
@@ -837,6 +840,7 @@ class GameController {
         centerOnCell: (q, r) => this.centerOnTile(q, r),
         exploredKeysFor: (playerIndex) => this.exploredKeysFor(playerIndex),
         saveGame: () => this.saveGame(),
+        promptTrade: () => this.trade.promptNextProposal(),
       });
     }
     return this.events;
@@ -994,7 +998,7 @@ class GameController {
     const selection = store.selection;
     if (!selection || !this.sim) return;
     const tile = tileAt(this.sim.map, selection.q, selection.r);
-    if (!tile?.unit || !tile.settlement || tile.settlement.owner === tile.unit.owner || !tile.settlement.captureReady) return;
+    if (!tile?.unit || !tile.settlement || tile.settlement.owner === tile.unit.owner || !tile.settlement.captureReady || tile.unit.hasHealed) return;
     store.setSelection(null);
     this.sendCommand({ type: CommandType.CAPTURE, q: selection.q, r: selection.r, unitId: tile.unit.id });
   }

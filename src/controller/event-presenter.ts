@@ -5,6 +5,7 @@ import { type AttackUnitPre, type GameEvent } from '../game/events';
 import { type MapTile } from '../game/map/map-gen';
 import { type Player } from '../game/players';
 import { tribeById } from '../game/tribes';
+import { resourceTokens } from '../game/economy/resources';
 import { canAttack, canMove, HEAL_AMOUNT, PIRATE_HP, PIRATE_OWNER, type Unit, UNIT_TYPES } from '../game/units/units';
 import { isWaterType } from '../game/map/tile-types';
 import { claimingVillage, villageWaterTiles } from '../game/units/storm';
@@ -133,6 +134,8 @@ export interface EventHost {
   centerOnCell(q: number, r: number): Promise<void>;
   exploredKeysFor(playerIndex: number): Set<string>;
   saveGame(): void;
+  /** Opens the popup for a waiting trade proposal, if any. */
+  promptTrade(): void;
 }
 
 /** The UNIT_MOVED events of a batch whose mover was stealthed while walking.
@@ -327,6 +330,16 @@ export class EventPresenter {
           }
           case GameEventType.BUILT: {
             // The new building bounces its hex, like a selected cell.
+            const tile = tileAt(sim.map, e.q, e.r);
+            if (tile && isExploredFor(tile, local)) {
+              this.host.render();
+              this.host.mapView()?.bounceHex(e.q, e.r);
+            }
+            break;
+          }
+          case GameEventType.ROAD_BUILT:
+          case GameEventType.BRIDGE_BUILT: {
+            // A new road or bridge bounces its hex, like a new building.
             const tile = tileAt(sim.map, e.q, e.r);
             if (tile && isExploredFor(tile, local)) {
               this.host.render();
@@ -529,6 +542,25 @@ export class EventPresenter {
           case GameEventType.WEATHER_DAMAGE:
             await this.presentWeatherDamage(e.units, e.buildings);
             break;
+          case GameEventType.PROPOSAL_DECLINED: {
+            if (e.seller !== useGameStore.getState().localPlayerIndex) break;
+            const buyer = sim.players[e.buyer];
+            useGameStore.getState().setCenterMessage(t('trade.msg.declined', {
+              name: (buyer && tribeById(buyer.tribe)?.name) ?? t('ui.unknownTribe'),
+              items: resourceTokens({ money: 0, wood: 0, stone: 0, ore: 0, food: 0, [e.resource]: e.quantity }),
+            }));
+            break;
+          }
+          case GameEventType.TRADE_SETTLED: {
+            if (e.seller !== useGameStore.getState().localPlayerIndex) break;
+            const buyer = sim.players[e.buyer];
+            useGameStore.getState().setCenterMessage(t('trade.msg.accepted', {
+              name: (buyer && tribeById(buyer.tribe)?.name) ?? t('ui.unknownTribe'),
+              gain: resourceTokens(e.payment),
+              loss: resourceTokens({ money: 0, wood: 0, stone: 0, ore: 0, food: 0, [e.resource]: e.quantity }),
+            }));
+            break;
+          }
           case GameEventType.TURN_STARTED:
             this.presentTurnStarted(e.playerIndex, e.turn);
             break;
@@ -1264,6 +1296,7 @@ export class EventPresenter {
     store.setAiActive(playerIndex !== store.localPlayerIndex);
     if (playerIndex === store.localPlayerIndex) store.setCenterMessage(t('msg.yourTurn'));
     if (playerIndex === store.localPlayerIndex && store.netMode === NetMode.SINGLE) this.host.saveGame();
+    if (playerIndex === store.localPlayerIndex) this.host.promptTrade();
   }
 
   private presentGameOver(winnerIndex: number, bonus: number): void {

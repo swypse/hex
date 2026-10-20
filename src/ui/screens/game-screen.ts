@@ -14,6 +14,7 @@ import { HudTurn } from '../hud/hud-turn';
 import { HudResourcePanel } from '../hud/hud-resource-panel';
 import { HudSelected } from '../hud/hud-selected';
 import { HudAchievements } from '../hud/hud-achievements';
+import { HudTrade } from '../hud/hud-trade';
 import { HudContextMenu } from '../hud/hud-context-menu';
 import { HudToolbar } from '../hud/hud-toolbar';
 import { HudWatchExit } from '../hud/hud-watch-exit';
@@ -135,6 +136,7 @@ export class GameScreen implements ScreenController {
       new HudResourcePanel(),
       new HudSelected(),
       new HudAchievements(),
+      new HudTrade(),
       new HudToolbar(),
       new HudContextMenu(),
       new HudPerf(),

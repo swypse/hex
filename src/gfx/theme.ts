@@ -9,6 +9,9 @@ import { FontSize } from '@enums';export const THEME = {
   panelAlpha: 0.6,
   dialogBg: 0x222222,
   highlight: 0xffd700,
+  /** Flat status button fills: idle, hover and pressed. */
+  success: { base: 0x3f9d5b, hover: 0x57b874, pressed: 0x2f7d46 },
+  warning: { base: 0xd9822b, hover: 0xeb9a47, pressed: 0xb56a1e },
   radius: 4,
   fontFamily: 'Roboto, system-ui, sans-serif',
   text: 0xeeeeee,

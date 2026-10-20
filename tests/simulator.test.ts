@@ -419,6 +419,21 @@ describe('Simulator commands', () => {
     ]);
   });
 
+  it('a unit that healed this turn cannot capture', () => {
+    const map = makeTestMap();
+    tileAt(map, 0, 0)!.settlement = { owner: 0, level: 1, captureReady: false };
+    tileAt(map, 0, 1)!.settlement = { owner: 1, level: 1, captureReady: true };
+    tileAt(map, 0, 1)!.ownedBy = 1;
+    const cap = makeUnit('cap', 0, UnitType.WARRIOR, 0, 1);
+    cap.hasHealed = true;
+    tileAt(map, 0, 1)!.unit = cap;
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    const sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5 });
+    sim.startGame();
+    sim.drainEvents();
+    expect(sim.applyCommand({ type: CommandType.CAPTURE, q: 0, r: 1, unitId: 'cap' })).toBe(false);
+  });
+
   it('counts a tribe eliminated when its last village is captured', () => {
     const map = makeTestMap();
     tileAt(map, 0, 0)!.settlement = { owner: 0, level: 1, captureReady: false };

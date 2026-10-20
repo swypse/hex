@@ -1,6 +1,7 @@
 import type { Axial } from './map/hex';
 import type { WeatherBuildingHit, WeatherEvent, WeatherUnitHit } from './weather/weather';
-import { AchievementId, BonusKind, BottleEffect, BuildingKind, GameEventType, Season, SiegeTargetKind, SkillId, UnitType, VillageUpgradeBonus } from '@enums';
+import type { Resources } from './economy/resources';
+import { AchievementId, ResourceKind, TradeCloseReason, BonusKind, BottleEffect, BuildingKind, GameEventType, Season, SiegeTargetKind, SkillId, UnitType, VillageUpgradeBonus } from '@enums';
 
 
 
@@ -62,6 +63,11 @@ export type GameEvent =
   | { type: GameEventType.WEATHER_DAMAGE; weather: WeatherEvent; units: WeatherUnitHit[]; buildings: WeatherBuildingHit[] }
   | { type: GameEventType.FIRE_TURN; units: WeatherUnitHit[]; buildings: WeatherBuildingHit[]; ignited: { q: number; r: number }[]; burnedOut: { q: number; r: number }[]; cleared: { q: number; r: number }[] }
   | { type: GameEventType.FIRE_EXTINGUISHED; unitId: string; q: number; r: number }
+  | { type: GameEventType.ORDER_PLACED; orderId: number; buyer: number; resource: ResourceKind; quantity: number }
+  | { type: GameEventType.PROPOSAL_MADE; orderId: number; buyer: number; seller: number; resource: ResourceKind; quantity: number; payment: Resources }
+  | { type: GameEventType.PROPOSAL_DECLINED; orderId: number; buyer: number; seller: number; resource: ResourceKind; quantity: number }
+  | { type: GameEventType.TRADE_SETTLED; orderId: number; buyer: number; seller: number; resource: ResourceKind; quantity: number; payment: Resources }
+  | { type: GameEventType.ORDER_CLOSED; orderId: number; buyer: number; reason: TradeCloseReason }
   | { type: GameEventType.TURN_STARTED; playerIndex: number; turn: number }
   | { type: GameEventType.AI_TURN; playerIndex: number }
   | { type: GameEventType.AI_TAKEOVER; playerIndex: number }

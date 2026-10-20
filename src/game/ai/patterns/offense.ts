@@ -27,7 +27,7 @@ export const OFFENSE_PATTERNS: AiPattern[] = [
         const unit = t.unit;
         if (!unit || unit.owner !== player.index) continue;
         if (state.acted.has(unit.id)) continue;
-        if (t.settlement && t.settlement.owner !== unit.owner && t.settlement.captureReady) {
+        if (t.settlement && t.settlement.owner !== unit.owner && t.settlement.captureReady && !unit.hasHealed) {
           state.acted.add(unit.id);
           return [{ type: AiActionType.CAPTURE, q: t.q, r: t.r, unitId: unit.id }];
         }

@@ -71,6 +71,12 @@ export function pay(have: Resources, cost: Resources): Resources {
   };
 }
 
+/** Rich-text tokens for the non-zero amounts of a bundle, e.g. `[money:12] [ore:1]` ('-' when empty), for the inline resource icons of rich labels. */
+export function resourceTokens(amount: Resources): string {
+  const parts = (['money', 'wood', 'stone', 'ore', 'food'] as const).filter((k) => amount[k] > 0).map((k) => `[${k}:${amount[k]}]`);
+  return parts.length > 0 ? parts.join(' ') : '-';
+}
+
 /** A cost as short button text: `40m, 10s, 5o` (money, wood, stone, ore; zeros left out). */
 export function costLabel(cost: Resources): string {
   const parts: string[] = [];

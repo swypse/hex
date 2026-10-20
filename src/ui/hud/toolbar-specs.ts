@@ -45,7 +45,7 @@ export function toolbarSpecs(): ToolbarSpec[] {
 
   if (settlement) {
     const isOwned = settlement.owner === store.localPlayerIndex;
-    const isCapturable = !isOwned && unit !== null && unit.owner === store.localPlayerIndex && settlement.captureReady;
+    const isCapturable = !isOwned && unit !== null && unit.owner === store.localPlayerIndex && settlement.captureReady && !unit.hasHealed;
     if (isCapturable) {
       out.push({ key: 'capture', label: t('ui.capturevillage'), disabled: false, onClick: () => gameController.captureSelectedVillage() });
     }

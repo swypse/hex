@@ -5,11 +5,11 @@ export const TRIBE_ICONS_ATLAS_FILE = 'tribe-icons-atlas.png';
 export const TRIBE_ICONS_ATLAS_CELL = 120;
 export const TRIBE_ICONS_ATLAS_COLS = 6;
 export const TRIBE_ICONS_ATLAS_FRAMES: Record<string, { x: number; y: number }> = {
-  'aqua-icon': { x: 0, y: 0 },
-  'barbarians-icon': { x: 120, y: 0 },
-  'cats-icon': { x: 240, y: 0 },
-  'forest-icon': { x: 360, y: 0 },
-  'sand-icon': { x: 480, y: 0 },
-  'villagers-icon': { x: 600, y: 0 },
-  'warriors-icon': { x: 0, y: 120 },
+  'aqua-icon': { x: 4, y: 4 },
+  'barbarians-icon': { x: 132, y: 4 },
+  'cats-icon': { x: 260, y: 4 },
+  'forest-icon': { x: 388, y: 4 },
+  'sand-icon': { x: 516, y: 4 },
+  'villagers-icon': { x: 644, y: 4 },
+  'warriors-icon': { x: 4, y: 132 },
 };

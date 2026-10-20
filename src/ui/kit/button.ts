@@ -27,6 +27,8 @@ interface ButtonOpts {
   label: string;
   /** A 32px-atlas icon key (e.g. 'attack-32') drawn before the text, as tall as the text. */
   icon?: string;
+  /** An icon and a short text drawn after the label, e.g. a price: `PLACE ORDER <coin> 5`. */
+  suffix?: { icon: string; text: string };
   onClick: () => void;
   disabled?: boolean;
   selected?: boolean;
@@ -75,6 +77,8 @@ export class Button extends Container {
   private readonly bg: Graphics;
   private readonly text: BitmapText;
   private readonly icon: Sprite | null = null;
+  private readonly suffixIcon: Sprite | null = null;
+  private readonly suffixText: BitmapText | null = null;
   private readonly w: number;
   private readonly h: number;
   private readonly onClick: () => void;
@@ -103,6 +107,11 @@ export class Button extends Container {
       this.icon = makeIcon32(opts.icon, this.text.height);
       this.icon.anchor.set(0, 0.5);
     }
+    if (opts.suffix) {
+      this.suffixText = makeLabel(opts.suffix.text, { fontSize: opts.fontSize ?? TEXT_BUTTON.fontSize, ...(this.style === ButtonStyle.TEXT && { fill: 0xffffff }) });
+      this.suffixIcon = makeIcon32(opts.suffix.icon, this.text.height);
+      this.suffixIcon.anchor.set(0, 0.5);
+    }
     this.w = opts.width ?? this.contentWidth() + paddingX * 2;
     this.h = Math.max(this.text.height + paddingY * 2, TEXT_BUTTON.minHeight);
     this.shadow = opts.shadow ?? true;
@@ -111,6 +120,7 @@ export class Button extends Container {
     this.render(THEME.button);
     this.addChild(this.bg, this.text);
     if (this.icon) this.addChild(this.icon);
+    if (this.suffixIcon && this.suffixText) this.addChild(this.suffixIcon, this.suffixText);
     this.layoutContent();
     this.eventMode = 'static';
     this.cursor = 'pointer';
@@ -147,6 +157,12 @@ export class Button extends Container {
       case ButtonStyle.POPUP: {
         const color = idle ? ACCENT : pressed ? THEME.buttonPressed : ACCENT_HOVER;
         this.bg.roundRect(0, 0, this.w, this.h, FLAT_RADIUS).fill(color);
+        return;
+      }
+      case ButtonStyle.SUCCESS:
+      case ButtonStyle.WARNING: {
+        const palette = this.style === ButtonStyle.SUCCESS ? THEME.success : THEME.warning;
+        this.bg.roundRect(0, 0, this.w, this.h, FLAT_RADIUS).fill(idle ? palette.base : pressed ? palette.pressed : palette.hover);
         return;
       }
       case ButtonStyle.POPUP_OUTLINE: {
@@ -238,7 +254,12 @@ export class Button extends Container {
 
   /** Width of the icon (if any), its gap and the text. */
   private contentWidth(): number {
-    return (this.icon ? this.icon.width + ICON_GAP : 0) + this.text.width;
+    return (this.icon ? this.icon.width + ICON_GAP : 0) + this.text.width + this.suffixWidth();
+  }
+
+  /** Width of the suffix (gap, icon, gap, text), 0 without one. */
+  private suffixWidth(): number {
+    return this.suffixIcon && this.suffixText ? ICON_GAP + this.suffixIcon.width + ICON_GAP + this.suffixText.width : 0;
   }
 
   /** Centres the icon + text group in the button. */
@@ -247,6 +268,11 @@ export class Button extends Container {
     const iconW = this.icon ? this.icon.width + ICON_GAP : 0;
     if (this.icon) this.icon.position.set(x, this.h / 2);
     this.text.position.set(x + iconW, (this.h - this.text.height) / 2);
+    if (this.suffixIcon && this.suffixText) {
+      const sx = x + iconW + this.text.width + ICON_GAP;
+      this.suffixIcon.position.set(sx, this.h / 2);
+      this.suffixText.position.set(sx + this.suffixIcon.width + ICON_GAP, (this.h - this.suffixText.height) / 2);
+    }
   }
 
   /** Layout box height; `height` is the drawn bounds, which for transparent styles is just the text. */

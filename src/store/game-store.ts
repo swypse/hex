@@ -36,6 +36,8 @@ type OverlayState =
   | { kind: OverlayKind.DISBAND; unitId: string }
   | { kind: OverlayKind.VETERAN_BONUS; unitId: string }
   | { kind: OverlayKind.VILLAGE_UPGRADE; q: number; r: number }
+  | { kind: OverlayKind.TRADE }
+  | { kind: OverlayKind.TRADE_PROPOSAL }
   | { kind: OverlayKind.WATCHING_PROMPT };
 
 interface LobbyState {
@@ -269,7 +271,7 @@ const SCREENS: Screen[] = [Screen.START, Screen.SETUP, Screen.LOBBY, Screen.GAME
 let suppressPush = false;
 
 /** View overlays the browser Back closes, rather than asking to leave the game. */
-const BACK_CLOSES_OVERLAY = new Set<OverlayKind>([OverlayKind.SKILL, OverlayKind.STATS, OverlayKind.ACHIEVEMENTS]);
+const BACK_CLOSES_OVERLAY = new Set<OverlayKind>([OverlayKind.SKILL, OverlayKind.STATS, OverlayKind.ACHIEVEMENTS, OverlayKind.TRADE]);
 
 /** Lets the visible screen consume a browser Back (e.g. a sub-step of the
  *  setup screen). Returning true keeps the current screen: the history entry

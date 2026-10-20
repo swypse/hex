@@ -36,6 +36,7 @@ export const ACTION_BUTTON_ICON_FILES: Record<string, string> = {
   stats: 'action-stats',
   skills: 'action-skills',
   achievements: 'action-cup',
+  trade: 'action-market',
   'end-turn': 'action-end-turn',
   'log-out': 'action-log-out',
 };

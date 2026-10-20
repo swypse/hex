@@ -1,5 +1,5 @@
 import { SeededRandom } from '@/util';
-import { AchievementId, VeteranBonus, VillageUpgradeBonus, AiActionType, AiEngine, BuilderExtraKind, BuildingKind, CommandType, GameEventType, GameMode, Season, SkillId, UnitType, WeatherType } from '@enums';
+import { AchievementId, VeteranBonus, VillageUpgradeBonus, AiActionType, AiEngine, BuilderExtraKind, BuildingKind, CommandType, GameEventType, GameMode, ResourceKind, Season, SkillId, UnitType, WeatherType } from '@enums';
 import { awardAchievementScores, currentlyMetIds, evaluateAchievements } from './achievements';
 import { planAiActions, planAiActionsSteps } from './ai/ai';
 import type { AiAction } from './ai/ai-types';
@@ -20,7 +20,7 @@ import { captureWinnerIndex, computeWinner, quickCaptureScore, quickCaptureTurns
 import { hexDistance, hexNeighbors } from './map/hex';
 import type { GameMap, MapTile } from './map/map-gen';
 import type { Player } from './players';
-import { START_RESOURCES, villageUpgradeCost } from './economy/resources';
+import { type Resources, START_RESOURCES, villageUpgradeCost } from './economy/resources';
 import { buildRoad, buildRoadIgnoringSkill } from './economy/roads';
 import {
   awardScore, awardTempleScores, CAPTURE_SCORE, COMBO_SCORE, EMPTY_STATS, KILL_SCORE, PIRATE_KILL_SCORE, type PlayerStats,
@@ -44,6 +44,9 @@ import { randomSeed } from '../util/random';
 import { Bonuses } from './bonuses';
 import { Environment } from './environment';
 import { Pirates, provokePirate } from './pirates';
+import { emptyTradeState, Trading } from './trade';
+import { runAiTrading } from './ai/ai-trade';
+import { flagsFor } from './ai/ai-flags';
 import type { SimContext } from './sim-context';
 import { tileAt } from './map/tile-index';
 import { extinguishCells } from './weather/fire';
@@ -77,6 +80,12 @@ export type Command =
   | { type: CommandType.EXTINGUISH; unitId: string; q: number; r: number }
   | { type: CommandType.STUN; unitId: string; q: number; r: number }
   | { type: CommandType.CHOOSE_VETERAN_BONUS; unitId: string; bonus: VeteranBonus }
+  | { type: CommandType.PLACE_ORDER; resource: ResourceKind; quantity: number; deliverTo?: { q: number; r: number } }
+  | { type: CommandType.CANCEL_ORDER; orderId: number }
+  | { type: CommandType.PROPOSE; orderId: number; payment: Resources; village?: { q: number; r: number } }
+  | { type: CommandType.WITHDRAW_PROPOSAL; orderId: number }
+  | { type: CommandType.ACCEPT_PROPOSAL; orderId: number; seller: number }
+  | { type: CommandType.DECLINE_PROPOSAL; orderId: number; seller: number }
   | { type: CommandType.END_TURN }
   | { type: CommandType.GIVE_TO_AI; playerIndex: number }
   | { type: CommandType.FORFEIT; playerIndex: number };
@@ -126,6 +135,7 @@ export class Simulator {
   private readonly pirates: Pirates;
   private readonly bonuses: Bonuses;
   private readonly environment: Environment;
+  readonly trading: Trading;
   private events: GameEvent[] = [];
   private achievementBaseline = new Map<number, Set<AchievementId>>();
 
@@ -156,6 +166,7 @@ export class Simulator {
     this.pirates = new Pirates(ctx);
     this.bonuses = new Bonuses(ctx);
     this.environment = new Environment(ctx);
+    this.trading = new Trading(ctx);
     this.turn = 1;
     this.currentPlayerIndex = 0;
     this.gameOver = false;
@@ -182,6 +193,7 @@ export class Simulator {
     sim.winnerIndex = snap.winnerIndex;
     sim.expectedTurns = snap.expectedTurns;
     sim.bonusAwarded = snap.bonusAwarded;
+    sim.trading.state = snap.trades ?? emptyTradeState();
     return sim;
   }
 
@@ -196,6 +208,7 @@ export class Simulator {
       winnerIndex: this.winnerIndex,
       expectedTurns: this.expectedTurns,
       bonusAwarded: this.bonusAwarded,
+      trades: this.trading.state,
     });
   }
 
@@ -322,6 +335,24 @@ export class Simulator {
         break;
       case CommandType.CHOOSE_VETERAN_BONUS:
         ok = this.doChooseVeteranBonus(cmd.unitId, cmd.bonus);
+        break;
+      case CommandType.PLACE_ORDER:
+        ok = !this.gameOver && this.trading.placeOrder(cmd.resource, cmd.quantity, cmd.deliverTo);
+        break;
+      case CommandType.CANCEL_ORDER:
+        ok = !this.gameOver && this.trading.cancelOrder(cmd.orderId);
+        break;
+      case CommandType.PROPOSE:
+        ok = !this.gameOver && this.trading.propose(cmd.orderId, cmd.payment, cmd.village);
+        break;
+      case CommandType.WITHDRAW_PROPOSAL:
+        ok = !this.gameOver && this.trading.withdrawProposal(cmd.orderId);
+        break;
+      case CommandType.ACCEPT_PROPOSAL:
+        ok = !this.gameOver && this.trading.acceptProposal(cmd.orderId, cmd.seller);
+        break;
+      case CommandType.DECLINE_PROPOSAL:
+        ok = !this.gameOver && this.trading.declineProposal(cmd.orderId, cmd.seller);
         break;
       case CommandType.END_TURN:
         this.doEndTurn();
@@ -910,7 +941,7 @@ export class Simulator {
     const unit = this.findUnit(unitId);
     if (!unit || unit.owner !== this.currentPlayerIndex) return false;
     if (village.unit !== unit) return false;
-    if (village.settlement.owner === unit.owner || !village.settlement.captureReady) return false;
+    if (village.settlement.owner === unit.owner || !village.settlement.captureReady || unit.hasHealed) return false;
     const oldOwner = village.settlement.owner;
     const result = captureVillage(this.map, village, unit);
     this.revealStalkersNearVillage(village, unit.owner);
@@ -1255,6 +1286,7 @@ export class Simulator {
       }
     }
     player.isActive = false;
+    this.trading.onEliminated(playerIndex);
     return true;
   }
 
@@ -1304,6 +1336,7 @@ export class Simulator {
       }
       this.markCaptureReadyFor(next);
       this.decrementStunsFor(next);
+      this.trading.onTurnStart();
       this.emit({ type: GameEventType.TURN_STARTED, playerIndex: next, turn: this.turn });
       return;
     }
@@ -1343,6 +1376,8 @@ export class Simulator {
     this.bonuses.collectAiBottles(playerIndex);
     this.markCaptureReadyFor(playerIndex);
     this.decrementStunsFor(playerIndex);
+    this.trading.onTurnStart();
+    if (flagsFor(ai).trade) runAiTrading(this.trading, this.map, this.players, ai, this.turn);
     this.emit({ type: GameEventType.AI_TURN, playerIndex });
     const exec = (a: AiAction): boolean => untrackedNetworks(() => this.execAiAction(a));
     if (ai.aiEngine !== AiEngine.BATCH) {

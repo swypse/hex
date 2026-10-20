@@ -1,6 +1,7 @@
 import { type GameMap } from './map/map-gen';
 import { type Player } from './players';
 import { GameMode } from '@enums';
+import type { TradeState } from './trade';
 
 export interface GameStateSnapshot {
   map: GameMap;
@@ -12,6 +13,7 @@ export interface GameStateSnapshot {
   winnerIndex: number | null;
   expectedTurns: number;
   bonusAwarded: boolean;
+  trades?: TradeState;
 }
 
 export function stripUndefinedValues(node: unknown): void {

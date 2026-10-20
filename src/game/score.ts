@@ -16,6 +16,7 @@ export const CAPTURE_SCORE = 50;
 export const PIRATE_KILL_SCORE = 30;
 export const COMBO_SCORE = 30;
 export const SKILL_SCORE = 15;
+export const TRADE_SCORE = 10;
 export const EXPLORED_SCORE = 3;
 const TEMPLE_SCORES: Record<number, number> = { 1: 10, 2: 15, 3: 20, 4: 25 };
 

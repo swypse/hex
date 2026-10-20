@@ -13,7 +13,9 @@ export const SCORE_CHIP_RADIUS = 24;
 export const SCORE_TEXT_Y = 48;
 /** Gap between the chip bottom and the achievements button below it. */
 export const SCORE_ACHIEVEMENTS_CHIP_GAP = 2;
-/** Gap between the achievements button bottom and the first buff icon. */
+/** Gap between the stacked achievements and trade buttons. */
+const SCORE_BUTTON_GAP = 6;
+/** Gap between the trade button bottom and the first buff icon. */
 const SCORE_BUFF_BUTTON_GAP = 6;
 /** Size of each temple-buff icon under the score chip. */
 const SCORE_BUFF_ICON = 16;
@@ -33,6 +35,7 @@ export function scoreButtonsPosition(
   screenHeight: number,
 ): {
   achievements: { x: number; y: number };
+  trade: { x: number; y: number };
 } {
   const chipX = screenWidth - SCORE_PAD - SCORE_CHIP_RADIUS;
   const chipY = SCORE_PAD + SCORE_TOP_OFFSET + SCORE_CHIP_RADIUS;
@@ -40,6 +43,7 @@ export function scoreButtonsPosition(
   const x = chipX - SKILLS_BUTTON_SIZE / 2;
   return {
     achievements: { x, y: chipBottom + SCORE_ACHIEVEMENTS_CHIP_GAP },
+    trade: { x, y: chipBottom + SCORE_ACHIEVEMENTS_CHIP_GAP + SKILLS_BUTTON_SIZE + SCORE_BUTTON_GAP },
   };
 }
 
@@ -53,6 +57,6 @@ export function buffRowPosition(screenWidth: number, screenHeight: number): { x:
   const chipBottom = chipY + SCORE_CHIP_RADIUS;
   return {
     x: chipX,
-    y: chipBottom + SCORE_ACHIEVEMENTS_CHIP_GAP + SKILLS_BUTTON_SIZE + SCORE_BUFF_BUTTON_GAP + SCORE_BUFF_ICON / 2 + SCORE_BUFF_DROP,
+    y: chipBottom + SCORE_ACHIEVEMENTS_CHIP_GAP + (SKILLS_BUTTON_SIZE + SCORE_BUTTON_GAP) * 2 - SCORE_BUTTON_GAP + SCORE_BUFF_BUTTON_GAP + SCORE_BUFF_ICON / 2 + SCORE_BUFF_DROP,
   };
 }

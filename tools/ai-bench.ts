@@ -49,6 +49,7 @@ interface Tally {
 }
 const realLog = console.log.bind(console);
 const reasons: Record<string, number> = {};
+let trades = 0;
 const tally: Record<Engine, Tally> = {
   A: { seats: 0, wins: 0, villages: 0, score: 0, kills: 0, exposure: 0, eliminated: 0, lost: 0, freeCaps: 0, enemyCaps: 0, aiMs: 0 },
   B: { seats: 0, wins: 0, villages: 0, score: 0, kills: 0, exposure: 0, eliminated: 0, lost: 0, freeCaps: 0, enemyCaps: 0, aiMs: 0 },
@@ -122,6 +123,7 @@ function playGame(seed: number): void {
     if (players[0]!.isActive) anySim.runAiTurn(0);
     sim.applyCommand({ type: 'endTurn' });
     for (const ev of sim.drainEvents()) {
+      if (ev.type === 'tradeSettled') trades++;
       if (ev.type !== 'captured') continue;
       if (ev.oldOwner !== null && ev.oldOwner >= 0) {
         lostBy[ev.oldOwner] = (lostBy[ev.oldOwner] ?? 0) + 1;
@@ -183,3 +185,4 @@ for (const e of ENGINES) {
 
 realLog(pairedLine('score', paired.score) + '\n' + pairedLine('villages', paired.villages) + '\n' + pairedLine('lost', paired.lost));
 realLog('exposure reasons:', JSON.stringify(Object.fromEntries(Object.entries(reasons).sort((a, b) => b[1] - a[1])), null, 1));
+realLog('settled trades:', trades);

@@ -11,6 +11,10 @@ export const MANIFEST_URL = new URL('../src/atlas-data/tribe-icons-atlas-data.ge
 
 export const TRIBE_ICON_COLS = 6;
 export const TRIBE_ICON_CELL = 120;
+/** Transparent pixels kept around every icon so linear/mipmapped sampling (icons are drawn
+ *  at 24-64px from 120px sources) never picks up a neighbouring icon's edge pixels. */
+export const TRIBE_ICON_GAP = 4;
+const PITCH = TRIBE_ICON_CELL + 2 * TRIBE_ICON_GAP;
 export const TRIBE_ICONS_ATLAS_FILE = 'tribe-icons-atlas.png';
 
 /** Permanent, sorted order of the source icon base names (e.g. 'cats-icon'). */
@@ -26,16 +30,16 @@ export function generateTribeIconsAtlas(sourceDir = SOURCE_DIR_URL, cols = TRIBE
     .sort();
   const cells = order.length;
   const rows = Math.ceil(cells / cols);
-  const width = cols * TRIBE_ICON_CELL;
-  const height = rows * TRIBE_ICON_CELL;
+  const width = cols * PITCH;
+  const height = rows * PITCH;
   const rgba = Buffer.alloc(width * height * 4); // zero = fully transparent
   const frames = {};
 
   order.forEach((base, i) => {
     const col = i % cols;
     const row = Math.floor(i / cols);
-    const x = col * TRIBE_ICON_CELL;
-    const y = row * TRIBE_ICON_CELL;
+    const x = col * PITCH + TRIBE_ICON_GAP;
+    const y = row * PITCH + TRIBE_ICON_GAP;
     const src = readFileSync(new URL(`${base}.png`, sourceDir));
     const icon = decodePng(src);
     if (icon.width !== TRIBE_ICON_CELL || icon.height !== TRIBE_ICON_CELL) {

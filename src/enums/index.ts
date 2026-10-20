@@ -61,6 +61,7 @@ export * from './start-modal.enum';
 export * from './terrain-feature.enum';
 export * from './tile-anchor.enum';
 export * from './tile-layer.enum';
+export * from './trade-close-reason.enum';
 export * from './tribe.enum';
 export * from './tutorial-step-id.enum';
 export * from './unit-facing.enum';

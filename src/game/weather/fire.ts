@@ -13,7 +13,9 @@ import { WEATHER_RULES, type WeatherEvent } from './weather';
 export const FIRE_RULES = {
   /** Rounds a forest burns before it turns into plain land. */
   forestBurnTurns: 3,
-  /** Chance per round that a forest next to a burning forest / building catches fire. */
+  /** A burning tile tries to spread every this many rounds of its burn (so fire expands every 2 rounds, not every round). */
+  spreadEveryTurns: 2,
+  /** Chance per spread attempt that a forest next to a burning forest / building catches fire. */
   spreadChance: 0.5,
   /** Damage per round to a unit standing on a burning forest. */
   unitDamage: 10,
@@ -73,17 +75,19 @@ export function applyLightning(map: GameMap, strike: WeatherEvent, rng: () => nu
 
 /** Round end for every burning tile: a unit on a burning forest takes
  *  `unitDamage`, a burning building takes `buildingDamage`, a burning bridge or
- *  forest ages and is lost after its burn time; then each forest next to a tile
- *  that was burning catches fire with `spreadChance`. */
+ *  forest ages and is lost after its burn time; then, every `spreadEveryTurns`
+ *  rounds of its burn, each forest next to the tile catches fire with `spreadChance`. */
 export function applyFireTurn(map: GameMap, rng: () => number): FireTurnReport {
   const report: FireTurnReport = { units: [], buildings: [], ignited: [], burnedOut: [], cleared: [] };
   const burning = map.tiles.filter((t) => t.fire);
   if (burning.length === 0) return report;
   const byKey = tileMapByKey(map);
+  const spreaders: MapTile[] = [];
   for (const tile of burning) {
     const forest = isForestType(tile.terrain);
     if (tile.unit && forest) report.units.push(hurtUnit(tile, FIRE_RULES.unitDamage));
     tile.fire!.age += 1;
+    if (tile.fire!.age % FIRE_RULES.spreadEveryTurns === 0) spreaders.push(tile);
     let out = false;
     if (tile.building) {
       const hit = hurtBuilding(tile, FIRE_RULES.buildingDamage);
@@ -110,7 +114,7 @@ export function applyFireTurn(map: GameMap, rng: () => number): FireTurnReport {
     }
   }
   const caught = new Set<string>();
-  for (const tile of burning) {
+  for (const tile of spreaders) {
     for (const n of hexNeighbors(tile)) {
       const target = byKey.get(axialKey(n));
       if (!target || target.fire || !isForestType(target.terrain) || caught.has(axialKey(n))) continue;

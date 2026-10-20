@@ -5,6 +5,7 @@ import { t } from '../../i18n';
 import { type UIHost } from '../host';
 import { makeLabel } from '../../gfx/label';
 import { makeIconChip } from '../kit/tribe-chip';
+import { hasResourceTokens, makeRichLabel } from '../kit/rich-label';
 import { ACHIEVEMENT_ATLAS_KEYS } from '../../gfx/achievement-icons';
 import { makeAchievementChip } from '../kit/tribe-chip';
 import { Popup, POPUP_BODY_SIZE } from '../kit/popup';
@@ -77,12 +78,10 @@ export class CenterMessage {
       if (iconFile) {
         this.addIconContent(popup, message, iconFile);
       } else {
-        const text = makeLabel(message, {
-          fontSize: FONT_SIZE,
-          fill: 0xffffff,
-          wordWrap: true,
-          wordWrapWidth: Math.max(120, popup.contentWidth),
-        });
+        const width = Math.max(120, popup.contentWidth);
+        const text = hasResourceTokens(message)
+          ? makeRichLabel(message, { fontSize: FONT_SIZE, fill: 0xffffff, width })
+          : makeLabel(message, { fontSize: FONT_SIZE, fill: 0xffffff, wordWrap: true, wordWrapWidth: width });
         text.position.set(0, 0);
         popup.content.addChild(text);
       }

@@ -15,6 +15,8 @@ interface AiPersonality {
   retreatHpRatio: number;
   /** Skills in the order the AI opens them when no strategy chain applies; null: the default order. */
   skillOrder: SkillId[] | null;
+  /** Price asked for trade goods, as a multiple of their fair value. */
+  tradeMargin: number;
 }
 
 const MILITARY_FIRST: SkillId[] = [SkillId.FORESTRY, SkillId.CLIMBING, SkillId.SMITHERY, SkillId.SWORDSMAN, SkillId.RIDING, SkillId.KNIGHTS, SkillId.AGRICULTURE, SkillId.ARCHER, SkillId.SHIELDS, SkillId.SCIENCE, SkillId.GEOLOGY, SkillId.ROADS];
@@ -25,22 +27,22 @@ export const AI_PERSONALITIES: Record<AiPersonalityId, AiPersonality> = {
   /** Attacks first: strong melee, early military tech, captures preferred over building up. */
   aggressive: {
     id: AiPersonalityId.AGGRESSIVE, goalWeights: { economy: 0.6, army: 2.0, defense: 0.9, naval: 0.4, score: 1.0 }, musterMinUnits: 3,
-    offenseTypes: [UnitType.KNIGHT, UnitType.SWORDSMAN, UnitType.WARRIOR], reserveDelta: -2, retreatHpRatio: 0.35, skillOrder: MILITARY_FIRST,
+    offenseTypes: [UnitType.KNIGHT, UnitType.SWORDSMAN, UnitType.WARRIOR], reserveDelta: -2, retreatHpRatio: 0.35, skillOrder: MILITARY_FIRST, tradeMargin: 1.3,
   },
   /** Neutral: attack and economy in equal share, the default order everywhere. */
   balanced: {
     id: AiPersonalityId.BALANCED, goalWeights: { economy: 1.0, army: 1.0, defense: 1.0, naval: 0.7, score: 1.0 }, musterMinUnits: 4,
-    offenseTypes: [], reserveDelta: 0, retreatHpRatio: 0.5, skillOrder: null,
+    offenseTypes: [], reserveDelta: 0, retreatHpRatio: 0.5, skillOrder: null, tradeMargin: 1.15,
   },
   /** Economy: farms, mines and upgrades first, a big ranged-supported push later. */
   builder: {
     id: AiPersonalityId.BUILDER, goalWeights: { economy: 2.0, army: 0.6, defense: 1.1, naval: 1.2, score: 1.0 }, musterMinUnits: 5,
-    offenseTypes: [UnitType.CATAPULT, UnitType.ARCHER, UnitType.KNIGHT], reserveDelta: 4, retreatHpRatio: 0.6, skillOrder: ECONOMY_FIRST,
+    offenseTypes: [UnitType.CATAPULT, UnitType.ARCHER, UnitType.KNIGHT], reserveDelta: 4, retreatHpRatio: 0.6, skillOrder: ECONOMY_FIRST, tradeMargin: 1.0,
   },
   /** Raider: fast cheap units, small squads, siege engines for enemy buildings. */
   raider: {
     id: AiPersonalityId.RAIDER, goalWeights: { economy: 0.8, army: 1.6, defense: 0.8, naval: 0.6, score: 1.0 }, musterMinUnits: 2,
-    offenseTypes: [UnitType.RIDER, UnitType.KNIGHT, UnitType.CATAPULT], reserveDelta: -2, retreatHpRatio: 0.4, skillOrder: RAID_FIRST,
+    offenseTypes: [UnitType.RIDER, UnitType.KNIGHT, UnitType.CATAPULT], reserveDelta: -2, retreatHpRatio: 0.4, skillOrder: RAID_FIRST, tradeMargin: 1.25,
   },
 };
 

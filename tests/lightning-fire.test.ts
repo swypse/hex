@@ -93,7 +93,7 @@ describe('fire turn', () => {
     const map = makeTestMap(3);
     const src = tileAt(map, 0, 0)!;
     src.terrain = TileType.GrasslandForest;
-    src.fire = { age: 0 };
+    src.fire = { age: 1 }; // its 2nd round of burning
     tileAt(map, 1, 0)!.terrain = TileType.GrasslandForest;
     tileAt(map, 0, 1)!.terrain = TileType.GrasslandForest;
     const report = applyFireTurn(map, () => 0.49);
@@ -104,10 +104,22 @@ describe('fire turn', () => {
     const quiet = makeTestMap(3);
     const s2 = tileAt(quiet, 0, 0)!;
     s2.terrain = TileType.GrasslandForest;
-    s2.fire = { age: 0 };
+    s2.fire = { age: 1 };
     tileAt(quiet, 1, 0)!.terrain = TileType.GrasslandForest;
     applyFireTurn(quiet, () => 0.5);
     expect(tileAt(quiet, 1, 0)!.fire).toBeFalsy();
+  });
+
+  it('spreads only every 2nd round of a tile burning', () => {
+    const map = makeTestMap(3);
+    const src = tileAt(map, 0, 0)!;
+    src.terrain = TileType.GrasslandForest;
+    src.fire = { age: 0 };
+    tileAt(map, 1, 0)!.terrain = TileType.GrasslandForest;
+    expect(applyFireTurn(map, () => 0).ignited).toHaveLength(0);
+    expect(tileAt(map, 1, 0)!.fire).toBeFalsy();
+    expect(applyFireTurn(map, () => 0).ignited).toHaveLength(1);
+    expect(tileAt(map, 1, 0)!.fire).toEqual({ age: 0 });
   });
 });
 

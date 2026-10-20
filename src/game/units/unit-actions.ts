@@ -15,6 +15,6 @@ export function unitCanAct(map: GameMap, tile: MapTile, unit: Unit, player: Play
   const canAttackAny = canAttack(unit) && attackableTargets(map, unit, player.index).length > 0;
   const canHealNow = canHeal(unit);
   const canCapture =
-    tile.settlement !== null && tile.settlement.owner !== unit.owner && tile.settlement.captureReady;
+    tile.settlement !== null && tile.settlement.owner !== unit.owner && tile.settlement.captureReady && !unit.hasHealed;
   return canMoveAnywhere || canAttackAny || canHealNow || canCapture;
 }

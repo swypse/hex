@@ -7,6 +7,11 @@ import { FontSize } from '@enums';
 const TOKEN = /\[(money|wood|stone|ore|food):(\d+)\]/;
 const ICONS: Record<string, string> = { money: 'gold-32', wood: 'wood-32', stone: 'stone-32', ore: 'ore-32', food: 'food-32' };
 
+/** Whether the text holds an inline resource token. */
+export function hasResourceTokens(text: string): boolean {
+  return TOKEN.test(text);
+}
+
 /** Word-wrapped text with inline resource icons (see TOKEN). */
 export function makeRichLabel(text: string, opts: { fontSize: FontSize; fill: number; width: number }): Container {
   const root = new Container();

@@ -151,7 +151,7 @@ Pirates never become veterans.
     doubles its attack (sneak attack) and ignores the defense.
 - **Heal** — if the unit has not moved/attacked, +15 HP (+10 more on a tile of a village with a university after
   *Medicine*), once per turn.
-- **Capture village** — a unit on an enemy or free village marked capturable captures it.
+- **Capture village** — a unit on an enemy or free village marked capturable captures it. It takes the whole action: a unit that has healed this turn cannot capture.
 - **Disband** — costs 3 × the unit's money upkeep; not after the unit has moved or attacked.
 - **Burn / Destroy road / Extinguish** — see [Food](#food) and [Lightning and fire](#lightning-and-fire).
 - Tribe special abilities: see the [tribe pages](#tribes).
@@ -336,7 +336,7 @@ limit. It lasts 1 turn and strikes one random tile (radius 0). Tuning: `WEATHER_
 
 - A burning forest burns 3 rounds, then becomes land of its biome; a unit on it takes **10** per round.
 - A burning building takes 1 damage per round (2 hp); a burning bridge is lost after 2 rounds.
-- Each forest next to a burning forest or building catches fire with 50% per round.
+- Every 2nd round of its burn, each forest next to a burning forest or building catches fire with 50% (so fire expands every 2 rounds, not every round).
 - A unit on or next to a burning tile can **Extinguish fire** (spends its whole turn).
 
 ## Bonuses and bottles
