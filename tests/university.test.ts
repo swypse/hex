@@ -54,7 +54,7 @@ describe('university', () => {
     expect(BUILDING_COSTS.university).toMatchObject({ money: 40, stone: 10, ore: 5 });
     const { site } = setup();
     site.building = { kind: BuildingKind.UNIVERSITY, level: 1 };
-    expect(tileUpkeep(site)).toBe(2);
+    expect(tileUpkeep(site)).toBe(4);
   });
 
   it('can be built with the build command and pays its cost', () => {

@@ -482,7 +482,8 @@ export class EventPresenter {
             const from = tileAt(sim.map, e.attackerTile.q, e.attackerTile.r);
             const to = tileAt(sim.map, e.targetTile.q, e.targetTile.r);
             const tex = this.host.textures()?.cannonbalTexture;
-            if (from && to && tex) {
+            // No shot for a stunner hidden by fog.
+            if (from && to && tex && isExploredFor(from, useGameStore.getState().localPlayerIndex)) {
               await this.effects.spawnProjectile(from, to, tex, 26);
             }
             if (!e.missed) this.host.render();

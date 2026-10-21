@@ -36,6 +36,7 @@ export function scoreButtonsPosition(
 ): {
   achievements: { x: number; y: number };
   trade: { x: number; y: number };
+  help: { x: number; y: number };
 } {
   const chipX = screenWidth - SCORE_PAD - SCORE_CHIP_RADIUS;
   const chipY = SCORE_PAD + SCORE_TOP_OFFSET + SCORE_CHIP_RADIUS;
@@ -44,6 +45,7 @@ export function scoreButtonsPosition(
   return {
     achievements: { x, y: chipBottom + SCORE_ACHIEVEMENTS_CHIP_GAP },
     trade: { x, y: chipBottom + SCORE_ACHIEVEMENTS_CHIP_GAP + SKILLS_BUTTON_SIZE + SCORE_BUTTON_GAP },
+    help: { x, y: chipBottom + SCORE_ACHIEVEMENTS_CHIP_GAP + (SKILLS_BUTTON_SIZE + SCORE_BUTTON_GAP) * 2 },
   };
 }
 
@@ -57,6 +59,6 @@ export function buffRowPosition(screenWidth: number, screenHeight: number): { x:
   const chipBottom = chipY + SCORE_CHIP_RADIUS;
   return {
     x: chipX,
-    y: chipBottom + SCORE_ACHIEVEMENTS_CHIP_GAP + (SKILLS_BUTTON_SIZE + SCORE_BUTTON_GAP) * 2 - SCORE_BUTTON_GAP + SCORE_BUFF_BUTTON_GAP + SCORE_BUFF_ICON / 2 + SCORE_BUFF_DROP,
+    y: chipBottom + SCORE_ACHIEVEMENTS_CHIP_GAP + (SKILLS_BUTTON_SIZE + SCORE_BUTTON_GAP) * 3 - SCORE_BUTTON_GAP + SCORE_BUFF_BUTTON_GAP + SCORE_BUFF_ICON / 2 + SCORE_BUFF_DROP,
   };
 }

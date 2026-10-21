@@ -23,4 +23,5 @@ export enum OverlayKind {
   VILLAGE_UPGRADE = 'villageUpgrade',
   TRADE = 'trade',
   TRADE_PROPOSAL = 'tradeProposal',
+  HELP = 'help',
 }

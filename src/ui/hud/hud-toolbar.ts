@@ -50,6 +50,13 @@ const ICON_ACTIONS: Record<string, string> = {
 
 const LAST_TURN_COLOR = 0x9cff55;
 const SIDE_PADDING = 12;
+const FOCUS_RING_COLOR = 0xffd54a;
+const FOCUS_RING_PAD = 4;
+
+interface FocusEntry {
+  btn: Container;
+  activate: () => void;
+}
 const ACTION_BTN = {
   color: { color: 0xffffff, alpha: 1 },
   hoverColor: { color: 0xffffff, alpha: 1 },
@@ -72,6 +79,11 @@ export class HudToolbar implements Widget {
   private actionPulse: Graphics | null = null;
   private stopSkillsPulse: (() => void) | null = null;
   private skillsPulse: Graphics | null = null;
+  /** Enabled buttons reachable by keyboard (Tab), rebuilt on every update. */
+  private focusables: FocusEntry[] = [];
+  /** Index into `focusables` while keyboard focus mode is on, else null. */
+  private focusIndex: number | null = null;
+  private focusRing: Graphics | null = null;
 
   mount(host: UIHost, root: Container): void {
     this.host = host;
@@ -86,6 +98,70 @@ export class HudToolbar implements Widget {
     this.unsub = useGameStore.subscribe(() => this.update());
     this.onResize = () => this.layout();
     window.addEventListener('resize', this.onResize);
+    window.addEventListener('keydown', this.onKeyDown, true);
+  }
+
+  /** Tab toggles keyboard focus on the buttons; left/right move it, Enter applies. */
+  private onKeyDown = (e: KeyboardEvent): void => {
+    if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
+    const target = e.target as HTMLElement | null;
+    if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) return;
+    const store = useGameStore.getState();
+    if (store.overlay !== null || store.texturesLoading || store.aiActive || store.gameOver) {
+      this.setFocus(null);
+      return;
+    }
+    const consume = (): void => {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+    };
+    if (e.key === 'Tab') {
+      consume();
+      if (e.repeat) return;
+      this.setFocus(this.focusIndex === null && this.focusables.length > 0 ? 0 : null);
+      return;
+    }
+    if (this.focusIndex === null) return;
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+      consume();
+      const n = this.focusables.length;
+      this.setFocus((this.focusIndex + (e.key === 'ArrowRight' ? 1 : -1) + n) % n);
+    } else if (e.key === 'Enter') {
+      consume();
+      if (e.repeat) return;
+      const entry = this.focusables[this.focusIndex];
+      this.setFocus(null);
+      entry?.activate();
+    }
+  };
+
+  private setFocus(index: number | null): void {
+    this.focusIndex = index;
+    this.drawFocusRing();
+  }
+
+  private drawFocusRing(): void {
+    this.focusRing?.destroy();
+    this.focusRing = null;
+    if (!this.el || !this.row || this.focusIndex === null) return;
+    const entry = this.focusables[this.focusIndex];
+    if (!entry) {
+      this.focusIndex = null;
+      return;
+    }
+    const k = this.row.scale.x;
+    const ring = new Graphics();
+    ring
+      .roundRect(
+        this.row.position.x + entry.btn.position.x * k - FOCUS_RING_PAD,
+        this.row.position.y - FOCUS_RING_PAD,
+        entry.btn.width * k + FOCUS_RING_PAD * 2,
+        entry.btn.height * k + FOCUS_RING_PAD * 2,
+        8,
+      )
+      .stroke({ width: 3, color: FOCUS_RING_COLOR, alpha: 0.95 });
+    this.el.addChild(ring);
+    this.focusRing = ring;
   }
 
   private layout = (): void => {
@@ -128,6 +204,7 @@ export class HudToolbar implements Widget {
       this.row.removeChildAt(0).destroy({ children: true });
     }
     const actions = toolbarSpecs();
+    this.focusables = [];
     const GAP = 12;
     const storeStep = store.tutorial && store.tutorialStep !== null ? store.tutorialStep : null;
     const tutorialKey = storeStep ? (STEP_CONFIG[storeStep].toolbarKey ?? null) : null;
@@ -148,6 +225,7 @@ export class HudToolbar implements Widget {
       btn.position.set(x, 0);
       this.row!.addChild(btn);
       x += btn.width + GAP;
+      if (!disabled) this.focusables.push({ btn, activate: onClick });
       if (tooltipsEnabled()) this.tooltips.push(new ActionTooltip(this.el!, btn, label));
       maybeHighlightAction(btn, key);
     };
@@ -162,6 +240,7 @@ export class HudToolbar implements Widget {
       btn.position.set(x, 0);
       this.row!.addChild(btn);
       x += btn.width + GAP;
+      if (!disabled) this.focusables.push({ btn, activate: onClick });
       if (tooltipsEnabled()) this.tooltips.push(new ActionTooltip(this.el!, btn, tooltipText));
       maybeHighlightAction(btn, key);
     };
@@ -184,6 +263,7 @@ export class HudToolbar implements Widget {
     skillsBtn.position.set(x, 0);
     this.row.addChild(skillsBtn);
     x += skillsBtn.width + GAP;
+    this.focusables.push({ btn: skillsBtn, activate: () => useGameStore.getState().setOverlay({ kind: OverlayKind.SKILL }) });
     if (tooltipsEnabled()) this.tooltips.push(new ActionTooltip(this.el!, skillsBtn, t('skillTree.title')));
     if (store.tutorial && skillPulseStep(store.tutorialStep) && !store.aiActive) {
       const ring = new Graphics();
@@ -213,6 +293,7 @@ export class HudToolbar implements Widget {
     endTurn.position.set(x, 0);
     this.row.addChild(endTurn);
     x += endTurn.width + GAP;
+    if (!store.aiActive) this.focusables.push({ btn: endTurn, activate: () => gameController.endTurn() });
     if (tooltipsEnabled()) this.tooltips.push(new ActionTooltip(this.el!, endTurn, t('hud.endTurn')));
 
     if (store.tutorialHighlightEndTurn && !store.aiActive) {
@@ -244,6 +325,8 @@ export class HudToolbar implements Widget {
     }
 
     this.layout();
+    if (this.focusIndex !== null && this.focusIndex >= this.focusables.length) this.focusIndex = this.focusables.length > 0 ? this.focusables.length - 1 : null;
+    this.drawFocusRing();
   }
 
   private startEndTurnPulse(): void {
@@ -320,6 +403,10 @@ export class HudToolbar implements Widget {
     this.skillsPulse = null;
     if (this.unsub) this.unsub();
     if (this.onResize) window.removeEventListener('resize', this.onResize);
+    window.removeEventListener('keydown', this.onKeyDown, true);
+    this.focusables = [];
+    this.focusIndex = null;
+    this.focusRing = null;
     this.unsub = null;
     this.onResize = null;
     this.el?.destroy({ children: true });

@@ -174,7 +174,7 @@ Pirates never become veterans.
 - **Territory radius** — level 1 → 1, level 2 → 2, then +1 for each *expand territory* pick (levels 5→6 and 9→10).
   Old saves keep the radius their level gave (2-4 → 2, 5-9 → 3, 10+ → 4).
 - **Building slots** — a village supports as many buildings as its level. Farms and granaries use no slot.
-- **Wall** — 20 money + 15 stone + 5 ore, needs *Defense*. A walled village gives its units +3 defense and must be
+- **Wall** — 20 money + 15 stone + 5 ore, needs *Defense*; costs 1 money upkeep per turn. A walled village gives its units +3 defense and must be
   breached by siege before it can be downgraded.
 - **Road** — 5 wood + 2 stone + 10 money, needs *Roads*. Connects a tile to an adjacent own road, port or village (a
   road must link back to an own village through the road/port/bridge network).
@@ -233,7 +233,7 @@ village slot (farms and granaries need none). No building produces money. Buildi
 | Forest temple | 10 stone + 30 money           | Forest temple | forest tile                                                  | same as temple; protects against earthquakes                                  |
 | Farm          | 10 money + 3 wood             | Agriculture   | own empty land tile (no forest/mountain/water; road is fine), no enemy unit | +3 food per round; 0 in winter (see [Food](#food))             |
 | Granary       | 20 money + 10 wood + 10 stone | Granary       | own empty land tile next to one of your farms, no enemy unit | stores unused food of adjacent farms, up to 15 per adjacent farm              |
-| University    | 40 money + 10 stone + 5 ore   | Science       | own empty land tile (no forest/mountain/water) of a level 5+ village; one per village; uses a slot | unlocks Geology, Agronomy, Engineering, Medicine; 2 money upkeep |
+| University    | 40 money + 10 stone + 5 ore   | Science       | own empty land tile (no forest/mountain/water) of a level 5+ village; one per village; uses a slot | unlocks Geology, Agronomy, Engineering, Medicine; 4 money upkeep |
 
 A builder ([Villagers](tribes/Villagers.md)) can place a sawmill, mine, port, bridge or road without the skill.
 
@@ -254,7 +254,7 @@ Skills, disbanding, demolishing and pirate deals cost money only.
 
 - **Money** — each village yields `max(0, 3 + 2 × level − upkeep) + 1` where the `+1` is a bonus for a village
   connected to another own village. Upkeep = money upkeep of the units it raised (see [Units](#units)) plus **1** for
-  every road tile, sawmill, farm, granary and mine it pays for (university 2; the claiming village pays, otherwise the
+  every road tile, wall, sawmill, farm, granary and mine it pays for (university 4; the claiming village pays, otherwise the
   nearest own one). An enemy unit standing on a village zeroes its income and stops its buildings' production.
 - **Wood** — sawmills. **Stone** and **Ore** — mines. **Food** — farms (see below). Sawmills and mines **keep** what
   they collect: a sawmill holds up to **20 wood**, a mine up to **20 stone and 20 ore**, and a full building stops
@@ -341,7 +341,8 @@ limit. It lasts 1 turn and strikes one random tile (radius 0). Tuning: `WEATHER_
 
 ## Bonuses and bottles
 
-**Bonus hexes** (golden marker): `players + 1` on random land cells, at least 4 hexes apart and from starting villages.
+**Bonus hexes** (red marker): `players + 1` on random land cells, at least 4 hexes apart and from starting villages. From then on, every **15th** turn (15, 30, …) one more appears on a random
+free land cell outside every village's territory (no building, unit or bonus on it).
 
 - A unit standing on a bonus at the start of the owner's turn can **Get the bonus**; that exhausts the unit for the
   turn. Each bonus is claimed once.

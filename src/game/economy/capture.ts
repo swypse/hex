@@ -33,20 +33,21 @@ function villageMaintenance(map: GameMap, villageTile: MapTile): number {
   return upkeep;
 }
 
-/** Money per turn each road tile and each sawmill, farm, granary and mine costs its village (a university costs twice that). */
-const STRUCTURE_UPKEEP = 1;
+/** Money per turn each road tile, wall and each sawmill, farm, granary and mine costs its village (a university costs more, see UNIVERSITY_UPKEEP). */
+export const STRUCTURE_UPKEEP = 1;
 
 const UPKEEP_BUILDINGS: readonly BuildingKind[] = [BuildingKind.SAWMILL, BuildingKind.FARM, BuildingKind.GRANARY, BuildingKind.MINE, BuildingKind.UNIVERSITY];
 /** A university costs more than the other buildings. */
-export const UNIVERSITY_UPKEEP = 2;
+export const UNIVERSITY_UPKEEP = 4;
 
-/** Money upkeep of what stands on `tile`: a road and/or a sawmill, farm, granary or mine (1 each), or a university (2). */
+/** Money upkeep of what stands on `tile`: a road, a village wall and/or a sawmill, farm, granary or mine (1 each), or a university (4). */
 export function tileUpkeep(tile: MapTile): number {
   const road = tile.roadOwner !== null && tile.roadOwner !== undefined ? 1 : 0;
   const building = tile.building && UPKEEP_BUILDINGS.includes(tile.building.kind)
     ? (tile.building.kind === BuildingKind.UNIVERSITY ? UNIVERSITY_UPKEEP : 1)
     : 0;
-  return (road + building) * STRUCTURE_UPKEEP;
+  const wall = tile.settlement?.wall ? 1 : 0;
+  return (road + building + wall) * STRUCTURE_UPKEEP;
 }
 
 /** Money upkeep of the roads and buildings paid by this village (see payerVillage). */

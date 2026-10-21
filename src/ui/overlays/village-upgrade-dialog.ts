@@ -10,6 +10,8 @@ import { Popup } from '../kit/popup';
 import { addPopupHint, PopupDialog } from './popup-dialog';
 import { OverlayKind, VillageUpgradeBonus } from '@enums';
 
+const ROW_GAP = 10;
+
 const LABELS: Record<VillageUpgradeBonus, () => string> = {
   [VillageUpgradeBonus.EXPAND_TERRITORY]: () => t('villageUpgrade.expand'),
   [VillageUpgradeBonus.MONEY]: () => t('villageUpgrade.money', { money: UPGRADE_MONEY_BONUS }),
@@ -28,18 +30,23 @@ export class VillageUpgradeDialog extends PopupDialog {
     if (!tile || level === undefined) return;
     const close = (): void => useGameStore.getState().setOverlay(null);
     const choices = villageUpgradeChoices(level);
-    const buttons = [
-      ...choices.map((bonus) => new Button({ label: LABELS[bonus](), onClick: () => gameController.actions.upgradeSelectedVillage(bonus) })),
-      new Button({ label: t('common.cancel'), onClick: close }),
-    ];
     const popup = new Popup({
       app: host.app,
       title: t('villageUpgrade.title', { level: level + 1 }),
-      buttons,
       onClose: close,
       closeOnBackdrop: false,
     });
-    addPopupHint(popup, choices.includes(VillageUpgradeBonus.VETERAN_SWORDSMAN) ? t('villageUpgrade.hintSwordsman') : t('villageUpgrade.hint'));
+    let y = addPopupHint(popup, choices.includes(VillageUpgradeBonus.VETERAN_SWORDSMAN) ? t('villageUpgrade.hintSwordsman') : t('villageUpgrade.hint')) + ROW_GAP;
+    // One full-width button per row: the choices, then Cancel.
+    const buttons = [
+      ...choices.map((bonus) => new Button({ label: LABELS[bonus](), width: popup.contentWidth, onClick: () => gameController.actions.upgradeSelectedVillage(bonus) })),
+      new Button({ label: t('common.cancel'), width: popup.contentWidth, onClick: close }),
+    ];
+    for (const button of buttons) {
+      button.position.set(0, y);
+      popup.content.addChild(button);
+      y += button.height + ROW_GAP;
+    }
     this.present(root, popup);
   }
 }

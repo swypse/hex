@@ -1,5 +1,5 @@
 import { BonusKind, BottleEffect, GameEventType, SkillId } from '@enums';
-import { bonusEligibleFor, explorerPath, findClosestVillage, revealExplorerPath } from './map/bonus';
+import { bonusEligibleFor, explorerPath, findClosestVillage, revealExplorerPath, trySpawnBonus } from './map/bonus';
 import { BOTTLE_HEAL, BOTTLE_MONEY, bottleCollectableFor, collectExpiredBottles, randomBottleEffectKind, trySpawnBottle } from './map/bottles';
 import { type GameEvent } from './events';
 import type { GameMap, MapTile } from './map/map-gen';
@@ -177,9 +177,10 @@ export class Bonuses {
     }
   }
 
-  /** Age out old bottles and maybe float a new one in each third turn. */
+  /** Age out old bottles, maybe float a new one, and add a map bonus on every 15th turn. */
   runBottleTurn(): void {
     collectExpiredBottles(this.map, this.turn);
     trySpawnBottle(this.map, this.turn, this.rng);
+    trySpawnBonus(this.map, this.turn, this.rng);
   }
 }

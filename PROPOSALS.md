@@ -1,61 +1,79 @@
-# Game feature proposals
+# Proposals
 
-Ideas that build on systems already in the game (seasons, weather, fire, ice, pirates, bonuses, bottles, temples, roads, food, veterans). Ordered by fit. Nothing here is implemented.
+Not implemented yet. Implemented or partly implemented ideas (random weather events, food/farming, seasons, trading,
+veterans, village upgrade choices, temples/walls, skill modifiers) were removed. Design rule: each system should create
+a decision that returns every few turns, show a warning before it hurts, and give the player a counter.
 
-## 1. Neutral threats and camps (best fit)
+## 1. Neutral camps and raiders (best fit)
 
-- **Wild camps:** neutral units guard bonuses or free villages. Clearing one gives a reward: gold, a veteran or a skill discount.
-- **Roaming events:** a wolf pack in winter that raids farms; a bandit band that follows roads and burns them (reuses the road-cutting logic). The land counterpart of pirates.
+- **Wild camps:** stationary, tough neutral units (owner `-1`) guarding a bonus or free village; they do not chase.
+  Reward: gold, a veteran, a skill discount or a village. Camps respawn slowly (~8 turns) in cleared areas.
+- **Roaming raiders:** a winter wolf pack that raids farms; a bandit band that follows roads and burns them (reuses the
+  road-cutting logic). The land counterpart of pirates.
 - **Map-centre boss:** a strong neutral the leader fights for a big prize.
-- **Why:** uses the existing neutral owner `-1` and AI code, gives players targets in the early turns, and gives the AI targets other than enemy players.
-- **Cost:** medium (spawn rules, simple neutral AI, balancing).
+- **Escalating pirates:** after turn 15 they come in pairs or stronger; deals cost more.
+- **Why:** gives mid-game targets other than the opponent, and simple AI (attack a camp if strong enough).
+- **Cost:** medium (spawn rules in `map-gen.ts`, neutral AI, balance).
 
-## 2. Quests and small goals
+## 2. Quests and objectives
 
-- Each player gets 2-3 optional goals per game or season: "capture a village before turn 20", "build a port", "kill 3 pirates", "hold 2 temples". Rewards: gold, a one-off skill discount, a veteran.
-- Some goals are shared and competitive: the first to reach a landmark gets the prize.
-- **Why:** adds direction without changing the core rules; the achievements system already tracks most conditions.
-- **Cost:** low to medium (UI plus a goal definition list).
+- 2-3 optional goals per player per game or season: "capture a village before turn 20", "build a port", "kill 3
+  pirates", "hold 2 temples". Rewards: gold, a one-off skill discount, a veteran.
+- Shared competitive goals: the first to reach a landmark or connect two villages by road gets the prize; they give the
+  trailing player something to catch up on.
+- **Why:** adds direction without changing core rules; achievements already track most conditions.
+- **Cost:** low to medium (goal definition list + UI).
 
-## 3. Random events
+## 3. Map features to contest
 
-Per-season draws on top of the existing weather:
-
-- Good: harvest festival (extra food), travelling merchant (buy one rare item), refugees (a free unit).
-- Bad: plague (a village loses population or income), raid, drought-linked famine.
-- Choice events: "spend 10 gold to avert it".
-- **Why:** fits the seasons and the weather event pipeline; adds luck against the AI's predictability.
-- **Cost:** low.
-
-## 4. More resources and economy depth
-
-- A luxury good (salt or furs) that only some biomes produce, making trade routes meaningful.
-- Or a "faith" resource from temples that powers abilities.
-- Mid-size option: tools or weapons from ore plus wood, gating upgrades.
-- **Risk:** more resources means more UI, AI and balance work for modest gain. Add at most one.
-
-## 5. Trading and diplomacy
-
-- **Trade routes:** connect two villages by road or port to earn gold; longer or more exposed routes pay more, which gives road raiding a real payoff.
-- **Player-to-player:** tribute, non-aggression pacts, gifts; mainly useful in multiplayer.
-- **Cost:** medium for routes, high for diplomacy (AI behaviour, UI, abuse cases).
-
-## 6. More abilities
-
-- Tribe-flavoured active abilities on a cooldown, e.g. Sand: sandstorm that hides units; Forest: grow or clear a forest tile; Aqua: raise or lower water; Cats: sneak-capture.
-- Or a veteran perk tree: units that survive fights earn choices.
-- **Why:** deepens tribe identity (starts now match the tribe's biome).
-- **Cost:** medium; each ability needs AI handling.
-
-## 7. Map features to contest
-
-- Ruins or wonders: capturing one gives a lasting bonus (+income, +vision, a free skill). Mountain passes and bridges as chokepoints.
+- Ruins (hold 3 turns → free skill), wonders (+income / +vision), lighthouse (vision, shorter ship routes), shrine
+  (heals units on it), watchtower ridge (+1 vision). Mountain passes and bridges as chokepoints.
 - Cheap with the bonus-placement code; gives the AI clear targets.
 
-## 8. Game modes
+## 4. Remaining random events
 
-- "Survive" mode against escalating neutral waves (needs idea 1), or a score-race mode where quests are the main way to score.
+On top of weather: harvest festival, travelling merchant, mercenaries for hire, refugees (free unit), plague, flood,
+wildfire, rebellion of a starving/high-upkeep village, meteor ore deposit. Choice events ("spend 10 gold to avert it").
+Forecast one round ahead, host-side seeded RNG, catch-up bias, setup toggle (off / mild / wild).
+
+## 5. Diplomacy
+
+- Ceasefire and non-aggression offers (AI proposes when losing); breaking one costs score.
+- Multiplayer alliances and shared vision (needs a team-score rule).
+- **Cost:** high (AI behaviour, UI, abuse cases).
+
+## 6. Stronger tribe identity
+
+- Passive traits next to the start bonus: Cats +1 vision, Villagers +1 money per village, Warriors banner within 3,
+  Barbarians wounded units +1 attack, Forest units heal +5 in forest, Aqua ports −5 cost, Sand desert costs no extra move.
+- Tribe active abilities on a cooldown: Sand sandstorm hides units, Forest grows/clears a forest tile, Aqua raises or
+  lowers water, Cats sneak-capture.
+- Tribe-specific buildings (Aqua fish market, Forest druid grove, Sand oasis well).
+- **Cost:** medium; each ability needs AI handling.
+
+## 7. Economy depth (optional)
+
+- One extra resource at most: a luxury good (salt/furs) from some biomes, or "faith" from temples powering abilities.
+- Market building with fixed conversion rates and a per-turn cap; trade routes paying by length and exposed to raids.
+- **Risk:** more UI, AI and balance work for modest gain.
+
+## 8. Unit growth beyond veterans
+
+- Heroes: one rare named commander per player with an aura, lost for good on death (score penalty).
+- Promotion choices at kill milestones (+attack, +HP, first strike, +1 move); keep +attack capped (damage snowballs with HP).
+
+## 9. Game modes
+
+- "Survive" against escalating neutral waves (needs 1), or a score-race mode where quests are the main way to score.
 
 ## Recommendation
 
-Start with **1 (neutral camps and raiders) together with 2 (quests)**: quests say what to do, neutrals are the obstacle, and both reuse existing code. Add **3 (random events)** next because it is cheap. Hold trading and new resources until the combat and economy loop feels thin in play.
+Start with **1 (camps and raiders) + 2 (quests)**, then **3 (map features)** and **4 (events)**. Hold diplomacy and new
+resources until the combat and economy loop feels thin in play.
+
+## Requirements for any new system
+
+- Multiplayer rolls happen on the host with the shared seed; the presenter only reads `GameEvent`s.
+- Minimal AI policy plus an AI bench entry (bench resolves only ~4pt effects; run several hundred games).
+- HUD line, tooltip, `help-texts.ts` entry, tutorial step if it appears before turn 10; small score hook.
+- Setup-screen toggle so competitive rooms can keep classic rules.

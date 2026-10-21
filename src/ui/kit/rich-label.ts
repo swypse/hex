@@ -13,10 +13,10 @@ export function hasResourceTokens(text: string): boolean {
 }
 
 /** Word-wrapped text with inline resource icons (see TOKEN). */
-export function makeRichLabel(text: string, opts: { fontSize: FontSize; fill: number; width: number }): Container {
+export function makeRichLabel(text: string, opts: { fontSize: FontSize; fill: number; width: number; lineHeight?: number }): Container {
   const root = new Container();
   const { fontSize, fill, width } = opts;
-  const lineH = Math.round(fontSize * 1.5);
+  const lineH = Math.round(fontSize * (opts.lineHeight ?? 1.5));
   const iconSize = Math.round(fontSize * 1.25);
   const space = Math.round(fontSize * 0.3);
   let x = 0;

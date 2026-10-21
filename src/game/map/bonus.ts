@@ -52,6 +52,22 @@ export function placeBonuses(map: GameMap, rng: () => number): void {
   }
 }
 
+/** A new bonus appears on the map every this many turns. */
+export const BONUS_SPAWN_TURNS = 15;
+
+/** Every `BONUS_SPAWN_TURNS`-th turn, puts a bonus on a random free land cell outside every village's territory
+ *  (no settlement, building, unit or other bonus). Returns the tile, or null when it is not the turn or nothing is free. */
+export function trySpawnBonus(map: GameMap, turn: number, rng: () => number): MapTile | null {
+  if (turn % BONUS_SPAWN_TURNS !== 0) return null;
+  const candidates = map.tiles.filter(
+    (t) => isLandType(t.terrain) && t.ownedBy == null && !t.settlement && !t.building && !t.bonus && !t.unit,
+  );
+  const spot = pickRandom(candidates, rng);
+  if (!spot) return null;
+  spot.bonus = { kind: randomBonusKind(rng), claimer: null, arrivalTurn: 0 };
+  return spot;
+}
+
 export function bonusEligibleFor(map: GameMap, playerIndex: number, turn: number): MapTile[] {
   const out: MapTile[] = [];
   for (const t of map.tiles) {

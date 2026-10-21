@@ -1,10 +1,10 @@
 import { t } from '../../i18n';
-import { type Container } from 'pixi.js';
+import { type Container, Graphics } from 'pixi.js';
 import { gameController } from '../../controller/game-controller';
 import { hasSkill } from '../../game/skills';
 import { networkStock } from '../../game/economy/stock';
 import { UNIT_TYPES, UNIT_TYPE_NAMES } from '../../game/units/units';
-import { TRIBE_SPECIAL_UNIT, TRIBES } from '../../game/tribes';
+import { BASE_UNIT_TYPES, TRIBE_SPECIAL_UNIT, TRIBES } from '../../game/tribes';
 import type { Player } from '../../game/players';
 import { useGameStore } from '../../store/game-store';
 import { type UIHost } from '../host';
@@ -38,7 +38,7 @@ function tribeCodeFor(type: UnitType): string {
 }
 
 /** The 7 base playable units every tribe can spawn. */
-const BASE_PLAYABLE: Exclude<UnitType, 'pirate'>[] = [UnitType.WARRIOR, UnitType.RIDER, UnitType.ARCHER, UnitType.SWORDSMAN, UnitType.SHIELD, UnitType.CATAPULT, UnitType.KNIGHT];
+const BASE_PLAYABLE = BASE_UNIT_TYPES;
 
 /** Types shown in the spawn popup for a player: the 7 base units plus that
  *  player's tribe special unit. */
@@ -47,7 +47,22 @@ export function spawnableTypesFor(player: Player): Exclude<UnitType, 'pirate'>[]
   return [...BASE_PLAYABLE, ...(BASE_PLAYABLE.includes(special) ? [] : [special])];
 }
 
+/** Keyboard selection ring drawn around a grid item's circle. */
+const SELECT_RING_COLOR = 0xffd54a;
+const SELECT_RING_RADIUS = 34;
+const CIRCLE_CENTER_Y = 30;
+
+const ARROW_STEPS: Record<string, { dx: number; dy: number }> = {
+  ArrowLeft: { dx: -1, dy: 0 },
+  ArrowRight: { dx: 1, dy: 0 },
+  ArrowUp: { dx: 0, dy: -1 },
+  ArrowDown: { dx: 0, dy: 1 },
+};
+
 export class SpawnDialog extends PopupDialog {
+  /** Grid index chosen with the keyboard. */
+  private selected = 0;
+  private showingReasons = false;
   mount(host: UIHost, root: Container): void {
     const s = useGameStore.getState();
     const map = gameController.getMap();
@@ -67,9 +82,42 @@ export class SpawnDialog extends PopupDialog {
     });
     root.addChild(popup.el);
     this.popup = popup;
+    this.selected = Math.max(0, this.types().findIndex((type) => this.reasons(type).length === 0));
     this.drawGrid();
     popup.finish();
+    window.addEventListener('keydown', this.onKeyDown);
   }
+
+  destroy(): void {
+    window.removeEventListener('keydown', this.onKeyDown);
+    super.destroy();
+  }
+
+  /** Arrows move the selection over the grid, Enter spawns the selected unit (or explains why it can't). */
+  private onKeyDown = (e: KeyboardEvent): void => {
+    if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (e.repeat) return;
+      if (this.showingReasons) {
+        this.drawGrid();
+        return;
+      }
+      const type = this.types()[this.selected];
+      if (!type) return;
+      if (this.reasons(type).length > 0) this.drawReasons(type);
+      else gameController.actions.spawnSelectedVillage(type);
+      return;
+    }
+    const step = ARROW_STEPS[e.key];
+    if (!step || this.showingReasons) return;
+    e.preventDefault();
+    const col = this.selected % COLS + step.dx;
+    const next = this.selected + step.dx + step.dy * COLS;
+    if (col < 0 || col >= COLS || next < 0 || next >= this.types().length) return;
+    this.selected = next;
+    this.drawGrid();
+  };
 
   private types(): Exclude<UnitType, 'pirate'>[] {
     const s = useGameStore.getState();
@@ -122,6 +170,7 @@ export class SpawnDialog extends PopupDialog {
   private drawGrid(): void {
     if (!this.popup) return;
     this.clearContent();
+    this.showingReasons = false;
     const types = this.types();
     const cols = COLS;
     const content = this.popup.content;
@@ -142,6 +191,10 @@ export class SpawnDialog extends PopupDialog {
         },
       });
       item.position.set(GRID_MARGIN + col * (ACTION_CELL_W + ITEM_PAD), GRID_MARGIN + row * (ACTION_CELL_H + ITEM_PAD));
+      if (i === this.selected) {
+        const cx = ACTION_CELL_W / 2;
+        item.addChild(new Graphics().circle(cx, CIRCLE_CENTER_Y, SELECT_RING_RADIUS).stroke({ width: 3, color: SELECT_RING_COLOR }));
+      }
       content.addChild(item);
     });
     this.popup.reflow();
@@ -150,6 +203,7 @@ export class SpawnDialog extends PopupDialog {
   private drawReasons(type: UnitType): void {
     if (!this.popup) return;
     this.clearContent();
+    this.showingReasons = true;
     const content = this.popup.content;
     const lines = this.reasons(type);
     const name = makeLabel(t('spawn.cannot', { unit: UNIT_TYPE_NAMES[type] }), {

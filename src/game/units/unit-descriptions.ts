@@ -41,6 +41,16 @@ const DESC_KEYS: Record<UnitType, string> = {
   stunner: 'help.stunner.desc',
 };
 
+/** The one-line description of a unit type. */
+export function unitTypeDescription(type: UnitType): string {
+  return t(DESC_KEYS[type]);
+}
+
+/** The feature bullets of a land unit type, without the leading base-stats line. */
+export function unitTypeFeatureLines(type: UnitType): string[] {
+  return LAND_KEYS[type].slice(1).map((key) => t(key));
+}
+
 export function unitHelpTitle(unit: Unit): string {
   if (unit.shipLevel !== undefined) return t('help.ship.title', { level: unit.shipLevel });
   return UNIT_TYPE_NAMES[unit.type];

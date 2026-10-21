@@ -17,13 +17,21 @@ import { FontSize } from '@enums';export const THEME = {
   text: 0xeeeeee,
   white: 0xffffff,
   skillTree: {
-    bg: 0x1a1a2e,
+    bg: 0x202032,
     openedLabelText: 0xffffff,
     closedLabelText: 0x444444,
     openedSkillBg: 0x373748,
     openedSkillStroke: 0xff8c00,
-    closedSkillBg: 0x373748,
-    closedSkillStroke: 0x333333,
+    closedSkillBg: 0x363636,
+    closedSkillStroke: 0x363636,
+    /** Line to a skill that can't be opened yet. */
+    unreachableLine: 0x1a1a2b,
+    /** Medallion fill/stroke of a skill that can't be opened yet. */
+    unreachableSkill: 0x1a1a2b,
+    /** Price badge fill of every unopened skill. */
+    priceBg: 0x141423,
+    /** Price text of a skill that can't be opened yet (missing parent skill or money). */
+    unreachablePriceText: 0x333333,
   },
   /** Map-layer UI palette (selection highlights, route strokes). */
   map: {

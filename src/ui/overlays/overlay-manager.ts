@@ -22,6 +22,7 @@ import { BonusLeaveDialog } from './bonus-leave-dialog';
 import { VeteranBonusDialog } from './veteran-bonus-dialog';
 import { StunChoiceDialog } from './stun-choice-dialog';
 import { BuilderBuildDialog } from './builder-build-dialog';
+import { HelpDialog } from './help-dialog';
 import { TradeDialog } from './trade-dialog';
 import { TradeProposalDialog } from './trade-proposal-dialog';
 import { OverlayKind, PauseReason, Screen } from '@enums';
@@ -69,6 +70,7 @@ export class OverlayManager {
     villageupgrade: { make: () => new VillageUpgradeDialog(), mounted: null, hiding: false },
     builderbuild: { make: () => new BuilderBuildDialog(), mounted: null, hiding: false },
     trade: { make: () => new TradeDialog(), mounted: null, hiding: false },
+    help: { make: () => new HelpDialog(), mounted: null, hiding: false },
     tradeproposal: { make: () => new TradeProposalDialog(), mounted: null, hiding: false },
   };
   private unsub: (() => void) | null = null;
@@ -157,6 +159,9 @@ export class OverlayManager {
           break;
         case OverlayKind.TRADE:
           active.add('trade');
+          break;
+        case OverlayKind.HELP:
+          active.add('help');
           break;
         case OverlayKind.TRADE_PROPOSAL:
           active.add('tradeproposal');

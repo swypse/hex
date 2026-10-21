@@ -26,7 +26,7 @@ function makeHost(): UIHost {
 const requestedImages: string[] = [];
 
 describe('SpawnDialog', () => {
-  let keyHandler: ((e: KeyboardEventLike) => void) | null;
+  let keyHandlers: ((e: KeyboardEventLike) => void)[];
   let host: UIHost;
   let root: Container;
 
@@ -55,9 +55,9 @@ describe('SpawnDialog', () => {
         requestedImages.push(url);
       }
     };
-    keyHandler = null;
+    keyHandlers = [];
     const win = (globalThis as { window: { addEventListener: (t: string, cb: unknown) => void; removeEventListener: (t: string, cb: unknown) => void } }).window;
-    win.addEventListener = (t, cb) => { if (t === 'keydown') keyHandler = cb as (e: KeyboardEventLike) => void; };
+    win.addEventListener = (t, cb) => { if (t === 'keydown') keyHandlers.push(cb as (e: KeyboardEventLike) => void); };
     win.removeEventListener = () => {};
 
     const map = makeTestMap(1);
@@ -86,7 +86,7 @@ describe('SpawnDialog', () => {
     const dialog = new SpawnDialog();
     dialog.mount(host, root);
     expect(useGameStore.getState().overlay).toEqual({ kind: OverlayKind.SPAWN });
-    keyHandler!({ key: 'Escape', preventDefault: () => {} });
+    for (const h of keyHandlers) h({ key: 'Escape', preventDefault: () => {} });
     expect(useGameStore.getState().overlay).toBeNull();
     dialog.destroy();
   });

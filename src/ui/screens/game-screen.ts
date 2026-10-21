@@ -1,7 +1,7 @@
 import { StarField } from '../../gfx/star-field';
 import { Container, Graphics } from 'pixi.js';
 import { gameController } from '../../controller/game-controller';
-import { useGameStore } from '../../store/game-store';
+import { type OverlayState, useGameStore } from '../../store/game-store';
 import { t } from '../../i18n';
 import { advanceCheatBuffer, triggeredCheat, SKILLS_CHEAT_WORD, RESOURCE_CHEAT_WORD, FOG_CHEAT_WORD, PIRATES_CHEAT_WORD, WIN_CHEAT_WORD, SEASON_CHEAT_WORDS, WEATHER_CHEAT_WORDS } from '../../game/cheats';
 import { type ScreenController, type UIHost, type Widget } from '../host';
@@ -14,6 +14,7 @@ import { HudTurn } from '../hud/hud-turn';
 import { HudResourcePanel } from '../hud/hud-resource-panel';
 import { HudSelected } from '../hud/hud-selected';
 import { HudAchievements } from '../hud/hud-achievements';
+import { HudHelp } from '../hud/hud-help';
 import { HudTrade } from '../hud/hud-trade';
 import { HudContextMenu } from '../hud/hud-context-menu';
 import { HudToolbar } from '../hud/hud-toolbar';
@@ -30,6 +31,13 @@ function scoreHud(): HudScore {
 }
 
 /** Screen direction each arrow key selects toward. */
+/** Keys that toggle a popup, with or without Shift. */
+const TOGGLE_OVERLAYS: Record<string, OverlayKind.SKILL | OverlayKind.ACHIEVEMENTS | OverlayKind.HELP> = {
+  KeyS: OverlayKind.SKILL,
+  KeyA: OverlayKind.ACHIEVEMENTS,
+  KeyH: OverlayKind.HELP,
+};
+
 const ARROW_DIRECTIONS: Record<string, { dx: number; dy: number }> = {
   ArrowLeft: { dx: -1, dy: 0 },
   ArrowRight: { dx: 1, dy: 0 },
@@ -50,42 +58,64 @@ export class GameScreen implements ScreenController {
   private unsub: (() => void) | null = null;
   private cheatBuffer = '';
 
-  /** Hotkeys: Enter ends the turn, Shift+S / Shift+A open skills / achievements,
+  /** Hotkeys: Ctrl+Enter ends the turn, Enter / Space start target selection, S / A / H toggle skills / achievements / help (Shift optional),
    *  arrows select the nearest own unit that way. Returns true when handled. */
   private handleHotkey(e: KeyboardEvent): boolean {
     const target = e.target as HTMLElement | null;
     if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) return false;
     const store = useGameStore.getState();
+    const toggled = !e.ctrlKey && !e.metaKey && !e.altKey ? TOGGLE_OVERLAYS[e.code] : undefined;
+    if (toggled !== undefined && !e.repeat && !store.texturesLoading && (store.overlay === null || store.overlay.kind === toggled)) {
+      store.setOverlay(store.overlay === null ? ({ kind: toggled } as OverlayState) : null);
+      return true;
+    }
     if (store.overlay !== null || store.texturesLoading) return false;
     const arrow = ARROW_DIRECTIONS[e.key];
+    if (e.code === 'Space' && !e.repeat) {
+      gameController.toggleKeyTargeting();
+      return true;
+    }
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && !e.repeat) {
+      gameController.endTurn();
+      return true;
+    }
+    if (arrow && e.shiftKey) {
+      gameController.selectAdjacentTile(arrow.dx, arrow.dy);
+      return true;
+    }
+    if (arrow && !e.shiftKey && gameController.isKeyTargeting) {
+      gameController.moveKeyTarget(arrow.dx, arrow.dy);
+      return true;
+    }
+    if (e.key === 'Enter' && !e.shiftKey && gameController.isKeyTargeting) {
+      if (!e.repeat) gameController.confirmKeyTarget();
+      return true;
+    }
     if (arrow && !e.shiftKey) {
       gameController.selectUnitInDirection(arrow.dx, arrow.dy);
       return true;
     }
     if (e.key === 'Enter' && !e.shiftKey && !e.repeat) {
-      gameController.endTurn();
-      return true;
-    }
-    if (e.shiftKey && !e.repeat && (e.code === 'KeyS' || e.code === 'KeyA')) {
-      store.setOverlay({ kind: e.code === 'KeyS' ? OverlayKind.SKILL : OverlayKind.ACHIEVEMENTS });
+      gameController.toggleKeyTargeting();
       return true;
     }
     return false;
   }
 
   private onKeyDown = (e: KeyboardEvent): void => {
-    if (e.ctrlKey || e.metaKey || e.altKey) return;
-    if (this.handleHotkey(e)) {
-      e.preventDefault();
-      return;
-    }
-    if (e.shiftKey) return;
-    if (e.key.length !== 1) return;
-    if (!/[a-z]/i.test(e.key)) return;
-    this.cheatBuffer = advanceCheatBuffer(this.cheatBuffer, e.key);
-    const cheat = triggeredCheat(this.cheatBuffer);
+    if ((e.ctrlKey || e.metaKey) && e.key !== 'Enter') return;
+    if (e.altKey) return;
+    // Letters feed the cheat buffer even when a letter hotkey (S / A / H) takes them.
+    const typedLetter = !e.shiftKey && e.key.length === 1 && /[a-z]/i.test(e.key);
+    if (typedLetter) this.cheatBuffer = advanceCheatBuffer(this.cheatBuffer, e.key);
+    const handled = this.handleHotkey(e);
+    if (handled) e.preventDefault();
+    const cheat = typedLetter ? triggeredCheat(this.cheatBuffer) : null;
     if (!cheat) return;
     this.cheatBuffer = '';
+    // The cheat word may have toggled a hotkey popup on the way; close it.
+    const store = useGameStore.getState();
+    if (store.overlay && (Object.values(TOGGLE_OVERLAYS) as OverlayKind[]).includes(store.overlay.kind)) store.setOverlay(null);
     if (cheat === RESOURCE_CHEAT_WORD && gameController.cheats.cheatResources()) {
       useGameStore.getState().setCenterMessage(t('msg.cheatResources'));
     } else if (cheat === SKILLS_CHEAT_WORD && gameController.cheats.cheatOpenAllSkills()) {
@@ -137,6 +167,7 @@ export class GameScreen implements ScreenController {
       new HudSelected(),
       new HudAchievements(),
       new HudTrade(),
+      new HudHelp(),
       new HudToolbar(),
       new HudContextMenu(),
       new HudPerf(),

@@ -27,6 +27,15 @@ export function tribeById(id: number): TribeInfo | undefined {
   return TRIBES.find((t) => t.id === id);
 }
 
+/** The 7 base units every tribe can spawn. */
+export const BASE_UNIT_TYPES: Exclude<UnitType, UnitType.PIRATE>[] = [UnitType.WARRIOR, UnitType.RIDER, UnitType.ARCHER, UnitType.SWORDSMAN, UnitType.SHIELD, UnitType.CATAPULT, UnitType.KNIGHT];
+
+/** The unit types a tribe can spawn: the base units plus its special unit. */
+export function tribeUnitTypes(tribe: Tribe): UnitType[] {
+  const special = TRIBE_SPECIAL_UNIT[tribe];
+  return [...BASE_UNIT_TYPES, ...(BASE_UNIT_TYPES.includes(special as never) ? [] : [special])];
+}
+
 /** The single tribe-gate: each tribe's special unit, spawnable only by it.
  *  Special units have no skill requirement — the tribe itself is the gate. */
 export const TRIBE_SPECIAL_UNIT: Record<Tribe, UnitType> = {

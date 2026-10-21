@@ -3,7 +3,7 @@ import { type GameMap, type MapTile } from '../game/map/map-gen';
 import { portDirection } from '../game/economy/buildings';
 import { isExploredFor } from '../game/map/explore';
 import { adjacentFarmCount } from '../game/economy/food';
-import { BuildingKind } from '@enums';
+import { BuildingKind, Season } from '@enums';
 import { weatherOverlayAt } from '../game/weather/weather';
 import { clamp } from '../util/math';
 
@@ -70,6 +70,8 @@ export function tileSignature(
     weatherOverlayAt(map, tile) ?? '',
     hidden ? 'h' : '',
     tile.building ? tile.building.kind : '',
+    // A farm swaps to its black-and-white art in winter.
+    tile.building?.kind === BuildingKind.FARM ? (map.season === Season.WINTER ? 'winter' : '') : '',
     tile.building?.kind === BuildingKind.PORT ? (portDirection(map, tile) ?? '-') : '',
     tile.building?.kind === BuildingKind.TEMPLE || tile.building?.kind === BuildingKind.FOREST_TEMPLE ? String(tile.building.level) : '',
     tile.building?.kind === BuildingKind.GRANARY ? String(granaryFarmCount(map, tile)) : '',

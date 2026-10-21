@@ -55,6 +55,10 @@ const PIRATE_DEAL_DOT = 8;
 const PIRATE_DEAL_GAP = 4;
 /** Screen-px gap between the pirate's hp bar anchor and the deal-dot row. */
 const PIRATE_DEAL_HPBAR_GAP = 4;
+/** Marker of the cell picked with the keyboard (placement targets, move/attack selection). */
+const PICK_MARKER_COLOR = 0xffd54a;
+/** Alpha of the other placement cells while the keyboard cursor stands on one. */
+const UNPICKED_MARKER_ALPHA = 0.45;
 /** Village name label text size (px). */
 const VILLAGE_LABEL_FONT_SIZE = FontSize.VERY_SMALL;
 /** Overlay stacking: village labels sit below the unit standing on the village,
@@ -318,6 +322,7 @@ export class MapView {
     tutorialMarkerKeys: Set<string> = new Set<string>(),
     localTurn = true,
     placementKeys?: Set<string>,
+    pickedKey?: string,
   ): void {
     if (this.tileViews.size === 0) this.buildTiles(map);
     this.map = map;
@@ -502,7 +507,7 @@ export class MapView {
       this.overlay.addChild(ex.el);
       this.overlayItems.push({ el: ex.el, world: ex.world });
     }
-    this.drawHighlights(map, selection, reachableKeys, attackableKeys, reachableColor, localPlayerIndex, tutorialMarkerKeys, localTurn, placementKeys);
+    this.drawHighlights(map, selection, reachableKeys, attackableKeys, reachableColor, localPlayerIndex, tutorialMarkerKeys, localTurn, placementKeys, pickedKey);
     this.shipBobs = shipBobs;
     this.startShipBob();
     this.startExclamationAnimation();
@@ -1134,6 +1139,7 @@ export class MapView {
     tutorialMarkerKeys: Set<string> = new Set<string>(),
     localTurn = true,
     placementKeys?: Set<string>,
+    pickedKey?: string,
   ): void {
     this.tutorialMarkerParts = [];
     this.attackPulseParts = [];
@@ -1160,6 +1166,8 @@ export class MapView {
     if (selectedKey) markerTileKeys.add(selectedKey);
     for (const tile of this.tilesForKeys(markerTileKeys)) {
       const key = axialKey(tile);
+      // A cell picked with the keyboard gets the yellow placement marker instead of its move/attack one.
+      if (placementKeys?.has(key) && key !== selectedKey) continue;
       const y = hexToPixel(tile, this.hexSize).y - tileElevation(tile, this.hexSize);
       if (reachableKeys.has(key) && key !== selectedKey) {
         const p = hexToPixel(tile, this.hexSize);
@@ -1206,9 +1214,18 @@ export class MapView {
         const p = hexToPixel(tile, this.hexSize);
         const y = p.y - tileElevation(tile, this.hexSize);
         const dot = this.pool.takeGraphics();
-        this.drawMarkerShape(dot, p.x, y, this.hexSize * 0.16, 0xffd54a);
+        const key = axialKey(tile);
+        // With a keyboard cursor on one of the cells, the others are dimmed so the cursor stands out.
+        const dimmed = pickedKey !== undefined && key !== pickedKey;
+        this.drawMarkerShape(dot, p.x, y, this.hexSize * 0.16, PICK_MARKER_COLOR);
+        dot.alpha = dimmed ? UNPICKED_MARKER_ALPHA : 1;
         this.markerLayer.addChild(dot);
         this.highlights.push(dot);
+        // A unit mirrored above the marker layer would cover it: draw it again above the mirror.
+        if (this.mirroredKeys.has(axialKey(tile))) {
+          dot.visible = false;
+          this.addAttackProxy(key, p.x, y, this.hexSize * 0.16, PICK_MARKER_COLOR);
+        }
       }
     }
   }
@@ -2019,11 +2036,11 @@ export class MapView {
 
   /** An attack marker drawn inside the overlay (above the unit mirrors at
    *  zIndex -1, below hp bars at 0), following the world transform each frame. */
-  private addAttackProxy(key: string, x: number, y: number, radius: number): void {
+  private addAttackProxy(key: string, x: number, y: number, radius: number, color: number = THEME.map.selected): void {
     const holder = new Container();
     holder.zIndex = OVERLAY_Z_ATTACK_MARKER;
     const g = this.pool.takeGraphics();
-    this.drawMarkerShape(g, x, y, radius, THEME.map.selected);
+    this.drawMarkerShape(g, x, y, radius, color);
     this.revealMarker(key, g);
     holder.addChild(g);
     const sync = (): void => {
@@ -2160,7 +2177,7 @@ export class MapView {
     const iconSize = 16;
     const gap = 4;
     const plateColor = territoryColor(tribe, this.knownOwners.has(owner));
-    const label = this.pool.takeText(`${tile.settlement!.name ?? ''} ${count}/${capacity}`.trim(), {
+    const label = this.pool.takeText(`${tile.settlement!.name ?? ''}${owner === this.lastLocalIndex ? ` ${count}/${capacity}` : ''}`.trim(), {
       fontSize: VILLAGE_LABEL_FONT_SIZE,
       fill: villageLabelTextColor(tribe, this.knownOwners.has(owner)),
       fontFamily: FONT_REGULAR

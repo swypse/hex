@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bonusEligibleFor, explorerPath, findClosestVillage, randomBonusKind, } from '../src/game/map/bonus';
+import { BONUS_SPAWN_TURNS, bonusEligibleFor, explorerPath, findClosestVillage, randomBonusKind, trySpawnBonus } from '../src/game/map/bonus';
 import { isExploredFor } from '../src/game/map/explore';
 import { hexDistance, hexNeighbors } from '../src/game/map/hex';
 import { type GameMap, generateMap } from '../src/game/map/map-gen';
@@ -288,5 +288,23 @@ describe('bonus claiming (simulator)', () => {
     expect(aiTile.bonus).toBeNull();
     const events = sim.drainEvents();
     expect(events.some((e) => e.type === GameEventType.BONUS_CLAIMED && e.playerIndex === 1)).toBe(true);
+  });
+});
+
+describe('periodic bonus spawn', () => {
+  it('adds a bonus on every 15th turn on a free land cell outside any territory', () => {
+    const map = generateMap(3, 7);
+    for (const t of map.tiles) t.bonus = null;
+    const rng = new SeededRandom(5);
+    expect(trySpawnBonus(map, BONUS_SPAWN_TURNS - 1, () => rng.next())).toBeNull();
+    expect(map.tiles.some((t) => t.bonus)).toBe(false);
+    const spot = trySpawnBonus(map, BONUS_SPAWN_TURNS, () => rng.next());
+    expect(spot).not.toBeNull();
+    expect(spot!.bonus).not.toBeNull();
+    expect(spot!.ownedBy ?? null).toBeNull();
+    expect(spot!.settlement).toBeNull();
+    expect(spot!.building).toBeNull();
+    expect(isWaterType(spot!.terrain)).toBe(false);
+    expect(map.tiles.filter((t) => t.bonus)).toHaveLength(1);
   });
 });

@@ -7,7 +7,7 @@ import { attackableTargets } from '@/game/units/combat';
 import { type GameEvent } from '@/game/events';
 import { initialExplorationFor, isExploredFor } from '@/game/map/explore';
 import { shouldPromptWatch } from '@/game/game-mode';
-import { axialKey, hexCorners, hexDistance, hexToPixel } from '@/game/map/hex';
+import { axialKey, hexCorners, hexDistance, hexNeighbors, hexToPixel, pixelToHex } from '@/game/map/hex';
 import { tileElevation } from '@/render/elevation';
 import { countIceTiles } from '@/game/map/ice';
 import { type GameMap, type MapTile, generateMap } from '@/game/map/map-gen';
@@ -92,6 +92,8 @@ class GameController {
   private overlayItems: OverlayItem[] = [];
   private reachableKeys = new Set<string>();
   private attackableKeys = new Set<string>();
+  /** Keyboard target selection (Space): the highlighted cell, or null when off. */
+  private keyTarget: { q: number; r: number } | null = null;
   private hiddenUnitIds = new Set<string>();
   /** Builder placement in progress: highlight candidate cells, wait for a tap. */
   /** Whether the last render hid detail (hp bars/labels) for the current zoom;
@@ -1006,6 +1008,113 @@ class GameController {
   /** Keyboard arrow: selects the own unit nearest to the selected hex (or the
    *  screen centre) in direction (`dx`, `dy`) on screen. Pans the camera when it
    *  is off screen. No unit that way keeps the selection. */
+  get isKeyTargeting(): boolean {
+    return this.keyTarget !== null;
+  }
+
+  /** Starts keyboard target selection on the selected unit's own cell, or leaves it. */
+  toggleKeyTargeting(): void {
+    if (this.keyTarget) {
+      this.keyTarget = null;
+      this.render();
+      return;
+    }
+    // A command just sent (e.g. the move that ended the previous targeting) is still being applied and presented;
+    // the highlighted cells are only current once it has finished and rendered.
+    void this.taskQueue.then(() => {
+      const sel = useGameStore.getState().selection;
+      if (this.keyTarget || !sel || sel.kind !== SelectionKind.UNIT) return;
+      const targets = this.keyTargets();
+      if (targets.length === 0) return;
+      // Move/attack: the cursor starts on the unit itself. Placement: on the cell nearest to it.
+      const start = this.placementPending ? targets.reduce((a, b) => (hexDistance(sel, b) < hexDistance(sel, a) ? b : a)) : sel;
+      this.keyTarget = { q: start.q, r: start.r };
+      this.render();
+    });
+  }
+
+  /** Arrows while targeting: moves the marker to the nearest target cell that way. */
+  moveKeyTarget(dx: number, dy: number): void {
+    if (!this.keyTarget) return;
+    const origin = hexToPixel(this.keyTarget, HEX_SIZE);
+    let best: { tile: MapTile; score: number } | null = null;
+    const sel = useGameStore.getState().selection;
+    const own = sel && !this.placementPending ? tileAt(this.sim!.map, sel.q, sel.r) : undefined;
+    for (const tile of own ? [own, ...this.keyTargets()] : this.keyTargets()) {
+      if (tile.q === this.keyTarget.q && tile.r === this.keyTarget.r) continue;
+      const p = hexToPixel(tile, HEX_SIZE);
+      const rx = p.x - origin.x;
+      const ry = p.y - origin.y;
+      const along = rx * dx + ry * dy;
+      if (along <= 0) continue;
+      const score = along + Math.abs(rx * dy - ry * dx) * 2;
+      if (!best || score < best.score) best = { tile, score };
+    }
+    if (!best) return;
+    this.keyTarget = { q: best.tile.q, r: best.tile.r };
+    this.render();
+  }
+
+  /** Enter while targeting: commits the move/attack on the marked cell; on the unit's own cell it just leaves. */
+  confirmKeyTarget(): void {
+    const target = this.keyTarget;
+    this.keyTarget = null;
+    const sel = useGameStore.getState().selection;
+    if (target && (this.placementPending || !(sel && sel.q === target.q && sel.r === target.r))) void this.handleMapClick(target.q, target.r);
+    else this.render();
+  }
+
+  /** A build / trap / extinguish / lightning target is being chosen (its cells are in `actions.placementKeys`). */
+  private get placementPending(): boolean {
+    const a = this.actions;
+    return !!(a.pendingPlacement || a.pendingTrap || a.pendingExtinguish || a.pendingLightning);
+  }
+
+  /** The cells the keyboard cursor may stand on: the placement cells while one is pending, else the move/attack cells. */
+  private keyTargets(): MapTile[] {
+    if (!this.sim) return [];
+    const pending = this.placementPending;
+    return this.sim.map.tiles.filter((t) => {
+      const key = axialKey(t);
+      return pending ? this.actions.placementKeys.has(key) : this.reachableKeys.has(key) || this.attackableKeys.has(key);
+    });
+  }
+
+  /** Shift+arrows: selects the neighbour of the selected cell (or of the screen centre) in that direction. */
+  selectAdjacentTile(dx: number, dy: number): void {
+    if (!this.sim || !this.app) return;
+    const store = useGameStore.getState();
+    if (store.gameOver || store.paused) return;
+    const camera = this.getCamera();
+    const sel = store.selection;
+    const centre = sel
+      ? { q: sel.q, r: sel.r }
+      : pixelToHex((this.app.screen.width / 2 - camera.pan.x) / camera.scale, (this.mapHeight() / 2 - camera.pan.y) / camera.scale, HEX_SIZE);
+    const origin = hexToPixel(centre, HEX_SIZE);
+    let best: { tile: MapTile; score: number } | null = null;
+    for (const n of sel ? hexNeighbors(centre) : [centre]) {
+      const tile = tileAt(this.sim.map, n.q, n.r);
+      if (!tile || !isExploredFor(tile, store.localPlayerIndex)) continue;
+      const p = hexToPixel(tile, HEX_SIZE);
+      const rx = p.x - origin.x;
+      const ry = p.y - origin.y;
+      const along = rx * dx + ry * dy;
+      if (sel && along <= 0) continue;
+      const score = -along + Math.abs(rx * dy - ry * dx) * 2;
+      if (!best || score < best.score) best = { tile, score };
+    }
+    if (!best) return;
+    this.keyTarget = null;
+    this.actions.cancelPlacement();
+    store.setContextMenu(null);
+    store.setSelection(cycleSelection(null, best.tile));
+    sfx.play('click');
+    if (best.tile.unit) this.mapView?.bounceUnit(best.tile.q, best.tile.r);
+    const camera2 = this.getCamera();
+    if (!camera2.isWorldPointVisible(hexToPixel(best.tile, HEX_SIZE), 0)) void this.centerOnTile(best.tile.q, best.tile.r);
+    this.render();
+  }
+
   selectUnitInDirection(dx: number, dy: number): void {
     if (!this.sim || !this.app) return;
     const store = useGameStore.getState();
@@ -1530,6 +1639,20 @@ class GameController {
       }
     }
 
+    let pickedKey: string | undefined;
+    if (this.keyTarget) {
+      const key = axialKey(this.keyTarget);
+      if (this.placementPending) {
+        // All placement cells stay marked; the cursor cell is drawn brighter.
+        if (this.actions.placementKeys.has(key)) pickedKey = key;
+        else this.keyTarget = null;
+      } else {
+        const own = selection && selection.q === this.keyTarget.q && selection.r === this.keyTarget.r;
+        if (own || this.reachableKeys.has(key) || this.attackableKeys.has(key)) this.actions.placementKeys = new Set([key]);
+        else this.keyTarget = null;
+      }
+    }
+
     this.mapView.update(
       this.sim.map,
       store.players,
@@ -1549,6 +1672,7 @@ class GameController {
       this.tutorialMarkerKeys(),
       isLocalTurn,
       this.actions.placementKeys.size > 0 ? this.actions.placementKeys : undefined,
+      pickedKey,
     );
     this.overlayItems = this.mapView.overlayItems;
     this.detailHidden = this.zoomOut() > ZOOM_DETAIL_HIDE;

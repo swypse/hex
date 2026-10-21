@@ -97,7 +97,20 @@ export class HudSelected implements Widget {
     this.unsub = useGameStore.subscribe(() => this.update());
     this.onResize = () => this.layout();
     window.addEventListener('resize', this.onResize);
+    window.addEventListener('keydown', this.onKeyDown);
   }
+
+  /** I toggles the selected-cell info panel between open and collapsed. */
+  private onKeyDown = (e: KeyboardEvent): void => {
+    if (e.code !== 'KeyI' || e.repeat || e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
+    const target = e.target as HTMLElement | null;
+    if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) return;
+    const s = useGameStore.getState();
+    if (s.overlay !== null || s.texturesLoading) return;
+    this.closed = !this.closed;
+    setSelectedInfoClosed(this.closed);
+    this.update();
+  };
 
   private layout = (): void => {
     if (!this.el || !this.host) return;
@@ -639,6 +652,7 @@ export class HudSelected implements Widget {
   destroy(): void {
     if (this.unsub) this.unsub();
     if (this.onResize) window.removeEventListener('resize', this.onResize);
+    window.removeEventListener('keydown', this.onKeyDown);
     this.unsub = null;
     this.onResize = null;
     this.el?.destroy({ children: true });

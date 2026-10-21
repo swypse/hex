@@ -13,9 +13,11 @@ import { makeLabel } from '../../gfx/label';
 import { Popup } from '../kit/popup';
 import { makeRichLabel } from '../kit/rich-label';
 import { makeIcon } from '../kit/icon';
+import { KeyHints } from '../kit/key-hints';
+import { isTouchDevice } from '../kit/touch';
 import { makeIconChip } from '../kit/tribe-chip';
 import { HudResourcePanel } from '../hud/hud-resource-panel';
-import { makeSkillMedallion } from '../kit/skill-medallion';
+import { makeSkillMedallion, medallionStrokeWidth } from '../kit/skill-medallion';
 import { THEME } from '../../gfx/theme';
 import { FontSize, SkillId } from '@enums';
 
@@ -87,11 +89,28 @@ export function skillLayout(): Record<SkillId, SkillNodeLayout> {
 
 const POS = skillLayout();
 
+const ARROW_DIRECTIONS: Record<string, { dx: number; dy: number }> = {
+  ArrowLeft: { dx: -1, dy: 0 },
+  ArrowRight: { dx: 1, dy: 0 },
+  ArrowUp: { dx: 0, dy: -1 },
+  ArrowDown: { dx: 0, dy: 1 },
+};
+/** Screen margins the keyboard cursor is kept inside by panning (the bottom one leaves room for the buttons). */
+const CURSOR_MARGIN_X = 70;
+const CURSOR_MARGIN_Y = 130;
+const CURSOR_COLOR = 0xffd54a;
+/** Gap below a button row to the key-hint line. */
+const HINT_GAP = 14;
+
 export class SkillTree {
   private el: Container | null = null;
   private host: UIHost | null = null;
   private ring: Container | null = null;
   private selected: SkillId | null = null;
+  /** Skill under the keyboard cursor (arrows move it, Enter opens its popup). */
+  private cursor: SkillId | null = null;
+  /** Opens the skill in the detail popup (Enter there); null when it can't be opened. */
+  private detailOpen: (() => void) | null = null;
   private detailPopup: Popup | null = null;
   private unsub: (() => void) | null = null;
   private hudMoney: HudResourcePanel | null = null;
@@ -336,13 +355,77 @@ export class SkillTree {
   }
 
   private onKeyDown = (e: KeyboardEvent): void => {
-    if (e.key !== 'Escape') return;
-    if (this.selected !== null || this.detailPopup) {
-      this.closeDetail();
-    } else {
-      useGameStore.getState().setOverlay(null);
+    if (e.key === 'Escape') {
+      if (this.selected !== null || this.detailPopup) {
+        this.closeDetail();
+      } else {
+        useGameStore.getState().setOverlay(null);
+      }
+      return;
     }
+    if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (e.repeat) return;
+      if (this.detailPopup) {
+        this.detailOpen?.();
+      } else if (this.cursor !== null) {
+        this.selected = this.cursor;
+        this.build();
+      }
+      return;
+    }
+    const dir = ARROW_DIRECTIONS[e.key];
+    if (!dir || this.detailPopup) return;
+    e.preventDefault();
+    this.moveCursor(dir.dx, dir.dy);
   };
+
+  /** Moves the keyboard cursor to the nearest skill in that direction (the first press picks the one nearest the screen centre). */
+  private moveCursor(dx: number, dy: number): void {
+    const ids = Object.keys(SKILLS) as SkillId[];
+    if (this.cursor === null) {
+      const centre = this.host ? this.worldAt(this.host.app.screen.width / 2, this.host.app.screen.height / 2) : { x: CX, y: CY };
+      this.cursor = ids.reduce((a, b) => (Math.hypot(POS[b].x - centre.x, POS[b].y - centre.y) < Math.hypot(POS[a].x - centre.x, POS[a].y - centre.y) ? b : a));
+    } else {
+      const from = POS[this.cursor];
+      let best: { id: SkillId; score: number } | null = null;
+      for (const id of ids) {
+        if (id === this.cursor) continue;
+        const rx = POS[id].x - from.x;
+        const ry = POS[id].y - from.y;
+        const along = rx * dx + ry * dy;
+        if (along <= 0) continue;
+        const score = along + Math.abs(rx * dy - ry * dx) * 2;
+        if (!best || score < best.score) best = { id, score };
+      }
+      if (!best) return;
+      this.cursor = best.id;
+    }
+    this.panToCursor();
+    this.build();
+  }
+
+  private worldAt(x: number, y: number): { x: number; y: number } {
+    const s = this.fitScale * this.zoom;
+    return { x: (x - this.pan.x) / s, y: (y - this.pan.y) / s };
+  }
+
+  /** Pans the tree just enough to keep the cursor skill on screen. */
+  private panToCursor(): void {
+    if (!this.host || this.cursor === null) return;
+    const s = this.fitScale * this.zoom;
+    const w = this.host.app.screen.width;
+    const h = this.host.app.screen.height;
+    const x = this.pan.x + POS[this.cursor].x * s;
+    const y = this.pan.y + POS[this.cursor].y * s;
+    const mx = CURSOR_MARGIN_X;
+    const my = CURSOR_MARGIN_Y;
+    if (x < mx) this.pan.x += mx - x;
+    else if (x > w - mx) this.pan.x -= x - (w - mx);
+    if (y < my) this.pan.y += my - y;
+    else if (y > h - my) this.pan.y -= y - (h - my);
+  }
 
   private closeDetail(): void {
     const popup = this.detailPopup;
@@ -370,11 +453,6 @@ export class SkillTree {
     const tribe = tribeById(human.tribe)!;
     const highlight = new Set(useGameStore.getState().tutorialHighlightSkills);
 
-    const title = makeLabel(t('skillTree.title'), { fontSize: FontSize.BIG, fill: 0xffffff, fontWeight: '700' });
-    title.anchor.set(0.5, 0.5);
-    title.position.set(host.app.screen.width / 2, 64);
-    this.el.addChild(title);
-
     const scale = Math.min(host.app.screen.width / 900, host.app.screen.height / 760, 1);
     this.fitScale = scale;
     const ring = new Container();
@@ -388,7 +466,8 @@ export class SkillTree {
       const p = parent ? POS[parent] : { x: CX, y: CY };
       const c = POS[id];
       const line = new Graphics();
-      line.moveTo(p.x, p.y).lineTo(c.x, c.y).stroke({ width: opened ? 4 : 2, color: opened ? 0xff8c00 : 0x555555 });
+      const lineColor = opened ? 0xff8c00 : canOpenSkill(human, id, gameController.getMap()) ? THEME.skillTree.closedSkillStroke : THEME.skillTree.unreachableLine;
+      line.moveTo(p.x, p.y).lineTo(c.x, c.y).stroke({ width: opened ? medallionStrokeWidth(MEDALLION_SIZE) : 2, color: lineColor });
       ring.addChild(line);
     }
 
@@ -405,6 +484,11 @@ export class SkillTree {
         halo.circle(pos.x, pos.y, 40).stroke({ width: 2, color: 0xffd700, alpha: 0.5 });
         ring.addChild(halo);
       }
+      if (id === this.cursor) {
+        const mark = new Graphics();
+        mark.circle(pos.x, pos.y, MEDALLION_SIZE / 2 + 6).stroke({ width: 4, color: CURSOR_COLOR });
+        ring.addChild(mark);
+      }
       // Skill nodes are intentionally not Pixi-interactive: panning, zooming
       // and tap-to-open are all handled at the DOM level (window pointer/wheel
       // events) so they work identically no matter what is under the cursor.
@@ -413,6 +497,7 @@ export class SkillTree {
         skill: id,
         opened,
         priceText: opened ? '\u2713' : String(skillCost(id, human.skills.length)),
+        reachable: canOpenSkill(human, id, gameController.getMap()),
         size: MEDALLION_SIZE,
         app: host.app,
         textBake: TREE_TEXT_BAKE,
@@ -422,7 +507,7 @@ export class SkillTree {
 
       const name = makeLabel(SKILLS[id].name, {
         fontSize: FontSize.VERY_SMALL,
-        fill: opened ? THEME.skillTree.openedLabelText : THEME.skillTree.closedLabelText,
+        fill: opened || canOpenSkill(human, id, gameController.getMap()) ? THEME.skillTree.openedLabelText : THEME.skillTree.closedLabelText,
         bake: TREE_TEXT_BAKE,
       });
       name.anchor.set(0.5, 0.5);
@@ -432,8 +517,17 @@ export class SkillTree {
     }
 
     const close = new Button({ label: t('common.close'), onClick: () => useGameStore.getState().setOverlay(null) });
-    close.position.set(host.app.screen.width / 2 - close.width / 2, host.app.screen.height - 60);
+    close.position.set(host.app.screen.width / 2 - close.width / 2, host.app.screen.height - 84);
     this.el.addChild(close);
+    if (!isTouchDevice()) {
+      const hint = new KeyHints([
+        { key: '↑↓←→', label: t('common.keySelect') },
+        { key: 'Enter', label: t('common.keyConfirm') },
+        { key: 'Esc', label: t('common.keyClose') },
+      ]);
+      hint.position.set((host.app.screen.width - hint.width) / 2, close.y + close.height + HINT_GAP / 2);
+      this.el.addChild(hint);
+    }
 
     if (this.selected !== null) this.drawDetail(human);
   }
@@ -446,15 +540,15 @@ export class SkillTree {
     const opened = hasSkill(human, id);
 
     const buttons: Button[] = [];
+    this.detailOpen = null;
     if (!opened) {
-      buttons.push(new Button({
-        label: t('ui.open'),
-        disabled: !canOpenSkill(human, id, gameController.getMap()),
-        onClick: () => {
-          gameController.actions.openSkill(id);
-          this.closeDetail();
-        },
-      }));
+      const canOpen = canOpenSkill(human, id, gameController.getMap());
+      const open = (): void => {
+        gameController.actions.openSkill(id);
+        this.closeDetail();
+      };
+      if (canOpen) this.detailOpen = open;
+      buttons.push(new Button({ label: t('ui.open'), disabled: !canOpen, onClick: open }));
     }
     buttons.push(new Button({ label: opened ? t('common.ok') : t('common.close'), onClick: () => this.closeDetail() }));
 
@@ -537,6 +631,14 @@ export class SkillTree {
     this.el.addChild(popup.el);
     this.detailPopup = popup;
     popup.finish();
+    if (!isTouchDevice()) {
+      const hint = new KeyHints([
+        ...(opened ? [] : [{ key: 'Enter', label: t('ui.open') }]),
+        { key: 'Esc', label: t('common.keyClose') },
+      ]);
+      hint.position.set((host.app.screen.width - hint.width) / 2, popup.cardEl.y + popup.height / 2 + HINT_GAP);
+      popup.el.addChild(hint);
+    }
   }
 
   destroy(): void {
@@ -558,5 +660,7 @@ export class SkillTree {
     this.ring = null;
     this.host = null;
     this.selected = null;
+    this.cursor = null;
+    this.detailOpen = null;
   }
 }

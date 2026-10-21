@@ -406,6 +406,12 @@ export class Popup {
     this.pointerId = null;
   }
 
+  /** Scrolls the content by `dy` px (clamped); `null` jumps back to the top. */
+  scrollBy(dy: number | null): void {
+    this.scrollOffset = dy === null ? 0 : clamp(this.scrollOffset + dy, 0, this.scrollMax);
+    this.content.position.y = -this.scrollOffset;
+  }
+
   private onWheel = (e: FederatedWheelEvent): void => {
     if (this.scrollMax <= 0 || e.deltaY === 0) return;
     this.scrollOffset = clamp(this.scrollOffset + e.deltaY, 0, this.scrollMax);
