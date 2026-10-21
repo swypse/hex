@@ -494,7 +494,7 @@ export class MapView {
       this.addUnitMirrorsAround(l.tile);
     }
     for (const g of granaryLabels) {
-      this.addGranaryLabel(g.tile, g.owner, g.world, players);
+      this.addBuildingLabel(g.tile, g.owner, g.world, players);
       this.addUnitMirrorsAround(g.tile);
     }
     // HP bars come after village labels so a unit's bar + text always render on
@@ -2114,7 +2114,7 @@ export class MapView {
 
   /** The materials a granary, sawmill or mine holds, in the village name style:
    *  white text (and icons) on a translucent black plate. */
-  private addGranaryLabel(tile: MapTile, owner: number, world: { x: number; y: number }, players: Player[]): void {
+  private addBuildingLabel(tile: MapTile, owner: number, world: { x: number; y: number }, players: Player[]): void {
     const tribe = players[owner] ? tribeById(players[owner]!.tribe) : undefined;
     if (!tribe) return;
     const parts = this.stockLabelParts(tile);
@@ -2139,7 +2139,7 @@ export class MapView {
     const padX = 4;
     const bg = this.pool.takeGraphics();
     bg.zIndex = 0;
-    bg.roundRect(-contentW / 2 - padX, -contentH / 2 - 1, contentW + padX * 2, contentH + 2, 2).fill({ color: 0x000000, alpha: 0.6 });
+    bg.roundRect(-contentW / 2 - padX, -contentH / 2 - 1, contentW + padX * 2, contentH + 2, 2).fill({ color: 0x000000, alpha: 0.4 });
     el.sortableChildren = true;
     el.zIndex = OVERLAY_Z_VILLAGE_LABEL;
     el.addChild(bg);

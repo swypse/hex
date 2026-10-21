@@ -1,4 +1,4 @@
-import { BitmapText, Container, Graphics } from 'pixi.js';
+import { BitmapText, Container, Graphics, Sprite, Texture } from 'pixi.js';
 import { makeIcon } from './icon';
 import { makeActionButtonIcon } from '../../gfx/action-button-icons';
 import { makeLabel } from '../../gfx/label';
@@ -37,6 +37,38 @@ export interface TribeOptionExtras {
 const NAME_TOP = RADIUS + 6;
 const NAME_LINE = 14;
 
+/** Supersampling of the baked mask circle. */
+const MASK_SCALE = 4;
+let circleMask: Texture | null = null;
+
+/** Anti-aliased circle alpha mask. A Graphics mask is stencil-clipped (hard,
+ *  jagged edge, esp. with antialias off on phones); a sprite mask is smooth. */
+function circleMaskSprite(): Sprite | Graphics {
+  try {
+    circleMask ??= bakeCircleMask();
+  } catch {
+    // No canvas 2D (headless): fall back to a hard-edged stencil mask.
+    return new Graphics().circle(0, 0, RADIUS).fill(0xffffff);
+  }
+  const sprite = new Sprite(circleMask);
+  sprite.anchor.set(0.5);
+  sprite.width = sprite.height = RADIUS * 2;
+  return sprite;
+}
+
+function bakeCircleMask(): Texture {
+  const size = RADIUS * 2 * MASK_SCALE;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d')!;
+  ctx.fillStyle = '#fff';
+  ctx.beginPath();
+  ctx.arc(size / 2, size / 2, size / 2, 0, Math.PI * 2);
+  ctx.fill();
+  return Texture.from(canvas);
+}
+
 /** Two-worded tribe names ("Sand people", "Aqua people", ...) wrap onto two
  *  stacked lines under the circle; single-word names stay on one line. */
 function nameLines(name: string): string[] {
@@ -60,8 +92,7 @@ export function makeTribeOption(
   const nameLine = Math.max(NAME_LINE, nameSize);
   const el = new Container();
   const circle = new Graphics();
-  const clip = new Graphics();
-  clip.circle(0, 0, RADIUS).fill(0xffffff);
+  const clip = circleMaskSprite();
   const icon = makeIcon(iconFile, 60);
   icon.position.set(0, 0);
   icon.mask = clip;

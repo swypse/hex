@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Bounds, Container, FillGradient, Graphics, Rectangle, RendererType, Text } from 'pixi.js';
 import { SetupScreen } from '../src/ui/screens/setup-screen';
-import { useGameStore, interceptBack } from '../src/store/game-store';
+import { useGameStore } from '../src/store/game-store';
 import { type UIHost } from '../src/ui/host';
 import { TRIBE_BG_DEPTH } from '../src/ui/screens/tribe-bg-shader';
 import { Screen } from '@enums';
@@ -62,49 +62,28 @@ describe('SetupScreen', () => {
   });
 
   const press = (key: string): void => keyHandler!({ key, preventDefault: () => {} });
-  const view = (): { step: string; selector: number; startBtn: { selected: boolean } } =>
-    screen as unknown as { step: string; selector: number; startBtn: { selected: boolean } };
+  const view = (): { selector: number; startBtn: { selected: boolean } } =>
+    screen as unknown as { selector: number; startBtn: { selected: boolean } };
 
-  it('starts on the tribe step and moves to options on Enter', () => {
-    expect(view().step).toBe('tribe');
-    press('Enter');
-    expect(view().step).toBe('options');
+  it('shows tribe and options together with start selected', () => {
     expect(view().startBtn.selected).toBe(true);
-  });
-
-  it('goes back from options to the tribe step, then to the start screen', () => {
-    useGameStore.setState({ screen: Screen.SETUP });
-    press('Enter');
-    press('Backspace');
-    expect(view().step).toBe('tribe');
-    expect(useGameStore.getState().screen).toBe(Screen.SETUP);
-    press('Backspace');
-    expect(useGameStore.getState().screen).toBe(Screen.START);
-  });
-
-  it('drops the tribe icon of step 2 when returning to step 1', () => {
-    const v = screen as unknown as { hero: unknown };
-    press('Enter');
-    expect(v.hero).not.toBeNull();
-    press('Backspace');
-    expect(v.hero).toBeNull();
-  });
-
-  it('browser Back on the options step returns to the tribe step', () => {
-    press('Enter');
-    expect(interceptBack()).toBe(true);
-    expect(view().step).toBe('tribe');
-    // On the tribe step the browser Back is left to the navigation.
-    expect(interceptBack()).toBe(false);
   });
 
   it('reaches the back button as the last selector and triggers it with Enter', () => {
     useGameStore.setState({ screen: Screen.SETUP });
-    press('Enter'); // options, start selected
     press('ArrowDown'); // back
-    expect(view().selector).toBe(4);
+    expect(view().selector).toBe(5);
     press('Enter');
-    expect(view().step).toBe('tribe');
+    expect(useGameStore.getState().screen).toBe(Screen.START);
+  });
+
+  it('changes the tribe with arrows on the tribe row', () => {
+    const s = screen as unknown as { tribe: unknown };
+    const before = s.tribe;
+    for (let i = 0; i < 4; i++) press('ArrowUp'); // start -> tribe row
+    expect(view().selector).toBe(0);
+    press('ArrowRight');
+    expect(s.tribe).not.toBe(before);
   });
 
   it('paints a full-screen tribe-tinted shader background at mount', () => {

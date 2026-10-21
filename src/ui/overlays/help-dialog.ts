@@ -2,7 +2,7 @@ import { BitmapText, Container, Graphics, Sprite } from 'pixi.js';
 import { t } from '../../i18n';
 import { HELP_BUILDINGS, HELP_SHORTCUTS, HELP_WEATHER } from '../../game/help-catalog';
 import { resourceTokens } from '../../game/economy/resources';
-import { tribeUnitTypes, TRIBES } from '../../game/tribes';
+import { tribeUnitTypes, TRIBE_SPECIAL_UNIT, TRIBES } from '../../game/tribes';
 import { unitTypeDescription, unitTypeFeatureLines } from '../../game/units/unit-descriptions';
 import { UNIT_IMAGE_FILES, UNIT_TYPE_NAMES, UNIT_TYPES, unitFoodUpkeep, unitSpawnCost, unitTypeMaintenance } from '../../game/units/units';
 import { BODY_LINE_HEIGHT, makeLabel } from '../../gfx/label';
@@ -37,14 +37,23 @@ const TRIBE_SCALE = 0.75;
 const TRIBE_RADIUS = 28 * TRIBE_SCALE;
 const TRIBE_GAP = 14;
 const TRIBE_STROKE = 4 * TRIBE_SCALE;
-const UNIT_SPRITE_SIZE = 84;
+const UNIT_SPRITE_SIZE = 112;
+/** Gap between a unit's art and its text (the art has its own padding). */
+const UNIT_ART_GAP = 2;
+/** Below this content width a unit's art sits above its text instead of beside it. */
+const UNIT_STACK_WIDTH = 440;
+/** The "Special unit" badge after a unit's name. */
+const BADGE_GAP = 8;
+const BADGE_PAD_X = 8;
+const BADGE_PAD_Y = 2;
+const BADGE_COLOR = 0xffd27a;
 /** Pixels one Up / Down key press scrolls. */
 const SCROLL_STEP = 60;
 const INACTIVE_ALPHA = 0.6;
 const TEXT_COLOR = 0xeeeeee;
 const MUTED_COLOR = 0xb8bccc;
 /** Share of the screen height the dialog takes; fixed so switching tabs doesn't resize it. */
-const HEIGHT_SHARE = 0.85;
+const HEIGHT_SHARE = 0.9;
 
 const TAB_LABELS: Record<HelpTab, string> = {
   [HelpTab.KEYBOARD]: 'guide.tab.keyboard',
@@ -156,11 +165,25 @@ export class HelpDialog extends PopupDialog {
   }
 
   /** A bold title above wrapped lines, to the right of an optional left column of `indent` px; returns the height used. */
-  private addBlock(y: number, indent: number, title: string, lines: string[], muted = false): number {
+  private addBlock(y: number, indent: number, title: string, lines: string[], muted = false, badge?: string): number {
     const width = this.contentWidth - indent;
     const head = makeLabel(title, { fontSize: FontSize.NORMAL, fill: 0xffffff, fontWeight: 'bold' });
     head.position.set(indent, y);
     this.body.addChild(head);
+    if (badge) {
+      const text = makeLabel(badge, { fontSize: FontSize.VERY_SMALL, fill: BADGE_COLOR });
+      const w = text.width + BADGE_PAD_X * 2;
+      const h = text.height + BADGE_PAD_Y * 2;
+      const pill = new Graphics()
+        .roundRect(0, 0, w, h, h / 2)
+        .fill({ color: BADGE_COLOR, alpha: 0.15 })
+        .stroke({ color: BADGE_COLOR, alpha: 0.6, width: 1 });
+      text.position.set(BADGE_PAD_X, BADGE_PAD_Y);
+      const el = new Container();
+      el.addChild(pill, text);
+      el.position.set(indent + head.width + BADGE_GAP, y + (head.height - h) / 2);
+      this.body.addChild(el);
+    }
     let h = head.height + 4;
     for (const line of lines) {
       const label = this.text(line, width, muted ? MUTED_COLOR : TEXT_COLOR);
@@ -262,10 +285,14 @@ export class HelpDialog extends PopupDialog {
 
     const tribe = TRIBES.find((tr) => tr.id === this.tribe)!;
     let y = (TRIBE_RADIUS + TRIBE_STROKE) * 2 * row.scale.x + SECTION_GAP * 1.5;
-    const types = tribeUnitTypes(this.tribe);
+    // The tribe's special unit goes first.
+    const special = TRIBE_SPECIAL_UNIT[this.tribe];
+    const types = [...tribeUnitTypes(this.tribe)].sort((a, b) => Number(b === special) - Number(a === special));
     for (const [i, type] of types.entries()) {
+      const stacked = this.contentWidth < UNIT_STACK_WIDTH;
       const sprite = this.unitSprite(tribe.code, type);
-      sprite.position.set(0, y);
+      if (stacked) sprite.anchor.set(0.5, 0);
+      sprite.position.set(stacked ? this.contentWidth / 2 : 0, y);
       this.body.addChild(sprite);
       const info = UNIT_TYPES[type];
       const lines = [
@@ -275,7 +302,12 @@ export class HelpDialog extends PopupDialog {
         t('guide.unit.upkeep', { money: unitTypeMaintenance(type), food: unitFoodUpkeep(type) }),
         ...unitTypeFeatureLines(type),
       ];
-      y = this.endRow(y + Math.max(UNIT_SPRITE_SIZE, this.addBlock(y, UNIT_SPRITE_SIZE + ICON_GAP, UNIT_TYPE_NAMES[type], lines)), i === types.length - 1);
+      const badge = type === special ? t('guide.unit.special') : undefined;
+      // Narrow: the art on its own row, the text below it at full width.
+      const bottom = stacked
+        ? y + UNIT_SPRITE_SIZE + UNIT_ART_GAP + this.addBlock(y + UNIT_SPRITE_SIZE + UNIT_ART_GAP, 0, UNIT_TYPE_NAMES[type], lines, false, badge)
+        : y + Math.max(UNIT_SPRITE_SIZE, this.addBlock(y, UNIT_SPRITE_SIZE + UNIT_ART_GAP, UNIT_TYPE_NAMES[type], lines, false, badge));
+      y = this.endRow(bottom, i === types.length - 1);
     }
   }
 

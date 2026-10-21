@@ -40,6 +40,13 @@ export const STEP_ORDER: TutorialStepId[] = [
   TutorialStepId.COLLECT_BONUS,
   TutorialStepId.APPROACH_FREE_VILLAGE,
   TutorialStepId.CAPTURE_FREE_VILLAGE,
+  TutorialStepId.OPEN_AGRICULTURE,
+  TutorialStepId.BUILD_FARM,
+  TutorialStepId.WINTER,
+  TutorialStepId.BUILD_GRANARY,
+  TutorialStepId.FOOD_STOCK,
+  TutorialStepId.LIGHTNING_INFO,
+  TutorialStepId.EXTINGUISH_FIRE,
   TutorialStepId.END,
 ];
 
@@ -49,8 +56,8 @@ const PORT_TILE = { ...TUTORIAL_PORT_TILE };
 export const STEP_CONFIG: Record<TutorialStepId, TutorialStepDef> = {
   welcome: {
     id: TutorialStepId.WELCOME,
-    heading: 'Welcome to the Hex tutorial',
-    text: 'Welcome to the Hex demo. This tutorial teaches you the basics: move a unit, upgrade your village, collect income each turn, research skills, build a sawmill and a mine, spawn an archer, and fight an enemy. Follow each instruction; your current objective is shown at the top of the screen.',
+    heading: 'Welcome to the Hex Terra tutorial',
+    text: 'This short tutorial covers the basics: moving, upgrading, building, researching skills, fighting, food and weather. Your current objective is shown at the top of the screen.',
     markers: [],
     highlightSkills: [],
     highlightEndTurn: false,
@@ -61,7 +68,7 @@ export const STEP_CONFIG: Record<TutorialStepId, TutorialStepDef> = {
   moveUnit: {
     id: TutorialStepId.MOVE_UNIT,
     heading: 'Move your Warrior',
-    text: 'Select your Warrior (it is already selected) and click a highlighted tile to move it to a new hex.',
+    text: 'Select your Warrior and click a highlighted tile to move it.',
     markers: [CAPITAL],
     highlightSkills: [],
     highlightEndTurn: false,
@@ -72,7 +79,7 @@ export const STEP_CONFIG: Record<TutorialStepId, TutorialStepDef> = {
   upgradeVillage: {
     id: TutorialStepId.UPGRADE_VILLAGE,
     heading: 'Upgrade your village',
-    text: 'Click your village, then press the pulsing Upgrade button (2 wood + 1 stone + 2 money). Each level raises its income, territory and unit capacity.',
+    text: 'Select your village and press the pulsing Upgrade button. Higher levels give more income, territory and unit capacity.',
     markers: [CAPITAL],
     highlightSkills: [],
     highlightEndTurn: false,
@@ -84,7 +91,7 @@ export const STEP_CONFIG: Record<TutorialStepId, TutorialStepDef> = {
   openForestry: {
     id: TutorialStepId.OPEN_FORESTRY,
     heading: 'Open the Forestry skill',
-    text: 'You need wood to build. Open the skill tree (the pulsing skills button, bottom right) and open the Forestry skill. It lets you build sawmills next to forests.',
+    text: 'Wood is needed to build. Open the skill tree (the pulsing button) and research Forestry to build sawmills next to forests.',
     markers: [],
     highlightSkills: [SkillId.FORESTRY],
     highlightEndTurn: false,
@@ -95,7 +102,7 @@ export const STEP_CONFIG: Record<TutorialStepId, TutorialStepDef> = {
   endTurn1: {
     id: TutorialStepId.END_TURN1,
     heading: 'End your turn',
-    text: 'You are done with this turn. Press the highlighted End Turn button.',
+    text: 'Nothing more to do this turn. Press the highlighted End Turn button.',
     markers: [],
     highlightSkills: [],
     highlightEndTurn: true,
@@ -106,7 +113,7 @@ export const STEP_CONFIG: Record<TutorialStepId, TutorialStepDef> = {
   endTurn2: {
     id: TutorialStepId.END_TURN2,
     heading: 'Income is collected each turn',
-    text: 'Money is collected each turn: a village pays 3 + 2 × its level, minus upkeep for the units it raised (warriors cost 1, archers/shields/riders 2, swordsmen 3, knights 4, catapults 5; ships cost 2-4). Press End Turn again to collect another turn of income.',
+    text: 'Your villages earn money every turn, minus upkeep for units. Some buildings also cost money for upkeep each turn. End the turn again to collect.',
     markers: [],
     highlightSkills: [],
     highlightEndTurn: true,
@@ -117,7 +124,7 @@ export const STEP_CONFIG: Record<TutorialStepId, TutorialStepDef> = {
   buildSawmill: {
     id: TutorialStepId.BUILD_SAWMILL,
     heading: 'Build a sawmill',
-    text: 'Select the highlighted tile beside the forest and press the pulsing Build sawmill button (10 money). Sawmills produce +1 wood per adjacent forest each turn.',
+    text: 'Select the highlighted tile next to the forest and press the pulsing Build sawmill button. Sawmills produce wood from adjacent forests.',
     markers: [{ q: 0, r: 1 }],
     highlightSkills: [],
     highlightEndTurn: false,
@@ -129,7 +136,7 @@ export const STEP_CONFIG: Record<TutorialStepId, TutorialStepDef> = {
   openClimbingSmithery: {
     id: TutorialStepId.OPEN_CLIMBING_SMITHERY,
     heading: 'Research Climbing, Smithery and Archer',
-    text: 'You will need stone and ore for mines and stronger units, and the Archer skill to spawn archers. Open the skill tree and research Climbing, then its child Smithery, and the Archer skill. All three nodes are highlighted.',
+    text: 'Stone and ore need mines, and new units need skills. Research Climbing, then Smithery, and also Archer. The nodes are highlighted.',
     markers: [],
     highlightSkills: [SkillId.CLIMBING, SkillId.SMITHERY, SkillId.ARCHER],
     highlightEndTurn: false,
@@ -140,7 +147,7 @@ export const STEP_CONFIG: Record<TutorialStepId, TutorialStepDef> = {
   buildMine: {
     id: TutorialStepId.BUILD_MINE,
     heading: 'Build a mine',
-    text: 'Select the highlighted mountain and press the pulsing Build mine button (15 money). Mines produce 1 stone and 1 ore each turn.',
+    text: 'Select the highlighted mountain and press the pulsing Build mine button. Mines produce stone and ore.',
     markers: [{ q: 2, r: -2 }],
     highlightSkills: [],
     highlightEndTurn: false,
@@ -152,7 +159,7 @@ export const STEP_CONFIG: Record<TutorialStepId, TutorialStepDef> = {
   spawnArcher: {
     id: TutorialStepId.SPAWN_ARCHER,
     heading: 'Spawn an Archer',
-    text: 'Select your village and press Spawn, then choose the Archer (6 money). Archers attack from up to 2 hexes away.',
+    text: 'Select your village, press Spawn and choose the Archer. Archers attack from a distance.',
     markers: [CAPITAL],
     highlightSkills: [],
     highlightEndTurn: false,
@@ -163,7 +170,7 @@ export const STEP_CONFIG: Record<TutorialStepId, TutorialStepDef> = {
   attackEnemy: {
     id: TutorialStepId.ATTACK_ENEMY,
     heading: 'Attack the enemy Warrior',
-    text: 'An enemy Warrior appeared three hexes away. Your fresh Archer cannot act until next turn, so end your turn to let it act — the enemy will not move. Then move your Archer to within 2 hexes and click the enemy to attack it.',
+    text: 'An enemy Warrior appeared nearby. A new unit cannot act until the next turn, so end your turn first. Then move your Archer within range and click the enemy to attack.',
     markers: [],
     highlightSkills: [],
     highlightEndTurn: false,
@@ -174,7 +181,7 @@ export const STEP_CONFIG: Record<TutorialStepId, TutorialStepDef> = {
   upgradeVillage3: {
     id: TutorialStepId.UPGRADE_VILLAGE3,
     heading: 'Upgrade your village again',
-    text: 'Your village is at its building limit. Select it and press the pulsing Upgrade button (4 wood + 2 stone + 4 money) to reach level 3 and make room for a port.',
+    text: 'Your village has no room for more buildings. Upgrade it again to make room for a port.',
     markers: [CAPITAL],
     highlightSkills: [],
     highlightEndTurn: false,
@@ -186,7 +193,7 @@ export const STEP_CONFIG: Record<TutorialStepId, TutorialStepDef> = {
   openWaterNavigation: {
     id: TutorialStepId.OPEN_WATER_NAVIGATION,
     heading: 'Open the Water and Navigation skills',
-    text: 'You need Water, then Navigation, to build a port and sail. Open the skill tree and research both — the nodes are highlighted.',
+    text: 'Ports and ships need the Water and Navigation skills. Research both; the nodes are highlighted.',
     markers: [],
     highlightSkills: [SkillId.WATER, SkillId.NAVIGATION],
     highlightEndTurn: false,
@@ -197,7 +204,7 @@ export const STEP_CONFIG: Record<TutorialStepId, TutorialStepDef> = {
   buildPort: {
     id: TutorialStepId.BUILD_PORT,
     heading: 'Build a port',
-    text: 'Select the highlighted water tile next to your village and press the pulsing Build port button (10 wood + 30 money + 2 ore).',
+    text: 'Select the highlighted water tile next to your village and press the pulsing Build port button.',
     markers: [PORT_TILE],
     highlightSkills: [],
     highlightEndTurn: false,
@@ -209,7 +216,7 @@ export const STEP_CONFIG: Record<TutorialStepId, TutorialStepDef> = {
   boardShip: {
     id: TutorialStepId.BOARD_SHIP,
     heading: 'Turn a unit into a ship',
-    text: 'Move your Warrior onto the port to turn it into a ship. Ships sail on water and can move then attack in the same turn.',
+    text: 'Move your Warrior onto the port to turn it into a ship. Ships sail on water and can move and attack in the same turn.',
     markers: [PORT_TILE],
     highlightSkills: [],
     highlightEndTurn: false,
@@ -220,7 +227,7 @@ export const STEP_CONFIG: Record<TutorialStepId, TutorialStepDef> = {
   upgradeShip: {
     id: TutorialStepId.UPGRADE_SHIP,
     heading: 'Upgrade your ship',
-    text: 'Select your ship and press the pulsing Upgrade Ship button (8 money + 4 wood). Level-2 ships move farther.',
+    text: 'Select your ship and press the pulsing Upgrade ship button. Better ships move farther.',
     markers: [],
     highlightSkills: [],
     highlightEndTurn: false,
@@ -232,7 +239,7 @@ export const STEP_CONFIG: Record<TutorialStepId, TutorialStepDef> = {
   attackEnemyShip: {
     id: TutorialStepId.ATTACK_ENEMY_SHIP,
     heading: 'Sail and attack the enemy ship',
-    text: 'An enemy ship appeared on the sea. If your ship cannot act yet, end your turn. Then sail within range and click the enemy ship to attack — it will not move.',
+    text: 'An enemy ship appeared at sea. End your turn if your ship cannot act yet, then sail within range and click the enemy ship to attack.',
     markers: [],
     highlightSkills: [],
     highlightEndTurn: false,
@@ -243,7 +250,7 @@ export const STEP_CONFIG: Record<TutorialStepId, TutorialStepDef> = {
   collectBonus: {
     id: TutorialStepId.COLLECT_BONUS,
     heading: 'Collect a bonus',
-    text: 'Bonus markers are scattered across the map. Move one of your units onto the glowing bonus, then press End your turn. On the next turn a "Get the bonus" button appears — press it to collect rewards such as money or resources.',
+    text: 'Move a unit onto the glowing bonus and end your turn. Next turn, press "Get the bonus" to collect the reward.',
     markers: [],
     highlightSkills: [],
     highlightEndTurn: false,
@@ -254,7 +261,7 @@ export const STEP_CONFIG: Record<TutorialStepId, TutorialStepDef> = {
   approachFreeVillage: {
     id: TutorialStepId.APPROACH_FREE_VILLAGE,
     heading: 'Claim an empty village',
-    text: 'An unclaimed village appeared next to your unit. Move that unit onto the village — if it already acted this turn, press End your turn first so it can move.',
+    text: 'An empty village appeared next to your unit. Move onto it; end your turn first if the unit already acted.',
     markers: [],
     highlightSkills: [],
     highlightEndTurn: false,
@@ -265,7 +272,7 @@ export const STEP_CONFIG: Record<TutorialStepId, TutorialStepDef> = {
   captureFreeVillage: {
     id: TutorialStepId.CAPTURE_FREE_VILLAGE,
     heading: 'Capture the empty village',
-    text: 'Press End your turn so the village becomes capturable, then select it and press the Capture button. Villages expand your income and unit capacity.',
+    text: 'End your turn, then select the village and press Capture. More villages mean more income and unit capacity.',
     markers: [],
     highlightSkills: [],
     highlightEndTurn: false,
@@ -273,10 +280,90 @@ export const STEP_CONFIG: Record<TutorialStepId, TutorialStepDef> = {
     dialog: false,
     buttonLabel: '',
   },
+  openAgriculture: {
+    id: TutorialStepId.OPEN_AGRICULTURE,
+    heading: 'Research Agriculture and Granary',
+    text: 'Units eat food. Research Agriculture (farms) and Granary (food storage); the nodes are highlighted.',
+    markers: [],
+    highlightSkills: [SkillId.AGRICULTURE, SkillId.GRANARY],
+    highlightEndTurn: false,
+    pulseSkillsButton: true,
+    dialog: false,
+    buttonLabel: '',
+  },
+  buildFarm: {
+    id: TutorialStepId.BUILD_FARM,
+    heading: 'Build a farm',
+    text: 'Select the highlighted tile and press the pulsing Build farm button. Farms produce food for your units.',
+    markers: [],
+    highlightSkills: [],
+    highlightEndTurn: false,
+    pulseSkillsButton: false,
+    toolbarKey: 'farm',
+    dialog: false,
+    buttonLabel: '',
+  },
+  winter: {
+    id: TutorialStepId.WINTER,
+    heading: 'Winter: farms give nothing',
+    text: 'Winter has come and the coast froze. Farms produce no food in winter, so units live on stored food only.',
+    markers: [],
+    highlightSkills: [],
+    highlightEndTurn: false,
+    pulseSkillsButton: false,
+    dialog: true,
+    buttonLabel: 'Continue',
+  },
+  buildGranary: {
+    id: TutorialStepId.BUILD_GRANARY,
+    heading: 'Spring: build a granary',
+    text: 'Spring is back. Select the highlighted tile next to the farm and press the pulsing Build granary button.',
+    markers: [],
+    highlightSkills: [],
+    highlightEndTurn: false,
+    pulseSkillsButton: false,
+    toolbarKey: 'granary',
+    dialog: false,
+    buttonLabel: '',
+  },
+  foodStock: {
+    id: TutorialStepId.FOOD_STOCK,
+    heading: 'Collect food for the winter',
+    text: 'Unused farm food is lost unless a granary stands next to the farm. Stock up on food before winter to keep your units fed.',
+    markers: [],
+    highlightSkills: [],
+    highlightEndTurn: false,
+    pulseSkillsButton: false,
+    dialog: true,
+    buttonLabel: 'Continue',
+  },
+  lightningInfo: {
+    id: TutorialStepId.LIGHTNING_INFO,
+    heading: 'Lightning',
+    text: 'Lightning can strike during storms, and Stormcallers can call it. It damages units and sets forests and buildings on fire; fire spreads to nearby forests. Press Continue to see a strike.',
+    markers: [],
+    highlightSkills: [],
+    highlightEndTurn: false,
+    pulseSkillsButton: false,
+    dialog: true,
+    buttonLabel: 'Continue',
+  },
+  extinguishFire: {
+    id: TutorialStepId.EXTINGUISH_FIRE,
+    heading: 'Put out the fire',
+    text: 'A forest is on fire! Select your Archer next to it and press the pulsing Extinguish button. If the Archer already acted, end your turn first.',
+    markers: [],
+    highlightSkills: [],
+    highlightEndTurn: false,
+    pulseSkillsButton: false,
+    toolbarKey: 'extinguish',
+    dialog: false,
+    buttonLabel: '',
+  },
   end: {
     id: TutorialStepId.END,
     heading: 'Basic tutorial complete',
-    text: 'You now know how to move, upgrade, build, research and fight. Good luck in the real game!',
+    text: 'You know the basics now. Good luck in the real game!',
     markers: [],
     highlightSkills: [],
     highlightEndTurn: false,
@@ -287,7 +374,15 @@ export const STEP_CONFIG: Record<TutorialStepId, TutorialStepDef> = {
 };
 
 export function skillPulseStep(step: TutorialStepId | null): boolean {
-  return step === TutorialStepId.OPEN_FORESTRY || step === TutorialStepId.OPEN_CLIMBING_SMITHERY || step === TutorialStepId.OPEN_WATER_NAVIGATION;
+  return step === TutorialStepId.OPEN_FORESTRY
+    || step === TutorialStepId.OPEN_CLIMBING_SMITHERY
+    || step === TutorialStepId.OPEN_WATER_NAVIGATION
+    || step === TutorialStepId.OPEN_AGRICULTURE;
+}
+
+/** Message steps the player dismisses with a button (the final one leaves the tutorial). */
+export function isDialogStep(step: TutorialStepId): boolean {
+  return STEP_CONFIG[step].dialog;
 }
 
 /** "[N/M]" counter where N is the 1-based step index and M is the total

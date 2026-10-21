@@ -67,10 +67,10 @@ describe('tutorial steps', () => {
     expect(skillPulseStep(TutorialStepId.OPEN_FORESTRY)).toBe(true);
     expect(skillPulseStep(TutorialStepId.OPEN_CLIMBING_SMITHERY)).toBe(true);
     expect(skillPulseStep(TutorialStepId.OPEN_WATER_NAVIGATION)).toBe(true);
+    expect(skillPulseStep(TutorialStepId.OPEN_AGRICULTURE)).toBe(true);
+    const skillSteps = [TutorialStepId.OPEN_FORESTRY, TutorialStepId.OPEN_CLIMBING_SMITHERY, TutorialStepId.OPEN_WATER_NAVIGATION, TutorialStepId.OPEN_AGRICULTURE];
     for (const id of STEP_ORDER) {
-      if (id !== TutorialStepId.OPEN_FORESTRY && id !== TutorialStepId.OPEN_CLIMBING_SMITHERY && id !== TutorialStepId.OPEN_WATER_NAVIGATION) {
-        expect(skillPulseStep(id)).toBe(false);
-      }
+      if (!skillSteps.includes(id)) expect(skillPulseStep(id)).toBe(false);
     }
   });
 

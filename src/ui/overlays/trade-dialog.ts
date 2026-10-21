@@ -245,29 +245,34 @@ export class TradeDialog extends PopupDialog {
     if (this.orderFormOpen && mine.length < MAX_OPEN_ORDERS) {
       heading(t('trade.placeOrder'));
       const fee = orderFee(local);
-      // One centred line: [-] N [+] and the resource circles.
-      const line = new Container();
+      // One centred line: [-] N [+] and the resource circles; two lines when the popup is too narrow.
       const stepper = makeStepper({
         value: this.quantity,
         onMinus: () => { this.quantity = Math.max(1, this.quantity - 1); this.render(); },
         onPlus: () => { this.quantity = Math.min(MAX_ORDER_QUANTITY, this.quantity + 1); this.render(); },
       });
-      const h = CIRCLE_RADIUS * 2;
-      stepper.y = (h - stepper.height) / 2;
-      line.addChild(stepper);
-      let x = stepper.width + CIRCLE_GAP * 1.5;
-      KINDS.forEach((k) => {
+      const circles = new Container();
+      KINDS.forEach((k, i) => {
         const c = resourceCircle(k, k === this.resource, () => { this.resource = k; this.render(); });
-        c.position.set(x, 0);
-        line.addChild(c);
-        x += CIRCLE_RADIUS * 2 + CIRCLE_GAP;
+        c.position.set(i * (CIRCLE_RADIUS * 2 + CIRCLE_GAP), 0);
+        circles.addChild(c);
       });
-      line.position.set((cw - (x - CIRCLE_GAP)) / 2, y);
-      popup.content.addChild(line);
-      y += h + ROW_GAP;
+      const h = CIRCLE_RADIUS * 2;
+      const gap = CIRCLE_GAP * 1.5;
+      if (stepper.width + gap + circles.width <= cw) {
+        const line = new Container();
+        stepper.y = (h - stepper.height) / 2;
+        circles.x = stepper.width + gap;
+        line.addChild(stepper, circles);
+        place(line);
+      } else {
+        place(stepper);
+        place(circles);
+      }
       // Village that receives the goods.
       plain(t('trade.deliverTo'), 0xcccccc);
       const target = villageList(pickVillage(villageGroups(sim.map, local.index), this.deliverTo), (v) => { this.deliverTo = { q: v.q, r: v.r }; this.render(); });
+      y += PICKER_MARGIN - ROW_GAP;
       const buttons = new Container();
       const post = new Button({
         label: t('trade.placeOrder'),

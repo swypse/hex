@@ -1,44 +1,55 @@
 import type { Simulator } from '../game/simulator';
 import type { GameEvent } from '../game/events';
 import { t } from '../i18n';
-import { hexDistance, hexNeighbors } from '../game/map/hex';
+import { hexDistance, hexNeighbors, type Axial } from '../game/map/hex';
 import type { MapTile } from '../game/map/map-gen';
-import { isLandType, isWaterType } from '../game/map/tile-types';
+import { isForestType, isIceType, isLandType, isWaterType } from '../game/map/tile-types';
 import { isExploredFor } from '../game/map/explore';
 import { hasSkill } from '../game/skills';
 import { makeUnit } from '../game/units/units';
-import { STEP_ORDER } from '../game/tutorial/tutorial-steps';
+import { isDialogStep, STEP_ORDER } from '../game/tutorial/tutorial-steps';
+import { canBuildFarm, canBuildGranary } from '../game/economy/buildings';
+import { addStock, readStock } from '../game/economy/stock';
 import {
   TUTORIAL_CAPITAL, TUTORIAL_ENEMY_PLAYER, TUTORIAL_ARCHER_ENEMY_PREFERRED,
   TUTORIAL_SHIP_ENEMY_PREFERRED, TUTORIAL_ENEMY_SHIP_ID, TUTORIAL_ENEMY_WARRIOR_ID,
   TUTORIAL_HUMAN, TUTORIAL_PORT_TILE, TUTORIAL_START_WARRIOR_ID,
 } from '../game/tutorial/tutorial-map';
-import { BonusKind, BuildingKind, GameEventType, SkillId, TutorialStepId, UnitType } from '@enums';
+import { BonusKind, BuildingKind, GameEventType, Season, SkillId, TutorialStepId, UnitType } from '@enums';
 import { tileAt } from '../game/map/tile-index';
 
 export interface TutorialHost {
   sim(): Simulator | null;
+  /** Plays the events queued by the director's own sim changes (season, lightning). */
+  presentPending?(): void;
 }
+
+/** Money and capital materials the food steps top up to, so the player can always afford them. */
+const FOOD_STEP_FUNDS = { money: 120, wood: 20, stone: 20 } as const;
 
 export class TutorialDirector {
   private stepIndex = 0;
   private freeVillageQ = 0;
   private freeVillageR = 0;
   private freeVillageSet = false;
+  private fireStarted = false;
 
   constructor(private readonly host: TutorialHost) {}
 
   start(): void {
     this.stepIndex = 0;
     this.freeVillageSet = false;
+    this.fireStarted = false;
   }
 
   currentStep(): TutorialStepId {
     return STEP_ORDER[this.stepIndex]!;
   }
 
-  welcomeClosed(): boolean {
-    if (this.currentStep() !== TutorialStepId.WELCOME) return false;
+  /** Dismisses the current message dialog (all but the final one); true when it advanced. */
+  continueDialog(): boolean {
+    const step = this.currentStep();
+    if (step === TutorialStepId.END || !isDialogStep(step)) return false;
     const before = this.stepIndex;
     this.stepIndex++;
     this.enterCurrent();
@@ -50,7 +61,7 @@ export class TutorialDirector {
   afterCommand(events: GameEvent[]): boolean {
     const step = this.currentStep();
     let changed = false;
-    if (step !== TutorialStepId.WELCOME && step !== TutorialStepId.END && this.completesOnEvents(step, events)) {
+    if (!isDialogStep(step) && this.completesOnEvents(step, events)) {
       this.stepIndex++;
       this.enterCurrent();
       changed = true;
@@ -63,8 +74,7 @@ export class TutorialDirector {
     let changed = false;
     for (let guard = 0; guard < STEP_ORDER.length; guard++) {
       const step = this.currentStep();
-      if (step === TutorialStepId.WELCOME || step === TutorialStepId.END) break;
-      if (!this.done(step)) break;
+      if (isDialogStep(step) || !this.done(step)) break;
       this.stepIndex++;
       this.enterCurrent();
       changed = true;
@@ -79,6 +89,10 @@ export class TutorialDirector {
     else if (step === TutorialStepId.ATTACK_ENEMY_SHIP) this.placeEnemyShip();
     else if (step === TutorialStepId.COLLECT_BONUS) this.placeTutorialBonus();
     else if (step === TutorialStepId.APPROACH_FREE_VILLAGE) this.placeFreeVillage();
+    else if (step === TutorialStepId.OPEN_AGRICULTURE) this.ensureFunds();
+    else if (step === TutorialStepId.WINTER) this.changeSeason(Season.WINTER);
+    else if (step === TutorialStepId.BUILD_GRANARY) this.startSpring();
+    else if (step === TutorialStepId.EXTINGUISH_FIRE) this.strikeForest();
     else if (step === TutorialStepId.END) this.removeDummyUnits();
   }
 
@@ -149,6 +163,14 @@ export class TutorialDirector {
         const v = tileAt(sim.map, this.freeVillageQ, this.freeVillageR);
         return v?.settlement?.owner === TUTORIAL_HUMAN;
       }
+      case TutorialStepId.OPEN_AGRICULTURE:
+        return hasSkill(human, SkillId.AGRICULTURE) && hasSkill(human, SkillId.GRANARY);
+      case TutorialStepId.BUILD_FARM:
+        return this.hasOwnBuilding(BuildingKind.FARM);
+      case TutorialStepId.BUILD_GRANARY:
+        return this.hasOwnBuilding(BuildingKind.GRANARY);
+      case TutorialStepId.EXTINGUISH_FIRE:
+        return !this.fireStarted || !sim.map.tiles.some((t) => t.fire);
       default:
         return false;
     }
@@ -191,6 +213,9 @@ export class TutorialDirector {
           if (attacker?.shipLevel !== undefined) return true;
           break;
         }
+        case TutorialStepId.EXTINGUISH_FIRE:
+          if (e.type === GameEventType.FIRE_EXTINGUISHED) return true;
+          break;
         case TutorialStepId.COLLECT_BONUS:
           if (e.type === GameEventType.BONUS_CLAIMED && e.playerIndex === TUTORIAL_HUMAN) return true;
           break;
@@ -199,6 +224,97 @@ export class TutorialDirector {
       }
     }
     return false;
+  }
+
+  /** Tiles the current step wants highlighted besides its fixed markers. */
+  markerTiles(): Axial[] {
+    const sim = this.host.sim();
+    const human = sim?.players[TUTORIAL_HUMAN];
+    if (!sim || !human) return [];
+    const step = this.currentStep();
+    if (step === TutorialStepId.BUILD_FARM || step === TutorialStepId.BUILD_GRANARY) {
+      const farm = step === TutorialStepId.BUILD_FARM;
+      const spot = sim.map.tiles
+        .filter((t) => (farm ? canBuildFarm(sim.map, t, human) : canBuildGranary(sim.map, t, human)))
+        .sort((a, b) => Number(!!a.unit) - Number(!!b.unit) || hexDistance(a, TUTORIAL_CAPITAL) - hexDistance(b, TUTORIAL_CAPITAL))[0];
+      return spot ? [{ q: spot.q, r: spot.r }] : [];
+    }
+    if (step === TutorialStepId.EXTINGUISH_FIRE) return sim.map.tiles.filter((t) => t.fire).map((t) => ({ q: t.q, r: t.r }));
+    return [];
+  }
+
+  private hasOwnBuilding(kind: BuildingKind): boolean {
+    return !!this.host.sim()?.map.tiles.some((t) => t.building?.kind === kind && t.ownedBy === TUTORIAL_HUMAN);
+  }
+
+  /** Tops up the player's money and the capital's materials for the food buildings. */
+  private ensureFunds(): void {
+    const sim = this.host.sim();
+    const human = sim?.players[TUTORIAL_HUMAN];
+    const capital = sim && tileAt(sim.map, TUTORIAL_CAPITAL.q, TUTORIAL_CAPITAL.r);
+    if (!human || !capital?.settlement) return;
+    human.resources.money = Math.max(human.resources.money, FOOD_STEP_FUNDS.money);
+    const stock = readStock(capital);
+    addStock(capital, {
+      wood: Math.max(0, FOOD_STEP_FUNDS.wood - stock.wood),
+      stone: Math.max(0, FOOD_STEP_FUNDS.stone - stock.stone),
+    });
+  }
+
+  private changeSeason(season: Season): void {
+    if (this.host.sim()?.forceSeason(season)) this.host.presentPending?.();
+  }
+
+  /** Spring melts the ice and kills whatever stands on it: move own units ashore first. */
+  private startSpring(): void {
+    const sim = this.host.sim();
+    if (!sim) return;
+    this.ensureFunds();
+    for (const tile of sim.map.tiles) {
+      if (!tile.unit || !isIceType(tile.terrain)) continue;
+      const shore = sim.map.tiles
+        .filter((t) => isLandType(t.terrain) && !t.unit && !t.settlement && !t.building)
+        .sort((a, b) => hexDistance(a, tile) - hexDistance(b, tile))[0];
+      if (!shore) continue;
+      const unit = tile.unit;
+      tile.unit = null;
+      shore.unit = unit;
+      unit.q = shore.q;
+      unit.r = shore.r;
+    }
+    this.changeSeason(Season.SPRING);
+  }
+
+  /** Lightning on the forest nearest to the archer, which is stood beside it and rested. */
+  private strikeForest(): void {
+    const sim = this.host.sim();
+    if (!sim) return;
+    const anchor = sim.map.tiles.find((t) => t.unit && t.unit.owner === TUTORIAL_HUMAN && t.unit.shipLevel === undefined);
+    const from = anchor ?? tileAt(sim.map, TUTORIAL_CAPITAL.q, TUTORIAL_CAPITAL.r)!;
+    const forest = sim.map.tiles
+      .filter((t) => isForestType(t.terrain) && !t.unit && !t.fire)
+      .sort((a, b) => hexDistance(a, from) - hexDistance(b, from))[0];
+    if (!forest) return;
+    const unit = anchor?.unit;
+    if (anchor && unit) {
+      if (hexDistance(anchor, forest) > 1) {
+        const spot = hexNeighbors(forest)
+          .map((n) => tileAt(sim.map, n.q, n.r))
+          .find((t) => t && isLandType(t.terrain) && !t.unit && !t.settlement && !t.building);
+        if (spot) {
+          anchor.unit = null;
+          spot.unit = unit;
+          unit.q = spot.q;
+          unit.r = spot.r;
+        }
+      }
+      unit.hasMoved = false;
+      unit.hasAttacked = false;
+      unit.hasHealed = false;
+    }
+    sim.forceLightning(forest);
+    this.fireStarted = true;
+    this.host.presentPending?.();
   }
 
   private placeEnemyWarrior(): void {

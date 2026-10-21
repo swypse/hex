@@ -33,7 +33,7 @@ describe('tutorial store fields', () => {
 describe('gameController tutorial API', () => {
   it('exposes tutorial entry/exit methods', () => {
     expect(typeof gameController.startTutorial).toBe('function');
-    expect(typeof gameController.tutorialWelcomeClosed).toBe('function');
+    expect(typeof gameController.tutorialContinue).toBe('function');
     expect(typeof gameController.exitTutorial).toBe('function');
   });
 });

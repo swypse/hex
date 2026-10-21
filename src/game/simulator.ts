@@ -49,7 +49,7 @@ import { runAiTrading } from './ai/ai-trade';
 import { flagsFor } from './ai/ai-flags';
 import type { SimContext } from './sim-context';
 import { tileAt } from './map/tile-index';
-import { extinguishCells } from './weather/fire';
+import { extinguishCells, ignite } from './weather/fire';
 
 export type Command =
   | { type: CommandType.MOVE; unitId: string; q: number; r: number }
@@ -1340,6 +1340,13 @@ export class Simulator {
       this.emit({ type: GameEventType.TURN_STARTED, playerIndex: next, turn: this.turn });
       return;
     }
+  }
+
+  /** Tutorial: a lightning bolt on `tile` that always sets a forest or building ablaze. */
+  forceLightning(tile: { q: number; r: number }): void {
+    this.environment.strikeLightning(tile);
+    const target = tileAt(this.map, tile.q, tile.r);
+    if (target) ignite(target);
   }
 
   /** Cheat: starts a `type` event right now, ignoring the schedule and the

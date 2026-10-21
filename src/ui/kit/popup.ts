@@ -5,6 +5,8 @@ import { THEME } from '../../gfx/theme';
 import { ButtonStyle, FontSize, PopupPosition } from '@enums';
 import { clamp } from '../../util/math';
 import { easeOutCubic } from '../../util/easing';
+import { markDirty } from '../../gfx/render-gate';
+import { INERTIA_START_SPEED, INERTIA_STOP_SPEED } from '../../controller/zoom';
 
 const PAD_H = 20;
 const PAD_TOP = 16;
@@ -24,6 +26,9 @@ const DIVIDER_ALPHA = 0.12;
 const ANIM_MS = 140;
 const DEFAULT_WIDTH = 420;
 const MIN_CARD_HEIGHT = 80;
+/** Release glide: residual speed per second, and the pause (ms) before release that cancels it. */
+const INERTIA_DECAY = 0.01;
+const INERTIA_IDLE_MS = 80;
 
 /** Standard body text size used across popups. */
 export const POPUP_BODY_SIZE = FontSize.SMALL;
@@ -120,6 +125,10 @@ export class Popup {
   private pointerId: number | null = null;
   private lastClientY = 0;
   private listening = false;
+  /** Scroll velocity (px/s) of the drag, and the ticker callback of the release glide. */
+  private scrollVelocity = 0;
+  private lastMoveTime = 0;
+  private inertiaFn: ((t: { deltaMS: number }) => void) | null = null;
   private tickerFn: ((t: { deltaMS: number }) => void) | null = null;
   private keyHandler: ((e: KeyboardEvent) => void) | null = null;
 
@@ -412,7 +421,30 @@ export class Popup {
     this.content.position.y = -this.scrollOffset;
   }
 
+  /** Keeps scrolling after a drag is released, slowing down until it stops or hits an end. */
+  private startInertia(): void {
+    if (this.inertiaFn || !this.app.ticker) return;
+    const fn = (t: { deltaMS: number }): void => {
+      const dt = Math.min(0.05, t.deltaMS / 1000);
+      const before = this.scrollOffset;
+      this.scrollOffset = clamp(before + this.scrollVelocity * dt, 0, this.scrollMax);
+      this.content.position.y = -this.scrollOffset;
+      this.scrollVelocity *= Math.pow(INERTIA_DECAY, dt);
+      markDirty();
+      if (this.scrollOffset === before || Math.abs(this.scrollVelocity) < INERTIA_STOP_SPEED) this.stopInertia();
+    };
+    this.inertiaFn = fn;
+    this.app.ticker.add(fn);
+  }
+
+  private stopInertia(): void {
+    if (this.inertiaFn) this.app.ticker?.remove(this.inertiaFn);
+    this.inertiaFn = null;
+    this.scrollVelocity = 0;
+  }
+
   private onWheel = (e: FederatedWheelEvent): void => {
+    this.stopInertia();
     if (this.scrollMax <= 0 || e.deltaY === 0) return;
     this.scrollOffset = clamp(this.scrollOffset + e.deltaY, 0, this.scrollMax);
     this.content.position.y = -this.scrollOffset;
@@ -420,8 +452,11 @@ export class Popup {
 
   private onScrollPointerDown = (e: FederatedPointerEvent): void => {
     if (this.scrollMax <= 0 || this.pointerId !== null || e.button !== 0) return;
+    this.stopInertia();
     this.pointerId = e.pointerId;
     this.lastClientY = e.clientY;
+    this.scrollVelocity = 0;
+    this.lastMoveTime = performance.now();
     window.addEventListener('pointermove', this.onWindowMove);
     window.addEventListener('pointerup', this.onWindowUp);
     window.addEventListener('pointercancel', this.onWindowUp);
@@ -432,6 +467,10 @@ export class Popup {
     const dy = e.clientY - this.lastClientY;
     this.lastClientY = e.clientY;
     if (dy === 0) return;
+    const now = performance.now();
+    const dt = Math.max(1, now - this.lastMoveTime) / 1000;
+    this.lastMoveTime = now;
+    this.scrollVelocity = this.scrollVelocity * 0.8 + (-dy / dt) * 0.2;
     this.scrollOffset = clamp(this.scrollOffset - dy, 0, this.scrollMax);
     this.content.position.y = -this.scrollOffset;
   };
@@ -439,6 +478,9 @@ export class Popup {
   private onWindowUp = (e: PointerEvent): void => {
     if (e.pointerId !== this.pointerId) return;
     this.pointerId = null;
+    // A pause before release means the finger stopped: no glide.
+    const stale = performance.now() - this.lastMoveTime > INERTIA_IDLE_MS;
+    if (e.type === 'pointerup' && !stale && Math.abs(this.scrollVelocity) >= INERTIA_START_SPEED) this.startInertia();
     window.removeEventListener('pointermove', this.onWindowMove);
     window.removeEventListener('pointerup', this.onWindowUp);
     window.removeEventListener('pointercancel', this.onWindowUp);
@@ -511,6 +553,7 @@ export class Popup {
     if (this.keyHandler) window.removeEventListener('keydown', this.keyHandler);
     this.keyHandler = null;
     this.disableScrollListeners();
+    this.stopInertia();
     this.pointerId = null;
     if (this.el.parent) this.el.parent.removeChild(this.el);
     this.el.destroy({ children: true });

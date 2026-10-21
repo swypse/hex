@@ -434,6 +434,7 @@ class GameController {
       const bonusTile = this.sim.map.tiles.find((t) => t.bonus !== undefined && t.bonus !== null);
       if (bonusTile) markers.add(axialKey(bonusTile));
     }
+    for (const m of this.tutorial.markerTiles()) markers.add(axialKey(m));
     if (step === TutorialStepId.APPROACH_FREE_VILLAGE || step === TutorialStepId.CAPTURE_FREE_VILLAGE) {
       const freeVillage = this.sim.map.tiles.find((t) => t.settlement && t.settlement.owner === null);
       if (freeVillage) markers.add(axialKey(freeVillage));
@@ -686,6 +687,7 @@ class GameController {
       if (useGameStore.getState().tutorial && this.tutorial) {
         const changed = this.tutorial.afterCommand(events);
         if (changed) {
+          this.syncStore();
           this.syncTutorialStore();
           const s = useGameStore.getState();
           // Once a skill step completes, close the skill tree so the player can
@@ -742,7 +744,7 @@ class GameController {
     this.sim = new Simulator(map, players, GameMode.TURNS30, { disablePirates: true });
     this.sim.startGame();
     this.sim.drainEvents();
-    this.tutorial = new TutorialDirector({ sim: () => this.sim } satisfies TutorialHost);
+    this.tutorial = new TutorialDirector({ sim: () => this.sim, presentPending: () => void this.cheats.presentPending() } satisfies TutorialHost);
     this.tutorial.start();
     beginMatchState({ players: players, mode: GameMode.TURNS30, expectedTurns: this.sim.expectedTurns, netMode: NetMode.SINGLE });
     store.setOverlay(null);
@@ -755,9 +757,10 @@ class GameController {
     return Promise.resolve();
   }
 
-  tutorialWelcomeClosed(): void {
+  tutorialContinue(): void {
     if (!this.tutorial) return;
-    if (this.tutorial.welcomeClosed()) {
+    if (this.tutorial.continueDialog()) {
+      this.syncStore();
       this.syncTutorialStore();
       this.render();
     }

@@ -19,5 +19,12 @@ export enum TutorialStepId {
   COLLECT_BONUS = 'collectBonus',
   APPROACH_FREE_VILLAGE = 'approachFreeVillage',
   CAPTURE_FREE_VILLAGE = 'captureFreeVillage',
+  OPEN_AGRICULTURE = 'openAgriculture',
+  BUILD_FARM = 'buildFarm',
+  WINTER = 'winter',
+  BUILD_GRANARY = 'buildGranary',
+  FOOD_STOCK = 'foodStock',
+  LIGHTNING_INFO = 'lightningInfo',
+  EXTINGUISH_FIRE = 'extinguishFire',
   END = 'end',
 }

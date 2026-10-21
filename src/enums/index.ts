@@ -54,7 +54,6 @@ export * from './screen.enum';
 export * from './scrim-side.enum';
 export * from './season.enum';
 export * from './selection-kind.enum';
-export * from './setup-step.enum';
 export * from './siege-target-kind.enum';
 export * from './skill-id.enum';
 export * from './spawn-preference.enum';

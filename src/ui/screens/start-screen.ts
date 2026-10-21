@@ -10,6 +10,7 @@ import { KeyHints, placeKeyHints } from '../kit/key-hints';
 import { markDirty } from '../../gfx/render-gate';
 import { type ScreenController, type UIHost } from '../host';
 import { ScreenScroll } from '../kit/vertical-scroll';
+import { TiltLogo } from '../kit/tilt-logo';
 
 /** Logo display size: the 194x170 hex-terra.png at its native size. Layout
  *  reserves it statically so the menu column never jumps when the logo image
@@ -162,7 +163,9 @@ export class StartScreen implements ScreenController {
   private root: Container | null = null;
   private host: UIHost | null = null;
   private scroll: ScreenScroll | null = null;
-  private title: Sprite | null = null;
+  /** Holder positioned by layout; the tilting logo is added once the image loads. */
+  private title: Container | null = null;
+  private tilt: TiltLogo | null = null;
   private hints: KeyHints | null = null;
   private divider: Graphics | null = null;
   private stars: MenuStars | null = null;
@@ -186,15 +189,14 @@ export class StartScreen implements ScreenController {
     this.stars = new MenuStars(host.app, this.root);
     this.scroll = new ScreenScroll(host.app, this.root);
 
-    this.title = new Sprite();
-    this.title.anchor.set(0.5, 0.5);
+    this.title = new Container();
     const img = new Image();
     img.onload = () => {
       if (!this.title || this.title.destroyed) return;
-      this.title.texture = Texture.from(img);
-      ensureCanvasResource(this.title.texture);
-      this.title.width = TITLE_WIDTH;
-      this.title.height = Math.round(TITLE_WIDTH * img.naturalHeight / img.naturalWidth);
+      const texture = Texture.from(img);
+      ensureCanvasResource(texture);
+      this.tilt = new TiltLogo(texture, TITLE_WIDTH, Math.round(TITLE_WIDTH * img.naturalHeight / img.naturalWidth));
+      this.title.addChild(this.tilt);
       this.layout();
       // Async visual change outside any store/interaction: request a frame so
       // the logo appears without a pointer event.
@@ -257,6 +259,8 @@ export class StartScreen implements ScreenController {
     this.layout();
     window.addEventListener('keydown', this.onKeyDown);
     window.addEventListener('resize', this.onResize);
+    window.addEventListener('pointermove', this.onPointerMove);
+    host.app.ticker.add(this.onTick);
   }
 
   private applyAuthGate(): void {
@@ -266,6 +270,19 @@ export class StartScreen implements ScreenController {
   }
 
   private onResize = (): void => this.layout();
+
+  /** Tilts the logo towards the pointer, relative to the logo centre. */
+  private onPointerMove = (e: PointerEvent): void => {
+    const logo = this.title;
+    const screen = this.host?.app.screen;
+    if (!logo || !screen) return;
+    this.tilt?.setPointer((e.clientX - logo.x) / (screen.width / 2), (e.clientY - logo.y) / (screen.height / 2));
+    markDirty();
+  };
+
+  private onTick = (): void => {
+    if (this.tilt?.update()) markDirty();
+  };
 
   private addGradientBackground(): void {
     const g = new Graphics();
@@ -390,6 +407,8 @@ export class StartScreen implements ScreenController {
     this.unsubscribeAuth = null;
     window.removeEventListener('keydown', this.onKeyDown);
     window.removeEventListener('resize', this.onResize);
+    window.removeEventListener('pointermove', this.onPointerMove);
+    this.host?.app.ticker.remove(this.onTick);
     this.stars?.destroy();
     this.stars = null;
     this.scroll?.destroy();
@@ -397,6 +416,7 @@ export class StartScreen implements ScreenController {
     this.root?.destroy({ children: true });
     this.root = null;
     this.title = null;
+    this.tilt = null;
     this.hints = null;
     this.divider = null;
     this.buttons = [];

@@ -171,6 +171,17 @@ export class CheatController {
     return true;
   }
 
+  /** Plays the events the sim queued outside a command (a forced season or lightning). */
+  presentPending(): Promise<void> {
+    return this.host.enqueue(async () => {
+      if (!this.host.sim) return;
+      const preExplored = this.host.exploredKeysFor(useGameStore.getState().localPlayerIndex);
+      this.host.saveGame();
+      await this.host.presentEvents(this.host.sim.drainEvents(), preExplored);
+      this.host.syncStore();
+    });
+  }
+
   /** Cheat (single-player only): jumps to the next `season` and plays the
    *  change (ice freezing / thawing). Returns true when applied. */
   cheatSetSeason(season: Season): Promise<boolean> {

@@ -16,6 +16,8 @@ export class TutorialOverlay {
   private host: UIHost | null = null;
   private popup: Popup | null = null;
   private unsub: (() => void) | null = null;
+  /** Step the popup shows (null: none), so unrelated store changes (selection, moves) leave it alone. */
+  private shownStep: TutorialStepId | null = null;
 
   mount(host: UIHost, root: Container): void {
     this.host = host;
@@ -36,11 +38,9 @@ export class TutorialOverlay {
     const s = useGameStore.getState();
     const active = s.screen === Screen.GAME && s.tutorial && !s.texturesLoading;
     this.el.visible = active;
-    if (!active) {
-      this.clearPopup();
-      return;
-    }
-    const step = s.tutorialStep;
+    const step = active ? s.tutorialStep : null;
+    if (step === this.shownStep && (step === null || this.popup)) return;
+    this.shownStep = step;
     if (step === null) {
       this.clearPopup();
       return;
@@ -61,8 +61,8 @@ export class TutorialOverlay {
       label: buttonLabel,
       width: 200,
       onClick: () => {
-        if (step === TutorialStepId.WELCOME) gameController.tutorialWelcomeClosed();
-        else gameController.exitTutorial();
+        if (step === TutorialStepId.END) gameController.exitTutorial();
+        else gameController.tutorialContinue();
       },
     });
     const popup = new Popup({

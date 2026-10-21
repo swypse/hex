@@ -1,9 +1,9 @@
-import { BuildingKind, CommandType, GameMode, SkillId, TutorialStepId, UnitType } from '@enums';
+import { BuildingKind, CommandType, GameMode, Season, SkillId, TutorialStepId, UnitType } from '@enums';
 import { describe, expect, it } from 'vitest';
 import { TutorialDirector, type TutorialHost } from '@/controller/tutorial-director';
 import { hexDistance } from '@/game/map/hex';
 import { Simulator } from '@/game/simulator';
-import { isWaterType } from '@/game/map/tile-types';
+import { isForestType, isWaterType, TileType } from '@/game/map/tile-types';
 import {
   buildTutorialMap, buildTutorialPlayers, TUTORIAL_ENEMY_PLAYER, TUTORIAL_ENEMY_SHIP_ID, TUTORIAL_HUMAN,
   TUTORIAL_PORT_TILE,
@@ -100,7 +100,7 @@ describe('TutorialDirector', () => {
     const dir = makeDirector(sim);
     dir.start();
     expect(dir.currentStep()).toBe(TutorialStepId.WELCOME);
-    dir.welcomeClosed();
+    dir.continueDialog();
     playToNavalStart(sim, dir);
     playNavalSkills(sim, dir);
 
@@ -176,8 +176,39 @@ describe('TutorialDirector', () => {
     expect(dir.currentStep()).toBe(TutorialStepId.CAPTURE_FREE_VILLAGE);
     const onVillage = sim.map.tiles.find((t) => t.settlement && t.unit?.owner === TUTORIAL_HUMAN)!;
     run(sim, dir, { type: CommandType.CAPTURE, q: freeVillage.q, r: freeVillage.r, unitId: onVillage.unit!.id });
-    expect(dir.currentStep()).toBe(TutorialStepId.END);
+    expect(dir.currentStep()).toBe(TutorialStepId.OPEN_AGRICULTURE);
     expect(freeVillage.settlement?.owner).toBe(TUTORIAL_HUMAN);
+
+    // Food: farm, winter message, spring + granary, food message.
+    run(sim, dir, { type: CommandType.OPEN_SKILL, skill: SkillId.AGRICULTURE });
+    run(sim, dir, { type: CommandType.OPEN_SKILL, skill: SkillId.GRANARY });
+    expect(dir.currentStep()).toBe(TutorialStepId.BUILD_FARM);
+    const [farmSpot] = dir.markerTiles();
+    expect(farmSpot).toBeDefined();
+    run(sim, dir, { type: CommandType.BUILD, q: farmSpot!.q, r: farmSpot!.r, kind: BuildingKind.FARM });
+    expect(dir.currentStep()).toBe(TutorialStepId.WINTER);
+    expect(sim.map.season).toBe(Season.WINTER);
+    expect(dir.continueDialog()).toBe(true);
+    expect(dir.currentStep()).toBe(TutorialStepId.BUILD_GRANARY);
+    expect(sim.map.season).toBe(Season.SPRING);
+    expect(sim.map.tiles.some((t) => t.terrain === TileType.Ice)).toBe(false);
+    const [granarySpot] = dir.markerTiles();
+    expect(hexDistance(granarySpot!, farmSpot!)).toBe(1);
+    run(sim, dir, { type: CommandType.BUILD, q: granarySpot!.q, r: granarySpot!.r, kind: BuildingKind.GRANARY });
+    expect(dir.currentStep()).toBe(TutorialStepId.FOOD_STOCK);
+    expect(dir.continueDialog()).toBe(true);
+
+    // Lightning: the info dialog, then a strike that sets a forest ablaze next to the archer.
+    expect(dir.currentStep()).toBe(TutorialStepId.LIGHTNING_INFO);
+    expect(sim.map.tiles.some((t) => t.fire)).toBe(false);
+    expect(dir.continueDialog()).toBe(true);
+    expect(dir.currentStep()).toBe(TutorialStepId.EXTINGUISH_FIRE);
+    const burning = sim.map.tiles.find((t) => t.fire)!;
+    expect(isForestType(burning.terrain)).toBe(true);
+    const firefighter = archerUnit(sim);
+    expect(hexDistance(firefighter, burning)).toBeLessThanOrEqual(1);
+    run(sim, dir, { type: CommandType.EXTINGUISH, unitId: firefighter.id, q: burning.q, r: burning.r });
+    expect(dir.currentStep()).toBe(TutorialStepId.END);
     expect(sim.map.tiles.some((t) => t.unit?.owner === TUTORIAL_ENEMY_PLAYER)).toBe(false);
   });
 
@@ -185,7 +216,7 @@ describe('TutorialDirector', () => {
     const sim = makeSim();
     const dir = makeDirector(sim);
     dir.start();
-    dir.welcomeClosed();
+    dir.continueDialog();
     playToNavalStart(sim, dir);
     playNavalSkills(sim, dir);
 
@@ -213,7 +244,7 @@ describe('TutorialDirector', () => {
     const sim = makeSim();
     const dir = makeDirector(sim);
     dir.start();
-    dir.welcomeClosed();
+    dir.continueDialog();
     playToNavalStart(sim, dir);
     playNavalSkills(sim, dir);
 
@@ -238,7 +269,7 @@ describe('TutorialDirector', () => {
     const sim = makeSim();
     const dir = makeDirector(sim);
     dir.start();
-    dir.welcomeClosed();
+    dir.continueDialog();
     const human = sim.players[TUTORIAL_HUMAN]!;
     human.skills.push(SkillId.FORESTRY, SkillId.CLIMBING, SkillId.SMITHERY, SkillId.ARCHER, SkillId.WATER, SkillId.NAVIGATION);
     run(sim, dir, { type: CommandType.MOVE, unitId: warriorUnit(sim).id, q: 1, r: -1 });
