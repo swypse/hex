@@ -12,7 +12,7 @@ export function unitCanAct(map: GameMap, tile: MapTile, unit: Unit, player: Play
   const canDock = hasSkill(player, SkillId.NAVIGATION);
   const canMoveAnywhere =
     canMove(unit) && reachableTargets(map, unit, movePoints(unit), canClimb, canDock, player.index).length > 0;
-  const canAttackAny = canAttack(unit) && attackableTargets(map, unit, player.index).length > 0;
+  const canAttackAny = canAttack(unit) && attackableTargets(map, unit, player.index, true).length > 0;
   const canHealNow = canHeal(unit);
   const canCapture =
     tile.settlement !== null && tile.settlement.owner !== unit.owner && tile.settlement.captureReady && !unit.hasHealed;

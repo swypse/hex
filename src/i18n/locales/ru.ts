@@ -70,6 +70,7 @@ export default {
   // Center / event messages
   'msg.tribeDied': 'Племя «{tribe}» выбыло из игры!',
   'msg.captured': 'Племя «{tribe}» захватило {village}!',
+  'msg.villageCapturedYours': 'Ваша деревня захвачена!',
   'msg.shipCaptured': 'Ваш корабль захвачен пиратами!',
   'msg.shipCaptureFailed': 'Пиратам не удалось захватить ваш корабль',
   'msg.pirates': 'Пираты!',

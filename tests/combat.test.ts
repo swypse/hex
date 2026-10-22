@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { type GameMap, type MapTile, type Settlement } from '../src/game/map/map-gen';
-import { attackDamage, attackableTargets, chooseBestAttack, resolveCombat, defenseBonusFor, MISS_CHANCE, missChanceFor, performAttack, performSiege, isEnemySiegeTarget, tradeIsFavorable, canCounterAttack, COMBAT_SCALE, COUNTER_SCALE } from '../src/game/units/combat';
+import { attackDamage, attackableTargets, chooseBestAttack, resolveCombat, defenseBonusFor, MISS_CHANCE, missChanceFor, performAttack, performSiege, isEnemySiegeTarget, isFreeSiegeTarget, tradeIsFavorable, canCounterAttack, COMBAT_SCALE, COUNTER_SCALE } from '../src/game/units/combat';
 import type { Player } from '../src/game/players';
 import { TileType } from '../src/game/map/tile-types';
 import { type Unit, UNIT_TYPES, MAX_HP } from '../src/game/units/units';
@@ -259,6 +259,35 @@ describe('performSiege', () => {
     expect(out.destroyed).toBeNull();
     expect(friendly.settlement!.level).toBe(2);
     expect(isEnemySiegeTarget(friendly, 0)).toBe(false);
+  });
+});
+
+describe('catapult and free-tile roads and bridges', () => {
+  const noMiss = (): number => 1;
+
+  it('breaks a road or bridge on an unowned tile whoever built it, but only in the player\'s own targeting', () => {
+    const c = makeCatapult('c', 0, 0, 0, 30);
+    const road = makeTile(1, 0, TileType.GrasslandLand);
+    road.roadOwner = 0;
+    expect(isEnemySiegeTarget(road, 0)).toBe(false);
+    expect(isFreeSiegeTarget(road)).toBe(true);
+    const map: GameMap = { radius: 4, tiles: [makeTile(0, 0, TileType.GrasslandLand, c), road], spawns: [] };
+    expect(attackableTargets(map, c, 0)).toHaveLength(0); // the AI's view
+    expect(attackableTargets(map, c, 0, true)).toEqual([road]);
+    expect(performSiege(c, road, noMiss).destroyed).toBe(SiegeTargetKind.ROAD);
+    expect(road.roadOwner).toBeNull();
+    const bridge = makeTile(1, -1, TileType.Water);
+    bridge.bridge = { owner: 0, dir: BridgeDir.WE };
+    bridge.roadOwner = 0;
+    c.hasAttacked = false;
+    expect(performSiege(c, bridge, noMiss).destroyed).toBe(SiegeTargetKind.BRIDGE);
+  });
+
+  it('leaves an own road on an owned tile alone', () => {
+    const road = makeTile(1, 0, TileType.GrasslandLand);
+    road.roadOwner = 0;
+    road.ownedBy = 0;
+    expect(isFreeSiegeTarget(road)).toBe(false);
   });
 });
 

@@ -18,9 +18,9 @@ describe('resources', () => {
 
   it('village upgrade cost scales with the current level', () => {
     expect(villageUpgradeCost(1)).toEqual({ wood: 2, stone: 1, money: 2, ore: 0, food: 0 });
-    expect(villageUpgradeCost(2)).toEqual({ wood: 5, stone: 2, money: 5, ore: 0, food: 0 });
-    expect(villageUpgradeCost(4)).toEqual({ wood: 12, stone: 6, money: 12, ore: 0, food: 0 });
-    // Compounding: far out of reach by level 25.
+    expect(villageUpgradeCost(2)).toEqual({ wood: 4, stone: 2, money: 4, ore: 0, food: 0 });
+    expect(villageUpgradeCost(4)).toEqual({ wood: 9, stone: 4, money: 9, ore: 0, food: 0 });
+    // Cubic surcharge: out of reach by level 25.
     expect(villageUpgradeCost(25).money).toBeGreaterThan(1000);
   });
 

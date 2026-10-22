@@ -27,7 +27,7 @@ import { attackPresenceParticipants, type AttackPresenceParticipant } from './at
 import { t } from '../i18n';
 import { sfx } from '../sound/sfx';
 import { attackSound } from '../sound/attack-sounds';
-import { AttackImpact, BonusKind, GameEventType, NetMode, SelectionKind, UnitFacing, UnitType, WeatherType } from '@enums';
+import { AttackImpact, BonusKind, GameEventType, NetMode, SelectionKind, SiegeTargetKind, UnitFacing, UnitType, WeatherType } from '@enums';
 import { sleep } from '../util/sleep';
 import { tileAt } from '../game/map/tile-index';
 import { EventEffects, RAYS_DAMAGE_COLOR } from './event-effects';
@@ -35,6 +35,8 @@ import { EventEffects, RAYS_DAMAGE_COLOR } from './event-effects';
 const HEX_SIZE = 40;
 
 const COMBAT_DEATH_GAP_MS = 350;
+/** How long the tooltip over your captured village stays; later messages wait for it. */
+const VILLAGE_CAPTURED_TOOLTIP_MS = 500;
 const COMBAT_ADVANCE_MS = 180;
 
 
@@ -314,7 +316,7 @@ export class EventPresenter {
             if (e.playerIndex === local) sfx.play('spawn');
             break;
           case GameEventType.CAPTURED:
-            this.presentCaptured(e);
+            await this.presentCaptured(e);
             break;
           case GameEventType.VILLAGE_UPGRADED: {
             if (e.playerIndex === local) sfx.play('upgrade');
@@ -437,6 +439,8 @@ export class EventPresenter {
           }
           case GameEventType.BURNED: {
             this.host.render();
+            const burnedTile = tileAt(sim.map, e.q, e.r);
+            if (burnedTile && isExploredFor(burnedTile, local)) this.effects.spawnMuzzleSmokeAt(burnedTile);
             const victim = tileAt(sim.map, e.q, e.r)?.ownedBy;
             if (victim === local && e.playerIndex !== local) {
               useGameStore.getState().setCenterMessage(t('msg.foodBuildingBurned', { building: BUILDING_NAMES[e.kind] }));
@@ -790,6 +794,8 @@ export class EventPresenter {
     if (!e.missed && targetVisible && targetTile !== undefined) {
       this.host.render();
       mapView.bounceHex(e.targetTile.q, e.targetTile.r);
+      // A building razed by the volley goes up in smoke on its tile.
+      if (e.destroyed === SiegeTargetKind.BUILDING) this.effects.spawnMuzzleSmokeAt(targetTile);
     }
   }
 
@@ -1245,13 +1251,22 @@ export class EventPresenter {
     this.host.render();
   }
 
-  private presentCaptured(e: Extract<GameEvent, { type: 'captured' }>): void {
+  private async presentCaptured(e: Extract<GameEvent, { type: 'captured' }>): Promise<void> {
     const sim = this.host.sim();
     if (!sim) return;
     const capturer = sim.players[e.newOwner]!;
     const village = tileAt(sim.map, e.q, e.r);
     if (e.oldOwner !== null && village) {
-      this.showCaptureMessage(village, capturer);
+      if (e.oldOwner === useGameStore.getState().localPlayerIndex) {
+        // Your own village: bring it into view with a short tooltip over it instead
+        // of the center message; later messages wait until the tooltip is gone.
+        this.host.render();
+        await this.host.centerOnCell(e.q, e.r);
+        this.effects.spawnTooltipAbove(village, t('msg.villageCapturedYours'), VILLAGE_CAPTURED_TOOLTIP_MS);
+        await sleep(VILLAGE_CAPTURED_TOOLTIP_MS);
+      } else {
+        this.showCaptureMessage(village, capturer);
+      }
     }
     if (e.oldOwner === null && village && isExploredFor(village, useGameStore.getState().localPlayerIndex)) {
       this.effects.spawnRays(village);

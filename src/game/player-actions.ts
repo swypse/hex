@@ -42,7 +42,7 @@ export function hasAnyAvailableAction(map: GameMap, player: Player, turn: number
     if (unit && unit.owner === player.index) {
       if (
         (canMove(unit) && reachableTargets(map, unit, undefined, canClimb, canDock, player.index).length > 0) ||
-        (canAttack(unit) && attackableTargets(map, unit, player.index).length > 0) ||
+        (canAttack(unit) && attackableTargets(map, unit, player.index, true).length > 0) ||
         canHeal(unit) ||
         canBurnBuilding(tile, unit) ||
         canBurnRoad(tile, unit)

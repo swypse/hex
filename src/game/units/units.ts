@@ -111,7 +111,7 @@ export interface Unit {
 export const VETERAN_KILLS = 3;
 export const VETERAN_ATTACK_BONUS = 5;
 export const VETERAN_HP_BONUS = 10;
-export const VETERAN_MOVE_BONUS = 20;
+export const VETERAN_MOVE_BONUS = 10;
 
 /** The unit's max hp: its type's, plus a veteran's hp bonus. */
 export function unitMaxHp(unit: Pick<Unit, 'type' | 'veteranBonus'>): number {

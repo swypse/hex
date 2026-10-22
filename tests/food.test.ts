@@ -169,6 +169,31 @@ describe('farms', () => {
     expect(FARM_FOOD).toBe(3);
   });
 
+  it('a farm on desert land always yields 2, even in winter; other farms are unchanged', () => {
+    const { p, map } = setup();
+    const farm = tileAt(map, 1, 0)!;
+    farm.terrain = TileType.DesertLand;
+    map.season = Season.SUMMER;
+    expect(farmYield(p, map, farm)).toBe(2);
+    map.season = Season.WINTER;
+    expect(farmYield(p, map, farm)).toBe(2);
+    // Agronomy with a university in the village adds its usual +1, winter or not.
+    p.skills.push(SkillId.AGRONOMY);
+    const uni = tileAt(map, 0, 1)!;
+    uni.building = { kind: BuildingKind.UNIVERSITY, level: 1 };
+    uni.ownedBy = 0;
+    expect(farmYield(p, map, farm)).toBe(3);
+    map.season = Season.SUMMER;
+    expect(farmYield(p, map, farm)).toBe(3);
+    p.skills.pop();
+    uni.building = null;
+    map.season = Season.WINTER;
+    farm.terrain = TileType.GrasslandLand;
+    expect(farmYield(p, map, farm)).toBe(0);
+    map.season = Season.SUMMER;
+    expect(farmYield(p, map, farm)).toBe(FARM_FOOD);
+  });
+
   it('yield 0 food in winter, even with Science', () => {
     const { map, p } = setup();
     map.season = Season.WINTER;

@@ -81,7 +81,7 @@ a fresh unit waits until the next turn. Each tribe's special unit (last seven ro
 | [Stormcaller](tribes/Aqua.md#stormcaller) | 20 | 20 | 8 | 1 | 44 | 6 money + 2 ore | Aqua people | 3 / 3 | 9 |
 | [Stunner](tribes/Sand.md#stunner) | 8 | 20 | 10 | 2 | 40 | 7 money + 2 ore | Sand people | 2 / 3 | 7 |
 
-- **Rider** can still move its full move points after attacking in the same turn.
+- **Rider** can still move its full move points after attacking in the same turn: the cell it attacks from does not stop it, only the cells next to an enemy that it walks into do (it ends its move on the first one).
 - **Shield** cannot attack in a turn in which it has moved (not applicable aboard a ship). Its counter-attack uses a
   lower multiplier than other units (see [Attack](#unit-actions)), but attacking one head-on still hurts.
 - **Knight** may attack again after a kill; killing 3 units in one turn gives a 30-point **Combo kill**.
@@ -90,7 +90,7 @@ a fresh unit waits until the next turn. Each tribe's special unit (last seven ro
   can target enemy buildings, walls, villages and roads within range with the usual range/fog logic. A hit on a village
   destroys its wall first, then lowers its level by one (minimum 1); a village with an enemy unit standing in it is hit
   as a normal unit. Mines, sawmills, ports, temples, forest temples, bridges, farms and granaries (2 hp) are removed
-  outright; a road is hit last on a tile with a building. A volley can miss like a regular attack and is never
+  outright; a road is hit last on a tile with a building. Besides enemy structures, any road or bridge on a free (unowned) tile can be targeted, whoever built it (human players only; the AI never targets its own). A volley can miss like a regular attack and is never
   countered. The AI sieges too, going for enemy buildings in this order: granary, university, farm, mine, sawmill; its
   other units burn enemy farms and granaries.
 - Pirates and units with no home village cost no upkeep.
@@ -125,7 +125,7 @@ Neutral units that belong to no tribe (80 HP, 50 move points on sea only, attack
 
 A unit's **3rd kill** (counter-attacks, storms and pirate kills count) makes it a **veteran**: it is fully healed, shows a
 star (`★ N/M`) and its owner picks a permanent bonus in a dialog that cannot be dismissed: **+5 attack**, **+10 max HP**
-(refilled) or **+20 move points** (not aboard a ship). A 3rd kill on an enemy's turn opens the dialog at the start of the
+(refilled) or **+10 move points** (not aboard a ship). A 3rd kill on an enemy's turn opens the dialog at the start of the
 owner's turn. AI picks at once: shields, banners, builders and stalkers take HP, riders move points, others attack.
 Pirates and tribe special units (builder, banner, berserker, stalker, trapper, stormcaller, stunner) never become veterans.
 
@@ -160,7 +160,7 @@ Pirates and tribe special units (builder, banner, berserker, stalker, trapper, s
 
 - **Spawning** — pay the unit's cost in an owned village; blocked if the village tile is occupied or the village's unit
   capacity (`1 + level`) is full.
-- **Upgrade** — `2×k` wood + `k` stone + `2×k` money with `k = level × 1.15^(level-1)`, rounded (level 1: 2 wood + 1 stone + 2 money; level 2: 5 wood / 2 stone / 5 money; level 5: 17/9/17; level 10: 70/35/70; level 25: ~1431/716/1431, unreachable in a normal game). Raises income and
+- **Upgrade** — `2×k` wood + `k` stone + `2×k` money with `k = level × (1 + (level/9)³)`, rounded: near-linear at first, then steeply rising (level 1: 2 wood + 1 stone + 2 money; level 2: 4/2/4; level 5: 12/6/12; level 10: 47/24/47; level 15: 169/84/169; level 25: ~1122/561/1122, unreachable in a normal game). Raises income and
   capacity; works while an enemy unit stands on the village. Some upgrades let the player pick a bonus:
   - level 5 → 6: **expand territory** (+1 radius) or **+5 money** (territory stays);
   - level 9 → 10: **expand territory** or a **veteran swordsman**;
@@ -231,7 +231,7 @@ village slot (farms and granaries need none). No building produces money. Buildi
 | Port          | 10 wood + 30 money + 2 ore    | Water         | owned water tile next to your own land                       | creates and upgrades ships                                                    |
 | Temple        | 10 stone + 30 money           | Water temples | water tile                                                   | grows +1 level every 2 turns (max 4); 10/15/20/25 score at game end           |
 | Forest temple | 10 stone + 30 money           | Forest temple | forest tile                                                  | same as temple; protects against earthquakes                                  |
-| Farm          | 10 money + 3 wood             | Agriculture   | own empty land tile (no forest/mountain/water; road is fine), no enemy unit | +3 food per round; 0 in winter (see [Food](#food))             |
+| Farm          | 10 money + 3 wood             | Agriculture   | own empty land tile (no forest/mountain/water; road is fine), no enemy unit | +3 food per round; 0 in winter (on desert land: always 2, +1 with Agronomy) (see [Food](#food))             |
 | Granary       | 20 money + 10 wood + 10 stone | Granary       | own empty land tile next to one of your farms, no enemy unit | stores unused food of adjacent farms, up to 15 per adjacent farm              |
 | University    | 40 money + 10 stone + 5 ore   | Science       | own empty land tile (no forest/mountain/water) of a level 5+ village; one per village; uses a slot | unlocks Geology, Agronomy, Engineering, Medicine; 4 money upkeep |
 

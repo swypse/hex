@@ -1638,7 +1638,7 @@ class GameController {
         this.reachableKeys = new Set(reachableTargets(this.sim.map, unit, movePoints(unit), canClimb, canDock, store.localPlayerIndex).map((t) => axialKey(t)));
       }
       if (unit && unit.owner === store.localPlayerIndex && canAttack(unit)) {
-        this.attackableKeys = new Set(attackableTargets(this.sim.map, unit, store.localPlayerIndex).map((t) => axialKey(t)));
+        this.attackableKeys = new Set(attackableTargets(this.sim.map, unit, store.localPlayerIndex, true).map((t) => axialKey(t)));
       }
     }
 

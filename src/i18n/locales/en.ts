@@ -70,6 +70,7 @@ export default {
   // Center / event messages
   'msg.tribeDied': '{tribe} died!',
   'msg.captured': '{village} is captured by {tribe}!',
+  'msg.villageCapturedYours': 'Your village is captured!',
   'msg.shipCaptured': 'Your ship is captured by pirates!',
   'msg.shipCaptureFailed': 'The attempt to capture your ship has failed',
   'msg.pirates': 'Pirates!',
@@ -713,7 +714,7 @@ export default {
   'help.building.temple.place': 'Built on an owned water tile.',
   'help.building.forestTemple.skill': 'Requires the Forest temple skill; costs {stone} stone + {money} money.',
   'help.building.forestTemple.place': 'Built on an owned forest tile.',
-  'help.building.farm.produce': 'Produces {food} food per round (+{agronomy} with Agronomy in a village with a university) for the units of its village and of villages connected to it by roads or ports. Food nobody eats is lost, unless an adjacent granary stores it. Farms produce nothing in winter.',
+  'help.building.farm.produce': 'Produces {food} food per round (+{agronomy} with Agronomy in a village with a university) for the units of its village and of villages connected to it by roads or ports. Food nobody eats is lost, unless an adjacent granary stores it. Farms produce nothing in winter, except on desert land, where a farm always gives 2 (+1 with Agronomy).',
   'help.building.farm.skill': 'Requires the Agriculture skill; costs {money} money + {wood} wood.',
   'help.building.farm.place': 'Built on an owned empty land tile (no forest, mountain or water; roads are fine).',
   'help.building.granary.store': 'Stores {food}/{cap} food ({perFarm} per adjacent farm): whatever adjacent farms produce beyond the upkeep of the connected villages. Villages short of food eat from granaries. Destroying the granary discards its food.',

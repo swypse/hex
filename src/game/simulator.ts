@@ -803,7 +803,7 @@ export class Simulator {
     if (!attacker || attacker.owner !== this.currentPlayerIndex || !canAttack(attacker)) return false;
     const target = tileAt(this.map, q, r);
     if (!target) return false;
-    if (!attackableTargets(this.map, attacker, attacker.owner).some((t) => t.q === q && t.r === r)) return false;
+    if (!attackableTargets(this.map, attacker, attacker.owner, true).some((t) => t.q === q && t.r === r)) return false;
     // Structure tiles (no standing unit) are siege targets: a catapult volley
     // removes a wall/building/bridge or downgrades a village instead of a
     // unit-vs-unit exchange.

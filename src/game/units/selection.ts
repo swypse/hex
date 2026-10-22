@@ -6,7 +6,7 @@ import { isExploredFor } from '../map/explore';
 import { movePoints as unitMovePoints, type Unit } from './units';
 import { tileMoveCost, waterRouteKeys } from './movement-cost';
 import { isMoveStealthed } from './stalker';
-import { BuildingKind, SelectionKind } from '@enums';
+import { BuildingKind, SelectionKind, UnitType } from '@enums';
 
 
 
@@ -129,8 +129,11 @@ export function reachableTargets(
       if (reached.has(ck)) continue;
       reached.add(ck);
       if (ck !== tkey(from)) result.push(cur);
-      // Movement ends at the first cell adjacent to an enemy.
-      if (isAdjacentToEnemy(map, cur, playerIndex)) continue;
+      // Movement ends at the first cell adjacent to an enemy. A rider that has just
+      // attacked stands next to its victim, but its second move is still a full
+      // one: only the cells it walks into can stop it.
+      const freeStart = ck === tkey(from) && unit.type === UnitType.RIDER && unit.hasAttacked;
+      if (!freeStart && isAdjacentToEnemy(map, cur, playerIndex)) continue;
       // A ship may never pass through land; landing tiles are terminal.
       if (canSail && !isWaterType(cur.terrain)) continue;
       // A land unit docking at its own port becomes a ship and its move ends.
@@ -260,7 +263,8 @@ function pathBetweenCost(
         }
         return path;
       }
-      if (isAdjacentToEnemy(map, cur, playerIndex)) continue;
+      // The cell the path starts from never stops it (see `reachableTargets`).
+      if (ck !== tkey(from) && isAdjacentToEnemy(map, cur, playerIndex)) continue;
       if (canSail && !isWaterType(cur.terrain)) continue;
       // A land unit docking at its own port becomes a ship and its move ends.
       if (!canSail && isOwnDock(cur, canDock, playerIndex)) continue;

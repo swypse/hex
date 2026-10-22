@@ -317,6 +317,30 @@ it('a forest tile costs 14 to leave', () => {
   });
 });
 
+describe('rider second move after an attack', () => {
+  const build = (attacked: boolean) => {
+    const unit = mkUnit(0, UnitType.RIDER, 0, 0);
+    unit.hasAttacked = attacked;
+    const enemy = mkUnit(1, UnitType.WARRIOR, 0, 1);
+    const map: GameMap = { radius: 8, tiles: [L(0, 0, { unit }), L(0, -1), L(0, -2), L(0, -3), L(0, 1, { unit: enemy })], spawns: [] };
+    return { unit, map };
+  };
+
+  it('is a full move even though it stands next to its victim', () => {
+    const { unit, map } = build(true);
+    const keys = reachableTargets(map, unit, 40).map((t) => `${t.q},${t.r}`);
+    expect(keys).toContain('0,-3');
+    expect(pathBetween(map, { q: 0, r: 0 }, { q: 0, r: -3 }, false, false, false, 0).length).toBe(3);
+  });
+
+  it('is still one step for a rider that has not attacked (it stands next to an enemy)', () => {
+    const { unit, map } = build(false);
+    const keys = reachableTargets(map, unit, 40).map((t) => `${t.q},${t.r}`);
+    expect(keys).toContain('0,-1');
+    expect(keys).not.toContain('0,-3');
+  });
+});
+
 describe('pathBetween', () => {
   it('walks around water cell by cell', () => {
     const map: GameMap = { radius: 4, tiles: [], spawns: [] };

@@ -131,6 +131,14 @@ export function isEnemySiegeTarget(t: MapTile, attackerOwner: number): boolean {
   return false;
 }
 
+/** A road or bridge on a tile nobody owns: a catapult may break it whoever built
+ *  it. (Only a player's own targeting, not the AI's: it never wrecks its own roads.) */
+export function isFreeSiegeTarget(t: MapTile): boolean {
+  if (t.ownedBy !== null && t.ownedBy !== undefined) return false;
+  if (t.settlement) return false;
+  return (t.bridge !== undefined && t.bridge !== null) || (t.roadOwner !== null && t.roadOwner !== undefined);
+}
+
 interface SiegeOutcome {
   missed: boolean;
   /** The structure destroyed on a hit: a village level, its wall, a building,
@@ -173,13 +181,14 @@ export function performSiege(catapult: Unit, target: MapTile, rng: () => number 
     target.building.hp = hp;
     return { missed: false, destroyed: null, buildingHp: hp };
   }
-  if (target.bridge !== undefined && target.bridge !== null && target.bridge.owner !== catapult.owner) {
+  const freeTile = target.ownedBy === null || target.ownedBy === undefined;
+  if (target.bridge !== undefined && target.bridge !== null && (target.bridge.owner !== catapult.owner || freeTile)) {
     target.bridge = null;
     target.roadOwner = null;
     return { missed: false, destroyed: SiegeTargetKind.BRIDGE };
   }
   // A road is hit last: a building on the same tile is destroyed first.
-  if (target.roadOwner !== null && target.roadOwner !== undefined && target.roadOwner !== catapult.owner) {
+  if (target.roadOwner !== null && target.roadOwner !== undefined && (target.roadOwner !== catapult.owner || freeTile)) {
     target.roadOwner = null;
     return { missed: false, destroyed: SiegeTargetKind.ROAD };
   }
@@ -188,7 +197,9 @@ export function performSiege(catapult: Unit, target: MapTile, rng: () => number 
   return { missed: false, destroyed: null };
 }
 
-export function attackableTargets(map: GameMap, unit: Unit, playerIndex = 0): MapTile[] {
+/** Tiles `unit` can attack. `includeFreeStructures` (a player's own targeting) also
+ *  lists roads and bridges on unowned tiles for a catapult; the AI leaves it off. */
+export function attackableTargets(map: GameMap, unit: Unit, playerIndex = 0, includeFreeStructures = false): MapTile[] {
   const result = map.tiles.filter((t) => {
     if (!t.unit) return false;
     if (t.unit.isStealthed === true) return false;
@@ -205,7 +216,7 @@ export function attackableTargets(map: GameMap, unit: Unit, playerIndex = 0): Ma
       if (t.unit) continue;
       if (hexDistance({ q: unit.q, r: unit.r }, t) > shipAttackDistance(unit)) continue;
       if (!isExploredFor(t, playerIndex)) continue;
-      if (isEnemySiegeTarget(t, unit.owner)) result.push(t);
+      if (isEnemySiegeTarget(t, unit.owner) || (includeFreeStructures && isFreeSiegeTarget(t))) result.push(t);
     }
   }
   return result;

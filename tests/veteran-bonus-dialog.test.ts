@@ -43,7 +43,7 @@ describe('VeteranBonusDialog', () => {
     useGameStore.setState({ overlay: null });
   });
 
-  it('offers +5 / +10 / +20 as an icon followed by the number', () => {
+  it('offers +5 / +10 / +10 as an icon followed by the number', () => {
     const host = { app: { screen: { width: 800, height: 600 } }, screenLayer: new Container(), overlayLayer: new Container() } as unknown as UIHost;
     const root = new Container();
     const dialog = new VeteranBonusDialog();
@@ -51,7 +51,7 @@ describe('VeteranBonusDialog', () => {
     const buttons = findAll(root, (c): c is Button => c instanceof Button);
     expect(buttons).toHaveLength(3);
     const texts = buttons.map((b) => String(findAll(b, (c): c is BitmapText => c instanceof BitmapText)[0]!.text));
-    expect(texts).toEqual(['+5', '+10', '+20']);
+    expect(texts).toEqual(['+5', '+10', '+10']);
     for (const b of buttons) {
       const sprites = findAll(b, (c): c is Sprite => c instanceof Sprite);
       expect(sprites).toHaveLength(1);

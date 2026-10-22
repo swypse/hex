@@ -431,6 +431,52 @@ export class EventEffects {
     ticker.add(fn);
   }
 
+  /** An arrow tooltip (like the context menu) above the top corner of `tile`,
+   *  showing `text` for `ms`. It follows the cell through camera pan and zoom. */
+  spawnTooltipAbove(tile: MapTile, text: string, ms: number): void {
+    const app = this.host.app();
+    const mapView = this.host.mapView();
+    if (!app || !mapView) return;
+    const overlay = mapView.overlay;
+    const mapRoot = mapView.container;
+    const world = hexToPixel(tile, HEX_SIZE);
+    const anchor = { x: world.x, y: world.y - tileElevation(tile, HEX_SIZE) - HEX_SIZE };
+    const label = makeLabel(text, { fontSize: FontSize.SMALL, fill: THEME.white });
+    const padX = 10;
+    const padY = 8;
+    const triH = 6;
+    const triW = 12;
+    const w = label.width + padX * 2;
+    const h = label.height + padY * 2;
+    const el = new Container();
+    el.zIndex = 1000;
+    const body = new Graphics();
+    body.roundRect(-w / 2, -h - triH, w, h, 6).fill({ color: 0x000000, alpha: 0.92 });
+    body.poly([-triW / 2, -triH, triW / 2, -triH, 0, 0]).fill({ color: 0x000000, alpha: 0.92 });
+    label.anchor.set(0.5, 0.5);
+    label.position.set(0, -triH - h / 2);
+    el.addChild(body, label);
+    overlay.addChild(el);
+    const start = performance.now();
+    const ticker = app.ticker;
+    const fn = (): void => {
+      if (el.destroyed) {
+        ticker.remove(fn);
+        return;
+      }
+      const pos = overlay.toLocal(anchor, mapRoot);
+      el.position.set(pos.x, pos.y);
+      markDirty();
+      if (performance.now() - start >= ms) {
+        ticker.remove(fn);
+        el.parent?.removeChild(el);
+        el.destroy({ children: true });
+      }
+    };
+    ticker.add(fn);
+    fn();
+  }
+
   spawnFogReveal(tile: MapTile): void {
     const app = this.host.app();
     const mapRoot = this.host.mapRoot();

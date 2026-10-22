@@ -1,3 +1,4 @@
+import { TileType } from '../map/tile-types';
 import { axialKey, hexNeighbors } from '../map/hex';
 import { BUILDING_COSTS, buildingIncome } from './buildings';
 import { tileHasUniversity } from './village';
@@ -14,6 +15,8 @@ import { tileMapByKey } from '../map/tile-index';
 
 /** Food a farm yields at the end of each round. */
 export const FARM_FOOD = 3;
+/** A farm on desert land always yields this much (plus the Agronomy bonus): every season, drought included. */
+export const DESERT_FARM_FOOD = 2;
 /** Extra food Agronomy gives a farm in a village with a university, and what such a farm yields in winter. */
 export const AGRONOMY_FOOD = 1;
 export const AGRONOMY_WINTER_FOOD = 1;
@@ -34,12 +37,13 @@ const UNIT_FEED_PRIORITY: UnitType[] = [
   UnitType.SHIELD, UnitType.RIDER, UnitType.ARCHER, UnitType.WARRIOR, UnitType.PIRATE,
 ];
 
-/** Farm yield per round: nothing while burning or in winter, otherwise 3 (+1 with Agronomy in a
+/** Farm yield per round: nothing while burning; a flat 2 (+1 with Agronomy) on desert land; otherwise nothing in winter, else 3 (+1 with Agronomy in a
  *  village with a university), halved (rounded up) for a farm inside a drought. */
 export function farmYield(owner: Player | null | undefined, map?: Pick<GameMap, 'season' | 'weather'> & Partial<Pick<GameMap, 'tiles'>>, farm?: MapTile): number {
   if (farm?.fire) return 0;
   // Agronomy: a farm in a village with a university yields 1 more, and 1 in winter.
   const agronomy = !!owner && !!farm && !!map?.tiles && hasSkill(owner, SkillId.AGRONOMY) && tileHasUniversity({ tiles: map.tiles }, farm);
+  if (farm?.terrain === TileType.DesertLand) return DESERT_FARM_FOOD + (agronomy ? AGRONOMY_FOOD : 0);
   if (map?.season === Season.WINTER) return agronomy ? AGRONOMY_WINTER_FOOD : 0;
   const normal = FARM_FOOD + (agronomy ? AGRONOMY_FOOD : 0);
   // A drought halves the farms inside it.

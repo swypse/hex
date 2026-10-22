@@ -1,6 +1,6 @@
 import { type GameMap, type MapTile } from '../map/map-gen';
 import { type Player } from '../players';
-import { payAt } from '../economy/stock';
+import { canAffordAt, payAt } from '../economy/stock';
 import { hasSkill } from '../skills';
 import { makeUnit, unitSpawnCost } from './units';
 import { unitsInVillage, villageCapacity } from '../economy/village';
@@ -9,7 +9,15 @@ import { SkillId, UnitType } from '@enums';
 
 let spawnSeq = 0;
 
-export function spawnUnit(
+/** Whether `player` may raise a `type` unit on `villageTile` right now: own village,
+ *  free and with room, skill and tribe gates, and the price covered. `spawnUnit`
+ *  applies exactly these rules. */
+export function canSpawnType(map: GameMap, villageTile: MapTile, type: UnitType, player: Player): boolean {
+  if (!spawnAllowed(map, villageTile, type, player)) return false;
+  return canAffordAt(map, player, villageTile, unitSpawnCost(type));
+}
+
+function spawnAllowed(
   map: GameMap,
   villageTile: MapTile,
   type: UnitType,
@@ -32,6 +40,16 @@ export function spawnUnit(
   } else if (Object.values(TRIBE_SPECIAL_UNIT).includes(type)) {
     return false;
   }
+  return true;
+}
+
+export function spawnUnit(
+  map: GameMap,
+  villageTile: MapTile,
+  type: UnitType,
+  player: Player,
+): boolean {
+  if (!spawnAllowed(map, villageTile, type, player)) return false;
   const cost = unitSpawnCost(type);
   if (!payAt(map, player, villageTile, cost)) return false;
 

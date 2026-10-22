@@ -23,7 +23,7 @@ import { waterRouteEdges, portWaterClusterJumps } from '../game/economy/water-ro
 import { tileElevation } from './elevation';
 import { DamageBadgeLayer } from './damage-badge';
 import { FireEffects } from './fire';
-import { spawnStormEffect } from './storm-effect';
+import { LoopingWeatherEffect, spawnStormEffect } from './storm-effect';
 import { roadStripOutline } from './road-path';
 import { IMAGE_H, IMAGE_HEX_CENTER_Y, IMAGE_HEX_W, type TextureSet, type TileTexture } from './texture-factory';
 import { villageTextureFor, villageOwnerTribe } from './village-texture';
@@ -37,7 +37,7 @@ import { unitGlowColor } from './unit-glow-color';
 import { weatherOverlayAt } from '../game/weather/weather';
 import { HP_BAR_BOX_TOP, HP_BAR_ICON_GAP } from './hp-bar-layout';
 import { icons32FrameTexture, makeIcon32 } from '../gfx/icons32';
-import { BuildingKind, FontSize, HpBarSide, PortDirection, Season, SelectionKind, UnitFacing, UnitType } from '@enums';
+import { BuildingKind, FontSize, HpBarSide, PortDirection, Season, SelectionKind, UnitFacing, UnitType, WeatherEffectKind, WeatherType } from '@enums';
 import { tileMapByKey } from '../game/map/tile-index';
 
 /** Diameter of a pirate-deal dot (screen px; the row does not scale with zoom). */
@@ -164,6 +164,10 @@ export class MapView {
   private exclamationAnimRemove: (() => void) | null = null;
   /** Fire particles over enemy-occupied villages (owned component). */
   readonly fireEffects: FireEffects;
+  /** Looping rain and foam over the water of active weather storms. */
+  private stormWeather!: LoopingWeatherEffect;
+  /** Looping rising heat lines over the land of active droughts. */
+  private droughtWeather!: LoopingWeatherEffect;
   private stopTutorialMarkers: (() => void) | null = null;
   private tutorialMarkerParts: { g: Graphics; points: { x: number; y: number }[] }[] = [];
   private attackPulseParts: { g: Graphics; x: number; y: number; base: number }[] = [];
@@ -231,6 +235,9 @@ export class MapView {
   ) {
     this.container = new Container();
     this.container.sortableChildren = true;
+    const weatherClock = { now: () => this.animNow(), isPaused: () => this.cameraBusy };
+    this.stormWeather = new LoopingWeatherEffect(app, this.container, hexSize, weatherClock, WeatherEffectKind.STORM);
+    this.droughtWeather = new LoopingWeatherEffect(app, this.container, hexSize, weatherClock, WeatherEffectKind.DROUGHT);
     this.overlay = new Container();
     this.overlay.sortableChildren = true;
     this.fireEffects = new FireEffects({
@@ -302,6 +309,8 @@ export class MapView {
     for (const tv of this.tileViews.values()) {
       if (tv.villageSprite) releaseVillageBuildTexture(tv.villageSprite.texture);
     }
+    this.stormWeather.destroy();
+    this.droughtWeather.destroy();
     this.container.destroy({ children: true });
     this.overlay.destroy({ children: true });
     this.markerLayer.destroy({ children: true });
@@ -378,6 +387,8 @@ export class MapView {
     const granaryLabels: { tile: MapTile; owner: number; world: { x: number; y: number } }[] = [];
     const exclamations: { el: Container; world: { x: number; y: number } }[] = [];
     const shipBobs: BobEntry[] = [];
+    const stormCells: { x: number; y: number; key: string }[] = [];
+    const droughtCells: { x: number; y: number; key: string }[] = [];
 
     for (const tile of map.tiles) {
       const tv = this.tileViews.get(axialKey(tile))!;
@@ -390,6 +401,11 @@ export class MapView {
       const p = hexToPixel(tile, this.hexSize);
       const y = p.y - tileElevation(tile, this.hexSize);
       const explored = isExploredFor(tile, localPlayerIndex);
+      if (explored) {
+        const weatherHere = weatherOverlayAt(map, tile);
+        if (weatherHere === WeatherType.STORM) stormCells.push({ x: p.x, y: p.y, key: axialKey(tile) });
+        else if (weatherHere === WeatherType.DROUGHT) droughtCells.push({ x: p.x, y: p.y, key: axialKey(tile) });
+      }
 
       if (tile.unit && !hiddenUnitIds.has(tile.unit.id) && explored && !(tile.unit.owner !== localPlayerIndex && tile.unit.isStealthed === true)) {
         const unit = tile.unit;
@@ -518,6 +534,8 @@ export class MapView {
       this.overlay.addChild(ex.el);
       this.overlayItems.push({ el: ex.el, world: ex.world });
     }
+    this.stormWeather.set(stormCells);
+    this.droughtWeather.set(droughtCells);
     this.drawHighlights(map, selection, reachableKeys, attackableKeys, reachableColor, localPlayerIndex, tutorialMarkerKeys, localTurn, placementKeys, pickedKey);
     this.shipBobs = shipBobs;
     this.startShipBob();
@@ -1743,6 +1761,7 @@ export class MapView {
       this.container,
       tiles.map((t) => ({ ...hexToPixel(t, this.hexSize), ring: hexDistance(origin, t) })),
       this.hexSize,
+      { now: () => this.animNow(), isPaused: () => this.cameraBusy },
     );
     this.runHexBounce(entries);
   }

@@ -18,6 +18,8 @@ import { makeIcon } from '../kit/icon';
 import { type UIHost, type Widget } from '../host';
 import { toolbarSpecs } from './toolbar-specs';
 import { suggestedSkillActions } from './suggested-skills';
+import { canSpawnType } from '../../game/units/spawn';
+import { spawnableTypesFor } from '../overlays/spawn-dialog';
 import { BuildingKind, FontSize } from '@enums';
 
 const BUILD_KEYS = new Set<string>([...Object.values(BuildingKind), 'road', 'bridge', 'build']);
@@ -38,6 +40,10 @@ const INFO_HEIGHT = 20;
 const ANIM_MS = 80;
 
 interface MenuItem {
+  /** Identifies the item in the rebuild key (items of equal count but different kinds). */
+  id?: string;
+  /** Draw the icon clipped to a circle with a thin ring. */
+  round?: boolean;
   icon: Container;
   disabled: boolean;
   onClick: () => void;
@@ -125,7 +131,23 @@ export class HudContextMenu implements Widget {
         },
       }];
     });
+    // Top row: every unit this village can raise right now; a tap spawns it.
+    const spawn: MenuItem[] = tile.settlement?.owner === human.index
+      ? spawnableTypesFor(human)
+          .filter((type) => canSpawnType(map, tile, type, human))
+          .map((type) => ({
+            id: type,
+            round: true,
+            icon: makeActionButtonIcon(`action-spawn-${type}`, ICON_SIZE),
+            disabled: false,
+            onClick: () => {
+              close();
+              gameController.actions.spawnSelectedVillage(type);
+            },
+          }))
+      : [];
     const rows: MenuRow[] = [];
+    if (spawn.length > 0) rows.push({ label: '', items: spawn });
     if (build.length > 0) rows.push({ label: t('menu.build'), items: build });
     if (skills.length > 0) rows.push({ label: t('menu.openSkill'), items: skills });
     return { info: this.info(map, tile, human), rows };
@@ -148,7 +170,7 @@ export class HudContextMenu implements Widget {
       this.dismiss();
       return;
     }
-    const key = `${open.q},${open.r}|${info.map((i) => i.icon + i.text).join(',')}|${rows.map((r) => r.items.map((i) => (i.disabled ? 'x' : 'o')).join('') + r.items.length).join('/')}`;
+    const key = `${open.q},${open.r}|${info.map((i) => i.icon + i.text).join(',')}|${rows.map((r) => r.items.map((i) => `${i.id ?? ''}${i.disabled ? 'x' : 'o'}`).join('') + r.items.length).join('/')}`;
     if (this.current?.key === key) {
       rows.forEach((r) => r.items.forEach((i) => i.icon.destroy()));
       return;
@@ -161,7 +183,9 @@ export class HudContextMenu implements Widget {
     if (!this.root) return;
     const labels = rows.map((row) => makeLabel(row.label, { fontSize: FontSize.VERY_SMALL, fill: THEME.white }));
     const labelW = Math.max(0, ...labels.map((l) => l.width));
-    const rowW = Math.max(0, ...rows.map((row) => row.items.length * ICON_SIZE + (row.items.length - 1) * ICON_GAP));
+    // A row without a label (the spawn icons) starts at the left edge.
+    const rowStart = (row: MenuRow): number => (row.label ? labelW + LABEL_GAP : 0);
+    const rowsW = Math.max(0, ...rows.map((row) => rowStart(row) + row.items.length * ICON_SIZE + (row.items.length - 1) * ICON_GAP));
     // Income line: icon + value pairs, left to right.
     const infoEl = new Container();
     let ix = 0;
@@ -175,7 +199,6 @@ export class HudContextMenu implements Widget {
       ix += INFO_ICON + 4 + text.width + INFO_GAP;
     }
     const infoW = info.length > 0 ? ix - INFO_GAP : 0;
-    const rowsW = rows.length > 0 ? labelW + LABEL_GAP + rowW : 0;
     const w = PAD_X * 2 + Math.max(infoW, rowsW);
     const infoH = info.length > 0 ? INFO_HEIGHT + (rows.length > 0 ? ROW_GAP : 0) : 0;
     const rowsH = rows.length > 0 ? rows.length * ICON_SIZE + (rows.length - 1) * ROW_GAP : 0;
@@ -197,9 +220,15 @@ export class HudContextMenu implements Widget {
       el.addChild(label);
       row.items.forEach((item, j) => {
         const btn = new Container();
-        btn.position.set(PAD_X + labelW + LABEL_GAP + j * (ICON_SIZE + ICON_GAP), y);
+        btn.position.set(PAD_X + rowStart(row) + j * (ICON_SIZE + ICON_GAP), y);
         item.icon.position.set(ICON_SIZE / 2, ICON_SIZE / 2);
+        if (item.round) {
+          const clip = new Graphics().circle(ICON_SIZE / 2, ICON_SIZE / 2, ICON_SIZE / 2).fill(0xffffff);
+          item.icon.mask = clip;
+          btn.addChild(clip);
+        }
         btn.addChild(item.icon);
+        if (item.round) btn.addChild(new Graphics().circle(ICON_SIZE / 2, ICON_SIZE / 2, ICON_SIZE / 2 - 0.5).stroke({ width: 1.5, color: 0xffffff, alpha: 0.8 }));
         btn.hitArea = new Rectangle(0, 0, ICON_SIZE, ICON_SIZE);
         btn.alpha = item.disabled ? 0.5 : 1;
         if (!item.disabled) {

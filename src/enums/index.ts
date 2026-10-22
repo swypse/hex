@@ -33,6 +33,7 @@ export * from './font-size.enum';
 export * from './food-pressure.enum';
 export * from './game-event-type.enum';
 export * from './hp-bar-side.enum';
+export * from './weather-effect-kind.enum';
 export * from './game-mode.enum';
 export * from './garrison-guard-kind.enum';
 export * from './help-building.enum';
