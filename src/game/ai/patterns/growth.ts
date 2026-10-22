@@ -14,6 +14,7 @@ import { isShip } from '../../units/ship';
 import { TRIBE_SPECIAL_UNIT } from '../../tribes';
 import { stormTargetShips } from '../../units/storm';
 import { bestLightningVillage } from '../ai-lightning';
+import { stormReady } from '../../units/storm';
 import { LIGHTNING_COST, lightningReady } from '../../units/lightning';
 import { flagsFor } from '../ai-flags';
 import { eatsFarmMaterials } from '../../economy/food';
@@ -181,7 +182,7 @@ export const GROWTH_PATTERNS: AiPattern[] = [
         const u = t.unit;
         if (!u || u.owner !== player.index) continue;
         const idle = !u.hasMoved && !u.hasAttacked && !u.hasHealed;
-        if (u.type === UnitType.STORMCALLER && idle && stormTargetShips(map, u).length > 0) {
+        if (u.type === UnitType.STORMCALLER && idle && stormReady(player, turn ?? 0) && stormTargetShips(map, u).length > 0) {
           return [{ type: AiActionType.STORM, unitId: u.id }];
         }
       }

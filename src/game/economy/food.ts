@@ -34,9 +34,10 @@ const UNIT_FEED_PRIORITY: UnitType[] = [
   UnitType.SHIELD, UnitType.RIDER, UnitType.ARCHER, UnitType.WARRIOR, UnitType.PIRATE,
 ];
 
-/** Farm yield per round: nothing in winter, otherwise 3 (+1 with Agronomy in a
+/** Farm yield per round: nothing while burning or in winter, otherwise 3 (+1 with Agronomy in a
  *  village with a university), halved (rounded up) for a farm inside a drought. */
 export function farmYield(owner: Player | null | undefined, map?: Pick<GameMap, 'season' | 'weather'> & Partial<Pick<GameMap, 'tiles'>>, farm?: MapTile): number {
+  if (farm?.fire) return 0;
   // Agronomy: a farm in a village with a university yields 1 more, and 1 in winter.
   const agronomy = !!owner && !!farm && !!map?.tiles && hasSkill(owner, SkillId.AGRONOMY) && tileHasUniversity({ tiles: map.tiles }, farm);
   if (map?.season === Season.WINTER) return agronomy ? AGRONOMY_WINTER_FOOD : 0;

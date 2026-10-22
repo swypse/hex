@@ -1,6 +1,6 @@
 import { buildPlayers } from '@/game/players';
 import { Simulator } from '@/game/simulator';
-import { stormDamage } from '@/game/units/storm';
+import { STORM_COOLDOWN_TURNS, STORM_DAMAGE_MAX, STORM_DAMAGE_MIN, STORM_RADIUS, stormEligible, stormReady, stormTurnsLeft, stormWaterTiles } from '@/game/units/storm';
 import { TileType } from '@/game/map/tile-types';
 import { Tribe } from '@/game/tribes';
 import { type Unit } from '@/game/units/units';
@@ -59,12 +59,35 @@ function ship(owner: number, q: number, r: number): Unit {
 }
 
 describe('stormcaller storm', () => {
-  it('is refused without a village, and refused on an unowned tile', () => {
-    const stormcaller = place(0, UnitType.STORMCALLER, 2, 0); // land, no village claims it
+  it('recharges for 3 turns after a cast, for the whole tribe', () => {
+    const a = place(0, UnitType.STORMCALLER, 1, 0);
+    const b = place(0, UnitType.STORMCALLER, 0, -1);
+    expect(sim.applyCommand({ type: CommandType.STORM, unitId: a.id })).toBe(true);
+    expect(sim.players[0]!.stormReadyTurn).toBe(sim.turn + STORM_COOLDOWN_TURNS);
+    expect(stormTurnsLeft(sim.players[0]!, sim.turn)).toBe(STORM_COOLDOWN_TURNS);
+    expect(sim.applyCommand({ type: CommandType.STORM, unitId: b.id })).toBe(false);
+    expect(stormReady(sim.players[0]!, sim.turn + STORM_COOLDOWN_TURNS - 1)).toBe(false);
+    expect(stormReady(sim.players[0]!, sim.turn + STORM_COOLDOWN_TURNS)).toBe(true);
+  });
+
+  it('is refused when no water is within the storm radius', () => {
+    for (const t of sim.map.tiles) t.terrain = TileType.GrasslandLand;
+    const stormcaller = place(0, UnitType.STORMCALLER, 2, 0);
     expect(sim.applyCommand({ type: CommandType.STORM, unitId: stormcaller.id })).toBe(false);
   });
 
-  it('strikes enemy and pirate ships on the village water tiles only, not own ships nor other village water', () => {
+  it('works on any tile, owned or not, and covers only water within the radius', () => {
+    const big = makeTestMap(8);
+    for (const t of big.tiles) t.terrain = TileType.Water;
+    const caller = makeUnit('sc', 0, UnitType.STORMCALLER, 0, 0);
+    tileAt(big, 0, 0)!.unit = caller;
+    const tiles = stormWaterTiles(big, caller);
+    expect(tiles.length).toBe(1 + 3 * STORM_RADIUS * (STORM_RADIUS + 1));
+    expect(tiles.every((t) => Math.max(Math.abs(t.q), Math.abs(t.r), Math.abs(t.q + t.r)) <= STORM_RADIUS)).toBe(true);
+    expect(stormEligible(big, caller)).toBe(true);
+  });
+
+  it('strikes enemy and pirate ships on water in range whoever owns it, not own ships', () => {
     const stormcaller = place(0, UnitType.STORMCALLER, 1, 0);
     tileAt(map, 1, 0)!.ownedBy = 0;
     tileAt(map, 1, 0)!.claimedByVillage = { q: 0, r: 0 };
@@ -80,10 +103,13 @@ describe('stormcaller storm', () => {
     const otherShip = ship(1, 0, 1); // village B water (0,1) claimed by (-1,0)
     const ok = sim.applyCommand({ type: CommandType.STORM, unitId: stormcaller.id });
     expect(ok).toBe(true);
-    expect(findUnit(enemyShip.id).hp).toBe(200 - stormDamage());
+    const lost = (id: string): number => 200 - findUnit(id).hp;
+    expect(lost(enemyShip.id)).toBeGreaterThanOrEqual(STORM_DAMAGE_MIN);
+    expect(lost(enemyShip.id)).toBeLessThanOrEqual(STORM_DAMAGE_MAX);
     expect(findUnit(ownShip.id).hp).toBe(200); // own ship untouched
-    expect(findUnit(pirateShip.id).hp).toBe(200 - stormDamage()); // pirate reduced too
-    expect(findUnit(otherShip.id).hp).toBe(200); // other village untouched
+    expect(lost(pirateShip.id)).toBeGreaterThanOrEqual(STORM_DAMAGE_MIN); // pirate reduced too
+    expect(lost(pirateShip.id)).toBeLessThanOrEqual(STORM_DAMAGE_MAX);
+    expect(lost(otherShip.id)).toBeGreaterThanOrEqual(STORM_DAMAGE_MIN); // ownership of the water does not matter
     expect(findUnit(stormcaller.id).hasMoved).toBe(true);
     expect(findUnit(stormcaller.id).hasAttacked).toBe(true);
   });
@@ -92,6 +118,7 @@ describe('stormcaller storm', () => {
     const stormcaller = place(0, UnitType.STORMCALLER, 1, 1, { shipLevel: 1 });
     const enemyShip = ship(1, 1, -1); // another village-A water tile
     expect(sim.applyCommand({ type: CommandType.STORM, unitId: stormcaller.id })).toBe(true);
-    expect(findUnit(enemyShip.id).hp).toBe(110);
+    expect(200 - findUnit(enemyShip.id).hp).toBeGreaterThanOrEqual(STORM_DAMAGE_MIN);
+    expect(200 - findUnit(enemyShip.id).hp).toBeLessThanOrEqual(STORM_DAMAGE_MAX);
   });
 });

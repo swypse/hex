@@ -127,7 +127,7 @@ A unit's **3rd kill** (counter-attacks, storms and pirate kills count) makes it 
 star (`★ N/M`) and its owner picks a permanent bonus in a dialog that cannot be dismissed: **+5 attack**, **+10 max HP**
 (refilled) or **+20 move points** (not aboard a ship). A 3rd kill on an enemy's turn opens the dialog at the start of the
 owner's turn. AI picks at once: shields, banners, builders and stalkers take HP, riders move points, others attack.
-Pirates never become veterans.
+Pirates and tribe special units (builder, banner, berserker, stalker, trapper, stormcaller, stunner) never become veterans.
 
 ## Unit actions
 
@@ -140,7 +140,7 @@ Pirates never become veterans.
 - **Attack** — once per turn on an enemy within range. Force-ratio formula (`COMBAT_SCALE` 1.5):
   `attackForce = attack × hp / maxHp`; `defenseForce = defense × hp / maxHp × defenseBonus`;
   damage = `round(attackForce / (attackForce + defenseForce) × attack × 1.5)`.
-  - `defenseBonus = 1 + reduction / 10`: own village +6 (×1.6), a wall adds +3 (×1.9); with 3+ own water temples ships
+  - `defenseBonus = 1 + reduction / 10`: own village +8 (×1.8), a wall adds +3 (×2.1); with 3+ own water temples ships
     get +10 (×2.0), with 3+ forest temples units on forest tiles get +10.
   - Each attack has a 10% miss chance (5% with *Science*); a miss still uses the attack.
   - A surviving target in range counter-attacks with
@@ -160,7 +160,7 @@ Pirates never become veterans.
 
 - **Spawning** — pay the unit's cost in an owned village; blocked if the village tile is occupied or the village's unit
   capacity (`1 + level`) is full.
-- **Upgrade** — `2×level` wood + `level` stone + `2×level` money (level 1: 2 wood + 1 stone + 2 money). Raises income and
+- **Upgrade** — `2×k` wood + `k` stone + `2×k` money with `k = level × 1.15^(level-1)`, rounded (level 1: 2 wood + 1 stone + 2 money; level 2: 5 wood / 2 stone / 5 money; level 5: 17/9/17; level 10: 70/35/70; level 25: ~1431/716/1431, unreachable in a normal game). Raises income and
   capacity; works while an enemy unit stands on the village. Some upgrades let the player pick a bonus:
   - level 5 → 6: **expand territory** (+1 radius) or **+5 money** (territory stays);
   - level 9 → 10: **expand territory** or a **veteran swordsman**;

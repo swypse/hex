@@ -8,7 +8,7 @@ import { tribeById } from '../game/tribes';
 import { resourceTokens } from '../game/economy/resources';
 import { canAttack, canMove, HEAL_AMOUNT, PIRATE_HP, PIRATE_OWNER, type Unit, UNIT_TYPES } from '../game/units/units';
 import { isWaterType } from '../game/map/tile-types';
-import { claimingVillage, villageWaterTiles } from '../game/units/storm';
+import { stormWaterTiles } from '../game/units/storm';
 import { isExploredFor } from '../game/map/explore';
 import { axialKey, hexDistance, hexToPixel, tilesInRange, type Axial } from '../game/map/hex';
 import { compassDirection, weatherCopies, type WeatherBuildingHit, type WeatherEvent, type WeatherUnitHit } from '../game/weather/weather';
@@ -453,8 +453,15 @@ export class EventPresenter {
           }
           case GameEventType.TRAP_TRIGGERED: {
             this.host.render();
-            const t = tileAt(sim.map, e.q, e.r);
-            if (t) this.effects.spawnHpText(t, `-${e.damage}`, 0xff6666);
+            const trapTile = tileAt(sim.map, e.q, e.r);
+            if (trapTile) {
+              this.effects.spawnHpText(trapTile, `-${e.damage}`, 0xff6666);
+              if (isExploredFor(trapTile, local)) this.effects.spawnRays(trapTile, RAYS_DAMAGE_COLOR);
+            }
+            // attackerIndex is the player whose move set the trap off.
+            if (e.attackerIndex === local) {
+              useGameStore.getState().setCenterMessage(t('msg.trapTriggered'));
+            }
             break;
           }
           case GameEventType.STORM: {
@@ -465,12 +472,9 @@ export class EventPresenter {
             // its first tick.
             this.host.render();
             const stormcaller = tileAt(sim.map, e.q, e.r);
-            if (stormcaller) {
-              const village = claimingVillage(sim.map, stormcaller);
-              const mapView = this.host.mapView();
-              if (village && mapView) {
-                mapView.stormWaterPulse(villageWaterTiles(sim.map, village), { q: e.q, r: e.r });
-              }
+            const mapView = this.host.mapView();
+            if (stormcaller?.unit && mapView) {
+              mapView.stormWaterPulse(stormWaterTiles(sim.map, stormcaller.unit), { q: e.q, r: e.r });
             }
             for (const target of e.targets) {
               const t = tileAt(sim.map, target.q, target.r);
@@ -531,7 +535,7 @@ export class EventPresenter {
             break;
           }
           case GameEventType.WEATHER_STARTED:
-            await this.presentWeatherStarted(e.weather);
+            await this.presentWeatherStarted(e.weather, this.lightningVictims(events, i, e.weather));
             break;
           case GameEventType.WEATHER_ENDED:
             await this.presentWeatherEnded(e.weather);
@@ -1315,7 +1319,32 @@ export class EventPresenter {
     if (sim) useGameStore.getState().setWeather(weatherCopies(sim.map));
   }
 
-  private async presentWeatherStarted(weather: WeatherEvent): Promise<void> {
+  /** Units this strike kills, as they were before it: they stay on the map until the bolt has been drawn. */
+  private lightningVictims(events: GameEvent[], index: number, weather: WeatherEvent): Map<string, Unit> {
+    const out = new Map<string, Unit>();
+    if (weather.type !== WeatherType.LIGHTNING) return out;
+    const sim = this.host.sim();
+    const local = useGameStore.getState().localPlayerIndex;
+    if (!sim) return out;
+    for (const next of events.slice(index + 1)) {
+      if (next.type !== GameEventType.WEATHER_DAMAGE || next.weather.id !== weather.id) continue;
+      for (const hit of next.units) {
+        const tile = tileAt(sim.map, hit.q, hit.r);
+        if (!hit.died || !tile || tile.unit || !isExploredFor(tile, local)) continue;
+        const info = UNIT_TYPES[hit.type];
+        out.set(axialKey(hit), {
+          id: hit.unitId, owner: hit.owner, type: hit.type, q: hit.q, r: hit.r,
+          hasMoved: false, hasAttacked: false, hasHealed: false,
+          hp: hit.hpBefore, attack: info.attack, attackDistance: info.attackDistance,
+          spawnVillage: null, shipLevel: hit.shipLevel,
+        });
+      }
+      break;
+    }
+    return out;
+  }
+
+  private async presentWeatherStarted(weather: WeatherEvent, victims: Map<string, Unit> = new Map()): Promise<void> {
     const sim = this.host.sim();
     if (!sim) return;
     this.syncWeatherStore();
@@ -1326,9 +1355,16 @@ export class EventPresenter {
     let shakeMs = 0;
     if (weather.type === WeatherType.LIGHTNING) {
       const strikeTile = tileAt(sim.map, weather.q, weather.r);
-      if (strikeTile && isExploredFor(strikeTile, local)) {
+      if (strikeTile) {
+        // The sim has already removed the dead: keep them drawn until the bolt lands.
+        const mapView = this.host.mapView();
+        if (victims.size > 0) {
+          mapView?.setUnitOverrides(victims);
+          this.host.render();
+        }
         await this.host.centerOnCell(weather.q, weather.r);
         await this.effects.playLightning(strikeTile);
+        mapView?.setUnitOverrides(null);
       }
       this.host.render();
     }

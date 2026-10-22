@@ -1,5 +1,5 @@
 import { Application, BitmapText, Circle, Container, Graphics, ImageSource, Sprite, Texture } from 'pixi.js';
-import { FONT_REGULAR } from '../gfx/bitmap-fonts';
+import { FONT_BLACK, FONT_REGULAR } from '../gfx/bitmap-fonts';
 import {
   axialKey, compareTileY, hexCorners, hexDistance, hexEdge, hexEdgeNeighbor, hexNeighbors, hexToPixel, splitHexBorder
 } from '../game/map/hex';
@@ -23,11 +23,12 @@ import { waterRouteEdges, portWaterClusterJumps } from '../game/economy/water-ro
 import { tileElevation } from './elevation';
 import { DamageBadgeLayer } from './damage-badge';
 import { FireEffects } from './fire';
+import { spawnStormEffect } from './storm-effect';
 import { roadStripOutline } from './road-path';
 import { IMAGE_H, IMAGE_HEX_CENTER_Y, IMAGE_HEX_W, type TextureSet, type TileTexture } from './texture-factory';
 import { villageTextureFor, villageOwnerTribe } from './village-texture';
 import { acquireVillageBuildTexture, releaseVillageBuildTexture } from './village-build-texture';
-import { tileSignature, tileInView, granaryFarmCount, type Viewport } from './tile-signature';
+import { tileSignature, tileInView, granaryFarmCount, farmIsIdle, type Viewport } from './tile-signature';
 import { t } from '../i18n';
 import { Tooltip } from '../gfx/tooltip';
 import { THEME } from '../gfx/theme';
@@ -169,6 +170,8 @@ export class MapView {
    *  a farm built/destroyed next to it swaps its texture. */
   private granaryFarms = new Map<string, number>();
   private granaryBounceKeys = new Set<string>();
+  /** A granary texture-change bounce is playing: a selection change must not cut it short. */
+  private granaryBounceActive = false;
   private hexBounceSprites: { obj: Sprite | Graphics; baseY: number; delay: number; ampScale?: number }[] = [];
   /** The current selected-hex border parts (top in the tile el, bottom in the
    *  container); they bounce together with the hex on selection. */
@@ -373,7 +376,7 @@ export class MapView {
     for (const tile of map.tiles) {
       const tv = this.tileViews.get(axialKey(tile))!;
       tv.el.visible = tileInView(tile, this.hexSize, viewport);
-      const sig = tileSignature(tile, map, localPlayerIndex, hiddenUnitIds, this.knownOwners, this.tileIndex, this.waterRouteNeighbors);
+      const sig = tileSignature(tile, map, localPlayerIndex, hiddenUnitIds, this.knownOwners, this.tileIndex, this.waterRouteNeighbors, players);
       if (sig !== tv.signature) {
         tv.signature = sig;
         this.applyTile(tv, tile, players, localPlayerIndex, hiddenUnitIds);
@@ -722,7 +725,7 @@ export class MapView {
     }
 
     const buildingIsPort = tile.building !== null && tile.building.kind === BuildingKind.PORT;
-    const buildingTileTex = tile.building !== null && !buildingIsPort ? this.buildingTexture(tile) : null;
+    const buildingTileTex = tile.building !== null && !buildingIsPort ? this.buildingTexture(tile, players) : null;
     const portTex = buildingIsPort ? this.portTileTexture(tile) : null;
     this.syncSprite(tv, 'buildingSprite', tile.building
       ? buildingIsPort
@@ -966,15 +969,15 @@ export class MapView {
   }
 
   /** Sprite texture of a non-port building. */
-  private buildingTexture(tile: MapTile): TileTexture {
+  private buildingTexture(tile: MapTile, players: Player[]): TileTexture {
     const b = tile.building!;
     const tx = this.textures;
     switch (b.kind) {
       case BuildingKind.SAWMILL:
         return tx.sawmillTexture;
       case BuildingKind.FARM:
-        // A farm that yields nothing (winter) uses the pre-baked black-and-white texture.
-        return this.map?.season === Season.WINTER ? tx.farmIdleTexture : tx.farmTexture;
+        // A farm that yields nothing uses the pre-baked black-and-white texture.
+        return this.map && farmIsIdle(this.map, tile, players) ? tx.farmIdleTexture : tx.farmTexture;
       case BuildingKind.GRANARY:
         return tx.granaryTextures[granaryFarmCount(this.map!, tile)]!;
       case BuildingKind.TEMPLE:
@@ -1481,7 +1484,9 @@ export class MapView {
     const key = selection ? axialKey(selection) : '';
     if (key === this.lastBouncedKey) return;
     this.lastBouncedKey = key;
-    this.stopHexBounce();
+    // Building the farm usually deselects the builder right after the render that
+    // changed the granary: do not cancel its bounce just for clearing the selection.
+    if (!(this.granaryBounceActive && !key)) this.stopHexBounce();
     if (!key) return;
     const tv = this.tileViews.get(key);
     if (!tv) return;
@@ -1558,7 +1563,9 @@ export class MapView {
       for (const sprite of this.hexSurfaceSprites(tv)) entries.push({ obj: sprite, baseY: sprite.position.y, delay: 0 });
     }
     this.granaryBounceKeys.clear();
-    if (entries.length > 0) this.runHexBounce(entries);
+    if (entries.length === 0) return;
+    this.runHexBounce(entries);
+    this.granaryBounceActive = true;
   }
 
   /** Village upgrade: the hex dips down, rises above its start, then settles back. */
@@ -1723,6 +1730,12 @@ export class MapView {
       const delay = Math.max(0, hexDistance(origin, tile) - 1) * 80;
       for (const s of sprites) entries.push({ obj: s, baseY: s.position.y, delay });
     }
+    spawnStormEffect(
+      this.app,
+      this.container,
+      tiles.map((t) => ({ ...hexToPixel(t, this.hexSize), ring: hexDistance(origin, t) })),
+      this.hexSize,
+    );
     this.runHexBounce(entries);
   }
 
@@ -1824,6 +1837,7 @@ export class MapView {
   }
 
   private stopHexBounce(): void {
+    this.granaryBounceActive = false;
     if (this.hexBounceRemove) {
       this.hexBounceRemove();
       this.hexBounceRemove = null;
@@ -2096,15 +2110,15 @@ export class MapView {
   }
 
   /** What the stock plate of a granary, sawmill or mine shows: a granary and a
-   *  sawmill `held/capacity`; a mine `<stone icon> N <ore icon> M`. */
+   *  sawmill `<icon> held/capacity`; a mine `<stone icon> N <ore icon> M`. */
   private stockLabelParts(tile: MapTile): { text: string; icon?: string }[] {
     const b = tile.building;
     if (!b) return [];
     if (b.kind === BuildingKind.GRANARY) {
-      return [{ text: `${b.food ?? 0}/${this.map ? granaryCapacity(this.map, tile) : 0}` }];
+      return [{ icon: 'food-32', text: `${b.food ?? 0}/${this.map ? granaryCapacity(this.map, tile) : 0}` }];
     }
     if (b.kind === BuildingKind.SAWMILL) {
-      return [{ text: `${heldInBuilding(b, 'wood')}/${buildingCapacity(b, 'wood')}` }];
+      return [{ icon: 'wood-32', text: `${heldInBuilding(b, 'wood')}/${buildingCapacity(b, 'wood')}` }];
     }
     return [
       { icon: 'stone-32', text: String(heldInBuilding(b, 'stone')) },
@@ -2113,7 +2127,7 @@ export class MapView {
   }
 
   /** The materials a granary, sawmill or mine holds, in the village name style:
-   *  white text (and icons) on a translucent black plate. */
+   *  white text (and icons) with a 1px black drop shadow, no plate. */
   private addBuildingLabel(tile: MapTile, owner: number, world: { x: number; y: number }, players: Player[]): void {
     const tribe = players[owner] ? tribeById(players[owner]!.tribe) : undefined;
     if (!tribe) return;
@@ -2123,26 +2137,27 @@ export class MapView {
     const iconSize = 14;
     const iconGap = 2;
     const partGap = 6;
-    const items: { text: BitmapText; icon: Sprite | null; width: number }[] = parts.map((part) => {
+    const items: { text: BitmapText; shadow: BitmapText; icon: Sprite | null; width: number }[] = parts.map((part) => {
       const text = this.pool.takeText(part.text, {
         fontSize: VILLAGE_LABEL_FONT_SIZE,
         fill: 0xffffff,
-        fontFamily: FONT_REGULAR,
+        fontFamily: FONT_BLACK,
       });
       text.anchor.set(0, 0.5);
       text.zIndex = 1;
+      const shadow = this.pool.takeText(part.text, {
+        fontSize: VILLAGE_LABEL_FONT_SIZE,
+        fill: 0x000000,
+        fontFamily: FONT_BLACK,
+      });
+      shadow.anchor.set(0, 0.5);
+      shadow.zIndex = 0;
       const icon = part.icon ? makeIcon32(part.icon, iconSize) : null;
-      return { text, icon, width: (icon ? iconSize + iconGap : 0) + text.width };
+      return { text, shadow, icon, width: (icon ? iconSize + iconGap : 0) + text.width };
     });
     const contentW = items.reduce((sum, it) => sum + it.width, 0) + partGap * (items.length - 1);
-    const contentH = Math.max(...items.map((it) => Math.max(it.text.height, it.icon ? iconSize : 0)));
-    const padX = 4;
-    const bg = this.pool.takeGraphics();
-    bg.zIndex = 0;
-    bg.roundRect(-contentW / 2 - padX, -contentH / 2 - 1, contentW + padX * 2, contentH + 2, 2).fill({ color: 0x000000, alpha: 0.4 });
     el.sortableChildren = true;
     el.zIndex = OVERLAY_Z_VILLAGE_LABEL;
-    el.addChild(bg);
     let x = -contentW / 2;
     for (const it of items) {
       if (it.icon) {
@@ -2152,8 +2167,9 @@ export class MapView {
         el.addChild(it.icon);
         x += iconSize + iconGap;
       }
+      it.shadow.position.set(x + 1, 1);
       it.text.position.set(x, 0);
-      el.addChild(it.text);
+      el.addChild(it.shadow, it.text);
       x += it.text.width + partGap;
     }
     el.position.set(world.x, world.y);

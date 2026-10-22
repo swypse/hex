@@ -2,7 +2,8 @@ import { type Axial, axialKey, hexNeighbors, hexToPixel } from '../game/map/hex'
 import { type GameMap, type MapTile } from '../game/map/map-gen';
 import { portDirection } from '../game/economy/buildings';
 import { isExploredFor } from '../game/map/explore';
-import { adjacentFarmCount } from '../game/economy/food';
+import { adjacentFarmCount, farmYield } from '../game/economy/food';
+import { type Player } from '../game/players';
 import { BuildingKind, Season } from '@enums';
 import { weatherOverlayAt } from '../game/weather/weather';
 import { clamp } from '../util/math';
@@ -15,6 +16,12 @@ export interface Viewport {
   height: number;
   /** 0 = default fit view, 1 = fully zoomed out; used to hide detail text. */
   zoomOut?: number;
+}
+
+/** Whether a farm yields no food right now (winter without Agronomy, fire), so it is drawn black and white. */
+export function farmIsIdle(map: GameMap, tile: MapTile, players?: readonly Player[]): boolean {
+  const owner = tile.ownedBy === null ? undefined : players?.[tile.ownedBy];
+  return farmYield(owner, map, tile) === 0;
 }
 
 /** Adjacent own farms of a granary, clamped to the available art (1..6). */
@@ -42,6 +49,7 @@ export function tileSignature(
   knownOwners?: Set<number>,
   tileIndex?: Map<string, MapTile>,
   waterRouteNeighbors?: Map<string, string[]>,
+  players?: readonly Player[],
 ): string {
   const explored = isExploredFor(tile, localPlayerIndex);
   const s = tile.settlement;
@@ -70,8 +78,8 @@ export function tileSignature(
     weatherOverlayAt(map, tile) ?? '',
     hidden ? 'h' : '',
     tile.building ? tile.building.kind : '',
-    // A farm swaps to its black-and-white art in winter.
-    tile.building?.kind === BuildingKind.FARM ? (map.season === Season.WINTER ? 'winter' : '') : '',
+    // A farm that yields nothing swaps to its black-and-white art.
+    tile.building?.kind === BuildingKind.FARM ? (farmIsIdle(map, tile, players) ? 'idle' : '') : '',
     tile.building?.kind === BuildingKind.PORT ? (portDirection(map, tile) ?? '-') : '',
     tile.building?.kind === BuildingKind.TEMPLE || tile.building?.kind === BuildingKind.FOREST_TEMPLE ? String(tile.building.level) : '',
     tile.building?.kind === BuildingKind.GRANARY ? String(granaryFarmCount(map, tile)) : '',

@@ -4,7 +4,24 @@ import { axialKey, hexNeighbors } from '../src/game/map/hex';
 import { TileType } from '../src/game/map/tile-types';
 import { tileSignature, tileInView } from '../src/render/tile-signature';
 import { type Viewport } from '../src/render/tile-signature';
-import { BridgeDir, UnitType } from '@enums';
+import { BridgeDir, BuildingKind, Season, UnitType } from '@enums';
+
+describe('tileSignature farms', () => {
+  it('only an idle farm (no food income) differs from a producing one', () => {
+    const map = generateMap(2, 42);
+    const t = map.tiles[0]!;
+    t.building = { kind: BuildingKind.FARM, level: 1 };
+    t.ownedBy = 0;
+    map.season = Season.SUMMER;
+    const summer = tileSignature(t, map, 0, new Set());
+    map.season = Season.WINTER;
+    const winter = tileSignature(t, map, 0, new Set());
+    expect(winter).not.toBe(summer);
+    map.season = Season.SUMMER;
+    t.fire = { age: 0 };
+    expect(tileSignature(t, map, 0, new Set())).toBe(winter);
+  });
+});
 
 describe('tileSignature', () => {
   it('changes when terrain changes', () => {

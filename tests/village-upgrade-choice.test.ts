@@ -1,3 +1,4 @@
+import { villageUpgradeCost } from '@/game/economy/resources';
 import { describe, expect, it } from 'vitest';
 import { AiActionType, CommandType, GameMode, UnitType, VillageUpgradeBonus } from '@enums';
 import { villageIncomeBreakdown } from '../src/game/economy/capture';
@@ -103,8 +104,8 @@ describe('upgrading through the simulator', () => {
     const players = buildPlayers(Tribe.Cats, 1, new SeededRandom(1));
     players[0]!.isHuman = true;
     migrateLegacyResources(map, players);
-    players[0]!.resources.money = 200;
-    v.settlement!.stock = { wood: 100, stone: 100, ore: 0, food: 50 };
+    players[0]!.resources.money = 1000;
+    v.settlement!.stock = { wood: 1000, stone: 1000, ore: 0, food: 50 };
     const s = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5 });
     s.currentPlayerIndex = 0;
     return { s, map, v, players };
@@ -120,7 +121,7 @@ describe('upgrading through the simulator', () => {
     expect(v.unit?.owner).toBe(0);
     expect(map.tiles.some((t) => t.unit?.id === 'e')).toBe(true);
     // The unit itself costs nothing; only the upgrade is paid.
-    expect(s.players[0]!.resources.money).toBe(before - 2 * 10);
+    expect(s.players[0]!.resources.money).toBe(before - villageUpgradeCost(10).money);
   });
 
   it('the money pick adds money; a pick the level does not offer is refused', () => {
@@ -130,7 +131,7 @@ describe('upgrading through the simulator', () => {
     expect(v.settlement!.level).toBe(5);
     s.applyCommand({ type: CommandType.UPGRADE_VILLAGE, q: 0, r: 0, bonus: VillageUpgradeBonus.MONEY });
     expect(v.settlement!.level).toBe(6);
-    expect(s.players[0]!.resources.money).toBe(before - 2 * 5 + UPGRADE_MONEY_BONUS);
+    expect(s.players[0]!.resources.money).toBe(before - villageUpgradeCost(5).money + UPGRADE_MONEY_BONUS);
   });
 });
 
@@ -140,8 +141,8 @@ describe('AI last-chance upgrade', () => {
     v.unit = makeUnit('e', 1, UnitType.WARRIOR, 0, 0);
     const players = buildPlayers(Tribe.Cats, 1, new SeededRandom(1));
     migrateLegacyResources(map, players);
-    players[0]!.resources.money = 200;
-    v.settlement!.stock = { wood: 100, stone: 100, ore: 0, food: 50 };
+    players[0]!.resources.money = 1000;
+    v.settlement!.stock = { wood: 1000, stone: 1000, ore: 0, food: 50 };
     const state: AiPlannerState = { moved: new Set(), acted: new Set(), upgraded: new Set(), spawned: new Set(), built: new Set(), opened: new Set(), occupied: new Set() };
     const pattern = AI_PATTERNS.find((p) => p.id === 'upgrade-for-swordsman')!;
     const step = pattern.evaluate({ map, player: players[0]!, rng: new SeededRandom(1), state });

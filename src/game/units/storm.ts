@@ -1,52 +1,51 @@
 import { type GameMap, type MapTile } from '../map/map-gen';
+import { hexDistance } from '../map/hex';
 import { isWaterType } from '../map/tile-types';
+import { type Player } from '../players';
 import { type Unit } from './units';
+import { randomInt } from '../../util/random';
 import { UnitType } from '@enums';
 
-const STORM_ATTACK = 60;
+/** Turns after a cast before the owner can storm again (shared by the whole tribe). */
+export const STORM_COOLDOWN_TURNS = 3;
 
-/** The village that claims `tile` (matching tile.claimedByVillage), or null. */
-export function claimingVillage(map: GameMap, tile: MapTile): MapTile | null {
-  const c = tile.claimedByVillage;
-  if (!c) return null;
-  return map.tiles.find((t) => t.q === c.q && t.r === c.r && t.settlement) ?? null;
+/** Whether the player's storm has recharged on `turn`. */
+export function stormReady(player: Pick<Player, 'stormReadyTurn'>, turn: number): boolean {
+  return (player.stormReadyTurn ?? 0) <= turn;
 }
 
-/** Water tiles claimed by `village`. */
-export function villageWaterTiles(map: GameMap, village: MapTile): MapTile[] {
-  const vk = `${village.q},${village.r}`;
-  return map.tiles.filter((t) => {
-    if (!t.claimedByVillage) return false;
-    if (`${t.claimedByVillage.q},${t.claimedByVillage.r}` !== vk) return false;
-    return isWaterType(t.terrain);
-  });
+/** Turns left until the player can storm again (0 when ready). */
+export function stormTurnsLeft(player: Pick<Player, 'stormReadyTurn'>, turn: number): number {
+  return Math.max(0, (player.stormReadyTurn ?? 0) - turn);
 }
 
-/** Whether the stormcaller can storm: it stands on an owned cell of its own
- *  village (a land tile OR a ship on an owned village water tile) and that
- *  village claims at least one water tile. */
-export function stormEligible(map: GameMap, unit: Unit): boolean {
-  if (unit.type !== UnitType.STORMCALLER) return false;
-  const tile = map.tiles.find((t) => t.unit === unit);
-  if (!tile || tile.ownedBy !== unit.owner) return false;
-  const village = claimingVillage(map, tile);
-  if (!village || village.settlement?.owner !== unit.owner) return false;
-  return villageWaterTiles(map, village).length >= 1;
-}
+/** Hex radius around the stormcaller that a storm covers. */
+export const STORM_RADIUS = 5;
 
-/** Ships (enemy or pirate) standing on this stormcaller's village water tiles. */
-export function stormTargetShips(map: GameMap, unit: Unit): MapTile[] {
+/** Water tiles within `STORM_RADIUS` of the stormcaller, whoever owns them. */
+export function stormWaterTiles(map: GameMap, unit: Unit): MapTile[] {
   const tile = map.tiles.find((t) => t.unit === unit);
   if (!tile) return [];
-  const village = claimingVillage(map, tile);
-  if (!village) return [];
-  return villageWaterTiles(map, village).filter(
-    (t) => t.unit !== null && t.unit.shipLevel !== undefined && t.unit.owner !== unit.owner,
+  return map.tiles.filter((t) => isWaterType(t.terrain) && hexDistance(tile, t) <= STORM_RADIUS);
+}
+
+/** Whether the stormcaller can storm: any tile will do, as long as some water is in range. */
+export function stormEligible(map: GameMap, unit: Unit): boolean {
+  return unit.type === UnitType.STORMCALLER && stormWaterTiles(map, unit).length >= 1;
+}
+
+/** Ships (enemy or pirate) standing on the storm's water tiles. */
+export function stormTargetShips(map: GameMap, unit: Unit): MapTile[] {
+  return stormWaterTiles(map, unit).filter(
+    (t) => t.unit !== null && (t.unit.shipLevel !== undefined || t.unit.type === UnitType.PIRATE) && t.unit.owner !== unit.owner,
   );
 }
 
-/** Damage the storm deals to each affected ship: a full-hp hit at 60 attack
- *  against defense 0 → round((60/60) * 60 * 1.5) = 90. No miss, no counter. */
-export function stormDamage(): number {
-  return Math.round(STORM_ATTACK * 1.5);
+/** Damage range the storm rolls for each affected ship. No miss, no counter. */
+export const STORM_DAMAGE_MIN = 30;
+export const STORM_DAMAGE_MAX = 60;
+
+/** Damage the storm deals to one ship: random in `STORM_DAMAGE_MIN`-`STORM_DAMAGE_MAX`. */
+export function stormDamage(rng: () => number = Math.random): number {
+  return randomInt(STORM_DAMAGE_MIN, STORM_DAMAGE_MAX, rng);
 }

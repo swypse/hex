@@ -23,6 +23,10 @@ export const FIRE_RULES = {
   buildingDamage: 1,
   /** Hexes around a unit (its own tile included) whose fire it can put out. */
   extinguishRange: 1,
+  /** Food a burning granary loses per round. */
+  granaryFoodLoss: 10,
+  /** Wood a burning sawmill loses per round. */
+  sawmillWoodLoss: 5,
 } as const;
 
 export interface FireTurnReport extends WeatherEffectReport {
@@ -90,6 +94,9 @@ export function applyFireTurn(map: GameMap, rng: () => number): FireTurnReport {
     if (tile.fire!.age % FIRE_RULES.spreadEveryTurns === 0) spreaders.push(tile);
     let out = false;
     if (tile.building) {
+      const b = tile.building;
+      if (b.kind === BuildingKind.GRANARY) b.food = Math.max(0, (b.food ?? 0) - FIRE_RULES.granaryFoodLoss);
+      if (b.kind === BuildingKind.SAWMILL) b.wood = Math.max(0, (b.wood ?? 0) - FIRE_RULES.sawmillWoodLoss);
       const hit = hurtBuilding(tile, FIRE_RULES.buildingDamage);
       report.buildings.push(hit);
       out = hit.destroyed;

@@ -412,6 +412,8 @@ export class EventEffects {
       // Follow the cell through camera pan and zoom.
       const pos = overlay.toLocal(anchor, mapRoot);
       el.position.set(pos.x, pos.y);
+      // The rays are map art: they grow and shrink with the map zoom.
+      el.scale.set(mapRoot.scale.x);
       const t = Math.min(1, (performance.now() - start) / RAYS_MS);
       const eased = 1 - (1 - t) * (1 - t);
       const dist = RAYS_INNER + (RAYS_OUTER - RAYS_INNER) * eased;

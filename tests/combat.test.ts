@@ -121,8 +121,8 @@ describe('defenseBonusFor', () => {
     const tile = map.tiles[1]!;
     tile.settlement = { owner: 1, level: 1, captureReady: false };
     tile.settlement!.owner = 1;
-    // VILLAGE_DEFENSE 6 -> 1 + 6/10 = 1.6
-    expect(defenseBonusFor(map, tile.unit!, tile)).toBe(1.6);
+    // VILLAGE_DEFENSE 8 -> 1 + 8/10 = 1.8
+    expect(defenseBonusFor(map, tile.unit!, tile)).toBe(1.8);
   });
 
   it('returns 1 for a null map (no context)', () => {

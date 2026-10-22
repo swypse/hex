@@ -41,9 +41,15 @@ export interface PlayerResources {
 
 export const UPGRADE_COST: Resources = { wood: 2, stone: 1, money: 2, ore: 0, food: 0 };
 
-// Cost to upgrade a village from the given level to the next one.
+/** Per-level compounding of the village upgrade price. */
+const UPGRADE_COST_GROWTH = 1.15;
+
+// Cost to upgrade a village from the given level to the next one: the level-1
+// price is 2 wood / 1 stone / 2 money, then it grows as level × 1.15^(level - 1)
+// (level 10 ≈ 35×, level 25 ≈ 715× the base), out of reach in a normal game.
 export function villageUpgradeCost(level: number): Resources {
-  return { wood: 2 * level, stone: level, money: 2 * level, ore: 0, food: 0 };
+  const k = level * UPGRADE_COST_GROWTH ** (level - 1);
+  return { wood: Math.round(2 * k), stone: Math.round(k), money: Math.round(2 * k), ore: 0, food: 0 };
 }
 
 /** Money-only cost, the common case for maintaining reserve checks. */

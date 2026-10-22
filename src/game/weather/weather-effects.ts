@@ -25,9 +25,10 @@ function tilesInScope(map: GameMap, event: WeatherEvent): MapTile[] {
 /** Deals `damage` to the unit standing on `tile`; removes it at 0 hp. */
 export function hurtUnit(tile: MapTile, damage: number): WeatherUnitHit {
   const unit = tile.unit!;
+  const hpBefore = unit.hp;
   unit.hp = Math.max(0, unit.hp - damage);
   const died = unit.hp <= 0;
-  const hit: WeatherUnitHit = { unitId: unit.id, owner: unit.owner, q: tile.q, r: tile.r, damage, died };
+  const hit: WeatherUnitHit = { unitId: unit.id, owner: unit.owner, q: tile.q, r: tile.r, damage, died, type: unit.type, shipLevel: unit.shipLevel, hpBefore };
   if (died) tile.unit = null;
   return hit;
 }

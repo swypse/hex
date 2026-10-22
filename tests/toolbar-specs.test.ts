@@ -7,7 +7,7 @@ import { SeededRandom } from '../src/util/random';
 import { gameController } from '../src/controller/game-controller';
 import { useGameStore } from '../src/store/game-store';
 import { toolbarSpecs } from '../src/ui/hud/toolbar-specs';
-import { isLandType, TileType } from '../src/game/map/tile-types';
+import { isLandType, isWaterType, TileType } from '../src/game/map/tile-types';
 import { hexNeighbors } from '../src/game/map/hex';
 import { UNIT_TYPES } from '../src/game/units/units';
 import { Tribe } from '../src/game/tribes';
@@ -441,11 +441,12 @@ describe('toolbarSpecs', () => {
     expect(toolbarSpecs().some((a) => a.key === 'build')).toBe(false);
   });
 
-  it('does not offer storm when the stormcaller village has no water', () => {
+  it('does not offer storm when no water is within the storm radius', () => {
     const players = useGameStore.getState().players;
     players[0]!.tribe = Tribe.Aqua;
     giveResources(map, players[0]!, { wood: 100, stone: 100, money: 100, ore: 100, food: 20 });
     useGameStore.getState().setPlayers(players);
+    for (const t of map.tiles) if (isWaterType(t.terrain)) t.terrain = TileType.GrasslandLand;
     const tile = map.tiles.find((t) => t.unit === null)!;
     tile.ownedBy = 0;
     tile.unit = {

@@ -11,6 +11,7 @@ import { isShip } from '../../game/units/ship';
 import { villageCapacity, villageBuildingLimit, buildingKindsInVillage, unitsInVillage } from '../../game/economy/village';
 import { tileUpkeep, villageIncomeBreakdown } from '../../game/economy/capture';
 import { lightningTurnsLeft } from '../../game/units/lightning';
+import { stormTurnsLeft } from '../../game/units/storm';
 import { buildingCapacity, heldInBuilding } from '../../game/economy/building-stock';
 import { farmYield, granaryCapacity, STARVATION_DAMAGE, villageFood, villageGranaries } from '../../game/economy/food';
 import { villageUpgradeCost } from '../../game/economy/resources';
@@ -197,6 +198,11 @@ export class HudSelected implements Widget {
         const turnsLeft = lightningTurnsLeft(human, s.turn);
         if (turnsLeft > 0) {
           lines.push(t('hud.selected.lightningRecharge', { n: turnsLeft }));
+          bolds.push(false);
+        }
+        const stormLeft = stormTurnsLeft(human, s.turn);
+        if (stormLeft > 0) {
+          lines.push(t('hud.selected.stormRecharge', { n: stormLeft }));
           bolds.push(false);
         }
       }

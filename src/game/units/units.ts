@@ -1,7 +1,7 @@
 import { t } from '../../i18n';
 import { shipMovePoints } from './ship';
 import type { Resources } from '../economy/resources';
-import { Tribe } from '../tribes';
+import { Tribe, TRIBE_SPECIAL_UNIT } from '../tribes';
 import { UnitType, VeteranBonus } from '@enums';
 
 
@@ -123,11 +123,18 @@ export function veteranAttackBonus(unit: Pick<Unit, 'veteranBonus'>): number {
   return unit.veteranBonus === VeteranBonus.ATTACK ? VETERAN_ATTACK_BONUS : 0;
 }
 
+/** Whether the unit is a tribe's special unit (builder, banner, berserker, ...). */
+export function isSpecialUnit(unit: Pick<Unit, 'type'>): boolean {
+  return Object.values(TRIBE_SPECIAL_UNIT).includes(unit.type);
+}
+
 /** Records a kill for a unit. Returns true when it just became a veteran: it is
- *  fully healed at once and its owner must pick a bonus. Pirates never promote. */
+ *  fully healed at once and its owner must pick a bonus. Pirates and special
+ *  units never promote. */
 export function recordKill(unit: Unit): boolean {
   if (unit.owner < 0) return false;
   unit.kills = (unit.kills ?? 0) + 1;
+  if (isSpecialUnit(unit)) return false;
   if (unit.veteran || unit.kills < VETERAN_KILLS) return false;
   unit.veteran = true;
   unit.hp = unitMaxHp(unit);

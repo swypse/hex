@@ -1,4 +1,4 @@
-import { BuildingKind, CompassDirection, WeatherType } from '@enums';
+import { BuildingKind, CompassDirection, UnitType, WeatherType } from '@enums';
 import { type Axial, axialKey, hexDistance, hexNeighbors, hexToPixel, tilesInRange } from '../map/hex';
 import { type GameMap, type MapTile } from '../map/map-gen';
 import { isMountainType, isSolidGround, isWaterType } from '../map/tile-types';
@@ -76,6 +76,10 @@ export interface WeatherUnitHit {
   r: number;
   damage: number;
   died: boolean;
+  /** The unit as it was before the hit, so the presenter can still draw it while the strike plays. */
+  type: UnitType;
+  shipLevel?: 1 | 2 | 3;
+  hpBefore: number;
 }
 
 export interface WeatherBuildingHit {

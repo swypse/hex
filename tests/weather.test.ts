@@ -263,7 +263,7 @@ describe('earthquake effects', () => {
     expect(farm.building).toBeNull();
     expect(unit.hp).toBe(30);
     expect(report.buildings).toEqual([{ q: -2, r: 0, destroyed: true }]);
-    expect(report.units).toEqual([{ unitId: 'u', owner: 0, q: -2, r: 1, damage: 20, died: false }]);
+    expect(report.units).toEqual([{ unitId: 'u', owner: 0, q: -2, r: 1, damage: 20, died: false, type: UnitType.WARRIOR, shipLevel: undefined, hpBefore: 50 }]);
   });
 
   it('spares everything when the roll fails', () => {

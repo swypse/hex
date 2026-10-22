@@ -34,6 +34,8 @@ export interface Player {
   siege?: { q: number; r: number; since: number } | null;
   /** Turn from which the stormcaller's Call lightning is available again (unset: ready). */
   lightningReadyTurn?: number;
+  /** Turn from which the stormcaller's Storm is available again (unset: ready). */
+  stormReadyTurn?: number;
   /** Turn from which the AI may post another trade order (unset: any time). */
   tradeCooldownTurn?: number;
 }

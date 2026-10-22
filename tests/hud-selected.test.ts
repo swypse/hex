@@ -244,11 +244,11 @@ describe('HudSelected village building constraints', () => {
     // The unit hp no longer appears in the selected-cell panel.
     expect(labels.some((x) => x.startsWith('50/50'))).toBe(false);
     expect(labels).toContain('20');
-    // Unit defense 10 plus 9 from the village (6) and its wall (3).
-    expect(labels).toContain('10 + 9');
+    // Unit defense 10 plus 9 from the village (8) and its wall (3).
+    expect(labels).toContain('10 + 11');
     expect(labels).toContain('1');
     expect(all).toContain('+3 — village wall');
-    expect(all).toContain('+6 — village');
+    expect(all).toContain('+8 — village');
     expect(all).not.toContain('DEF');
     expect(all).not.toContain('UPKEEP');
   });

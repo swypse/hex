@@ -34,7 +34,7 @@ import { spawnUnit } from './units/spawn';
 import { adjacentEnemyVillages } from './units/stalker';
 import type { GameStateSnapshot } from './state';
 import { migrateLegacyResources, payAt } from './economy/stock';
-import { stormDamage, stormEligible, stormTargetShips } from './units/storm';
+import { STORM_COOLDOWN_TURNS, stormDamage, stormEligible, stormReady, stormTargetShips } from './units/storm';
 import { LIGHTNING_COOLDOWN_TURNS, LIGHTNING_COST, lightningReady, lightningStrikeCell, lightningVillages } from './units/lightning';
 import { TileType } from './map/tile-types';
 import { canPlaceTrapOn, TRAP_COST, trapAlive, trapDamage } from './units/traps';
@@ -686,7 +686,7 @@ export class Simulator {
   }
 
   /** Stormcaller storms its village's water tiles: every enemy or pirate ship
-   *  on them takes ~90 damage (no miss, no counter). Consumes the whole turn. */
+   *  on them takes 30-60 damage (no miss, no counter). Consumes the whole turn. */
   private doStorm(unitId: string): boolean {
     const unit = this.findUnit(unitId);
     if (!unit || unit.owner !== this.currentPlayerIndex) return false;
@@ -694,12 +694,13 @@ export class Simulator {
     if (unit.hasMoved || unit.hasAttacked || unit.hasHealed) return false;
     if ((unit.stunTurns ?? 0) >= 1) return false;
     if (!stormEligible(this.map, unit)) return false;
-    const damage = stormDamage();
+    if (!stormReady(this.players[unit.owner]!, this.turn)) return false;
     const targets = stormTargetShips(this.map, unit);
     const report: { q: number; r: number; damage: number }[] = [];
     const killer = this.players[unit.owner]!;
     for (const t of targets) {
       const ship = t.unit!;
+      const damage = stormDamage(this.rng);
       ship.hp = Math.max(0, ship.hp - damage);
       report.push({ q: t.q, r: t.r, damage });
       if (ship.hp <= 0) {
@@ -709,11 +710,13 @@ export class Simulator {
         this.emitScoreFly(killer.index, pts, t);
         const victim = ship.owner >= 0 ? this.players[ship.owner] : null;
         if (victim) this.statsOf(victim).killedUnits += 1;
-        this.statsOf(killer).enemyShipsKilled += 1;
+        if (ship.owner >= 0) this.statsOf(killer).enemyShipsKilled += 1;
+        else this.statsOf(killer).pirateKills += 1;
         t.unit = null;
         this.creditKill(unit);
       }
     }
+    this.players[unit.owner]!.stormReadyTurn = this.turn + STORM_COOLDOWN_TURNS;
     this.consumeUnitTurn(unit);
     this.emit({ type: GameEventType.STORM, unitId, q: unit.q, r: unit.r, targets: report });
     return true;

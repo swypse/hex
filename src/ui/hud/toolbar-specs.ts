@@ -13,7 +13,7 @@ import { canBuildBridge, BRIDGE_COST } from '../../game/economy/bridges';
 import { bonusEligibleFor } from '../../game/map/bonus';
 import { bottleCollectableFor } from '../../game/map/bottles';
 import { trapCells, TRAP_COST } from '../../game/units/traps';
-import { stormEligible } from '../../game/units/storm';
+import { stormEligible, stormTurnsLeft } from '../../game/units/storm';
 import { extinguishCells } from '../../game/weather/fire';
 import { LIGHTNING_COST, lightningTurnsLeft, lightningVillages } from '../../game/units/lightning';
 import { adjacentEnemyVillages } from '../../game/units/stalker';
@@ -176,7 +176,8 @@ export function toolbarSpecs(): ToolbarSpec[] {
       });
     }
     if (unit.type === UnitType.STORMCALLER && stormEligible(map, unit)) {
-      out.push({ key: 'storm', label: t('action.storm'), disabled: !idle, onClick: () => gameController.actions.stormSelected() });
+      const stormLeft = stormTurnsLeft(player, store.turn);
+      out.push({ key: 'storm', label: stormLeft > 0 ? t('action.stormRecharging', { turns: stormLeft }) : t('action.storm'), disabled: !idle || stormLeft > 0, onClick: () => gameController.actions.stormSelected() });
     }
   }
 

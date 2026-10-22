@@ -5,7 +5,7 @@ import { skillPulseStep, STEP_CONFIG } from '@/game/tutorial/tutorial-steps';
 import { t } from '@/i18n';
 import { useGameStore } from '@/store/game-store';
 import { FontSize, GameMode, OverlayKind } from '@enums';
-import { Container, Graphics } from 'pixi.js';
+import { Container, Graphics, Rectangle, type FederatedPointerEvent, type FederatedWheelEvent } from 'pixi.js';
 import { type UIHost, type Widget } from '../host';
 import { ACTION_BUTTON_ICON_FILES, makeActionButtonIcon } from '../../gfx/action-button-icons';
 import { ActionTooltip } from '../kit/action-tooltip';
@@ -52,6 +52,10 @@ const LAST_TURN_COLOR = 0x9cff55;
 const SIDE_PADDING = 12;
 const FOCUS_RING_COLOR = 0xffd54a;
 const FOCUS_RING_PAD = 4;
+/** Pointer travel (px) after which a press on the toolbar becomes a scroll drag, not a tap. */
+const DRAG_THRESHOLD = 6;
+/** Vertical room around the 48px buttons kept visible inside the scroll mask (pulse rings, focus ring). */
+const MASK_PAD_Y = 8;
 
 interface FocusEntry {
   btn: Container;
@@ -69,6 +73,16 @@ const ACTION_BTN = {
 export class HudToolbar implements Widget {
   private el: Container | null = null;
   private row: Container | null = null;
+  /** Clips the row to the screen width when it overflows; the row scrolls inside it. */
+  private viewport: Container | null = null;
+  private maskG: Graphics | null = null;
+  private pad: Graphics | null = null;
+  private scrollX = 0;
+  private maxScroll = 0;
+  private activePointer: number | null = null;
+  private dragStartX = 0;
+  private dragStartScroll = 0;
+  private dragged = false;
   private host: UIHost | null = null;
   private unsub: (() => void) | null = null;
   private onResize: (() => void) | null = null;
@@ -89,10 +103,23 @@ export class HudToolbar implements Widget {
     this.host = host;
     const el = new Container();
     const row = new Container();
-    el.addChild(row);
+    const viewport = new Container();
+    const pad = new Graphics();
+    pad.eventMode = 'static';
+    const maskG = new Graphics();
+    viewport.addChild(pad, row);
+    viewport.mask = maskG;
+    viewport.eventMode = 'static';
+    viewport.on('pointerdown', this.onPointerDown);
+    viewport.on('wheel', this.onWheel);
+    viewport.on('pointertapcapture', this.onTapCapture);
+    el.addChild(viewport, maskG);
     root.addChild(el);
     this.el = el;
     this.row = row;
+    this.viewport = viewport;
+    this.maskG = maskG;
+    this.pad = pad;
     this.layout();
     this.update();
     this.unsub = useGameStore.subscribe(() => this.update());
@@ -150,6 +177,7 @@ export class HudToolbar implements Widget {
       return;
     }
     const k = this.row.scale.x;
+    this.revealFocused(entry.btn);
     const ring = new Graphics();
     ring
       .roundRect(
@@ -164,6 +192,21 @@ export class HudToolbar implements Widget {
     this.focusRing = ring;
   }
 
+  /** Scrolls the row just enough to bring a keyboard-focused button fully into view. */
+  private revealFocused(btn: Container): void {
+    if (this.maxScroll <= 0 || !this.host) return;
+    const left = btn.position.x - FOCUS_RING_PAD;
+    const right = btn.position.x + btn.width + FOCUS_RING_PAD;
+    const viewW = this.host.app.screen.width - SIDE_PADDING * 2;
+    let next = this.scrollX;
+    if (left < next) next = left;
+    else if (right > next + viewW) next = right - viewW;
+    next = Math.min(Math.max(0, next), this.maxScroll);
+    if (next === this.scrollX) return;
+    this.scrollX = next;
+    this.layout();
+  }
+
   private layout = (): void => {
     if (!this.el || !this.row || !this.host) return;
     const screenW = this.host.app.screen.width;
@@ -172,10 +215,72 @@ export class HudToolbar implements Widget {
     const barY = (TOOLBAR_HEIGHT - 48) / 2;
     const maxW = Math.max(0, screenW - SIDE_PADDING * 2);
     const rowW = this.row.width;
-    const scale = rowW > maxW ? maxW / rowW : 1;
-    this.row.scale.set(scale, scale);
-    this.row.position.set(screenW / 2 - (rowW * scale) / 2, barY);
+    const overflow = rowW > maxW;
+    this.maxScroll = overflow ? rowW - maxW : 0;
+    this.scrollX = Math.min(Math.max(0, this.scrollX), this.maxScroll);
+    // Buttons keep their size: a row wider than the screen scrolls instead of shrinking.
+    this.row.position.set(overflow ? SIDE_PADDING - this.scrollX : screenW / 2 - rowW / 2, barY);
+    const clipX = overflow ? SIDE_PADDING : 0;
+    const clipW = overflow ? maxW : screenW;
+    this.maskG?.clear().rect(clipX, barY - MASK_PAD_Y, clipW, 48 + MASK_PAD_Y * 2).fill(0xffffff);
+    this.pad?.clear().rect(clipX, barY - MASK_PAD_Y, clipW, 48 + MASK_PAD_Y * 2).fill({ color: 0x000000, alpha: 0.001 });
+    if (this.viewport) this.viewport.hitArea = new Rectangle(clipX, barY - MASK_PAD_Y, clipW, 48 + MASK_PAD_Y * 2);
   };
+
+  private onWheel = (e: FederatedWheelEvent): void => {
+    if (this.maxScroll <= 0) return;
+    this.scrollBy(e.deltaX || e.deltaY);
+  };
+
+  private scrollBy(dx: number): void {
+    this.scrollX = Math.min(Math.max(0, this.scrollX + dx), this.maxScroll);
+    this.layout();
+    this.drawFocusRing();
+  }
+
+  private onPointerDown = (e: FederatedPointerEvent): void => {
+    if (this.maxScroll <= 0 || this.activePointer !== null || e.button !== 0) return;
+    this.activePointer = e.pointerId;
+    this.dragStartX = e.clientX;
+    this.dragStartScroll = this.scrollX;
+    this.dragged = false;
+    window.addEventListener('pointermove', this.onWindowMove);
+    window.addEventListener('pointerup', this.onWindowUp);
+    window.addEventListener('pointercancel', this.onWindowUp);
+  };
+
+  /** A tap that ends a real drag must not press the button under the finger. */
+  private onTapCapture = (e: FederatedPointerEvent): void => {
+    if (this.dragged && e.pointerId === this.activePointer) e.stopPropagation();
+  };
+
+  private onWindowMove = (e: PointerEvent): void => {
+    if (e.pointerId !== this.activePointer) return;
+    const delta = this.dragStartX - e.clientX;
+    if (!this.dragged) {
+      if (Math.abs(delta) < DRAG_THRESHOLD) return;
+      this.dragged = true;
+    }
+    this.scrollX = this.dragStartScroll + delta;
+    this.layout();
+    this.drawFocusRing();
+  };
+
+  private onWindowUp = (e: PointerEvent): void => {
+    if (e.pointerId !== this.activePointer) return;
+    // Cleared after the tap event of this release has been dispatched.
+    setTimeout(() => {
+      this.activePointer = null;
+      this.dragged = false;
+    }, 0);
+    this.detachPointerListeners();
+  };
+
+  private detachPointerListeners(): void {
+    window.removeEventListener('pointermove', this.onWindowMove);
+    window.removeEventListener('pointerup', this.onWindowUp);
+    window.removeEventListener('pointercancel', this.onWindowUp);
+  }
 
   private update(): void {
     if (!this.el || !this.row || !this.host) return;
@@ -404,6 +509,11 @@ export class HudToolbar implements Widget {
     if (this.unsub) this.unsub();
     if (this.onResize) window.removeEventListener('resize', this.onResize);
     window.removeEventListener('keydown', this.onKeyDown, true);
+    this.detachPointerListeners();
+    this.activePointer = null;
+    this.viewport = null;
+    this.maskG = null;
+    this.pad = null;
     this.focusables = [];
     this.focusIndex = null;
     this.focusRing = null;
