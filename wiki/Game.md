@@ -180,7 +180,7 @@ Pirates and tribe special units (builder, banner, berserker, stalker, trapper, s
   road must link back to an own village through the road/port/bridge network).
 - **Bridge** — 10 wood + 15 money + 5 stone, needs *Bridges*. On a water tile between two land hexes: walkable by land
   units, ships still sail under it, connects roads. Not on a port or temple; ports and temples not on a bridge.
-- **Port connections** — own ports of one stretch of own water connect automatically (light-blue route); villages
+- **Port connections** — own ports of one stretch of own or free (unowned) water connect automatically (water owned by another player blocks the route) (light-blue route); villages
   reached through a port route count as road-connected and the route halves move cost for the owner. Connections are
   recomputed live.
 - **Repair** — a damaged own building (buildings have 2 hp) is repaired for 2 wood + 2 stone + 2 ore + 3 money.

@@ -107,8 +107,15 @@ const SELECTED_BORDER_WIDTH = 6;
 /** Vertical squash applied to move/attack marker circles so they sit flat on
  *  the ground plane like the hexes. */
 const MARKER_Y_SCALE = 0.72;
-/** `viewport.zoomOut` above which hp bars/text and village names are hidden. */
-export const ZOOM_DETAIL_HIDE = 0.7;
+/** Share of the map's width visible on screen above which hp bars/text and village names are hidden. */
+export const MAP_SHARE_DETAIL_HIDE = 0.6;
+
+/** Whether labels are hidden at this view: more than `MAP_SHARE_DETAIL_HIDE` of the
+ *  map's width fits on the screen. */
+export function detailHiddenAt(screenWidth: number, scale: number, mapRadius: number, hexSize: number): boolean {
+  const mapWidth = 2 * Math.sqrt(3) * mapRadius * hexSize;
+  return mapWidth > 0 && screenWidth / scale / mapWidth > MAP_SHARE_DETAIL_HIDE;
+}
 
 interface TileView {
   el: Container;
@@ -380,7 +387,7 @@ export class MapView {
     this.exclamationBobs = [];
     // When zoomed out far enough the hp bars, hp text and village names are too
     // small to read; drop them to keep the map clean.
-    const detailHidden = (viewport.zoomOut ?? 0) > ZOOM_DETAIL_HIDE;
+    const detailHidden = viewport.labelsHidden === true;
     const hpBarSpecs: HpBarSpec[] = [];
     const buildingHpBarSpecs: HpBarSpec[] = [];
     const labels: { tile: MapTile; owner: number; el: Container; world: { x: number; y: number } }[] = [];

@@ -11,8 +11,8 @@ interface WaterComponent {
   tiles: Set<string>;
 }
 
-/** Flood-filled components over a player's own water cells (terrain water
- *  tiles it owns, bridges and ports included) that contain at least two of
+/** Flood-filled components over the water cells a player's ports can connect through
+ *  (terrain water tiles it owns or nobody owns, bridges and ports included) that contain at least two of
  *  the player's own ports. */
 function findWaterPortComponents(map: GameMap): WaterComponent[] {
   const byKey = tileMapByKey(map);
@@ -54,8 +54,10 @@ function findWaterPortComponents(map: GameMap): WaterComponent[] {
   return components;
 }
 
+/** Water a port route may cross: the owner's own and free (unowned) water. Water
+ *  owned by another player is closed to it. */
 function isOwnWater(t: MapTile, owner: number): boolean {
-  return isWaterType(t.terrain) && t.ownedBy === owner;
+  return isWaterType(t.terrain) && (t.ownedBy === owner || t.ownedBy === null || t.ownedBy === undefined);
 }
 
 /** Results are memoized per map state and shared: treat them as read-only.

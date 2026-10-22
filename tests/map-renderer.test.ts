@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Application, BitmapText, Container, Graphics, ImageSource, Sprite, Texture } from 'pixi.js';
-import { MapView } from '../src/render/map-renderer';
+import { detailHiddenAt, MapView } from '../src/render/map-renderer';
 import { FIRE_SIZE_MIN, FIRE_SIZE_MAX } from '../src/render/fire';
 import { type GameMap, type MapTile } from '../src/game/map/map-gen';
 import { type Selection } from '../src/game/units/selection';
@@ -301,10 +301,10 @@ describe('MapView hp bar anchoring', () => {
     };
     const base = { x: 400, y: 300, scale: 1, width: 800, height: 600 };
 
-    view.update(map, players, null, new Set(), new Set(), 0, new Set(), { ...base, zoomOut: 0 });
+    view.update(map, players, null, new Set(), new Set(), 0, new Set(), { ...base, labelsHidden: false });
     expect(view.hpBarEntries().length).toBeGreaterThan(0);
 
-    view.update(map, players, null, new Set(), new Set(), 0, new Set(), { ...base, zoomOut: 1 });
+    view.update(map, players, null, new Set(), new Set(), 0, new Set(), { ...base, labelsHidden: true });
     expect(view.hpBarEntries()).toEqual([]);
   });
 
@@ -2021,13 +2021,13 @@ describe('MapView water roads', () => {
     expect(fills[0]!.data.style.color).toBe(0x7fd8f5);
   });
 
-  it('does not draw a water road over an unowned gap', () => {
+  it('does not draw a water road over an enemy-owned gap', () => {
     map = {
       radius: 1,
       spawns: [],
       tiles: [
         waterTile(0, 0, { port: true, ownedBy: 0 }),
-        waterTile(1, 0, { ownedBy: null }),
+        waterTile(1, 0, { ownedBy: 1 }),
         waterTile(2, 0, { port: true, ownedBy: 0 }),
       ],
     };
@@ -2938,5 +2938,16 @@ describe('MapView marker reveal deferral', () => {
       (performance as { now: () => number }).now = origNow;
       v.destroy();
     }
+  });
+});
+
+describe('detailHiddenAt', () => {
+  it('hides labels once more than 60% of the map width is on screen', () => {
+    const radius = 10;
+    const mapWidth = 2 * Math.sqrt(3) * radius * 40;
+    expect(detailHiddenAt(mapWidth * 0.7, 1, radius, 40)).toBe(true);
+    expect(detailHiddenAt(mapWidth * 0.5, 1, radius, 40)).toBe(false);
+    // Zooming in (a larger scale) shows less of the map.
+    expect(detailHiddenAt(mapWidth * 0.7, 2, radius, 40)).toBe(false);
   });
 });

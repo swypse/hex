@@ -119,12 +119,12 @@ describe('achievements', () => {
     expect(evaluateAchievements(mapOf(tiles), p)).toContain(AchievementId.GREAT_CONNECTOR);
   });
 
-  it('does not unlock The Great Connector when the water gap between ports is unowned', () => {
+  it('does not unlock The Great Connector when the water gap between ports belongs to an enemy', () => {
     const tiles = [
       tile(0, 0, { settlement: { owner: 0, level: 1, captureReady: false }, ownedBy: 0 }),
       tile(1, 0, { roadOwner: 0 }),
       tile(2, 0, { terrain: TileType.Water, building: { kind: BuildingKind.PORT, level: 1 }, ownedBy: 0 }),
-      tile(3, 0, { terrain: TileType.Water }),
+      tile(3, 0, { terrain: TileType.Water, ownedBy: 1 }),
       tile(4, 0, { terrain: TileType.Water, building: { kind: BuildingKind.PORT, level: 1 }, ownedBy: 0 }),
       tile(5, 0, { roadOwner: 0 }),
       tile(6, 0, { settlement: { owner: 0, level: 1, captureReady: false }, ownedBy: 0 }),

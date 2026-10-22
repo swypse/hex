@@ -45,20 +45,30 @@ describe('portWaterClusterJumps', () => {
     expect(jumps.get('2,0')?.has('0,0')).toBe(true);
   });
 
-  it('does not connect ports separated by unowned water', () => {
+  it('does not connect ports separated by water an enemy owns', () => {
+    const map = mapOf([
+      tile(0, 0, TileType.Water, 0, { port: true }),
+      tile(1, 0, TileType.Water, 1),
+      tile(2, 0, TileType.Water, 0, { port: true }),
+    ]);
+    expect(portWaterClusterJumps(map)).toEqual(new Map());
+  });
+
+  it('connects ports through free (unowned) water', () => {
     const map = mapOf([
       tile(0, 0, TileType.Water, 0, { port: true }),
       tile(1, 0, TileType.Water, null),
       tile(2, 0, TileType.Water, 0, { port: true }),
     ]);
-    expect(portWaterClusterJumps(map)).toEqual(new Map());
+    expect(portWaterClusterJumps(map).get('0,0')).toEqual(new Set(['2,0']));
+    expect(waterRouteEdges(map).get('1,0')).toEqual(['0,0', '2,0']);
   });
 
   it('does not connect ports in separate water components', () => {
     const map = mapOf([
       tile(0, 0, TileType.Water, 0, { port: true }),
       tile(1, 0, TileType.Water, 0),
-      tile(2, 0, TileType.Water, null),
+      tile(2, 0, TileType.Water, 1),
       tile(3, 0, TileType.Water, 0),
       tile(4, 0, TileType.Water, 0, { port: true }),
     ]);
@@ -106,7 +116,7 @@ describe('waterRouteEdges', () => {
   it('produces no edges for ports with no own-water connection', () => {
     const map = mapOf([
       tile(0, 0, TileType.Water, 0, { port: true }),
-      tile(1, 0, TileType.Water, null),
+      tile(1, 0, TileType.Water, 1),
       tile(2, 0, TileType.Water, 0, { port: true }),
     ]);
     expect(waterRouteEdges(map)).toEqual(new Map());

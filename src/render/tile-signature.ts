@@ -14,8 +14,8 @@ export interface Viewport {
   scale: number;
   width: number;
   height: number;
-  /** 0 = default fit view, 1 = fully zoomed out; used to hide detail text. */
-  zoomOut?: number;
+  /** Labels (hp text, village names) are hidden at this zoom; decided by the host (see `detailHiddenAt`). */
+  labelsHidden?: boolean;
 }
 
 /** Whether a farm yields no food right now (winter without Agronomy, fire), so it is drawn black and white. */

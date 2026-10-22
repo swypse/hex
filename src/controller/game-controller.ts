@@ -33,7 +33,7 @@ import { exploreVillageSights } from '@/game/economy/village';
 import { t } from '@/i18n';
 import { localizeVillageName } from '@/i18n/lists';
 import type { HostMessage } from '@/net/peer-session';
-import { MapView, type OverlayItem, ZOOM_DETAIL_HIDE } from '@/render/map-renderer';
+import { detailHiddenAt, MapView, type OverlayItem } from '@/render/map-renderer';
 import { markDirty } from '@/gfx/render-gate';
 import { adoptTerrainTextures, createTerrainTextures, createTextures, destroyTextureSet, suppressPixiWarnings, type TerrainTextures, type TextureSet } from '@/render/texture-factory';
 import { pickTileAt } from '@/render/tile-pick';
@@ -784,11 +784,11 @@ class GameController {
     return this.app.screen.height;
   }
 
-  /** 0 at the default view (camera zoom 1), 1 at the farthest zoom-out
-   *  (camera zoom 0.5). Used to hide detail text when zoomed out. */
-  private zoomOut(): number {
-    if (!this.camera) return 0;
-    return clamp01((1 - this.camera.zoom) / 0.5);
+  /** Labels (hp text, village names) are hidden while more than 60% of the map's
+   *  width is visible on screen. */
+  private labelsHidden(): boolean {
+    if (!this.camera || !this.app || !this.sim) return false;
+    return detailHiddenAt(this.app.screen.width, this.camera.scale, this.sim.map.radius, HEX_SIZE);
   }
 
   /** Current camera pan (screen px); zero before the camera exists. */
@@ -919,7 +919,7 @@ class GameController {
         scale,
         width: this.app.screen.width,
         height: this.mapHeight(),
-        zoomOut: this.zoomOut(),
+        labelsHidden: this.labelsHidden(),
       };
       // While the camera is busy (drag / zoom / pan) the viewport can jump at
       // pointermove rate; culling the whole tile map and rebuilding the edge
@@ -934,7 +934,7 @@ class GameController {
     }
     // Zoom changes never re-render the overlay, so hp bars/labels stay stale
     // until the detail threshold is crossed; force a render then.
-    const hidden = this.zoomOut() > ZOOM_DETAIL_HIDE;
+    const hidden = this.labelsHidden();
     if (hidden !== this.detailHidden) {
       this.detailHidden = hidden;
       this.render();
@@ -1670,7 +1670,7 @@ class GameController {
         scale: this.camera!.scale,
         width: this.app.screen.width,
         height: this.mapHeight(),
-        zoomOut: this.zoomOut(),
+        labelsHidden: this.labelsHidden(),
       },
       this.tutorialMarkerKeys(),
       isLocalTurn,
@@ -1678,7 +1678,7 @@ class GameController {
       pickedKey,
     );
     this.overlayItems = this.mapView.overlayItems;
-    this.detailHidden = this.zoomOut() > ZOOM_DETAIL_HIDE;
+    this.detailHidden = this.labelsHidden();
     this.applyTransform();
   }
 }

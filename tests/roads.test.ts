@@ -298,12 +298,12 @@ describe('ports as water network', () => {
     expect(isVillageRoadConnected(map, map.tiles[6]!)).toBe(true);
   });
 
-  it('does not connect villages through ports with an unowned water gap', () => {
+  it('does not connect villages through ports with an enemy-owned water gap', () => {
     const map = mapWith([
       villageTile(0, 0, 0),
       tile(1, 0, TileType.GrasslandLand, { roadOwner: 0 }),
       tile(2, 0, TileType.Water, { building: { kind: BuildingKind.PORT, level: 1 }, ownedBy: 0 }),
-      tile(3, 0, TileType.Water),
+      tile(3, 0, TileType.Water, { ownedBy: 1 }),
       tile(4, 0, TileType.Water, { building: { kind: BuildingKind.PORT, level: 1 }, ownedBy: 0 }),
       tile(5, 0, TileType.GrasslandLand, { roadOwner: 0 }),
       villageTile(6, 0, 0),
