@@ -523,18 +523,10 @@ describe('MapView hp bar anchoring', () => {
     expect(hpBarItem().world.y).toBeCloseTo(topWorld + 40, 5);
   });
 
-  it('renders the hp label on an opaque black background with the label above', () => {
+  it('renders the hp label as plain outlined text, without a plate', () => {
     const el = hpBarItem().el;
-    const labelIndex = el.children.findIndex((c) => c instanceof BitmapText);
-    const labelBg = el.children[labelIndex - 1] as Graphics;
-    const context = labelBg.context as unknown as {
-      instructions: Array<{ action: string; data: { style: { color: number; alpha: number } } }>;
-    };
-    const fill = context.instructions.find((i) => i.action === 'fill')!.data.style;
-    expect(fill.color).toBe(0x000000);
-    expect(fill.alpha).toBe(1);
-    const label = el.children[labelIndex];
-    expect(labelIndex).toBeGreaterThan(el.children.indexOf(labelBg));
+    expect(el.children.some((c) => c instanceof BitmapText)).toBe(true);
+    expect(el.children.filter((c) => c instanceof Graphics)).toHaveLength(3); // white box, orange ghost, green bar
   });
 
   it('lays the village label text above its background', () => {
@@ -743,16 +735,7 @@ describe('MapView hp bar anchoring', () => {
     view.destroy();
   });
 
-  it('lays the hp label text above its black background', () => {
-    const el = hpBarItem().el;
-    expect(el.sortableChildren).toBe(true);
-    const labelIndex = el.children.findIndex((c) => c instanceof BitmapText);
-    const labelBg = el.children[labelIndex - 1] as Graphics;
-    const label = el.children[labelIndex] as BitmapText;
-    expect(label.zIndex).toBeGreaterThan(labelBg.zIndex);
-  });
-
-  it('dims the hp label background for an own unit with no actions', () => {
+  it('dims the hp label text for an own unit with no actions', () => {
     const tile = map.tiles.find((t) => t.q === 0 && t.r === 0)!;
     tile.unit = { ...tile.unit!, hasMoved: true, hasAttacked: true, hasHealed: true };
     view.update(map, players, null, new Set(), new Set(), 0, new Set(), {
@@ -763,14 +746,8 @@ describe('MapView hp bar anchoring', () => {
       height: 600,
     });
     const el = hpBarItem().el;
-    const labelIndex = el.children.findIndex((c) => c instanceof BitmapText);
-    const labelBg = el.children[labelIndex - 1] as Graphics;
-    const context = labelBg.context as unknown as {
-      instructions: Array<{ action: string; data: { style: { color: number; alpha: number } } }>;
-    };
-    const fill = context.instructions.find((i) => i.action === 'fill')!.data.style;
-    expect(fill.color).toBe(0x000000);
-    expect(fill.alpha).toBe(0.3);
+    const label = el.children.find((c) => c instanceof BitmapText) as BitmapText;
+    expect(label.alpha).toBe(0.5);
   });
 
   it('keeps an own unit dimmed while it is not the local turn even if it can act', () => {
@@ -782,36 +759,14 @@ describe('MapView hp bar anchoring', () => {
       height: 600,
     }, new Set(), false);
     const el = hpBarItem().el;
-    const labelIndex = el.children.findIndex((c) => c instanceof BitmapText);
-    const labelBg = el.children[labelIndex - 1] as Graphics;
-    const context = labelBg.context as unknown as {
-      instructions: Array<{ action: string; data: { style: { color: number; alpha: number } } }>;
-    };
-    const fill = context.instructions.find((i) => i.action === 'fill')!.data.style;
-    expect(fill.color).toBe(0x000000);
-    expect(fill.alpha).toBe(0.3);
+    const label = el.children.find((c) => c instanceof BitmapText) as BitmapText;
+    expect(label.alpha).toBe(0.5);
   });
 
   it('does not draw the red can-act dot on an own unit hp bar', () => {
     const el = hpBarItem().el;
     const graphicsCount = el.children.filter((c) => c instanceof Graphics).length;
-    expect(graphicsCount).toBe(4); // white box, orange ghost, green bar, label bg
-  });
-
-  it('puts the hp text on a black plate with HP_LABEL_PAD_X side padding and rounded corners', () => {
-    const el = hpBarItem().el;
-    const plate = el.children.find((c) => c instanceof Graphics && c !== el.children[0] && c !== el.children[1] && c !== el.children[2]) as Graphics;
-    const label = el.children.find((c) => c instanceof BitmapText) as BitmapText;
-    expect(plate.getBounds().width).toBeCloseTo(label.width + HP_LABEL_PAD_X * 2, 5);
-    const shapes = plate.context.instructions.flatMap((i) => {
-      const path = (i.data as { path?: { instructions: Array<{ action: string; data: number[] }> } })?.path;
-      return path ? path.instructions : [];
-    });
-    const round = shapes.find((i) => i.action === 'roundRect');
-    expect(round).toBeDefined();
-    expect(round!.data[4]).toBe(HP_LABEL_RADIUS); // roundRect(x, y, w, h, radius)
-    const fill = plate.context.instructions.find((i) => i.action === 'fill')!.data as { style: { color: number } };
-    expect(fill.style.color).toBe(0x000000);
+    expect(graphicsCount).toBe(3); // white box, orange ghost, green bar
   });
 
   it('draws a white box (HP_BAR_OUTER_W x HP_BAR_OUTER_H) with a full green bar and an orange ghost behind it', () => {
@@ -978,7 +933,7 @@ describe('MapView hp bar anchoring', () => {
     }
   });
 
-  it('shows the same white-box hp bar for a damaged building', () => {
+  it('shows the same hp bar box for a damaged building', () => {
     const tile = map.tiles.find((t) => t.q === 0 && t.r === 0)!;
     tile.unit = null;
     tile.building = { kind: BuildingKind.MINE, level: 1, hp: 1 };
@@ -990,7 +945,7 @@ describe('MapView hp bar anchoring', () => {
       return label instanceof BitmapText && label.text === '1/2';
     });
     expect(bars).toHaveLength(1);
-    expect(bars[0]!.el.children.filter((c) => c instanceof Graphics).length).toBe(4);
+    expect(bars[0]!.el.children.filter((c) => c instanceof Graphics).length).toBe(3);
   });
 
   it('draws the attack marker of a village unit in the overlay above its unit mirror', () => {

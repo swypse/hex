@@ -5,6 +5,9 @@ import { forEachIdle } from '../util/time-slice';
 
 export const FONT_REGULAR = 'Roboto Regular';
 export const FONT_BLACK = 'Roboto Black';
+/** Roboto Black with a black outline, for map labels. Only exists as a sized bake;
+ *  without sized fonts it falls back to plain `FONT_BLACK`. */
+export const FONT_OUTLINED = 'Roboto Black Outlined';
 
 const FONT_BASE = `${import.meta.env.BASE_URL}fonts/`;
 
@@ -49,6 +52,7 @@ const MAX_BAKE = 3;
  *  baked on first use and remembered for the next start-up. */
 const SEED_FONT_SIZES: readonly (readonly [string, number])[] = [
   ...SCALE_SIZES.flatMap((size): [string, number][] => [[FONT_REGULAR, size], [FONT_BLACK, size]]),
+  [FONT_OUTLINED, FontSize.VERY_SMALL],
   [FONT_REGULAR, FontSize.VERY_SMALL * MAX_BAKE],
   [FONT_REGULAR, FontSize.SMALL * MAX_BAKE],
 ];
@@ -126,7 +130,7 @@ function warnIfOffScale(size: number): void {
  *  glyphs outside ASCII (Cyrillic, symbols) are added on first use. Falls back to
  *  the shipped atlas when disabled or the bake fails. */
 export function sizedFontFamily(family: string, fontSize: number): string {
-  if (!sizedFontsEnabled) return family;
+  if (!sizedFontsEnabled) return family === FONT_OUTLINED ? FONT_BLACK : family;
   const size = Math.max(1, Math.round(fontSize));
   warnIfOffScale(size);
   const name = `${family}@${size}`;
@@ -138,9 +142,11 @@ export function sizedFontFamily(family: string, fontSize: number): string {
       name,
       style: {
         fontFamily: 'Roboto',
-        fontWeight: family === FONT_BLACK ? '800' : '400',
+        fontWeight: family === FONT_BLACK || family === FONT_OUTLINED ? '800' : '400',
         fontSize: size,
         fill: 0xffffff,
+        // Centered stroke: 1px of black shows outside the glyph.
+        ...(family === FONT_OUTLINED ? { stroke: { color: 0x000000, width: 2, join: 'round' as const } } : {}),
       },
       chars: [[' ', '~']],
       resolution: Math.min(MAX_SIZED_RESOLUTION, Math.max(1, window.devicePixelRatio || 1)),

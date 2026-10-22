@@ -1,5 +1,5 @@
 import { Application, BitmapText, Circle, Container, Graphics, ImageSource, Sprite, Texture } from 'pixi.js';
-import { FONT_BLACK, FONT_REGULAR } from '../gfx/bitmap-fonts';
+import { FONT_OUTLINED, FONT_REGULAR } from '../gfx/bitmap-fonts';
 import {
   axialKey, compareTileY, hexCorners, hexDistance, hexEdge, hexEdgeNeighbor, hexNeighbors, hexToPixel, splitHexBorder
 } from '../game/map/hex';
@@ -37,7 +37,7 @@ import { unitGlowColor } from './unit-glow-color';
 import { weatherOverlayAt } from '../game/weather/weather';
 import { HP_BAR_BOX_TOP, HP_BAR_ICON_GAP } from './hp-bar-layout';
 import { icons32FrameTexture, makeIcon32 } from '../gfx/icons32';
-import { BuildingKind, FontSize, PortDirection, Season, SelectionKind, UnitFacing, UnitType } from '@enums';
+import { BuildingKind, FontSize, HpBarSide, PortDirection, Season, SelectionKind, UnitFacing, UnitType } from '@enums';
 import { tileMapByKey } from '../game/map/tile-index';
 
 /** Diameter of a pirate-deal dot (screen px; the row does not scale with zoom). */
@@ -80,6 +80,12 @@ interface BobEntry {
 }
 
 const OVERLAY_Z_VILLAGE_LABEL = -2;
+/** Village name labels sit this many px lower than the base label spot. */
+/** Sawmill, granary and mine stock labels are lifted this many px above the base label spot. */
+const STOCK_LABEL_RAISE = 4;
+/** The mine label is lifted this much more than the other stock labels. */
+const MINE_LABEL_EXTRA_RAISE = 8;
+const VILLAGE_LABEL_DROP = 8;
 const OVERLAY_Z_UNIT_MIRROR = -1;
 /** Attack markers above a mirrored unit, still below hp bars (0). */
 const OVERLAY_Z_ATTACK_MARKER = -0.5;
@@ -404,6 +410,7 @@ export class MapView {
             bonus: attackBonus(unit, map),
             starving: unit.starving === true,
             veteran: unit.veteran === true,
+            side: unit.owner === localPlayerIndex ? HpBarSide.OWN : HpBarSide.ENEMY,
           });
         }
         if (unit.type === UnitType.PIRATE || unit.shipLevel !== undefined) {
@@ -427,6 +434,7 @@ export class MapView {
           label: `${bhp}/${BUILDING_MAX_HP}`,
           dim: false,
           bonus: 0,
+          side: tile.ownedBy === null ? HpBarSide.NEUTRAL : tile.ownedBy === localPlayerIndex ? HpBarSide.OWN : HpBarSide.ENEMY,
         });
       }
       // Thorn traps are visible only to their owner. `applyTile` owns the trap
@@ -448,14 +456,14 @@ export class MapView {
           tile,
           owner: tile.settlement.owner,
           el: new Container(),
-          world: { x: p.x, y: y + this.hexSize * 0.35 + 5 }
+          world: { x: p.x, y: y + this.hexSize * 0.35 + 5 + VILLAGE_LABEL_DROP }
         });
       }
       const kind = tile.building?.kind;
       const hasStockLabel = kind === BuildingKind.GRANARY || kind === BuildingKind.SAWMILL || kind === BuildingKind.MINE;
       // Only your own stock is shown; enemy capacities stay hidden.
       if (hasStockLabel && tile.ownedBy === localPlayerIndex && explored && !detailHidden) {
-        granaryLabels.push({ tile, owner: tile.ownedBy, world: { x: p.x, y: y + this.hexSize * 0.35 + 5 } });
+        granaryLabels.push({ tile, owner: tile.ownedBy, world: { x: p.x, y: y + this.hexSize * 0.35 + 5 - STOCK_LABEL_RAISE - (kind === BuildingKind.MINE ? MINE_LABEL_EXTRA_RAISE : 0) } });
       }
       if (tile.settlement && tile.settlement.captureReady && tile.unit && tile.unit.owner !== tile.settlement.owner && explored) {
         const el = new Container();
@@ -2110,15 +2118,15 @@ export class MapView {
   }
 
   /** What the stock plate of a granary, sawmill or mine shows: a granary and a
-   *  sawmill `<icon> held/capacity`; a mine `<stone icon> N <ore icon> M`. */
+   *  sawmill `held/capacity`; a mine `<stone icon> N <ore icon> M`. */
   private stockLabelParts(tile: MapTile): { text: string; icon?: string }[] {
     const b = tile.building;
     if (!b) return [];
     if (b.kind === BuildingKind.GRANARY) {
-      return [{ icon: 'food-32', text: `${b.food ?? 0}/${this.map ? granaryCapacity(this.map, tile) : 0}` }];
+      return [{ text: `${b.food ?? 0}/${this.map ? granaryCapacity(this.map, tile) : 0}` }];
     }
     if (b.kind === BuildingKind.SAWMILL) {
-      return [{ icon: 'wood-32', text: `${heldInBuilding(b, 'wood')}/${buildingCapacity(b, 'wood')}` }];
+      return [{ text: `${heldInBuilding(b, 'wood')}/${buildingCapacity(b, 'wood')}` }];
     }
     return [
       { icon: 'stone-32', text: String(heldInBuilding(b, 'stone')) },
@@ -2137,23 +2145,16 @@ export class MapView {
     const iconSize = 14;
     const iconGap = 2;
     const partGap = 6;
-    const items: { text: BitmapText; shadow: BitmapText; icon: Sprite | null; width: number }[] = parts.map((part) => {
+    const items: { text: BitmapText; icon: Sprite | null; width: number }[] = parts.map((part) => {
       const text = this.pool.takeText(part.text, {
         fontSize: VILLAGE_LABEL_FONT_SIZE,
         fill: 0xffffff,
-        fontFamily: FONT_BLACK,
+        fontFamily: FONT_OUTLINED,
       });
       text.anchor.set(0, 0.5);
       text.zIndex = 1;
-      const shadow = this.pool.takeText(part.text, {
-        fontSize: VILLAGE_LABEL_FONT_SIZE,
-        fill: 0x000000,
-        fontFamily: FONT_BLACK,
-      });
-      shadow.anchor.set(0, 0.5);
-      shadow.zIndex = 0;
       const icon = part.icon ? makeIcon32(part.icon, iconSize) : null;
-      return { text, shadow, icon, width: (icon ? iconSize + iconGap : 0) + text.width };
+      return { text, icon, width: (icon ? iconSize + iconGap : 0) + text.width };
     });
     const contentW = items.reduce((sum, it) => sum + it.width, 0) + partGap * (items.length - 1);
     el.sortableChildren = true;
@@ -2167,9 +2168,8 @@ export class MapView {
         el.addChild(it.icon);
         x += iconSize + iconGap;
       }
-      it.shadow.position.set(x + 1, 1);
       it.text.position.set(x, 0);
-      el.addChild(it.shadow, it.text);
+      el.addChild(it.text);
       x += it.text.width + partGap;
     }
     el.position.set(world.x, world.y);
@@ -2226,20 +2226,20 @@ export class MapView {
     el.addChild(labelBg);
     el.addChild(label);
     if (tile.settlement!.starving) {
-      // Red starvation tag right below the village name.
-      const tag = this.pool.takeText(t('village.starving'), {
+      // Red "S" on black left of the village plate, like a starving unit's.
+      const tag = this.pool.takeText('S', {
         fontSize: VILLAGE_LABEL_FONT_SIZE,
         fill: 0xff4d4d,
         fontFamily: FONT_REGULAR,
       });
-      tag.anchor.set(0.5, 0);
-      const tagY = label.height / 2 + 3;
-      tag.position.set(0, tagY);
+      tag.anchor.set(1, 0.5);
+      const tagRight = x0 - padX - 2;
+      tag.position.set(tagRight - padX, 0);
       tag.zIndex = 1;
       const tagBg = this.pool.takeGraphics();
       tagBg.zIndex = 0;
       tagBg
-        .roundRect(-tag.width / 2 - padX, tagY - 1, tag.width + padX * 2, tag.height + 2, 2)
+        .roundRect(tagRight - tag.width - padX * 2, -tag.height / 2 - 1, tag.width + padX * 2, tag.height + 2, 2)
         .fill({ color: 0x000000, alpha: 0.7 });
       el.addChild(tagBg);
       el.addChild(tag);

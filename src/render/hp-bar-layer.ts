@@ -1,13 +1,19 @@
 import { Application, BitmapText, Container, Graphics, Sprite } from 'pixi.js';
 import type { ObjectPool } from './object-pool';
 import type { TextureSet } from './texture-factory';
-import { FONT_REGULAR } from '../gfx/bitmap-fonts';
-import { HP_BAR_BOX_TOP, HP_BAR_HEIGHT, HP_BAR_INNER_W, HP_BAR_OUTER_H, HP_BAR_OUTER_W, HP_BAR_PADDING, HP_LABEL_GAP, HP_LABEL_PAD_X, HP_LABEL_PLATE_GAP, HP_LABEL_RADIUS } from './hp-bar-layout';
+import { FONT_OUTLINED } from '../gfx/bitmap-fonts';
+import { HP_BAR_BOX_TOP, HP_BAR_HEIGHT, HP_BAR_INNER_W, HP_BAR_OUTER_H, HP_BAR_OUTER_W, HP_BAR_PADDING, HP_LABEL_GAP, HP_LABEL_PAD_X, HP_LABEL_PLATE_GAP } from './hp-bar-layout';
 import { makeIcon32 } from '../gfx/icons32';
-import { FontSize } from '@enums';
+import { FontSize, HpBarSide } from '@enums';
 import { clamp, clamp01 } from '../util/math';
 
 const HP_BAR_GREEN = 0x49cc5d;
+/** Fill colour of the inner hp box by owner: enemies red, everyone else green. */
+const HP_BAR_FILL: Record<HpBarSide, number> = {
+  [HpBarSide.OWN]: HP_BAR_GREEN,
+  [HpBarSide.ENEMY]: 0xe04848,
+  [HpBarSide.NEUTRAL]: HP_BAR_GREEN,
+};
 const HP_BAR_GHOST = 0xfa9a09;
 const HP_BAR_GREEN_MS = 100;
 const HP_BAR_GHOST_MS = 300;
@@ -18,6 +24,12 @@ const HP_RESTAGE_WINDOW_MS = 1000;
 /** Veteran star icon size and its gap to the hp text. */
 const VETERAN_STAR_SIZE = 12;
 const VETERAN_STAR_GAP = 2;
+/** Attack-bonus marker after the hp text: icon size, gap before the icon and gap before the +N text. */
+const BONUS_ICON_SIZE = 16;
+const BONUS_ICON_GAP = 1;
+const BONUS_TEXT_GAP = 0;
+/** Opacity of the hp text and attack-bonus marker of a unit that cannot act (the veteran star stays opaque). */
+const HP_LABEL_DIM_ALPHA = 0.5;
 
 /** What the HP bar layer needs to draw one bar for a unit or a building. */
 export interface HpBarSpec {
@@ -32,6 +44,8 @@ export interface HpBarSpec {
   starving?: boolean;
   /** A veteran: a star icon before the hp text. */
   veteran?: boolean;
+  /** Whose bar it is (colour of the hp fill); neutral when unset. */
+  side?: HpBarSide;
 }
 
 /** A persistent unit/building hp bar: a white 62x12 box holding an orange
@@ -41,14 +55,15 @@ interface HpBarEntry {
   el: Container;
   world: { x: number; y: number };
   bg: Graphics;
+  /** Whose bar it is now (a captured building changes side): picks the fill colour. */
+  side: HpBarSide;
   ghost: Graphics;
   green: Graphics;
   label: BitmapText;
-  labelBg: Graphics;
   bonusIcon: Sprite | null;
   bonusText: BitmapText | null;
-  /** Red "S" on black before the hp text of a starving unit. */
-  starveTag: { text: BitmapText; bg: Graphics } | null;
+  /** Red "S" before the hp text of a starving unit. */
+  starveTag: BitmapText | null;
   /** Star icon before the hp text of a veteran. */
   star: Sprite | null;
   greenW: number;
@@ -67,11 +82,6 @@ interface HpBarEntry {
 
 /** A `stage:`-prefixed unit id (combat staging) refers to the same entity as
  *  the real unit; map both to the real id's hp bar key. */
-/** Black rounded plate behind hp-line text: the text box (x, y, w, h) plus side padding. */
-function drawHpPlate(g: Graphics, x: number, y: number, w: number, h: number, alpha: number): void {
-  g.roundRect(x - HP_LABEL_PAD_X, y, w + HP_LABEL_PAD_X * 2, h, HP_LABEL_RADIUS).fill({ color: 0x000000, alpha });
-}
-
 function normalizeHpBarKey(key: string): string {
   return key.startsWith('stage:') ? key.slice('stage:'.length) : key;
 }
@@ -150,6 +160,7 @@ export class HpBarLayer {
         bar.greenW = targetW;
         bar.ghostW = targetW;
       }
+      bar.side = spec.side ?? HpBarSide.NEUTRAL;
       this.updateHpBarLabel(bar, spec);
       this.drawHpBars(bar);
     }
@@ -188,18 +199,13 @@ export class HpBarLayer {
     const label = this.deps.pool.takeText(spec.label, {
       fontSize: FontSize.VERY_SMALL,
       fill: 0xffffff,
-      fontFamily: FONT_REGULAR,
+      fontFamily: FONT_OUTLINED,
     });
     label.anchor.set(0.5, 1);
     label.position.set(0, boxTop - HP_LABEL_GAP);
     label.zIndex = 1;
     this.labelHeight = label.height;
 
-    const labelBg = this.deps.pool.takeGraphics();
-    labelBg.zIndex = 0;
-    const alpha = spec.dim ? 0.3 : 1;
-    drawHpPlate(labelBg, label.x - label.width / 2, label.y - label.height, label.width, label.height, alpha);
-    el.addChild(labelBg);
     el.addChild(label);
 
     let bonusIcon: Sprite | null = null;
@@ -208,19 +214,19 @@ export class HpBarLayer {
     if (spec.bonus > 0 && attackIcon) {
       const icon = new Sprite(attackIcon);
       icon.anchor.set(0.5, 1);
-      icon.width = 16;
-      icon.height = 16;
-      icon.position.set(label.x + label.width / 2 + HP_LABEL_PAD_X + 10, label.y);
+      icon.width = BONUS_ICON_SIZE;
+      icon.height = BONUS_ICON_SIZE;
+      icon.position.set(label.x + label.width / 2 + BONUS_ICON_GAP + BONUS_ICON_SIZE / 2, label.y);
       icon.zIndex = 1;
       el.addChild(icon);
       bonusIcon = icon;
       bonusText = this.deps.pool.takeText(`+${spec.bonus}`, {
         fontSize: FontSize.VERY_SMALL,
         fill: 0xffcc00,
-        fontFamily: FONT_REGULAR,
+        fontFamily: FONT_OUTLINED,
       });
       bonusText.anchor.set(0, 1);
-      bonusText.position.set(label.x + label.width / 2 + HP_LABEL_PAD_X + 22, label.y);
+      bonusText.position.set(label.x + label.width / 2 + BONUS_ICON_GAP + BONUS_ICON_SIZE + BONUS_TEXT_GAP, label.y);
       bonusText.zIndex = 1;
       el.addChild(bonusText);
     }
@@ -229,10 +235,10 @@ export class HpBarLayer {
       el,
       world: spec.world,
       bg,
+      side: spec.side ?? HpBarSide.NEUTRAL,
       ghost,
       green,
       label,
-      labelBg,
       bonusIcon,
       bonusText,
       starveTag: null,
@@ -253,12 +259,14 @@ export class HpBarLayer {
 
   private updateHpBarLabel(bar: HpBarEntry, spec: HpBarSpec): void {
     bar.label.text = spec.label;
-    const alpha = spec.dim ? 0.3 : 1;
+    // A unit with nothing left to do dims its hp text and attack bonus.
+    const textAlpha = spec.dim ? HP_LABEL_DIM_ALPHA : 1;
+    bar.label.alpha = textAlpha;
+    if (bar.bonusIcon) bar.bonusIcon.alpha = textAlpha;
+    if (bar.bonusText) bar.bonusText.alpha = textAlpha;
     const starW = this.updateStar(bar, spec);
-    // The plate grows to the left to hold the star inside it.
-    drawHpPlate(bar.labelBg.clear(), bar.label.x - bar.label.width / 2 - starW, bar.label.y - bar.label.height, bar.label.width + starW, bar.label.height, alpha);
     this.labelHeight = bar.label.height;
-    this.updateStarveTag(bar, spec, alpha, starW);
+    this.updateStarveTag(bar, spec, starW);
   }
 
   /** Keeps the veteran star left of the hp text in sync with the unit. Returns the
@@ -280,44 +288,35 @@ export class HpBarLayer {
       bar.star = star;
     }
     const w = VETERAN_STAR_SIZE + VETERAN_STAR_GAP;
-    bar.star.alpha = spec.dim ? 0.3 : 1;
     bar.star.position.set(bar.label.x - bar.label.width / 2 - w, bar.label.y - 1);
     return w;
   }
 
   /** Keeps the red "S" starvation tag before the hp text in sync with the unit. */
-  private updateStarveTag(bar: HpBarEntry, spec: HpBarSpec, alpha: number, starW = 0): void {
+  private updateStarveTag(bar: HpBarEntry, spec: HpBarSpec, starW = 0): void {
     if (!spec.starving) {
       if (bar.starveTag) {
-        bar.starveTag.text.parent?.removeChild(bar.starveTag.text);
-        bar.starveTag.bg.parent?.removeChild(bar.starveTag.bg);
-        bar.starveTag.text.destroy();
-        bar.starveTag.bg.destroy();
+        bar.starveTag.parent?.removeChild(bar.starveTag);
+        bar.starveTag.destroy();
         bar.starveTag = null;
       }
       return;
     }
     if (!bar.starveTag) {
-      const text = this.deps.pool.takeText('S', { fontSize: FontSize.VERY_SMALL, fill: 0xff4d4d, fontFamily: FONT_REGULAR });
+      const text = this.deps.pool.takeText('S', { fontSize: FontSize.VERY_SMALL, fill: 0xff4d4d, fontFamily: FONT_OUTLINED });
       text.anchor.set(1, 1);
       text.zIndex = 1;
-      const bg = this.deps.pool.takeGraphics();
-      bg.zIndex = 0;
-      bar.el.addChild(bg);
       bar.el.addChild(text);
-      bar.starveTag = { text, bg };
+      bar.starveTag = text;
     }
-    const { text, bg } = bar.starveTag;
-    // The tag's plate ends HP_LABEL_PLATE_GAP before the hp plate.
-    const right = bar.label.x - bar.label.width / 2 - starW - HP_LABEL_PAD_X - HP_LABEL_PLATE_GAP - HP_LABEL_PAD_X;
-    text.position.set(right, bar.label.y);
-    drawHpPlate(bg.clear(), right - text.width, bar.label.y - bar.label.height, text.width, bar.label.height, alpha);
+    // The tag ends HP_LABEL_PLATE_GAP before the hp text (and the star, if any).
+    bar.starveTag.position.set(bar.label.x - bar.label.width / 2 - starW - HP_LABEL_PLATE_GAP, bar.label.y);
   }
 
   private drawHpBars(bar: HpBarEntry): void {
     const boxTop = HP_BAR_BOX_TOP;
     bar.ghost.clear().rect(-HP_BAR_OUTER_W / 2 + HP_BAR_PADDING, boxTop + HP_BAR_PADDING, bar.ghostW, HP_BAR_HEIGHT).fill(HP_BAR_GHOST);
-    bar.green.clear().rect(-HP_BAR_OUTER_W / 2 + HP_BAR_PADDING, boxTop + HP_BAR_PADDING, bar.greenW, HP_BAR_HEIGHT).fill(HP_BAR_GREEN);
+    bar.green.clear().rect(-HP_BAR_OUTER_W / 2 + HP_BAR_PADDING, boxTop + HP_BAR_PADDING, bar.greenW, HP_BAR_HEIGHT).fill(HP_BAR_FILL[bar.side]);
   }
 
   /** Runs the shared hp bar ticker while any bar is animating; redraws the

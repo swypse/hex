@@ -27,8 +27,8 @@ describe('prewarmSizedFonts', () => {
     expect(names).toContain(`${FONT_REGULAR}@14`);
     expect(names).toContain(`${FONT_REGULAR}@42`);
     expect(names).toContain(`${FONT_BLACK}@36`); // learned (on the scale, not a seed)
-    expect(idles).toBe(11); // 4 sizes x 2 weights + 2 baked skill-tree sizes + 1 learned
-    expect(names).toHaveLength(11);
+    expect(idles).toBe(12); // 4 sizes x 2 weights + 1 pixel-font size + 2 baked skill-tree sizes + 1 learned
+    expect(names).toHaveLength(12);
     expect(new Set(names).size).toBe(names.length);
   });
 
