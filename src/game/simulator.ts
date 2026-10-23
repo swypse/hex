@@ -604,6 +604,7 @@ export class Simulator {
   private triggerTrap(victim: Unit, trapTile: MapTile): void {
     const damage = trapDamage();
     victim.hp = Math.max(0, victim.hp - damage);
+    const trapOwner = trapTile.trap?.owner ?? -1;
     trapTile.trap = null;
     this.emit({
       type: GameEventType.TRAP_TRIGGERED,
@@ -611,7 +612,8 @@ export class Simulator {
       r: trapTile.r,
       targetId: victim.id,
       damage,
-      attackerIndex: this.currentPlayerIndex
+      attackerIndex: this.currentPlayerIndex,
+      trapOwner,
     });
     if (victim.hp <= 0) {
       const t = tileAt(this.map, victim.q, victim.r);
@@ -663,6 +665,13 @@ export class Simulator {
     const tile = tileAt(this.map, unit.q, unit.r)!;
     const target = tileAt(this.map, q, r);
     if (!target) return false;
+    // A hidden enemy stalker on the target cell is revealed instead; no trap is
+    // placed and the trapper keeps its action (like walking into one).
+    const hidden = target.unit;
+    if (hidden && hidden !== unit && hidden.owner !== unit.owner && hidden.isStealthed === true) {
+      this.revealStalker(hidden);
+      return true;
+    }
     if (!canPlaceTrapOn(target, tile)) return false;
     if (!payAt(this.map, player, tile, TRAP_COST)) return false;
     target.trap = { owner: unit.owner, placedTurn: this.turn };

@@ -100,6 +100,7 @@ export function applyFireTurn(map: GameMap, rng: () => number): FireTurnReport {
       const hit = hurtBuilding(tile, FIRE_RULES.buildingDamage);
       report.buildings.push(hit);
       out = hit.destroyed;
+      if (out) tile.fireTrail = true;
     } else if (tile.bridge) {
       if (tile.fire!.age >= BUILDING_MAX_HP) {
         tile.bridge = null;
@@ -109,6 +110,7 @@ export function applyFireTurn(map: GameMap, rng: () => number): FireTurnReport {
     } else if (forest) {
       if (tile.fire!.age >= FIRE_RULES.forestBurnTurns) {
         tile.terrain = forestToLand(tile.terrain);
+        tile.fireTrail = true;
         report.cleared.push({ q: tile.q, r: tile.r });
         out = true;
       }

@@ -1,7 +1,6 @@
 import { Container } from 'pixi.js';
 import { spawnConfettiBurst } from '../../gfx/confetti';
 import { useGameStore } from '../../store/game-store';
-import { t } from '../../i18n';
 import { type UIHost } from '../host';
 import { makeLabel } from '../../gfx/label';
 import { makeIconChip } from '../kit/tribe-chip';
@@ -12,15 +11,10 @@ import { Popup, POPUP_BODY_SIZE } from '../kit/popup';
 import { OverlayKind } from '@enums';
 
 const MESSAGE_MS = 1400;
-const YOUR_TURN_MS = 800;
 const FORCE_CLOSE_MS = 5000;
 const FONT_SIZE = POPUP_BODY_SIZE;
 const ICON_CHIP_SIZE = 48;
 const ICON_ICON_GAP = 6;
-
-function messageDuration(message: string): number {
-  return message === t('msg.yourTurn') ? YOUR_TURN_MS : MESSAGE_MS;
-}
 
 export class CenterMessage {
   private el: Container | null = null;
@@ -99,7 +93,7 @@ export class CenterMessage {
     // Always re-arm the auto-dismiss timer, even when the same message is
     // queued again, so the popup can never stay on screen forever.
     if (this.timer) clearTimeout(this.timer);
-    this.timer = setTimeout(() => this.close(), messageDuration(message));
+    this.timer = setTimeout(() => this.close(), MESSAGE_MS);
   }
 
   /** A fixed-width notification card: an icon centred above the text. */

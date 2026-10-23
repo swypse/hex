@@ -53,6 +53,19 @@ describe('trapper traps', () => {
     expect(TRAP_COST).toEqual({ wood: 0, stone: 0, money: 3, ore: 2, food: 0 });
   });
 
+  it('reveals a hidden enemy stalker on the target cell instead of placing a trap', () => {
+    const trapper = place(0, UnitType.TRAPPER, 0, 0);
+    const stalker = place(1, UnitType.STALKER, 1, 0);
+    stalker.isStealthed = true;
+    sim.drainEvents();
+    expect(sim.applyCommand({ type: CommandType.TRAP, unitId: trapper.id, q: 1, r: 0 })).toBe(true);
+    expect(stalker.isStealthed).toBe(false);
+    expect(tileAt(map, 1, 0)!.trap).toBeFalsy();
+    expect(findUnit(trapper.id).hasMoved).toBe(false);
+    expect(sim.players[0]!.resources.money).toBe(100);
+    expect(sim.drainEvents().some((e) => e.type === GameEventType.STEALTH_REVEALED)).toBe(true);
+  });
+
   it('places a trap on its own cell, the one the trapper stands on', () => {
     const trapper = place(0, UnitType.TRAPPER, 0, 0);
     expect(sim.applyCommand({ type: CommandType.TRAP, unitId: trapper.id, q: 0, r: 0 })).toBe(true);

@@ -76,6 +76,7 @@ export function tileSignature(
     u ? (u.paidBy ?? []).join(',') : '',
     u ? (u.isStealthed ? 's' : '') : '',
     weatherOverlayAt(map, tile) ?? '',
+    tile.fireTrail ? 'ft' : '',
     hidden ? 'h' : '',
     tile.building ? tile.building.kind : '',
     // A farm that yields nothing swaps to its black-and-white art.

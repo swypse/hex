@@ -3,7 +3,6 @@ import { Container, Sprite, BitmapText } from 'pixi.js';
 import { CenterMessage } from '../src/ui/overlays/center-message';
 import { OverlayKind } from '@enums';
 import { useGameStore } from '../src/store/game-store';
-import { t } from '../src/i18n';
 import { type UIHost } from '../src/ui/host';
 
 function makeHost(width = 800, height = 600): UIHost {
@@ -165,18 +164,14 @@ describe('CenterMessage', () => {
     msg.destroy();
   });
 
-  it('closes "Your turn" after 0.8s and other messages after 1.4s', () => {
+  it('closes messages after 1.4s', () => {
     vi.useFakeTimers();
     try {
       installCanvas();
       const host = makeHost();
       const msg = new CenterMessage();
 
-      useGameStore.setState({ centerMessage: t('msg.yourTurn') });
       msg.mount(host, new Container());
-      vi.advanceTimersByTime(900);
-      expect(useGameStore.getState().centerMessage).toBeNull();
-
       useGameStore.setState({ centerMessage: 'Hello' });
       vi.advanceTimersByTime(900);
       expect(useGameStore.getState().centerMessage).toBe('Hello');

@@ -1,7 +1,7 @@
 import { Application, BitmapText, Circle, Container, Graphics, ImageSource, Sprite, Texture } from 'pixi.js';
 import { FONT_OUTLINED, FONT_REGULAR } from '../gfx/bitmap-fonts';
 import {
-  axialKey, compareTileY, hexCorners, hexDistance, hexEdge, hexEdgeNeighbor, hexNeighbors, hexToPixel, splitHexBorder
+  type Axial, axialKey, compareTileY, hexCorners, HEX_TILT, hexDistance, hexEdge, hexEdgeNeighbor, hexNeighbors, hexToPixel, splitHexBorder
 } from '../game/map/hex';
 import { type GameMap, type MapTile } from '../game/map/map-gen';
 import { bridgeCoastOffsets } from '../game/economy/bridges';
@@ -107,14 +107,26 @@ const SELECTED_BORDER_WIDTH = 6;
 /** Vertical squash applied to move/attack marker circles so they sit flat on
  *  the ground plane like the hexes. */
 const MARKER_Y_SCALE = 0.72;
-/** Share of the map's width visible on screen above which hp bars/text and village names are hidden. */
-export const MAP_SHARE_DETAIL_HIDE = 0.6;
+/** Shares of the map's width and height visible on screen above which (both) hp bars/text and village names are hidden. */
+export const MAP_WIDTH_SHARE_DETAIL_HIDE = 0.6;
+export const MAP_HEIGHT_SHARE_DETAIL_HIDE = 0.9;
 
-/** Whether labels are hidden at this view: more than `MAP_SHARE_DETAIL_HIDE` of the
- *  map's width fits on the screen. */
-export function detailHiddenAt(screenWidth: number, scale: number, mapRadius: number, hexSize: number): boolean {
+/** Whether labels are hidden at this view: more than `MAP_WIDTH_SHARE_DETAIL_HIDE` of the
+ *  map's width and more than `MAP_HEIGHT_SHARE_DETAIL_HIDE` of its height fit on the screen. */
+export function detailHiddenAt(
+  screenWidth: number,
+  screenHeight: number,
+  scale: number,
+  mapRadius: number,
+  hexSize: number,
+): boolean {
   const mapWidth = 2 * Math.sqrt(3) * mapRadius * hexSize;
-  return mapWidth > 0 && screenWidth / scale / mapWidth > MAP_SHARE_DETAIL_HIDE;
+  const mapHeight = 3 * mapRadius * hexSize * HEX_TILT;
+  if (mapWidth <= 0) return false;
+  return (
+    screenWidth / scale / mapWidth > MAP_WIDTH_SHARE_DETAIL_HIDE &&
+    screenHeight / scale / mapHeight > MAP_HEIGHT_SHARE_DETAIL_HIDE
+  );
 }
 
 interface TileView {
@@ -135,6 +147,8 @@ interface TileView {
   territory: Graphics;
   /** Storm / drought art drawn over the terrain while the tile is inside one. */
   weatherOverlay: Sprite | null;
+  /** Burnt ground over the terrain where fire destroyed a building or forest. */
+  fireTrailSprite: Sprite | null;
   roadGraphics: Graphics | null;
   /** Interactive row of 8px tribe-colored dots, one per active pirate deal. */
   dealCircles: Container | null;
@@ -400,7 +414,8 @@ export class MapView {
     for (const tile of map.tiles) {
       const tv = this.tileViews.get(axialKey(tile))!;
       tv.el.visible = tileInView(tile, this.hexSize, viewport);
-      const sig = tileSignature(tile, map, localPlayerIndex, hiddenUnitIds, this.knownOwners, this.tileIndex, this.waterRouteNeighbors, players);
+      const sig = tileSignature(tile, map, localPlayerIndex, hiddenUnitIds, this.knownOwners, this.tileIndex, this.waterRouteNeighbors, players)
+        + (this.fireTrailHeld.has(axialKey(tile)) ? 'fh' : '');
       if (sig !== tv.signature) {
         tv.signature = sig;
         this.applyTile(tv, tile, players, localPlayerIndex, hiddenUnitIds);
@@ -713,6 +728,7 @@ export class MapView {
         glowSprite: null,
         territory,
         weatherOverlay: null,
+        fireTrailSprite: null,
         roadGraphics: null,
         dealCircles: null,
         signature: '',
@@ -776,6 +792,7 @@ export class MapView {
     this.drawTileTerritory(tv.territory, tile, players, explored);
     tv.territory.visible = explored;
     this.syncWeatherOverlay(tv, tile, explored, p.x, y);
+    this.syncFireTrail(tv, tile, explored, p.x, y);
 
     this.drawRoad(tv, tile, explored);
 
@@ -1088,6 +1105,40 @@ export class MapView {
       tv.weatherOverlay.texture = texture;
     }
     tv.weatherOverlay.position.set(x, y);
+  }
+
+  /** Tiles whose fire trail waits for their new terrain texture (a burnt-down forest still draws as a forest until the rebake). */
+  private fireTrailHeld = new Set<string>();
+
+  holdFireTrail(tiles: Axial[]): void {
+    for (const t of tiles) this.fireTrailHeld.add(axialKey(t));
+  }
+
+  releaseFireTrail(): void {
+    this.fireTrailHeld.clear();
+  }
+
+  /** The fire-trail art over the terrain (under fog, territory and everything built); gone once the tile is built on. */
+  private syncFireTrail(tv: TileView, tile: MapTile, explored: boolean, x: number, y: number): void {
+    const texture = explored && tile.fireTrail && !tile.building && !this.fireTrailHeld.has(axialKey(tile)) ? (this.textures.fireTrailTexture ?? null) : null;
+    if (!texture) {
+      if (tv.fireTrailSprite) {
+        tv.el.removeChild(tv.fireTrailSprite);
+        tv.fireTrailSprite.destroy();
+        tv.fireTrailSprite = null;
+      }
+      return;
+    }
+    if (!tv.fireTrailSprite || tv.fireTrailSprite.destroyed) {
+      const sprite = new Sprite(texture);
+      sprite.anchor.set(0.5, IMAGE_HEX_CENTER_Y / IMAGE_H);
+      sprite.scale.set((Math.sqrt(3) * this.hexSize) / IMAGE_HEX_W);
+      sprite.zIndex = 0.5;
+      sprite.eventMode = 'none';
+      tv.el.addChild(sprite);
+      tv.fireTrailSprite = sprite;
+    }
+    tv.fireTrailSprite.position.set(x, y);
   }
 
   private drawTileTerritory(g: Graphics, tile: MapTile, players: Player[], explored: boolean): void {

@@ -52,7 +52,7 @@ export type GameEvent =
   | { type: GameEventType.ROAD_BURNED; unitId: string; q: number; r: number; playerIndex: number; owner: number }
   | { type: GameEventType.BURNED; unitId: string; kind: BuildingKind.FARM | BuildingKind.GRANARY; q: number; r: number; playerIndex: number }
   | { type: GameEventType.STARVATION; q: number; r: number; playerIndex: number; units: { q: number; r: number; damage: number }[] }
-  | { type: GameEventType.TRAP_TRIGGERED; q: number; r: number; targetId: string; damage: number; attackerIndex: number }
+  | { type: GameEventType.TRAP_TRIGGERED; q: number; r: number; targetId: string; damage: number; attackerIndex: number; trapOwner: number }
   | { type: GameEventType.STORM; unitId: string; q: number; r: number; targets: { q: number; r: number; damage: number }[] }
   | { type: GameEventType.STUN_SHOT; attackerId: string; targetId: string; attackerTile: Axial; targetTile: Axial; missed: boolean; stunned: boolean }
   | { type: GameEventType.ACHIEVEMENT_UNLOCKED; playerIndex: number; achievement: AchievementId }

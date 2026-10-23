@@ -97,6 +97,8 @@ export interface MapTile {
   trap?: { owner: number; placedTurn: number } | null;
   /** Burning forest / building / bridge (lightning, spread); `age` = round ends survived. */
   fire?: { age: number } | null;
+  /** Burnt ground left where fire destroyed a building or forest; cleared when something is built here. */
+  fireTrail?: boolean;
 }
 
 export interface Spawn {

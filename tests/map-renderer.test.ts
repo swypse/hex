@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Application, BitmapText, Container, Graphics, ImageSource, Sprite, Texture } from 'pixi.js';
 import { detailHiddenAt, MapView } from '../src/render/map-renderer';
+import { HEX_TILT } from '../src/game/map/hex';
 import { FIRE_SIZE_MIN, FIRE_SIZE_MAX } from '../src/render/fire';
 import { type GameMap, type MapTile } from '../src/game/map/map-gen';
 import { type Selection } from '../src/game/units/selection';
@@ -2942,12 +2943,15 @@ describe('MapView marker reveal deferral', () => {
 });
 
 describe('detailHiddenAt', () => {
-  it('hides labels once more than 60% of the map width is on screen', () => {
-    const radius = 10;
-    const mapWidth = 2 * Math.sqrt(3) * radius * 40;
-    expect(detailHiddenAt(mapWidth * 0.7, 1, radius, 40)).toBe(true);
-    expect(detailHiddenAt(mapWidth * 0.5, 1, radius, 40)).toBe(false);
+  const radius = 10;
+  const mapWidth = 2 * Math.sqrt(3) * radius * 40;
+  const mapHeight = 3 * radius * 40 * HEX_TILT;
+
+  it('hides labels once more than 60% of the map width and 90% of its height are on screen', () => {
+    expect(detailHiddenAt(mapWidth * 0.7, mapHeight * 0.95, 1, radius, 40)).toBe(true);
+    expect(detailHiddenAt(mapWidth * 0.5, mapHeight * 0.95, 1, radius, 40)).toBe(false);
+    expect(detailHiddenAt(mapWidth * 0.7, mapHeight * 0.85, 1, radius, 40)).toBe(false);
     // Zooming in (a larger scale) shows less of the map.
-    expect(detailHiddenAt(mapWidth * 0.7, 2, radius, 40)).toBe(false);
+    expect(detailHiddenAt(mapWidth * 0.7, mapHeight * 0.95, 2, radius, 40)).toBe(false);
   });
 });

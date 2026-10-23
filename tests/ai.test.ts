@@ -178,6 +178,33 @@ describe('planAiActions', () => {
     expect(actions.some((a) => a.type === AiActionType.MOVE)).toBe(false);
   });
 
+  it('moves a rider that already attacked to a tile no enemy can reach', () => {
+    const map: GameMap = { radius: 8, tiles: [], spawns: [] };
+    const rider = makeRider('r1', 1, 0, 0);
+    rider.hasAttacked = true;
+    map.tiles.push(
+      makeTile(-3, 0, 1, { owner: 1, level: 1, captureReady: false }),
+      makeTile(0, 0, null, null, rider),
+      makeTile(1, 0, 0, null, makeWarrior('enemy', 0, 1, 0)),
+    );
+    for (let q = -2; q <= -1; q++) map.tiles.push(makeTile(q, 0, null));
+    const actions = planAiActions(map, fund(map, aiPlayer()), new SeededRandom(1), GameMode.CAPTURE, 0, (a) => {
+      if (a.type === AiActionType.MOVE) {
+        rider.hasMoved = true;
+        const from = map.tiles.find((t) => t.unit === rider)!;
+        from.unit = null;
+        const to = map.tiles.find((t) => t.q === a.q && t.r === a.r)!;
+        to.unit = rider;
+        rider.q = a.q;
+        rider.r = a.r;
+      }
+      return true;
+    });
+    const move = actions.find((a) => a.type === AiActionType.MOVE && a.unitId === 'r1');
+    expect(move).toBeDefined();
+    expect(Math.abs((move as { q: number }).q - 1)).toBeGreaterThanOrEqual(4);
+  });
+
   it('keeps the last defender in an endangered village when ganging up would move it out', () => {
     // Enemy rider sits two hexes away (in move distance, so the village is
     // endangered). focus-fire would move the in-village warrior out to join a

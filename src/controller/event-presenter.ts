@@ -413,15 +413,22 @@ export class EventPresenter {
             this.host.render();
             break;
           case GameEventType.FIRE_TURN: {
+            const cleared = (e.cleared ?? []).map((c) => tileAt(sim.map, c.q, c.r)).filter((ct): ct is MapTile => !!ct);
+            // The burnt ground appears only once the forest texture is gone.
+            this.host.mapView()?.holdFireTrail(cleared);
             await this.presentWeatherDamage(e.units, e.buildings);
             this.host.render();
             // A forest that burned down is land now: smoke rises and the tile
             // takes its new texture at once.
-            const cleared = (e.cleared ?? []).map((c) => tileAt(sim.map, c.q, c.r)).filter((ct): ct is MapTile => !!ct);
             const seen = cleared.filter((ct) => isExploredFor(ct, local));
             if (cleared.length > 0) {
               for (const ct of seen) this.effects.spawnMuzzleSmokeAt(ct);
-              await this.host.refreshTerrain();
+              try {
+                await this.host.refreshTerrain();
+              } finally {
+                this.host.mapView()?.releaseFireTrail();
+                this.host.render();
+              }
             }
             break;
           }
@@ -458,6 +465,11 @@ export class EventPresenter {
           case GameEventType.TRAP_TRIGGERED: {
             this.host.render();
             const trapTile = tileAt(sim.map, e.q, e.r);
+            // Your own trap went off: bring it into view and let the damage play out.
+            if (trapTile && e.trapOwner === local) {
+              await this.host.centerOnCell(e.q, e.r);
+              await sleep(100);
+            }
             if (trapTile) {
               this.effects.spawnHpText(trapTile, `-${e.damage}`, 0xff6666);
               if (isExploredFor(trapTile, local)) this.effects.spawnRays(trapTile, RAYS_DAMAGE_COLOR);
@@ -1314,7 +1326,7 @@ export class EventPresenter {
     store.setTurn(turn);
     // Keep the last selected hex between turns.
     store.setAiActive(playerIndex !== store.localPlayerIndex);
-    if (playerIndex === store.localPlayerIndex) store.setCenterMessage(t('msg.yourTurn'));
+    if (playerIndex === store.localPlayerIndex) store.showTurnBanner();
     if (playerIndex === store.localPlayerIndex && store.netMode === NetMode.SINGLE) this.host.saveGame();
     if (playerIndex === store.localPlayerIndex) this.host.promptTrade();
   }

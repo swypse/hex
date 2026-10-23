@@ -125,6 +125,8 @@ export interface TextureSet {
   farmIdleTexture: TileTexture;
   /** Weather overlay art (storm / drought), raw terrain-atlas frames drawn over a tile. Shared, not owned by the set. */
   weatherOverlays?: Partial<Record<WeatherType.STORM | WeatherType.DROUGHT, Texture>>;
+  /** Burnt-ground art drawn over the terrain of tiles where fire destroyed a building or forest. Shared, not owned by the set. */
+  fireTrailTexture?: Texture;
   /** Indexed by adjacent farm count, 1..GRANARY_MAX_FARMS (index 0 unused). */
   granaryTextures: TileTexture[];
   bridgeTextures: Record<BridgeDir, TileTexture>;
@@ -663,6 +665,7 @@ export async function createTextures(
     farmTexture,
     farmIdleTexture,
     weatherOverlays: weatherOverlayTextures(),
+    fireTrailTexture: terrainFrameTexture('fire-trail') ?? undefined,
     granaryTextures,
     bridgeTextures,
     portTextures,

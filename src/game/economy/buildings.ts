@@ -443,6 +443,7 @@ function payAndPlaceBuilding(map: GameMap, tile: MapTile, kind: BuildingKind, pl
   const joined = kind === BuildingKind.PORT ? villagesJoinedBy(map, player.index, tile) : [];
   if (!payAt(map, player, tile, buildingCostAt(map, player, tile, kind), joined)) return false;
   tile.building = kind === BuildingKind.GRANARY ? { kind, level: 1, food: 0 } : { kind, level: 1 };
+  tile.fireTrail = false;
   return true;
 }
 

@@ -74,6 +74,7 @@ describe('fire turn', () => {
     expect(tile.fire).toBeNull();
     expect(last.burnedOut).toEqual([{ q: 0, r: 0 }]);
     expect(last.cleared).toEqual([{ q: 0, r: 0 }]);
+    expect(tile.fireTrail).toBe(true);
   });
 
   it('burns a building for 1 damage a round until it is destroyed', () => {
@@ -87,6 +88,7 @@ describe('fire turn', () => {
     applyFireTurn(map, () => 0.99);
     expect(tile.building).toBeNull();
     expect(tile.fire).toBeNull();
+    expect(tile.fireTrail).toBe(true);
   });
 
   it('spreads to adjacent forests with 50% chance, never to land', () => {

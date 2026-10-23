@@ -2,6 +2,7 @@ import { Container } from 'pixi.js';
 import { useGameStore } from '../../store/game-store';
 import { type UIHost } from '../host';
 import { CenterMessage } from './center-message';
+import { TurnBanner } from './turn-banner';
 import { DisbandDialog } from './disband-dialog';
 import { LeaveGameDialog } from './leave-game-dialog';
 import { ShipLandingDialog } from './ship-landing-dialog';
@@ -73,6 +74,7 @@ export class OverlayManager {
     help: { make: () => new HelpDialog(), mounted: null, hiding: false },
     tradeproposal: { make: () => new TradeProposalDialog(), mounted: null, hiding: false },
   };
+  private readonly turnBanner = new TurnBanner();
   private unsub: (() => void) | null = null;
   private refreshing = false;
 
@@ -80,6 +82,7 @@ export class OverlayManager {
     this.host = host;
     this.root = new Container();
     host.overlayLayer.addChild(this.root);
+    this.turnBanner.mount(host, this.root);
     this.unsub = useGameStore.subscribe(() => this.refresh());
     this.refresh();
   }
@@ -212,6 +215,7 @@ export class OverlayManager {
         entry.mounted = null;
       }
     }
+    this.turnBanner.destroy();
     this.root.destroy({ children: true });
   }
 }

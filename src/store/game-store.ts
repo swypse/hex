@@ -68,6 +68,8 @@ interface GameStore {
   watching: boolean;
   expectedTurns: number;
   bonusAwarded: boolean;
+  /** Bumped to show the transient "Your turn" banner; it is not part of the center message queue. */
+  turnBannerNonce: number;
   centerMessage: string | null;
   centerMessageQueue: string[];
   centerIconFile: string | null;
@@ -107,6 +109,7 @@ interface GameStore {
   setWatching: (v: boolean) => void;
   setExpectedTurns: (turns: number) => void;
   setBonusAwarded: (awarded: boolean) => void;
+  showTurnBanner: () => void;
   setCenterMessage: (message: string | null, iconFile?: string | null, chipStyle?: IconChipStyle | null) => void;
   /** Announces newly met tribes in one message. Tribes met while an earlier "you meet" message is still queued join it. */
   queueMetTribes: (names: string[], iconFile: string | null, format: (names: string[]) => string) => void;
@@ -142,6 +145,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   watching: false,
   expectedTurns: 0,
   bonusAwarded: false,
+  turnBannerNonce: 0,
   centerMessage: null,
   centerMessageQueue: [],
   centerIconFile: null,
@@ -199,6 +203,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   setWatching: (watching) => set({ watching }),
   setExpectedTurns: (turns) => set({ expectedTurns: turns }),
   setBonusAwarded: (awarded) => set({ bonusAwarded: awarded }),
+  showTurnBanner: () => set((s) => ({ turnBannerNonce: s.turnBannerNonce + 1 })),
   setCenterMessage: (message, iconFile = null, chipStyle = null) =>
     set((s) => {
       if (message === null) {

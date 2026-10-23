@@ -785,10 +785,10 @@ class GameController {
   }
 
   /** Labels (hp text, village names) are hidden while more than 60% of the map's
-   *  width is visible on screen. */
+   *  width and 90% of its height are visible on screen. */
   private labelsHidden(): boolean {
     if (!this.camera || !this.app || !this.sim) return false;
-    return detailHiddenAt(this.app.screen.width, this.camera.scale, this.sim.map.radius, HEX_SIZE);
+    return detailHiddenAt(this.app.screen.width, this.app.screen.height, this.camera.scale, this.sim.map.radius, HEX_SIZE);
   }
 
   /** Current camera pan (screen px); zero before the camera exists. */
