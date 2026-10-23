@@ -8,14 +8,14 @@ export const TRAP_TURNS = 10;
 const TRAP_ATTACK = 30;
 
 /** Cells the trapper on `trapperTile` may trap: its own tile plus adjacent
- *  tiles, as long as each is non-water, unoccupied, has no village/building
+ *  tiles, as long as each is non-water, unoccupied, has no village
  *  and no existing trap. Ownership no longer matters. */
 export function canPlaceTrapOn(tile: MapTile, trapperTile: MapTile): boolean {
   if (isWaterType(tile.terrain) || isIceType(tile.terrain)) return false;
   const isOwnTile = tile.q === trapperTile.q && tile.r === trapperTile.r;
   if (!isOwnTile && !hexNeighbors(trapperTile).some((n) => n.q === tile.q && n.r === tile.r)) return false;
   if (tile.unit && !isOwnTile) return false;
-  if (tile.settlement || tile.building) return false;
+  if (tile.settlement) return false;
   if (tile.trap) return false;
   return true;
 }
