@@ -27,6 +27,7 @@ import { updateStrategy, deriveDirectives } from './ai-strategy';
 import { flagsFor } from './ai-flags';
 import { stepVetoed } from './ai-review';
 import { SEASON_SAFETY_PATTERN, seasonVetoed } from './ai-season';
+import { tornadoVetoed } from './ai-weather';
 import { personalityFor } from './ai-personality';
 import { OPERATION_PATTERN, updateOperation } from './ai-operations';
 import { MARCH_PATTERN } from './ai-march';
@@ -827,7 +828,7 @@ export function* planAiActionsSteps(
     const review = difficulty.lookahead && flagsFor(player).lookahead;
     for (const pattern of patterns) {
       next = pattern.evaluate(ctx);
-      if (next && (seasonVetoed(map, turn, next) || (review && stepVetoed(map, player, next, state)))) next = null;
+      if (next && (seasonVetoed(map, turn, next) || tornadoVetoed(map, next) || (review && stepVetoed(map, player, next, state)))) next = null;
       if (next) break;
     }
     if (!next) {
@@ -835,7 +836,7 @@ export function* planAiActionsSteps(
       next = bestAvailableAction(map, player, rng, state, situation, difficulty, directives, source);
     }
     if (!next) break;
-    if (seasonVetoed(map, turn, next) || (review && stepVetoed(map, player, next, state))) {
+    if (seasonVetoed(map, turn, next) || tornadoVetoed(map, next) || (review && stepVetoed(map, player, next, state))) {
       // The fallback pick is unsafe too: keep its unit where it stands.
       for (const a of next) if (a.type === AiActionType.MOVE) state.moved.add(a.unitId);
       continue;

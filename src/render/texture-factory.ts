@@ -9,15 +9,15 @@ import { UNIT_IMAGE_FILES, UNIT_TYPES } from '../game/units/units';
 import { shadeColor } from '../util/color';
 import { tileElevation } from './elevation';
 import { ensureCanvasResource } from '../gfx/image-texture';
-import { countIceTiles } from '../game/map/ice';
-import { ensureTerrainAtlas, terrainFrameTexture, terrainTileTexture, TERRAIN_TILE_FILES, TERRAIN_FOG_FILE, TERRAIN_CRACKED_ICE_FILE } from './terrain-atlas';
+import { countIceTiles, willFreeze } from '../game/map/ice';
+import { ensureTerrainAtlas, terrainFrameTexture, terrainTileTexture, TERRAIN_TILE_FILES, TERRAIN_FOG_FILE, TERRAIN_CRACKED_ICE_FILE, TERRAIN_WATER_ICE_FILE } from './terrain-atlas';
 import { buildingTileTexture, ensureBuildingsAtlas } from './buildings-atlas';
 import { ensureTribeAtlas, tribeTileTexture } from './tribe-atlas';
 import { ensureActionButtonAtlas, actionButtonFrameTexture } from '../gfx/action-button-icons';
 import { ensureIcons32Atlas, icons32FrameTexture } from '../gfx/icons32';
 import { VillageBuildTextureService } from './village-build-texture';
 import { SLICE_BUDGET_MS, yieldToMain } from '../util/time-slice';
-import { BridgeDir, PortDirection, Season, TileAnchor, TileLayer, UnitType, WeatherType } from '@enums';
+import { BridgeDir, IcePhase, PortDirection, Season, TileAnchor, TileLayer, UnitType, WeatherType } from '@enums';
 import { tileMapByKey } from '../game/map/tile-index';
 
 const TEXTURE_BASE = `${import.meta.env.BASE_URL}textures/`;
@@ -94,15 +94,15 @@ export interface TileTexture {
 }
 
 /** Terrain part of a TextureSet: what changes with the season, ice and burned forests. */
-export type TerrainTextures = Pick<TextureSet, 'season' | 'iceTiles' | 'crackedIce' | 'ownedTextures' | 'tileTextures' | 'fogTextures'>;
+export type TerrainTextures = Pick<TextureSet, 'season' | 'iceTiles' | 'icePhase' | 'ownedTextures' | 'tileTextures' | 'fogTextures'>;
 
 export interface TextureSet {
   /** Season the terrain tile textures were baked for (spring when absent). */
   season?: Season;
   /** Number of ice tiles on the map when baked (0 when absent). */
   iceTiles?: number;
-  /** Whether the ice was baked cracked (false when absent). */
-  crackedIce?: boolean;
+  /** Ice state the terrain was baked for (none when absent). */
+  icePhase?: IcePhase;
   /** Render textures baked for this set; freed by destroyTextureSet. */
   ownedTextures?: Texture[];
   tileTextures: Map<string, TileTexture>;
@@ -286,17 +286,22 @@ function loadImageTexture(url: string): Promise<Texture | null> {
   });
 }
 
-async function loadTileImages(season: Season, crackedIce: boolean): Promise<Map<string, Texture>> {
+/** Key of the freezing-water texture in the loaded tile images (not a tile type). */
+const WATER_ICE_KEY = 'water-ice';
+
+async function loadTileImages(season: Season, icePhase: IcePhase): Promise<Map<string, Texture>> {
   await ensureTerrainAtlas();
   const map = new Map<string, Texture>();
   for (const [key, frameKey] of Object.entries(TERRAIN_TILE_FILES)) {
     const tex = terrainTileTexture(frameKey, season);
     if (tex) map.set(key, tex);
   }
-  if (crackedIce) {
+  if (icePhase === IcePhase.CRACKED) {
     const cracked = terrainFrameTexture(TERRAIN_CRACKED_ICE_FILE);
     if (cracked) map.set(String(TileType.Ice), cracked);
   }
+  const waterIce = terrainFrameTexture(TERRAIN_WATER_ICE_FILE);
+  if (waterIce) map.set(WATER_ICE_KEY, waterIce);
   const fog = terrainFrameTexture(TERRAIN_FOG_FILE);
   if (fog) map.set('fog', fog);
   return map;
@@ -434,8 +439,8 @@ export async function createTextures(
   activeTribes: ReadonlySet<Tribe> = new Set(TRIBES.map((t) => t.id)),
   /** Season whose terrain tile variants are baked. */
   season: Season = Season.SPRING,
-  /** Draw ice cracked (last winter turn, it melts next). */
-  crackedIce = false,
+  /** Ice state: cracked ice before the thaw, freezing water before the freeze. */
+  icePhase: IcePhase = IcePhase.NONE,
   /** Bake only the terrain and fog tiles (see createTerrainTextures). */
   terrainOnly = false,
 ): Promise<TextureSet> {
@@ -463,7 +468,7 @@ export async function createTextures(
     await yieldToMain();
     sliceEnd = performance.now() + SLICE_BUDGET_MS;
   };
-  const images = await loadTileImages(season, crackedIce);
+  const images = await loadTileImages(season, icePhase);
   if (!terrainOnly) await ensureBuildingsAtlas();
   const tileTextures = new Map<string, TileTexture>();
   const fogTextures = new Map<string, TileTexture>();
@@ -516,11 +521,12 @@ export async function createTextures(
     heightPx: tileElevation(tile, hexSize),
     sideHeightPx: edgeSideHeight(tile),
     brightness: coastWaterBrightness(tile, findNeighbor),
+    freezing: icePhase === IcePhase.FREEZING && willFreeze(map, tile),
   }));
   for (const spec of tileSpecs) {
     const fill = TILE_TYPE_COLORS[spec.terrain];
     const bottom = isWaterType(spec.terrain) ? shadeColor(fill, 0.7) : fill;
-    const img = images.get(String(spec.terrain)) ?? null;
+    const img = (spec.freezing ? images.get(WATER_ICE_KEY) : null) ?? images.get(String(spec.terrain)) ?? null;
     tileTextures.set(
       spec.key,
       getTileTexture(TileLayer.TILE, spec.terrain, spec.heightPx || spec.sideHeightPx, img, bottom, TileAnchor.BASE, {
@@ -544,7 +550,7 @@ export async function createTextures(
     await maybeYield();
   }
   if (terrainOnly) {
-    return { season, iceTiles, crackedIce, ownedTextures: owned, tileTextures, fogTextures } as unknown as TextureSet;
+    return { season, iceTiles, icePhase, ownedTextures: owned, tileTextures, fogTextures } as unknown as TextureSet;
   }
   const unitTextures = {} as Record<Tribe, Record<UnitType, TileTexture>>;
   const glowFor = new LazyGlowMap((base) => makeUnitGlowTexture(bakeApp, base));
@@ -645,7 +651,7 @@ export async function createTextures(
   return {
     season,
     iceTiles,
-    crackedIce,
+    icePhase,
     ownedTextures: owned,
     tileTextures,
     fogTextures,
@@ -701,9 +707,9 @@ export function createTerrainTextures(
   map: GameMap,
   hexSize: number,
   season: Season,
-  crackedIce: boolean,
+  icePhase: IcePhase,
 ): Promise<TerrainTextures> {
-  return createTextures(app, map, hexSize, new Set(), season, crackedIce, true);
+  return createTextures(app, map, hexSize, new Set(), season, icePhase, true);
 }
 
 /** Moves a freshly baked terrain part into the live set. The superseded terrain
@@ -716,7 +722,7 @@ export function adoptTerrainTextures(live: TextureSet, terrain: TerrainTextures)
   live.fogTextures = terrain.fogTextures;
   live.season = terrain.season;
   live.iceTiles = terrain.iceTiles;
-  live.crackedIce = terrain.crackedIce;
+  live.icePhase = terrain.icePhase;
   const fresh = new Set(terrain.ownedTextures ?? []);
   // Old terrain textures leave the owned list (they are freed on their own);
   // the new ones join it so destroyTextureSet still frees them with the set.

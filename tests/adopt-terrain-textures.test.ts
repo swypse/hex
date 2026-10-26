@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { adoptTerrainTextures, type TerrainTextures, type TextureSet } from '../src/render/texture-factory';
-import { Season } from '@enums';
+import { IcePhase, Season } from '@enums';
 
 const tex = (n: string) => ({ n }) as never;
 const tile = (t: unknown) => ({ texture: t, anchorY: 1 }) as never;
@@ -12,7 +12,7 @@ describe('adoptTerrainTextures', () => {
     const oldFog = tex('old-fog');
     const unit = tex('unit');
     const live = {
-      season: Season.AUTUMN, iceTiles: 0, crackedIce: false,
+      season: Season.AUTUMN, iceTiles: 0, icePhase: IcePhase.NONE,
       ownedTextures: [oldTile, oldFog, unit],
       tileTextures: new Map([['0,0', tile(oldTile)]]),
       fogTextures: new Map([['0,0', tile(oldFog)]]),
@@ -20,7 +20,7 @@ describe('adoptTerrainTextures', () => {
     const newTile = tex('new-tile');
     const newFog = tex('new-fog');
     const fresh = {
-      season: Season.WINTER, iceTiles: 3, crackedIce: true,
+      season: Season.WINTER, iceTiles: 3, icePhase: IcePhase.CRACKED,
       ownedTextures: [newTile, newFog],
       tileTextures: new Map([['0,0', tile(newTile)]]),
       fogTextures: new Map([['0,0', tile(newFog)]]),
@@ -31,7 +31,7 @@ describe('adoptTerrainTextures', () => {
     expect(new Set(superseded)).toEqual(new Set([oldTile, oldFog]));
     expect(live.tileTextures.get('0,0')!.texture).toBe(newTile);
     expect(live.fogTextures.get('0,0')!.texture).toBe(newFog);
-    expect([live.season, live.iceTiles, live.crackedIce]).toEqual([Season.WINTER, 3, true]);
+    expect([live.season, live.iceTiles, live.icePhase]).toEqual([Season.WINTER, 3, IcePhase.CRACKED]);
     expect(live.ownedTextures).toEqual([unit, newTile, newFog]);
   });
 });

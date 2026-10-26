@@ -33,6 +33,11 @@ const INCOME_PARTS = [
   { key: 'food', icon: 'food-32' },
 ] as const;
 const DEATH_PARTICLE_COUNT = 10;
+/** Tornado debris: pieces per damaged building, flight time, plank and stick colours. */
+const DEBRIS_PIECES = 8;
+const DEBRIS_MS = 1100;
+const DEBRIS_BOARD_COLOR = 0xb07a45;
+const DEBRIS_STICK_COLOR = 0x6b4423;
 const DEATH_RISE = 200;
 const DEATH_MS = 3000;
 const DEATH_STAGGER_MS = 700;
@@ -370,6 +375,52 @@ export class EventEffects {
         mapRoot.removeChild(el);
         el.destroy();
       }
+    };
+    ticker.add(fn);
+  }
+
+  /** Boards and sticks flung out of a damaged building: each spins up and away
+   *  along an arc, falls back a little and fades. */
+  spawnDebris(tile: MapTile): void {
+    const app = this.host.app();
+    const mapView = this.host.mapView();
+    if (!app || !mapView) return;
+    const mapRoot = mapView.container;
+    const world = hexToPixel(tile, HEX_SIZE);
+    const el = new Container();
+    el.zIndex = 12;
+    const pieces = Array.from({ length: DEBRIS_PIECES }, (_, i) => {
+      const g = new Graphics();
+      const board = i % 2 === 0;
+      const len = board ? 12 + Math.random() * 6 : 8 + Math.random() * 5;
+      g.rect(-len / 2, -(board ? 2.5 : 1), len, board ? 5 : 2).fill({ color: board ? DEBRIS_BOARD_COLOR : DEBRIS_STICK_COLOR });
+      el.addChild(g);
+      const angle = (i / DEBRIS_PIECES) * Math.PI * 2 + Math.random() * 0.6;
+      return { g, angle, reach: HEX_SIZE * (0.5 + Math.random() * 0.5), lift: HEX_SIZE * (0.5 + Math.random() * 0.6), spin: (Math.random() - 0.5) * 14 };
+    });
+    el.position.set(world.x, world.y - tileElevation(tile, HEX_SIZE));
+    mapRoot.addChild(el);
+    const start = performance.now();
+    const ticker = app.ticker;
+    const fn = (): void => {
+      if (el.destroyed) {
+        ticker.remove(fn);
+        return;
+      }
+      const t = Math.min(1, (performance.now() - start) / DEBRIS_MS);
+      for (const p of pieces) {
+        // Swirl around the building while flying out, arcing up then dropping.
+        const a = p.angle + t * 3;
+        p.g.position.set(Math.cos(a) * p.reach * t, Math.sin(a) * p.reach * t * 0.35 - Math.sin(t * Math.PI) * p.lift);
+        p.g.rotation = p.spin * t;
+        p.g.alpha = 1 - t * t;
+      }
+      if (t >= 1) {
+        ticker.remove(fn);
+        mapRoot.removeChild(el);
+        el.destroy({ children: true });
+      }
+      markDirty();
     };
     ticker.add(fn);
   }

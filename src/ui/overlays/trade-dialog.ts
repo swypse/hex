@@ -26,9 +26,14 @@ const BTN_GAP = 6;
 const PICKER_MARGIN = 20;
 /** Vertical padding of a selectable village row's background, and its selected colour. */
 const ROW_PAD = 4;
+/** Left padding of a village item inside its selectable cell. */
+const CELL_PAD_LEFT = 6;
 const SELECTED_ROW = 0x5297ff;
 /** Gap between the "Value N" and "(allowed ...)" parts. */
 const VALUE_GAP = 10;
+/** Villages per row in the village selector, and the gap between them. */
+const VILLAGE_COLUMNS = 2;
+const COLUMN_GAP = 8;
 const KINDS = Object.values(ResourceKind);
 
 const RESOURCE_ICONS: Record<ResourceKind, string> = {
@@ -180,9 +185,9 @@ export class TradeDialog extends PopupDialog {
     const btn = (label: string, onClick: () => void, disabled = false, style?: ButtonStyle): Button =>
       new Button({ label, onClick, disabled, style, fontSize: FontSize.VERY_SMALL });
     /** A line of text with buttons aligned to its right, optionally the tribe icon of a player before it and a second, grey line below the text. */
-    const row = (value: string, buttons: Button[], tribeOf?: number, second?: string, iconName?: string): void => {
+    const row = (value: string, buttons: Button[], tribeOf?: number, second?: string, iconName?: string, fill?: number): void => {
       const tribe = tribeOf === undefined ? undefined : tribeById(s.players[tribeOf]?.tribe ?? -1);
-      y += addTradeRow(popup.content, y, cw, { value, buttons, iconKey: tribe ? `${tribe.code}-icon.png` : iconName, second }) + ROW_GAP;
+      y += addTradeRow(popup.content, y, cw, { value, buttons, iconKey: tribe ? `${tribe.code}-icon.png` : iconName, second, fill }) + ROW_GAP;
     };
     /** Adds a block horizontally centred as its own row. */
     const place = (el: Container): void => {
@@ -198,6 +203,35 @@ export class TradeDialog extends PopupDialog {
 
     /** The player's villages as rows `Name [stock] [Select]`, one block per road/port network; returns the selected village. */
     const villageList = (selected: MapTile | undefined, onSelect: (v: MapTile) => void): MapTile | undefined => {
+      const colW = (cw - COLUMN_GAP * (VILLAGE_COLUMNS - 1)) / VILLAGE_COLUMNS;
+      /** One selectable village `Name [stock]` in a column; with `measure` only returns its height. */
+      const villageCell = (v: MapTile, x: number, y0: number, measure: boolean, rowH = 0): number => {
+        const stock = readStock(v);
+        const chosen = v === selected;
+        const cell = new Container();
+        const h = addTradeRow(cell, 0, colW - CELL_PAD_LEFT, { value: `${villageName(v)} ${resourceTokens({ money: 0, wood: stock.wood, stone: stock.stone, ore: stock.ore, food: stock.food })}`, buttons: [] });
+        if (measure) {
+          cell.destroy({ children: true });
+          return h;
+        }
+        cell.position.set(x + CELL_PAD_LEFT, y0 + (rowH - h) / 2);
+        // The whole cell is the button: a background behind it marks the selected village.
+        const bg = new Graphics();
+        // Never fully transparent, so the cell still takes clicks.
+        const draw = (alpha: number): void => {
+          bg.clear().roundRect(x, y0 - ROW_PAD, colW, rowH + ROW_PAD * 2, 6).fill({ color: chosen ? SELECTED_ROW : 0xffffff, alpha: Math.max(alpha, 0.001) });
+        };
+        draw(chosen ? 0.35 : 0);
+        bg.eventMode = 'static';
+        bg.cursor = chosen ? 'default' : 'pointer';
+        if (!chosen) {
+          bg.on('pointerover', () => draw(0.1));
+          bg.on('pointerout', () => draw(0));
+          bg.on('pointertap', () => onSelect(v));
+        }
+        popup.content.addChild(bg, cell);
+        return h;
+      };
       villageGroups(sim.map, s.localPlayerIndex).forEach((group, i) => {
         if (i > 0) {
           const line = new Graphics().rect(0, 0, cw, 1).fill({ color: 0xffffff, alpha: 0.12 });
@@ -205,28 +239,10 @@ export class TradeDialog extends PopupDialog {
           popup.content.addChild(line);
           y += ROW_GAP;
         }
-        for (const v of group) {
-          const stock = readStock(v);
-          const chosen = v === selected;
-          const y0 = y;
-          const at = popup.content.children.length;
-          row(`${villageName(v)} ${resourceTokens({ money: 0, wood: stock.wood, stone: stock.stone, ore: stock.ore, food: stock.food })}`, [], undefined, undefined, 'village-32');
-          // The whole row is the button: a background behind it marks the selected village.
-          const bg = new Graphics();
-          const rowH = y - ROW_GAP - y0;
-          // Never fully transparent, so the row still takes clicks.
-          const draw = (alpha: number): void => {
-            bg.clear().roundRect(0, y0 - ROW_PAD, cw, rowH + ROW_PAD * 2, 6).fill({ color: chosen ? SELECTED_ROW : 0xffffff, alpha: Math.max(alpha, 0.001) });
-          };
-          draw(chosen ? 0.35 : 0);
-          bg.eventMode = 'static';
-          bg.cursor = chosen ? 'default' : 'pointer';
-          if (!chosen) {
-            bg.on('pointerover', () => draw(0.1));
-            bg.on('pointerout', () => draw(0));
-            bg.on('pointertap', () => onSelect(v));
-          }
-          popup.content.addChildAt(bg, at);
+        for (let i0 = 0; i0 < group.length; i0 += VILLAGE_COLUMNS) {
+          const rowH = Math.max(...group.slice(i0, i0 + VILLAGE_COLUMNS).map((v) => villageCell(v, 0, 0, true)));
+          group.slice(i0, i0 + VILLAGE_COLUMNS).forEach((v, c) => villageCell(v, c * (colW + COLUMN_GAP), y, false, rowH));
+          y += rowH + ROW_GAP;
         }
       });
       return selected;
@@ -236,7 +252,7 @@ export class TradeDialog extends PopupDialog {
     const mine = sim.trading.ordersOf(local.index);
 
     if (this.draft) {
-      this.renderDraft(popup, text, row, place, (px) => { y += px; }, plain, villageList, btn, sim.trading.state.orders.find((o) => o.id === this.draft!.orderId), nameOf);
+      this.renderDraft(popup, text, place, (px) => { y += px; }, row, villageList, btn, sim.trading.state.orders.find((o) => o.id === this.draft!.orderId), nameOf);
       popup.reflow();
       return;
     }
@@ -270,7 +286,7 @@ export class TradeDialog extends PopupDialog {
         place(circles);
       }
       // Village that receives the goods.
-      plain(t('trade.deliverTo'), 0xcccccc);
+      row(t('trade.deliverTo'), [], undefined, undefined, 'village-32', 0xcccccc);
       const target = villageList(pickVillage(villageGroups(sim.map, local.index), this.deliverTo), (v) => { this.deliverTo = { q: v.q, r: v.r }; this.render(); });
       y += PICKER_MARGIN - ROW_GAP;
       const buttons = new Container();
@@ -344,10 +360,9 @@ export class TradeDialog extends PopupDialog {
   private renderDraft(
     popup: Popup,
     text: (v: string, fill?: number) => void,
-    row: (v: string, b: Button[], tribeOf?: number) => void,
     place: (el: Container) => void,
     space: (px: number) => void,
-    plain: (v: string, fill?: number) => void,
+    row: (v: string, b: Button[], tribeOf?: number, second?: string, iconName?: string, fill?: number) => void,
     villageList: (selected: MapTile | undefined, onSelect: (v: MapTile) => void) => MapTile | undefined,
     btn: (label: string, onClick: () => void, disabled?: boolean, style?: ButtonStyle) => Button,
     order: Order | undefined,
@@ -383,10 +398,6 @@ export class TradeDialog extends PopupDialog {
       place(stepper);
     }
     space(PICKER_MARGIN - ROW_GAP);
-    // Village the goods come from and the payment goes to.
-    plain(t('trade.yourVillage'), 0xcccccc);
-    const sim = gameController.getSim();
-    const home = sim ? villageList(pickVillage(villageGroups(sim.map, useGameStore.getState().localPlayerIndex), draft.village), (v) => { draft.village = { q: v.q, r: v.r }; this.render(); }) : undefined;
     const goods = goodsValue(order.resource, order.quantity);
     const ok = priceInRange(order.resource, order.quantity, draft.payment);
     // Centred "Value N" and "(allowed a — b)", a gap apart.
@@ -397,6 +408,10 @@ export class TradeDialog extends PopupDialog {
     const valueLine = new Container();
     valueLine.addChild(value, range);
     place(valueLine);
+    // Village the goods come from and the payment goes to.
+    row(t('trade.yourVillage'), [], undefined, undefined, 'village-32', 0xcccccc);
+    const sim = gameController.getSim();
+    const home = sim ? villageList(pickVillage(villageGroups(sim.map, useGameStore.getState().localPlayerIndex), draft.village), (v) => { draft.village = { q: v.q, r: v.r }; this.render(); }) : undefined;
     const buttons = new Container();
     const send = btn(t('trade.send'), () => { gameController.trade.propose(order.id, draft.payment, home ? { q: home.q, r: home.r } : undefined); this.draft = null; this.render(); }, !ok);
     const cancel = btn(t('common.cancel'), () => { this.draft = null; this.render(); });

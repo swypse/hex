@@ -561,7 +561,7 @@ export class EventPresenter {
             this.host.render();
             break;
           case GameEventType.WEATHER_DAMAGE:
-            await this.presentWeatherDamage(e.units, e.buildings);
+            await this.presentWeatherDamage(e.units, e.buildings, e.weather.type === WeatherType.TORNADO, e.roads);
             break;
           case GameEventType.PROPOSAL_DECLINED: {
             if (e.seller !== useGameStore.getState().localPlayerIndex) break;
@@ -1395,6 +1395,10 @@ export class EventPresenter {
       }
       this.host.render();
     }
+    if (weather.type === WeatherType.TORNADO) {
+      const tile = tileAt(sim.map, weather.q, weather.r);
+      if (tile && isExploredFor(tile, local)) await this.host.centerOnCell(weather.q, weather.r);
+    }
     if (weather.type === WeatherType.EARTHQUAKE) {
       // Bring the quake into view first, so the shake plays where the player looks.
       const centerTile = tileAt(sim.map, weather.q, weather.r);
@@ -1426,7 +1430,7 @@ export class EventPresenter {
     useGameStore.getState().setCenterMessage(t(`weather.ended.${weather.type}` as never));
   }
 
-  private async presentWeatherDamage(units: WeatherUnitHit[], buildings: WeatherBuildingHit[]): Promise<void> {
+  private async presentWeatherDamage(units: WeatherUnitHit[], buildings: WeatherBuildingHit[], debris = false, roads: { q: number; r: number }[] = []): Promise<void> {
     const sim = this.host.sim();
     if (!sim) return;
     this.host.render();
@@ -1443,7 +1447,15 @@ export class EventPresenter {
     }
     for (const hit of buildings) {
       const tile = tileAt(sim.map, hit.q, hit.r);
-      if (tile) this.effects.spawnHpText(tile, '-1', 0xffa040);
+      if (!tile) continue;
+      this.effects.spawnHpText(tile, '-1', 0xffa040);
+      if (debris && isExploredFor(tile, local)) this.effects.spawnDebris(tile);
+    }
+    for (const road of roads) {
+      const tile = tileAt(sim.map, road.q, road.r);
+      if (!tile || !isExploredFor(tile, local)) continue;
+      this.effects.spawnDebris(tile);
+      this.host.mapView()?.bounceHex(road.q, road.r);
     }
     if (burst) await sleep(COMBAT_DEATH_GAP_MS);
   }

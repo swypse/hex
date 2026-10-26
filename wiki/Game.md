@@ -308,7 +308,7 @@ again). The HUD shows e.g. "Spring 2/6". Seasons change terrain textures.
 ## Weather
 
 From turn 9, every 3rd turn (9, 12, 15, …) an attempt succeeds with **30%** unless 2 events are already active. A random
-type (storm, drought, earthquake) appears on a random valid tile (none valid → the attempt fails). Each event has a
+type (storm, drought, earthquake, tornado) appears on a random valid tile (none valid → the attempt fails). Each event has a
 centre, a radius and a lifetime; the HUD lists them as `Name N/M`, and tapping one centres the map. Everyone is told
 when an event starts and ends. Weather is part of saved games and multiplayer state. Tuning: `WEATHER_RULES`
 (`src/game/weather/weather.ts`).
@@ -320,6 +320,10 @@ when an event starts and ends. Weather is part of saved games and multiplayer st
 - **Earthquake** — 1 turn, a random mountain tile, radius 1-3. Each building in scope is destroyed with 60% and each
   unit takes **20** damage with 60%. Villages and walls are unaffected; own buildings and units within an own forest
   temple's radius are spared.
+- **Tornado** — 5 turns, any tile (land or water), radius 1. Moves to a random neighbouring tile every turn. At round
+  end each building in scope loses **1** hp and each unit takes **15** damage, and each road or bridge is destroyed, each with 50%. Villages and walls are
+  unaffected; own buildings and units within an own forest temple's radius are spared. Damaged buildings shed flying
+  boards and sticks. Cheat: type `tornado`.
 
 ### Lightning and fire
 

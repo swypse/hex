@@ -1,11 +1,12 @@
-import { type MapTile } from '../../map/map-gen';
+import { type GameMap, type MapTile } from '../../map/map-gen';
+import { type Player } from '../../players';
 import { hasSkill } from '../../skills';
 import { reachableTargets } from '../../units/selection';
 import { movePoints, type Unit } from '../../units/units';
 import { hexDistance } from '../../map/hex';
 import { attackableTargets, attackDamage, isPoorTrapperTarget } from '../../units/combat';
 import { isExploredFor } from '../../map/explore';
-import { type AiAction } from '../ai-types';
+import { type AiAction, type AiPlannerState } from '../ai-types';
 import { coastExposedTile } from '../ai-situation';
 import { adjacentEnemyVillages } from '../../units/stalker';
 import { canUpgradeShip } from '../../units/ship';
@@ -14,9 +15,58 @@ import { isForestType } from '../../map/tile-types';
 import { flagsFor } from '../ai-flags';
 import { planGangAttack } from '../ai-attack-plan';
 import { ENTER_VILLAGE_PATTERN } from '../ai-enter-village';
-import { AiActionType, AiStance, GarrisonGuardKind, SkillId, UnitType } from '@enums';
+import { AiActionType, AiStance, BuildingKind, GarrisonGuardKind, SkillId, UnitType } from '@enums';
 
 import { type AiPattern, STALKER_STEALTH_RADIUS, STUN_MIN_DAMAGE, attackersForTile, enemyCanReach, gangAttackActions, guardGarrisonAttack, incomingForceAt, isHitVillage, isSupportUnit, key, nearestEnemyDistanceFrom, unitHoldsVillage } from '../ai-pattern-helpers';
+
+/** Attacks (or moves in to attack) the enemy standing on `enemyInVillage` with every idle unit that can. */
+function attackIntruder(map: GameMap, player: Player, state: AiPlannerState, enemyInVillage: MapTile): AiAction[] | null {
+  // A trapper in the village is shot by ranged units first; melee units
+  // join only when they finish it. Ranged units able to hit it now or
+  // after a move are what holds the melee ones back.
+  const trapper = enemyInVillage.unit?.type === UnitType.TRAPPER;
+  const rangedCanHit = trapper && attackersForTile(map, player, enemyInVillage, state).some((a) => a.unit.attackDistance > 1);
+  const actions: AiAction[] = [];
+  for (const t of map.tiles) {
+    const unit = t.unit;
+    if (!unit || unit.owner !== player.index) continue;
+    if (state.acted.has(unit.id)) continue;
+    // Support units never join a fight; a stalker strikes only when it can
+    // kill the defender outright.
+    if (isSupportUnit(unit)) continue;
+    if (unit.type === UnitType.STALKER && enemyInVillage.unit && attackDamage(unit) < enemyInVillage.unit.hp) continue;
+    if (rangedCanHit && enemyInVillage.unit && isPoorTrapperTarget(unit, enemyInVillage.unit)) continue;
+    if (
+      attackableTargets(map, unit, unit.owner).some(
+        (a) => a.q === enemyInVillage.q && a.r === enemyInVillage.r,
+      )
+    ) {
+      const garrisonGuard = guardGarrisonAttack(map, player, unit, enemyInVillage, state);
+      if (garrisonGuard.kind === GarrisonGuardKind.HOLD) continue;
+      actions.push({ type: AiActionType.ATTACK, unitId: unit.id, q: enemyInVillage.q, r: enemyInVillage.r });
+      if (garrisonGuard.guardType) {
+        actions.push({ type: AiActionType.SPAWN, q: t.q, r: t.r, unitType: garrisonGuard.guardType });
+      }
+      continue;
+    }
+    if (state.moved.has(unit.id)) continue;
+    // A garrison in its own endangered village defends in place; it must
+    // not march to help a different village and leave home empty.
+    if (t.settlement && t.settlement.owner === player.index && enemyCanReach(map, t, player.index)) continue;
+    const moveTarget = reachableTargets(map, unit, undefined, undefined, undefined, unit.owner).find(
+      (c) =>
+        !state.occupied.has(key(c.q, c.r)) &&
+        hexDistance(c, enemyInVillage) <= unit.attackDistance,
+    );
+    if (moveTarget) {
+      actions.push(
+        { type: AiActionType.MOVE, unitId: unit.id, q: moveTarget.q, r: moveTarget.r },
+        { type: AiActionType.ATTACK, unitId: unit.id, q: enemyInVillage.q, r: enemyInVillage.r },
+      );
+    }
+  }
+  return actions.length > 0 ? actions : null;
+}
 
 export const OFFENSE_PATTERNS: AiPattern[] = [
   {
@@ -207,52 +257,22 @@ export const OFFENSE_PATTERNS: AiPattern[] = [
           t.settlement.owner === player.index &&
           t.unit.owner !== player.index,
       );
-      if (!enemyInVillage) return null;
-      // A trapper in the village is shot by ranged units first; melee units
-      // join only when they finish it. Ranged units able to hit it now or
-      // after a move are what holds the melee ones back.
-      const trapper = enemyInVillage.unit?.type === UnitType.TRAPPER;
-      const rangedCanHit = trapper && attackersForTile(map, player, enemyInVillage, state).some((a) => a.unit.attackDistance > 1);
-      const actions: AiAction[] = [];
+      return enemyInVillage ? attackIntruder(map, player, state, enemyInVillage) : null;
+    },
+  },
+  {
+    // An enemy squatting on one of our buildings (a granary above all) is a
+    // danger: it blocks production and the building is lost if it stays.
+    id: 'attack-enemy-on-building',
+    priority: 199,
+    evaluate({ map, player, state }): AiAction[] | null {
+      let target: MapTile | null = null;
       for (const t of map.tiles) {
-        const unit = t.unit;
-        if (!unit || unit.owner !== player.index) continue;
-        if (state.acted.has(unit.id)) continue;
-        // Support units never join a fight; a stalker strikes only when it can
-        // kill the defender outright.
-        if (isSupportUnit(unit)) continue;
-        if (unit.type === UnitType.STALKER && enemyInVillage.unit && attackDamage(unit) < enemyInVillage.unit.hp) continue;
-        if (rangedCanHit && enemyInVillage.unit && isPoorTrapperTarget(unit, enemyInVillage.unit)) continue;
-        if (
-          attackableTargets(map, unit, unit.owner).some(
-            (a) => a.q === enemyInVillage.q && a.r === enemyInVillage.r,
-          )
-        ) {
-          const garrisonGuard = guardGarrisonAttack(map, player, unit, enemyInVillage, state);
-          if (garrisonGuard.kind === GarrisonGuardKind.HOLD) continue;
-          actions.push({ type: AiActionType.ATTACK, unitId: unit.id, q: enemyInVillage.q, r: enemyInVillage.r });
-          if (garrisonGuard.guardType) {
-            actions.push({ type: AiActionType.SPAWN, q: t.q, r: t.r, unitType: garrisonGuard.guardType });
-          }
-          continue;
-        }
-        if (state.moved.has(unit.id)) continue;
-        // A garrison in its own endangered village defends in place; it must
-        // not march to help a different village and leave home empty.
-        if (t.settlement && t.settlement.owner === player.index && enemyCanReach(map, t, player.index)) continue;
-        const moveTarget = reachableTargets(map, unit, undefined, undefined, undefined, unit.owner).find(
-          (c) =>
-            !state.occupied.has(key(c.q, c.r)) &&
-            hexDistance(c, enemyInVillage) <= unit.attackDistance,
-        );
-        if (moveTarget) {
-          actions.push(
-            { type: AiActionType.MOVE, unitId: unit.id, q: moveTarget.q, r: moveTarget.r },
-            { type: AiActionType.ATTACK, unitId: unit.id, q: enemyInVillage.q, r: enemyInVillage.r },
-          );
-        }
+        if (!t.building || t.ownedBy !== player.index || !t.unit || t.unit.owner === player.index) continue;
+        if (!isExploredFor(t, player.index)) continue;
+        if (!target || (t.building.kind === BuildingKind.GRANARY && target.building?.kind !== BuildingKind.GRANARY)) target = t;
       }
-      return actions.length > 0 ? actions : null;
+      return target ? attackIntruder(map, player, state, target) : null;
     },
   },
   ENTER_VILLAGE_PATTERN,

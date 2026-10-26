@@ -12,7 +12,7 @@ import { tileElevation } from '@/render/elevation';
 import { countIceTiles } from '@/game/map/ice';
 import { type GameMap, type MapTile, generateMap } from '@/game/map/map-gen';
 import { buildPlayers } from '@/game/players';
-import { iceCracksAt, seasonForTurn } from '@/game/season';
+import { icePhaseAt, seasonForTurn } from '@/game/season';
 import { cycleSelection, reachableTargets } from '@/game/units/selection';
 import { type Command, Simulator } from '@/game/simulator';
 import { hasSkill } from '@/game/skills';
@@ -45,7 +45,7 @@ import { saveRepository } from '@/storage/save-game';
 import { welcomeDismissed } from '@/storage/settings';
 import { beginMatchState, confirmLeaveGame, useGameStore } from '@/store/game-store';
 import { SeededRandom } from '@/util';
-import { AiDifficulty, CommandType, GameMode, NetMode, OverlayKind, Screen, Season, SelectionKind, SkillId, TutorialStepId, UnitType } from '@enums';
+import { AiDifficulty, CommandType, IcePhase, GameMode, NetMode, OverlayKind, Screen, Season, SelectionKind, SkillId, TutorialStepId, UnitType } from '@enums';
 import { Application, Container } from 'pixi.js';
 import { CAMERA_FOLLOW_MS, CameraController } from './camera-controller';
 import { damagePreviewVictim } from './damage-preview';
@@ -153,7 +153,7 @@ class GameController {
     if (this.sim) {
       this.applyFitToScreen();
       useGameStore.getState().setTexturesLoading(true);
-      const bake = createTextures(app, this.sim.map, HEX_SIZE * this.getCamera().qualityFactor, new Set(this.sim.players.map((p) => p.tribe)), seasonForTurn(this.sim.turn), iceCracksAt(this.sim.turn)).then((textures) => {
+      const bake = createTextures(app, this.sim.map, HEX_SIZE * this.getCamera().qualityFactor, new Set(this.sim.players.map((p) => p.tribe)), seasonForTurn(this.sim.turn), icePhaseAt(this.sim.turn)).then((textures) => {
         if (token === this.initToken) useGameStore.getState().setTexturesLoading(false);
         if (token !== this.initToken || !this.mapRoot) return;
         this.replaceTextures(textures);
@@ -181,12 +181,12 @@ class GameController {
   /** Whether the baked terrain textures no longer match the sim's season / ice. */
   private terrainTexturesStale(): boolean {
     if (!this.sim || !this.textures) return false;
-    return (this.textures.season ?? Season.SPRING) !== seasonForTurn(this.sim.turn) || (this.textures.iceTiles ?? 0) !== countIceTiles(this.sim.map) || (this.textures.crackedIce ?? false) !== iceCracksAt(this.sim.turn);
+    return (this.textures.season ?? Season.SPRING) !== seasonForTurn(this.sim.turn) || (this.textures.iceTiles ?? 0) !== countIceTiles(this.sim.map) || (this.textures.icePhase ?? IcePhase.NONE) !== icePhaseAt(this.sim.turn);
   }
 
-  private bakeTerrain(season: Season, cracked = iceCracksAt(this.sim!.turn)): Promise<TerrainTextures> {
+  private bakeTerrain(season: Season, icePhase = icePhaseAt(this.sim!.turn)): Promise<TerrainTextures> {
     const hexSize = HEX_SIZE * this.getCamera().qualityFactor;
-    return createTerrainTextures(this.app!, this.sim!.map, hexSize, season, cracked);
+    return createTerrainTextures(this.app!, this.sim!.map, hexSize, season, icePhase);
   }
 
   /** Puts a freshly baked terrain part into the live texture set and points the
@@ -275,13 +275,13 @@ class GameController {
     if (this.seasonRebake) return;
     const season = seasonForTurn(useGameStore.getState().turn);
     const ice = countIceTiles(this.sim.map);
-    const cracked = iceCracksAt(useGameStore.getState().turn);
-    if ((this.textures.season ?? Season.SPRING) === season && (this.textures.iceTiles ?? 0) === ice && (this.textures.crackedIce ?? false) === cracked) return;
+    const icePhase = icePhaseAt(useGameStore.getState().turn);
+    if ((this.textures.season ?? Season.SPRING) === season && (this.textures.iceTiles ?? 0) === ice && (this.textures.icePhase ?? IcePhase.NONE) === icePhase) return;
     this.seasonRebake = true;
     const token = this.initToken;
     const epoch = this.lossEpoch;
     const hexSize = HEX_SIZE * this.getCamera().qualityFactor;
-    void createTerrainTextures(this.app, this.sim.map, hexSize, season, cracked)
+    void createTerrainTextures(this.app, this.sim.map, hexSize, season, icePhase)
       .then((textures) => {
         if (token !== this.initToken || !this.app || !this.mapRoot) {
           destroyTextureSet(textures as TextureSet);
@@ -612,7 +612,7 @@ class GameController {
       // A bake that straddles another loss is blank: bake again (a few times).
       for (let attempt = 0; attempt < 3; attempt++) {
         const epoch = this.lossEpoch;
-        const textures = await createTextures(this.app, this.sim.map, hexSize, new Set(this.sim.players.map((p) => p.tribe)), seasonForTurn(this.sim.turn), iceCracksAt(this.sim.turn));
+        const textures = await createTextures(this.app, this.sim.map, hexSize, new Set(this.sim.players.map((p) => p.tribe)), seasonForTurn(this.sim.turn), icePhaseAt(this.sim.turn));
         if (token !== this.initToken || !this.app || !this.mapRoot) return;
         if (epoch !== this.lossEpoch || this.glContextLost()) {
           destroyTextureSet(textures, { contextLost: true });
@@ -730,7 +730,7 @@ class GameController {
       // screen was already mounted `init` did not run, so bake here.
       const inFlight = this.initBake;
       if (inFlight) await inFlight;
-      else this.replaceTextures(await createTextures(this.app, map, HEX_SIZE * this.getCamera().qualityFactor, new Set(this.sim!.players.map((p) => p.tribe)), seasonForTurn(this.sim!.turn), iceCracksAt(this.sim!.turn)));
+      else this.replaceTextures(await createTextures(this.app, map, HEX_SIZE * this.getCamera().qualityFactor, new Set(this.sim!.players.map((p) => p.tribe)), seasonForTurn(this.sim!.turn), icePhaseAt(this.sim!.turn)));
     }
     this.render();
     this.centerOnStartVillage();

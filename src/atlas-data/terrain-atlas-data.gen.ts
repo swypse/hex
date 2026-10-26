@@ -16,4 +16,5 @@ export const TERRAIN_ATLAS_FRAMES: Record<string, { x: number; y: number; w: num
   'pirates-ship': { x: 256, y: 448, w: 256, h: 448 },
   'storm': { x: 512, y: 448, w: 256, h: 448 },
   'water': { x: 768, y: 448, w: 256, h: 448 },
+  'water-ice': { x: 1024, y: 448, w: 256, h: 448 },
 };

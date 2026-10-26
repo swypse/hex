@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { AiActionType, UnitType } from '@enums';
+import { AiActionType, IcePhase, UnitType } from '@enums';
 import { SEASON_SAFETY_PATTERN, seasonUnsafe, seasonVetoed } from '../src/game/ai/ai-season';
 import { type AiPlannerState } from '../src/game/ai/ai-types';
 import { type Player } from '../src/game/players';
@@ -70,12 +70,12 @@ describe('season safety', () => {
   });
 });
 
-describe('iceCracksAt', () => {
-  it('is true only on the last winter turn', async () => {
-    const { iceCracksAt } = await import('../src/game/season');
-    expect(iceCracksAt(LAST_WINTER)).toBe(true);
-    expect(iceCracksAt(LAST_WINTER - 1)).toBe(false);
-    expect(iceCracksAt(LAST_AUTUMN)).toBe(false);
-    expect(iceCracksAt(LAST_WINTER + 1)).toBe(false);
+describe('icePhaseAt', () => {
+  it('flags the last autumn turn as freezing and the last winter turn as cracked', async () => {
+    const { icePhaseAt } = await import('../src/game/season');
+    expect(icePhaseAt(LAST_WINTER)).toBe(IcePhase.CRACKED);
+    expect(icePhaseAt(LAST_AUTUMN)).toBe(IcePhase.FREEZING);
+    expect(icePhaseAt(LAST_WINTER - 1)).toBe(IcePhase.NONE);
+    expect(icePhaseAt(LAST_WINTER + 1)).toBe(IcePhase.NONE);
   });
 });

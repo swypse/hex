@@ -3,4 +3,5 @@ export enum WeatherType {
   DROUGHT = 'drought',
   EARTHQUAKE = 'earthquake',
   LIGHTNING = 'lightning',
+  TORNADO = 'tornado',
 }

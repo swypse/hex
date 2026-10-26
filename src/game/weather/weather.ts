@@ -36,6 +36,15 @@ export const WEATHER_RULES = {
     hitChance: 0.6,
     unitDamage: 20,
   },
+  tornado: {
+    lifetime: 5,
+    minRadius: 1,
+    maxRadius: 1,
+    /** Chance per turn that a building / unit in scope is hit. */
+    hitChance: 0.5,
+    buildingDamage: 1,
+    unitDamage: 15,
+  },
   lightning: {
     lifetime: 1,
     minRadius: 0,
@@ -159,7 +168,7 @@ export function isWeatherSpawnTurn(turn: number): boolean {
   return turn >= WEATHER_RULES.firstTurn && (turn - WEATHER_RULES.firstTurn) % WEATHER_RULES.interval === 0;
 }
 
-const SPAWN_TYPES: readonly WeatherType[] = [WeatherType.STORM, WeatherType.DROUGHT, WeatherType.EARTHQUAKE];
+const SPAWN_TYPES: readonly WeatherType[] = [WeatherType.STORM, WeatherType.DROUGHT, WeatherType.EARTHQUAKE, WeatherType.TORNADO];
 
 /** True on the turns where a lightning strike is attempted. */
 export function isLightningTurn(turn: number): boolean {
@@ -184,6 +193,7 @@ function spawnCandidates(map: GameMap, type: WeatherType): MapTile[] {
     case WeatherType.EARTHQUAKE:
       return map.tiles.filter((t) => isMountainType(t.terrain));
     case WeatherType.LIGHTNING:
+    case WeatherType.TORNADO:
       return map.tiles;
   }
 }
@@ -239,6 +249,15 @@ export function advanceWeather(map: GameMap, rng: () => number): { ended: Weathe
       continue;
     }
     alive.push(event);
+    if (event.type === WeatherType.TORNADO) {
+      // A tornado wanders over any terrain, every turn.
+      const step = pickRandom(hexNeighbors(event).filter((n) => byKey.has(axialKey(n))), rng);
+      if (!step) continue;
+      event.q = step.q;
+      event.r = step.r;
+      moved.push(event);
+      continue;
+    }
     if (event.type !== WeatherType.STORM || rng() >= WEATHER_RULES.storm.moveChance) continue;
     const past = new Set(event.pastCenters ?? []);
     const targets = hexNeighbors(event).filter((n) => {

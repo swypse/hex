@@ -55,4 +55,4 @@ export const HELP_BUILDINGS: readonly HelpBuildingEntry[] = [
 ];
 
 /** The Events tab, in listing order. Texts live under `guide.weather.<type>.*`. */
-export const HELP_WEATHER: readonly WeatherType[] = [WeatherType.STORM, WeatherType.DROUGHT, WeatherType.EARTHQUAKE, WeatherType.LIGHTNING];
+export const HELP_WEATHER: readonly WeatherType[] = [WeatherType.STORM, WeatherType.DROUGHT, WeatherType.EARTHQUAKE, WeatherType.LIGHTNING, WeatherType.TORNADO];

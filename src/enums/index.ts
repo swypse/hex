@@ -54,6 +54,7 @@ export * from './relay-server-message-type.enum';
 export * from './resource-kind.enum';
 export * from './screen.enum';
 export * from './scrim-side.enum';
+export * from './ice-phase.enum';
 export * from './season.enum';
 export * from './selection-kind.enum';
 export * from './siege-target-kind.enum';

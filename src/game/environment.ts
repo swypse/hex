@@ -5,7 +5,7 @@ import type { GameMap } from './map/map-gen';
 import { seasonForTurn } from './season';
 import { activeWeather, advanceWeather, createWeather, spawnLightning, spawnWeather, WEATHER_RULES, type WeatherEvent } from './weather/weather';
 import { applyFireTurn, applyLightning } from './weather/fire';
-import { applyEarthquake, applyStormTurn } from './weather/weather-effects';
+import { applyEarthquake, applyStormTurn, applyTornadoTurn } from './weather/weather-effects';
 
 import type { SimContext } from './sim-context';
 
@@ -29,12 +29,12 @@ export class Environment {
     this.ctx.emit(e);
   }
 
-  /** Round-end damage of the storms active during the turn that is ending, then the fires. */
+  /** Round-end damage of the storms and tornadoes active during the turn that is ending, then the fires. */
   applyWeatherEffects(): void {
     for (const storm of activeWeather(this.map)) {
-      if (storm.type !== WeatherType.STORM) continue;
-      const report = applyStormTurn(this.map, storm);
-      if (report.units.length > 0 || report.buildings.length > 0) {
+      if (storm.type !== WeatherType.STORM && storm.type !== WeatherType.TORNADO) continue;
+      const report = storm.type === WeatherType.STORM ? applyStormTurn(this.map, storm) : applyTornadoTurn(this.map, storm, this.rng);
+      if (report.units.length > 0 || report.buildings.length > 0 || (report.roads?.length ?? 0) > 0) {
         this.emit({ type: GameEventType.WEATHER_DAMAGE, weather: { ...storm }, ...report });
       }
     }

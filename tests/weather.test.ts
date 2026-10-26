@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { BuildingKind, CompassDirection, UnitType, WeatherType } from '@enums';
+import { BUILDING_MAX_HP } from '../src/game/economy/buildings';
 import { axialKey, hexDistance } from '../src/game/map/hex';
 import { TileType } from '../src/game/map/tile-types';
 import { tileMoveCost, TILE_MOVE_COST } from '../src/game/units/movement-cost';
@@ -16,7 +17,7 @@ import {
   WEATHER_RULES,
   type WeatherEvent,
 } from '../src/game/weather/weather';
-import { applyEarthquake, applyStormTurn } from '../src/game/weather/weather-effects';
+import { applyEarthquake, applyStormTurn, applyTornadoTurn } from '../src/game/weather/weather-effects';
 import { makeTestMap, makeUnit, tileAt } from './helpers/test-map';
 
 function storm(q: number, r: number, over: Partial<WeatherEvent> = {}): WeatherEvent {
@@ -81,7 +82,7 @@ describe('spawn timing', () => {
     expect(tileAt(map, drought.q, drought.r)!.terrain).not.toBe(TileType.Water);
     expect(drought.lifetime).toBe(5);
     map.weather = [];
-    const quake = spawnWeather(map, 12, sequence(0.1, 0.9, 0, 0))!;
+    const quake = spawnWeather(map, 12, sequence(0.1, 0.6, 0, 0))!;
     expect(quake.type).toBe(WeatherType.EARTHQUAKE);
     expect([quake.q, quake.r]).toEqual([-3, 0]);
     expect(quake.lifetime).toBe(1);
@@ -341,5 +342,61 @@ describe('weatherEffectsAt', () => {
     expect(weatherEffectsAt(map, tileAt(map, 1, 0)!)).toEqual([]);
     map.weather = [storm(5, 0, { radius: 1 })];
     expect(weatherEffectsAt(map, tileAt(map, -5, 0)!)).toEqual([]);
+  });
+});
+
+describe('tornado', () => {
+  function tornado(q: number, r: number): WeatherEvent {
+    return { id: 'tornado@9', type: WeatherType.TORNADO, q, r, radius: 1, startTurn: 9, age: 1, lifetime: 5 };
+  }
+
+  it('can appear on water as well as on land', () => {
+    const map = mixedMap();
+    const water = spawnWeather(map, 9, sequence(0.1, 0.9, 0.99))!;
+    expect(water.type).toBe(WeatherType.TORNADO);
+    map.weather = [];
+    const land = spawnWeather(map, 9, sequence(0.1, 0.9, 0))!;
+    expect(land.type).toBe(WeatherType.TORNADO);
+    expect([tileAt(map, water.q, water.r)!.terrain, tileAt(map, land.q, land.r)!.terrain]).toContain(TileType.Water);
+  });
+
+  it('wanders one tile every turn', () => {
+    const map = mixedMap();
+    const t = tornado(0, 0);
+    map.weather = [t];
+    const { moved } = advanceWeather(map, () => 0);
+    expect(moved).toEqual([t]);
+    expect(hexDistance({ q: 0, r: 0 }, t)).toBe(1);
+  });
+
+  it('damages buildings by 1 hp and units in scope, sparing the outside', () => {
+    const map = mixedMap();
+    const farm = tileAt(map, -1, 0)!;
+    farm.building = { kind: BuildingKind.FARM, level: 1 };
+    const far = tileAt(map, -4, 0)!;
+    far.building = { kind: BuildingKind.FARM, level: 1 };
+    const unit = tileAt(map, 0, 0)!;
+    unit.unit = makeUnit('u', 0, UnitType.WARRIOR, 0, 0);
+    const hp = unit.unit.hp;
+    const report = applyTornadoTurn(map, tornado(0, 0), () => 0);
+    expect(report.buildings).toEqual([{ q: -1, r: 0, destroyed: false }]);
+    expect(farm.building!.hp).toBe(BUILDING_MAX_HP - WEATHER_RULES.tornado.buildingDamage);
+    expect(unit.unit.hp).toBe(hp - WEATHER_RULES.tornado.unitDamage);
+    expect(far.building!.hp).toBeUndefined();
+  });
+
+  it('sweeps away roads and bridges in scope', () => {
+    const map = mixedMap();
+    const road = tileAt(map, -1, 0)!;
+    road.roadOwner = 0;
+    const bridge = tileAt(map, 1, 0)!;
+    bridge.roadOwner = 0;
+    bridge.bridge = { owner: 0 } as never;
+    const far = tileAt(map, -4, 0)!;
+    far.roadOwner = 0;
+    const report = applyTornadoTurn(map, tornado(0, 0), () => 0);
+    expect(report.roads).toEqual(expect.arrayContaining([{ q: -1, r: 0 }, { q: 1, r: 0 }]));
+    expect([road.roadOwner, road.bridge, bridge.roadOwner, bridge.bridge]).toEqual([null, null, null, null]);
+    expect(far.roadOwner).toBe(0);
   });
 });

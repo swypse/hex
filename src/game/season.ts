@@ -1,4 +1,4 @@
-import { Season } from '@enums';
+import { IcePhase, Season } from '@enums';
 export const SEASONS: readonly Season[] = [Season.SPRING, Season.SUMMER, Season.AUTUMN, Season.WINTER];
 
 /** Number of turns each season lasts. The game starts in spring. */
@@ -14,7 +14,10 @@ export function seasonForTurn(turn: number): Season {
   return SEASONS[idx]!;
 }
 
-/** Last winter turn: the ice is about to melt, so it is drawn cracked. */
-export function iceCracksAt(turn: number): boolean {
-  return seasonForTurn(turn) === Season.WINTER && seasonTurn(turn) === SEASON_LENGTH;
+/** Ice state announced for a turn: coast water freezes after the last autumn turn, ice melts after the last winter one. */
+export function icePhaseAt(turn: number): IcePhase {
+  if (seasonTurn(turn) !== SEASON_LENGTH) return IcePhase.NONE;
+  const season = seasonForTurn(turn);
+  if (season === Season.AUTUMN) return IcePhase.FREEZING;
+  return season === Season.WINTER ? IcePhase.CRACKED : IcePhase.NONE;
 }

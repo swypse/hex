@@ -60,7 +60,7 @@ export type GameEvent =
   | { type: GameEventType.WEATHER_STARTED; weather: WeatherEvent }
   | { type: GameEventType.WEATHER_ENDED; weather: WeatherEvent }
   | { type: GameEventType.WEATHER_MOVED; weather: WeatherEvent }
-  | { type: GameEventType.WEATHER_DAMAGE; weather: WeatherEvent; units: WeatherUnitHit[]; buildings: WeatherBuildingHit[] }
+  | { type: GameEventType.WEATHER_DAMAGE; weather: WeatherEvent; units: WeatherUnitHit[]; buildings: WeatherBuildingHit[]; roads?: { q: number; r: number }[] }
   | { type: GameEventType.FIRE_TURN; units: WeatherUnitHit[]; buildings: WeatherBuildingHit[]; ignited: { q: number; r: number }[]; burnedOut: { q: number; r: number }[]; cleared: { q: number; r: number }[] }
   | { type: GameEventType.FIRE_EXTINGUISHED; unitId: string; q: number; r: number }
   | { type: GameEventType.ORDER_PLACED; orderId: number; buyer: number; resource: ResourceKind; quantity: number }

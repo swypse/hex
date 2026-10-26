@@ -1,6 +1,6 @@
 import { BuildingKind, UnitType } from '@enums';
 import { BUILDING_MAX_HP } from '../economy/buildings';
-import { axialKey, tilesInRange } from '../map/hex';
+import { type Axial, axialKey, tilesInRange } from '../map/hex';
 import { type GameMap, type MapTile } from '../map/map-gen';
 import { isShip } from '../units/ship';
 import { earthquakeProtected, stormProtected, WEATHER_RULES, type WeatherBuildingHit, type WeatherEvent, type WeatherUnitHit } from './weather';
@@ -9,6 +9,8 @@ import { tileMapByKey } from '../map/tile-index';
 export interface WeatherEffectReport {
   units: WeatherUnitHit[];
   buildings: WeatherBuildingHit[];
+  /** Tiles whose road and bridge were swept away (tornado). */
+  roads?: Axial[];
 }
 
 /** The map tiles inside an event's scope, in a fixed order. */
@@ -56,6 +58,29 @@ export function applyStormTurn(map: GameMap, storm: WeatherEvent): WeatherEffect
     }
     if (portsHit && tile.building?.kind === BuildingKind.PORT && !(tile.ownedBy !== null && stormProtected(map, tile, tile.ownedBy))) {
       report.buildings.push(hurtBuilding(tile, rules.portDamage));
+    }
+  }
+  return report;
+}
+
+/** A tornado's end-of-turn damage: each building in scope loses `buildingDamage`
+ *  hp and each unit (ships too) takes `unitDamage`; a road or bridge is swept
+ *  away, each with probability `hitChance`. Villages and walls are unaffected. */
+export function applyTornadoTurn(map: GameMap, tornado: WeatherEvent, rng: () => number): WeatherEffectReport {
+  const rules = WEATHER_RULES.tornado;
+  const report: WeatherEffectReport = { units: [], buildings: [] };
+  for (const tile of tilesInScope(map, tornado)) {
+    if (tile.building && rng() < rules.hitChance && !(tile.ownedBy !== null && earthquakeProtected(map, tile, tile.ownedBy))) {
+      report.buildings.push(hurtBuilding(tile, rules.buildingDamage));
+    }
+    if (tile.unit && rng() < rules.hitChance && !earthquakeProtected(map, tile, tile.unit.owner)) {
+      report.units.push(hurtUnit(tile, rules.unitDamage));
+    }
+    const hasRoad = (tile.roadOwner !== null && tile.roadOwner !== undefined) || (tile.bridge !== null && tile.bridge !== undefined);
+    if (hasRoad && rng() < rules.hitChance) {
+      tile.roadOwner = null;
+      tile.bridge = null;
+      (report.roads ??= []).push({ q: tile.q, r: tile.r });
     }
   }
   return report;

@@ -24,6 +24,8 @@ import { tileElevation } from './elevation';
 import { DamageBadgeLayer } from './damage-badge';
 import { FireEffects } from './fire';
 import { LoopingWeatherEffect, spawnStormEffect } from './storm-effect';
+import { TornadoEffect, type TornadoPoint } from './tornado-effect';
+import { isForestType } from '../game/map/tile-types';
 import { roadStripOutline } from './road-path';
 import { IMAGE_H, IMAGE_HEX_CENTER_Y, IMAGE_HEX_W, type TextureSet, type TileTexture } from './texture-factory';
 import { villageTextureFor, villageOwnerTribe } from './village-texture';
@@ -34,7 +36,7 @@ import { Tooltip } from '../gfx/tooltip';
 import { THEME } from '../gfx/theme';
 import { villageLabelTextColor } from './village-label-color';
 import { unitGlowColor } from './unit-glow-color';
-import { weatherOverlayAt } from '../game/weather/weather';
+import { activeWeather, weatherOverlayAt } from '../game/weather/weather';
 import { HP_BAR_BOX_TOP, HP_BAR_ICON_GAP } from './hp-bar-layout';
 import { icons32FrameTexture, makeIcon32 } from '../gfx/icons32';
 import { BuildingKind, FontSize, HpBarSide, PortDirection, Season, SelectionKind, UnitFacing, UnitType, WeatherEffectKind, WeatherType } from '@enums';
@@ -49,6 +51,8 @@ const ICE_BOUNCE_MS = 150;
 /** Earthquake shake: how many up-down-back cycles each tile plays, and how long one takes. */
 /** Village jump height relative to the terrain bounce on upgrade. */
 const VILLAGE_JUMP_SCALE = 2;
+/** Px the tornado funnel is drawn above its tile centre. */
+const TORNADO_LIFT = 15;
 const QUAKE_SHAKE_CYCLES = 5;
 const QUAKE_SHAKE_CYCLE_MS = 110;
 const PIRATE_DEAL_DOT = 8;
@@ -189,6 +193,7 @@ export class MapView {
   private stormWeather!: LoopingWeatherEffect;
   /** Looping rising heat lines over the land of active droughts. */
   private droughtWeather!: LoopingWeatherEffect;
+  private tornadoWeather!: TornadoEffect;
   private stopTutorialMarkers: (() => void) | null = null;
   private tutorialMarkerParts: { g: Graphics; points: { x: number; y: number }[] }[] = [];
   private attackPulseParts: { g: Graphics; x: number; y: number; base: number }[] = [];
@@ -259,6 +264,7 @@ export class MapView {
     const weatherClock = { now: () => this.animNow(), isPaused: () => this.cameraBusy };
     this.stormWeather = new LoopingWeatherEffect(app, this.container, hexSize, weatherClock, WeatherEffectKind.STORM);
     this.droughtWeather = new LoopingWeatherEffect(app, this.container, hexSize, weatherClock, WeatherEffectKind.DROUGHT);
+    this.tornadoWeather = new TornadoEffect(app, this.container, hexSize, weatherClock);
     this.overlay = new Container();
     this.overlay.sortableChildren = true;
     this.fireEffects = new FireEffects({
@@ -332,6 +338,7 @@ export class MapView {
     }
     this.stormWeather.destroy();
     this.droughtWeather.destroy();
+    this.tornadoWeather.destroy();
     this.container.destroy({ children: true });
     this.overlay.destroy({ children: true });
     this.markerLayer.destroy({ children: true });
@@ -558,6 +565,7 @@ export class MapView {
     }
     this.stormWeather.set(stormCells);
     this.droughtWeather.set(droughtCells);
+    this.tornadoWeather.set(this.tornadoPoints(map, localPlayerIndex));
     this.drawHighlights(map, selection, reachableKeys, attackableKeys, reachableColor, localPlayerIndex, tutorialMarkerKeys, localTurn, placementKeys, pickedKey);
     this.shipBobs = shipBobs;
     this.startShipBob();
@@ -2022,6 +2030,19 @@ export class MapView {
 
   private clearFireEffects(): void {
     this.fireEffects.clear();
+  }
+
+  /** World positions of the explored tornado centres. */
+  private tornadoPoints(map: GameMap, localPlayerIndex: number): TornadoPoint[] {
+    const byKey = tileMapByKey(map);
+    const out: TornadoPoint[] = [];
+    for (const event of activeWeather(map)) {
+      const tile = event.type === WeatherType.TORNADO ? byKey.get(axialKey(event)) : undefined;
+      if (!tile || !isExploredFor(tile, localPlayerIndex)) continue;
+      const p = hexToPixel(tile, this.hexSize);
+      out.push({ x: p.x, y: p.y - tileElevation(tile, this.hexSize) + this.hexSize * 0.3 - TORNADO_LIFT, debris: tile.building !== null || isForestType(tile.terrain) });
+    }
+    return out;
   }
 
   private startFireAnimation(): void {
