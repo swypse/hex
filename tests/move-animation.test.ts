@@ -258,6 +258,7 @@ describe('move animation', () => {
   let h: Harness;
 
   beforeEach(() => {
+    useGameStore.setState({ centerMessage: null, centerMessageQueue: [] });
     Object.defineProperty(Text.prototype, 'width', { configurable: true, get: () => 40 });
     Object.defineProperty(Text.prototype, 'height', { configurable: true, get: () => 14 });
     h = setupGame(makeMap(), [player(0, Tribe.Cats)]);
@@ -674,7 +675,7 @@ describe('move animation', () => {
     }
   });
 
-  it('queues a tribe died notification after the last village is captured', async () => {
+  it('shows a tribe died notification instead of a capture message when the local player takes the last village', async () => {
     const map = makeOpenMap();
     h = setupGame(map, [player(0, Tribe.Cats), player(1, Tribe.Barbarians)]);
     const village = unitAt(map, 1, 0);
@@ -686,9 +687,9 @@ describe('move animation', () => {
     const p = h.gc.presentEvents(events, h.gc.exploredKeysFor(0));
     await p;
     const s = useGameStore.getState();
-    expect(s.centerMessage).toBe('Settlement is captured by Cats!');
-    expect(s.centerMessageQueue).toContain('Barbarians died!');
-    expect(s.centerIconQueue).toContain('barbarians-icon.png');
+    // The local player made the capture: no capture message, just the death notice.
+    expect(s.centerMessage).toBe('Barbarians died!');
+    expect(s.centerIconFile).toBe('barbarians-icon.png');
   });
 
   it('spawns a 10-circle death animation on the dead unit hex and removes it after the rise', async () => {

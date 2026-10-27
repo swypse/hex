@@ -1,5 +1,5 @@
 import { t } from '../../i18n';
-import { type Container, Graphics } from 'pixi.js';
+import type { Container } from 'pixi.js';
 import { gameController } from '../../controller/game-controller';
 import { hasSkill } from '../../game/skills';
 import { networkStock } from '../../game/economy/stock';
@@ -46,11 +46,6 @@ export function spawnableTypesFor(player: Player): Exclude<UnitType, 'pirate'>[]
   const special = TRIBE_SPECIAL_UNIT[player.tribe] as Exclude<UnitType, 'pirate'>;
   return [...BASE_PLAYABLE, ...(BASE_PLAYABLE.includes(special) ? [] : [special])];
 }
-
-/** Keyboard selection ring drawn around a grid item's circle. */
-const SELECT_RING_COLOR = 0xffd54a;
-const SELECT_RING_RADIUS = 34;
-const CIRCLE_CENTER_Y = 30;
 
 const ARROW_STEPS: Record<string, { dx: number; dy: number }> = {
   ArrowLeft: { dx: -1, dy: 0 },
@@ -185,16 +180,13 @@ export class SpawnDialog extends PopupDialog {
         name: UNIT_TYPE_NAMES[type],
         cost: resourceCostParts({ ...EMPTY_COST, money: info.price, wood: info.priceWood, ore: info.priceOre }),
         dimmed: disabled,
+        highlighted: i === this.selected,
         onClick: () => {
           if (disabled) this.drawReasons(type);
           else gameController.actions.spawnSelectedVillage(type);
         },
       });
       item.position.set(GRID_MARGIN + col * (ACTION_CELL_W + ITEM_PAD), GRID_MARGIN + row * (ACTION_CELL_H + ITEM_PAD));
-      if (i === this.selected) {
-        const cx = ACTION_CELL_W / 2;
-        item.addChild(new Graphics().circle(cx, CIRCLE_CENTER_Y, SELECT_RING_RADIUS).stroke({ width: 3, color: SELECT_RING_COLOR }));
-      }
       content.addChild(item);
     });
     this.popup.reflow();

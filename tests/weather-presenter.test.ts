@@ -48,11 +48,11 @@ describe('weather notifications', () => {
     expect(useGameStore.getState().centerMessage).toBe('Drought in the center');
   });
 
-  it('announces when a storm is over and removes it from the HUD list', async () => {
+  it('ends a storm quietly and removes it from the HUD list', async () => {
     useGameStore.setState({ weather: [weather(WeatherType.STORM, 0, 8)] });
     const presenter = new EventPresenter(makeHost([]));
     await presenter.present([{ type: GameEventType.WEATHER_ENDED, weather: weather(WeatherType.STORM, 0, 8, { age: 7 }) }], new Set());
-    expect(useGameStore.getState().centerMessage).toBe('Storm is over');
+    expect(useGameStore.getState().centerMessage).toBeNull();
     expect(useGameStore.getState().weather).toEqual([]);
   });
 
@@ -63,19 +63,23 @@ describe('weather notifications', () => {
     expect(useGameStore.getState().centerMessage).toBeNull();
   });
 
-  it('queues the end of one event and the start of another one after the other', async () => {
-    const ended = weather(WeatherType.STORM, 0, 8, { age: 7 });
+  it('freezes the next event until the first message is closed', async () => {
+    const ended = weather(WeatherType.LIGHTNING, 0, 8, { age: 7 });
     const started = weather(WeatherType.DROUGHT, -8, 0, { id: 'drought@12', startTurn: 12, lifetime: 5 });
     const presenter = new EventPresenter(makeHost([started]));
-    await presenter.present(
+    const done = presenter.present(
       [
         { type: GameEventType.WEATHER_ENDED, weather: ended },
         { type: GameEventType.WEATHER_STARTED, weather: started },
       ],
       new Set(),
     );
-    const s = useGameStore.getState();
-    expect([s.centerMessage, ...s.centerMessageQueue]).toEqual(['Storm is over', 'Drought in the west']);
+    await new Promise((r) => setTimeout(r, 50));
+    expect(useGameStore.getState().centerMessage).toBe('Lightning is over');
+    expect(useGameStore.getState().centerMessageQueue).toEqual([]);
+    useGameStore.getState().setCenterMessage(null);
+    await done;
+    expect(useGameStore.getState().centerMessage).toBe('Drought in the west');
   });
 
   it('centers the map on an earthquake first, then shakes the visible tiles in its scope', async () => {
@@ -102,6 +106,7 @@ describe('weather notifications', () => {
     const centerOnCell = vi.fn(async () => {});
     const storm = weather(WeatherType.STORM, 0, 8);
     await new EventPresenter(makeHost([storm], { centerOnCell })).present([{ type: GameEventType.WEATHER_STARTED, weather: storm }], new Set());
+    useGameStore.getState().setCenterMessage(null);
     const quake = weather(WeatherType.EARTHQUAKE, 5, 5, { lifetime: 1 });
     const hidden = [{ q: 5, r: 5, exploredBy: [] }];
     await new EventPresenter(makeHost([quake], { centerOnCell, mapView: vi.fn(() => ({ shakeTiles: () => 0 })) }, hidden)).present(

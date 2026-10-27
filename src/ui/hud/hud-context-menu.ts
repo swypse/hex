@@ -131,7 +131,7 @@ export class HudContextMenu implements Widget {
         },
       }];
     });
-    // Top row: every unit this village can raise right now; a tap spawns it.
+    // Top row: the village upgrade, then every unit this village can raise right now; a tap spawns it.
     const spawn: MenuItem[] = tile.settlement?.owner === human.index
       ? spawnableTypesFor(human)
           .filter((type) => canSpawnType(map, tile, type, human))
@@ -146,6 +146,34 @@ export class HudContextMenu implements Widget {
             },
           }))
       : [];
+    // Always first in the spawn row; the toolbar spec only exists when the upgrade is affordable.
+    const upgrade = toolbarSpecs().find((s) => s.key === 'upgrade');
+    if (upgrade && tile.settlement?.owner === human.index) {
+      spawn.unshift({
+        id: 'upgrade',
+        round: true,
+        icon: makeActionButtonIcon('upgrade', ICON_SIZE),
+        disabled: false,
+        onClick: () => {
+          close();
+          upgrade.onClick();
+        },
+      });
+    }
+    // An enemy village the selected unit can take right now (the toolbar spec exists only then).
+    const capture = toolbarSpecs().find((s) => s.key === 'capture');
+    if (capture) {
+      spawn.push({
+        id: 'capture',
+        round: true,
+        icon: makeActionButtonIcon('capture', ICON_SIZE),
+        disabled: capture.disabled,
+        onClick: () => {
+          close();
+          capture.onClick();
+        },
+      });
+    }
     const rows: MenuRow[] = [];
     if (spawn.length > 0) rows.push({ label: '', items: spawn });
     if (build.length > 0) rows.push({ label: t('menu.build'), items: build });

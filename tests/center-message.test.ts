@@ -135,19 +135,6 @@ describe('CenterMessage', () => {
     msg.destroy();
   });
 
-  it('auto-clears the message after a timeout', async () => {
-    installCanvas();
-    useGameStore.setState({ centerMessage: 'Hello' });
-    const host = makeHost();
-    const root = new Container();
-    const msg = new CenterMessage();
-    msg.mount(host, root);
-    expect(useGameStore.getState().centerMessage).toBe('Hello');
-    await new Promise((r) => setTimeout(r, 1500));
-    expect(useGameStore.getState().centerMessage).toBeNull();
-    msg.destroy();
-  });
-
   it('closes immediately when the card is clicked', () => {
     installCanvas();
     useGameStore.setState({ centerMessage: 'Hello' });
@@ -164,60 +151,15 @@ describe('CenterMessage', () => {
     msg.destroy();
   });
 
-  it('closes messages after 1.4s', () => {
-    vi.useFakeTimers();
-    try {
-      installCanvas();
-      const host = makeHost();
-      const msg = new CenterMessage();
-
-      msg.mount(host, new Container());
-      useGameStore.setState({ centerMessage: 'Hello' });
-      vi.advanceTimersByTime(900);
-      expect(useGameStore.getState().centerMessage).toBe('Hello');
-      vi.advanceTimersByTime(600);
-      expect(useGameStore.getState().centerMessage).toBeNull();
-
-      msg.destroy();
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it('regular auto-close clears the pending force-close timer', () => {
+  it('never closes on its own, only by a tap', () => {
     vi.useFakeTimers();
     try {
       installCanvas();
       useGameStore.setState({ centerMessage: 'Hello' });
       const msg = new CenterMessage();
       msg.mount(makeHost(), new Container());
-      vi.advanceTimersByTime(1400);
-      expect(useGameStore.getState().centerMessage).toBeNull();
-      vi.advanceTimersByTime(5000);
-      expect(useGameStore.getState().centerMessage).toBeNull();
-      msg.destroy();
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it('force-closes after 5s even when the regular timer keeps being re-armed', () => {
-    vi.useFakeTimers();
-    try {
-      installCanvas();
-      useGameStore.setState({ centerMessage: 'Hello' });
-      const root = new Container();
-      const msg = new CenterMessage();
-      msg.mount(makeHost(), root);
-
-      for (let t = 0; t < 4; t++) {
-        vi.advanceTimersByTime(1000);
-        useGameStore.setState({ turn: t + 2 });
-      }
+      vi.advanceTimersByTime(60_000);
       expect(useGameStore.getState().centerMessage).toBe('Hello');
-      vi.advanceTimersByTime(1000);
-      expect(useGameStore.getState().centerMessage).toBeNull();
-
       msg.destroy();
     } finally {
       vi.useRealTimers();

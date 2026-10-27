@@ -10,8 +10,6 @@ import { makeAchievementChip } from '../kit/tribe-chip';
 import { Popup, POPUP_BODY_SIZE } from '../kit/popup';
 import { OverlayKind } from '@enums';
 
-const MESSAGE_MS = 1400;
-const FORCE_CLOSE_MS = 5000;
 const FONT_SIZE = POPUP_BODY_SIZE;
 const ICON_CHIP_SIZE = 48;
 const ICON_ICON_GAP = 6;
@@ -20,8 +18,6 @@ export class CenterMessage {
   private el: Container | null = null;
   private popup: Popup | null = null;
   private host: UIHost | null = null;
-  private timer: ReturnType<typeof setTimeout> | null = null;
-  private forceTimer: ReturnType<typeof setTimeout> | null = null;
   private unsub: (() => void) | null = null;
   private current: string | null = null;
 
@@ -31,8 +27,17 @@ export class CenterMessage {
     root.addChild(el);
     this.el = el;
     this.unsub = useGameStore.subscribe(() => this.render());
+    // Capture phase: Esc/Enter close the message before any other handler sees them.
+    window.addEventListener('keydown', this.onKeyDown, true);
     this.render();
   }
+
+  private onKeyDown = (e: KeyboardEvent): void => {
+    if (!this.popup || (e.key !== 'Escape' && e.key !== 'Enter')) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    if (!e.repeat) this.close();
+  };
 
   private render(): void {
     if (!this.el || !this.host) return;
@@ -40,7 +45,6 @@ export class CenterMessage {
     // Messages wait while the skill tree covers the map and show once it closes.
     const message = state.overlay?.kind === OverlayKind.SKILL ? null : state.centerMessage;
     if (message === null) {
-      this.clearTimers();
       if (this.current !== null || this.popup) {
         this.popup?.destroy();
         this.popup = null;
@@ -62,7 +66,7 @@ export class CenterMessage {
         ? this.makeIconPopup(message)
         : new Popup({
             app: this.host.app,
-            modal: false,
+            modal: true,
             interactive: true,
             fitContent: true,
             closeOnBackdrop: false,
@@ -87,13 +91,7 @@ export class CenterMessage {
         const b = popup.el.getBounds();
         spawnConfettiBurst(this.host.app, this.el, b.x + b.width / 2, b.y + b.height / 2);
       }
-      this.armForceClose();
     }
-
-    // Always re-arm the auto-dismiss timer, even when the same message is
-    // queued again, so the popup can never stay on screen forever.
-    if (this.timer) clearTimeout(this.timer);
-    this.timer = setTimeout(() => this.close(), MESSAGE_MS);
   }
 
   /** A fixed-width notification card: an icon centred above the text. */
@@ -105,7 +103,7 @@ export class CenterMessage {
     const desired = Math.max(probe.width, chipSize) + 8 + 40;
     return new Popup({
       app: host.app,
-      modal: false,
+      modal: true,
       interactive: true,
       width: Math.min(Math.ceil(desired), Math.floor(screenW * 0.9)),
       closeOnBackdrop: false,
@@ -138,34 +136,9 @@ export class CenterMessage {
     popup.content.addChild(chip);
   }
 
-  private armForceClose(): void {
-    if (this.forceTimer) clearTimeout(this.forceTimer);
-    this.forceTimer = setTimeout(() => this.forceClose(), FORCE_CLOSE_MS);
-  }
-
+  /** Only a tap on the card closes it; the modal backdrop blocks the rest of the UI. */
   private close(): void {
-    this.clearTimers();
     useGameStore.getState().setCenterMessage(null);
-  }
-
-  private forceClose(): void {
-    this.clearTimers();
-    this.popup?.destroy();
-    this.popup = null;
-    this.current = null;
-    this.el?.removeChildren().forEach((c) => c.destroy({ children: true }));
-    useGameStore.getState().setCenterMessage(null);
-  }
-
-  private clearTimers(): void {
-    if (this.timer) {
-      clearTimeout(this.timer);
-      this.timer = null;
-    }
-    if (this.forceTimer) {
-      clearTimeout(this.forceTimer);
-      this.forceTimer = null;
-    }
   }
 
   hide(onDone: () => void): void {
@@ -174,7 +147,7 @@ export class CenterMessage {
   }
 
   destroy(): void {
-    this.clearTimers();
+    window.removeEventListener('keydown', this.onKeyDown, true);
     if (this.unsub) this.unsub();
     this.unsub = null;
     this.popup?.destroy();

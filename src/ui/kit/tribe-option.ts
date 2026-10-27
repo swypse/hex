@@ -35,6 +35,82 @@ export interface TribeOptionExtras {
   showGames?: boolean;
 }
 const NAME_TOP = RADIUS + 6;
+
+const RAY_COUNT = 12;
+const RAY_LENGTH = 20;
+/** Rotation speed (rad/ms) of the ray sprite. */
+const RAY_SPEED = 0.0003;
+const GLOW_SCALE = 4;
+const GLOW_RGB = '255, 215, 90';
+let glowTextures: { halo: Texture; rays: Texture } | null = null;
+
+/** Soft glow bake: a radial halo and blurred rays fading out with distance. */
+function bakeGlow(): { halo: Texture; rays: Texture } {
+  const half = (RADIUS + RAY_LENGTH) * GLOW_SCALE;
+  const make = (draw: (ctx: CanvasRenderingContext2D) => void): Texture => {
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = half * 2;
+    const ctx = canvas.getContext('2d')!;
+    ctx.translate(half, half);
+    draw(ctx);
+    return Texture.from(canvas);
+  };
+  const inner = (RADIUS - 4) * GLOW_SCALE;
+  const fade = (alpha: number): CanvasGradient => {
+    const grad = document.createElement('canvas').getContext('2d')!.createRadialGradient(0, 0, inner, 0, 0, half);
+    grad.addColorStop(0, `rgba(${GLOW_RGB}, ${alpha})`);
+    grad.addColorStop(1, `rgba(${GLOW_RGB}, 0)`);
+    return grad;
+  };
+  const halo = make((ctx) => {
+    ctx.fillStyle = fade(0.25);
+    ctx.beginPath();
+    ctx.arc(0, 0, half, 0, Math.PI * 2);
+    ctx.fill();
+  });
+  const rays = make((ctx) => {
+    ctx.filter = `blur(${2 * GLOW_SCALE}px)`;
+    ctx.fillStyle = fade(0.3);
+    for (let i = 0; i < RAY_COUNT; i++) {
+      const a = (i / RAY_COUNT) * Math.PI * 2;
+      const w = 0.12;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(a - w) * inner, Math.sin(a - w) * inner);
+      ctx.lineTo(Math.cos(a) * half * 0.95, Math.sin(a) * half * 0.95);
+      ctx.lineTo(Math.cos(a + w) * inner, Math.sin(a + w) * inner);
+      ctx.closePath();
+      ctx.fill();
+    }
+  });
+  return { halo, rays };
+}
+
+/** Golden radiance behind the circle: soft static halo plus slowly rotating, pulsing blurred rays. */
+function makeRays(): Container {
+  const root = new Container();
+  root.eventMode = 'none';
+  try {
+    glowTextures ??= bakeGlow();
+  } catch {
+    return root; // No canvas 2D (headless): no glow.
+  }
+  const size = (RADIUS + RAY_LENGTH) * 2;
+  const halo = new Sprite(glowTextures.halo);
+  const rays = new Sprite(glowTextures.rays);
+  for (const sprite of [halo, rays]) {
+    sprite.anchor.set(0.5);
+    sprite.width = sprite.height = size;
+    sprite.blendMode = 'add';
+  }
+  root.addChild(halo, rays);
+  root.onRender = () => {
+    const now = performance.now();
+    rays.rotation = now * RAY_SPEED;
+    rays.alpha = 0.65 + 0.35 * Math.sin(now * 0.003);
+    halo.alpha = 0.8 + 0.2 * Math.sin(now * 0.003 + Math.PI);
+  };
+  return root;
+}
 const NAME_LINE = 14;
 
 /** Supersampling of the baked mask circle. */
@@ -121,7 +197,16 @@ export function makeTribeOption(
   starRow.position.set(0, NAME_TOP + namesHeight + 2 + starSize / 2);
   starRow.eventMode = 'none';
   el.addChild(starRow);
+  let rays: Container | null = null;
   const setStars = (value: number | null): void => {
+    const gold = value !== null && value >= MAX_STARS;
+    if (gold && !rays) {
+      rays = makeRays();
+      el.addChildAt(rays, 0);
+    } else if (!gold && rays) {
+      rays.destroy({ children: true });
+      rays = null;
+    }
     starRow.removeChildren().forEach((c) => c.destroy());
     if (value === null) return;
     for (let i = 0; i < MAX_STARS; i++) {

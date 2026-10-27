@@ -243,6 +243,16 @@ export class EventPresenter {
     }
   }
 
+  private waitCenterMessageClosed(): Promise<void> {
+    return new Promise((resolve) => {
+      const unsub = useGameStore.subscribe((s) => {
+        if (s.centerMessage !== null) return;
+        unsub();
+        resolve();
+      });
+    });
+  }
+
   async present(events: GameEvent[], preExplored: Set<string>): Promise<void> {
     const sim = this.host.sim();
     if (!this.host.app() || !sim) return;
@@ -296,6 +306,8 @@ export class EventPresenter {
     let hadAttack = false;
     try {
       for (let i = 0; i < events.length; i++) {
+        // The game stays frozen until a center message is closed by a tap.
+        if (useGameStore.getState().centerMessage !== null) await this.waitCenterMessageClosed();
         const e = events[i]!;
         switch (e.type) {
           case GameEventType.UNIT_MOVED:
@@ -447,9 +459,11 @@ export class EventPresenter {
           case GameEventType.BURNED: {
             this.host.render();
             const burnedTile = tileAt(sim.map, e.q, e.r);
+            const lost = burnedTile?.ownedBy === local && e.playerIndex !== local;
+            // Your building: bring it into view first.
+            if (lost) await this.host.centerOnCell(e.q, e.r);
             if (burnedTile && isExploredFor(burnedTile, local)) this.effects.spawnMuzzleSmokeAt(burnedTile);
-            const victim = tileAt(sim.map, e.q, e.r)?.ownedBy;
-            if (victim === local && e.playerIndex !== local) {
+            if (lost) {
               useGameStore.getState().setCenterMessage(t('msg.foodBuildingBurned', { building: BUILDING_NAMES[e.kind] }));
             }
             break;
@@ -1276,7 +1290,7 @@ export class EventPresenter {
         await this.host.centerOnCell(e.q, e.r);
         this.effects.spawnTooltipAbove(village, t('msg.villageCapturedYours'), VILLAGE_CAPTURED_TOOLTIP_MS);
         await sleep(VILLAGE_CAPTURED_TOOLTIP_MS);
-      } else {
+      } else if (e.newOwner !== useGameStore.getState().localPlayerIndex) {
         this.showCaptureMessage(village, capturer);
       }
     }
@@ -1295,13 +1309,10 @@ export class EventPresenter {
     const village = sim ? tileAt(sim.map, e.villageQ, e.villageR) : undefined;
     const store = useGameStore.getState();
     this.host.render();
-    if (village?.settlement?.owner === store.localPlayerIndex) {
-      store.setCenterMessage(t('msg.stalkerInYourVillage'));
-      await this.host.centerOnCell(e.villageQ, e.villageR);
-      return;
-    }
-    const name = village?.settlement?.name ?? t('tile.Settlement');
-    store.setCenterMessage(t('msg.stalkerSpotted', { village: name }));
+    // Only the village owner is told.
+    if (village?.settlement?.owner !== store.localPlayerIndex) return;
+    store.setCenterMessage(t('msg.stalkerInYourVillage'));
+    await this.host.centerOnCell(e.villageQ, e.villageR);
   }
 
   private showCaptureMessage(village: MapTile, capturer: Player): void {
@@ -1427,6 +1438,8 @@ export class EventPresenter {
     this.host.render();
     // A one-turn event (the earthquake) is over before anyone could read it.
     if (weather.lifetime <= 1) return;
+    // Storms, droughts and tornadoes end quietly; the HUD list already drops them.
+    if (weather.type === WeatherType.STORM || weather.type === WeatherType.DROUGHT || weather.type === WeatherType.TORNADO) return;
     useGameStore.getState().setCenterMessage(t(`weather.ended.${weather.type}` as never));
   }
 

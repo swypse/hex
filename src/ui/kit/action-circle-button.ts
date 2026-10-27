@@ -11,6 +11,8 @@ const RADIUS = 30;
 const NAME_Y = 66;
 const COST_Y = 84;
 const COST_ICON_SIZE = 16;
+const STROKE_COLOR = 0x888888;
+const HIGHLIGHT_COLOR = 0xffd54a;
 
 export interface CostPart {
   /** 32px-atlas icon key, e.g. `gold-32`. */
@@ -41,6 +43,8 @@ interface ActionCircleOpts {
   dimmed?: boolean;
   /** Drawn faded and inert: no click, no pointer cursor. */
   disabled?: boolean;
+  /** Keyboard selection: the circle's stroke turns yellow. */
+  highlighted?: boolean;
   onClick: () => void;
 }
 
@@ -53,7 +57,7 @@ export function makeActionCircleButton(opts: ActionCircleOpts): Container {
   const cx = ACTION_CELL_W / 2;
 
   const circle = new Graphics();
-  circle.circle(cx, RADIUS, RADIUS).fill(0x333333).stroke({ width: 2, color: 0x888888 });
+  circle.circle(cx, RADIUS, RADIUS).fill(0x333333).stroke({ width: 2, color: opts.highlighted ? HIGHLIGHT_COLOR : STROKE_COLOR });
   item.addChild(circle);
 
   // Clip the icon to the circle so its texture never spills past the border.

@@ -1,5 +1,5 @@
 import { GameEventType, GameMode, NetMode } from '@enums';
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { Application, Container, ImageSource, Text, Texture } from 'pixi.js';
 import { gameController } from '../src/controller/game-controller';
 import { Simulator } from '../src/game/simulator';
@@ -110,17 +110,23 @@ describe('stalker spotted notification', () => {
     mapView.destroy();
   });
 
-  it('shows "Stalker in the {village}!" to every player when a stalker is spotted', async () => {
+  const present = (gc: Record<string, unknown>, ev: GameEvent): Promise<void> =>
+    (gc as { presentEvents: (e: GameEvent[], pre: Set<string>) => Promise<void> }).presentEvents([ev], new Set());
+
+  it('tells the owner "Stalker in your village!"', async () => {
     const villageTile = (gc as { sim: { map: GameMap } }).sim.map.tiles.find((t) => t.q === 1 && t.r === 0)!;
-    villageTile.settlement = { owner: 0, level: 1, captureReady: false, name: 'Willow Creek' };
-    const ev: GameEvent = { type: GameEventType.STALKER_SPOTTED, unitId: 's1', villageQ: 1, villageR: 0 };
-    await (gc as { presentEvents: (e: GameEvent[], pre: Set<string>) => Promise<void> }).presentEvents([ev], new Set());
-    expect(useGameStore.getState().centerMessage).toBe('Stalker in the Willow Creek!');
+    villageTile.settlement = { owner: 1, level: 1, captureReady: false, name: 'Willow Creek' };
+    const centerOnTile = vi.fn(async () => {});
+    (gc as { centerOnTile: unknown }).centerOnTile = centerOnTile;
+    await present(gc, { type: GameEventType.STALKER_SPOTTED, unitId: 's1', villageQ: 1, villageR: 0 });
+    expect(useGameStore.getState().centerMessage).toBe('Stalker in your village!');
+    expect(centerOnTile).toHaveBeenCalledWith(1, 0);
   });
 
-  it('falls back to a generic village name when the village has none', async () => {
-    const ev: GameEvent = { type: GameEventType.STALKER_SPOTTED, unitId: 's1', villageQ: 1, villageR: 0 };
-    await (gc as { presentEvents: (e: GameEvent[], pre: Set<string>) => Promise<void> }).presentEvents([ev], new Set());
-    expect(useGameStore.getState().centerMessage).toBe('Stalker in the Settlement!');
+  it('shows nothing for a village of another player', async () => {
+    const villageTile = (gc as { sim: { map: GameMap } }).sim.map.tiles.find((t) => t.q === 1 && t.r === 0)!;
+    villageTile.settlement = { owner: 0, level: 1, captureReady: false, name: 'Willow Creek' };
+    await present(gc, { type: GameEventType.STALKER_SPOTTED, unitId: 's1', villageQ: 1, villageR: 0 });
+    expect(useGameStore.getState().centerMessage).toBeNull();
   });
 });
