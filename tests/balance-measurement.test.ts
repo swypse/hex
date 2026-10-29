@@ -67,9 +67,8 @@ describe('balance measurement: duel model', () => {
     expect(duel(UnitType.BERSERKER, UnitType.SHIELD).winner).toBe(UnitType.SHIELD);
   });
 
-  it('a stalker first strike ignores defense', () => {
-    // Against a shield (def 20) the stalker's first hit is the full 15 dmg
-    // instead of 3, so the shield loses hp to a stalker it could otherwise ignore.
+  it('a stalker first strike doubles its attack', () => {
+    // Against a shield (def 20) the doubled first hit still lands, so the shield loses hp.
     const d = duel(UnitType.STALKER, UnitType.SHIELD);
     expect(d.hpB).toBeLessThan(80);
   });

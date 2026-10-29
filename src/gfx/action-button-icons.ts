@@ -21,6 +21,7 @@ export const ACTION_BUTTON_ICON_FILES: Record<string, string> = {
   'burn-farm': 'action-burn-farm',
   'burn-granary': 'action-burn-granary',
   'burn-road': 'action-burn-road',
+  'destroy-building': 'action-burn-building',
   port: 'action-build-port',
   road: 'action-build-road',
   bridge: 'action-build-bridge',

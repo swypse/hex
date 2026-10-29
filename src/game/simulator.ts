@@ -7,7 +7,7 @@ import { touchBottle } from './map/bottles';
 import { buildBridge, buildBridgeIgnoringSkill } from './economy/bridges';
 import {
   buildBuilding, buildBuildingIgnoringSkill, builderBuildable, type BuilderBuildKind, buildingGains, storeBuildingGains,
-  burnBuilding, burnRoad, canUsePort, destroyBuilding, repairBuilding
+  burnBuilding, burnRoad, demolish, canUsePort, destroyBuilding, repairBuilding
 } from './economy/buildings';
 import { captureVillage, villageIncome, villageIncomeTotal } from './economy/capture';
 import { attackableTargets, missChanceFor, performAttack, performSiege } from './units/combat';
@@ -61,6 +61,7 @@ export type Command =
   | { type: CommandType.DESTROY_BUILDING; q: number; r: number }
   | { type: CommandType.BURN; unitId: string }
   | { type: CommandType.BURN_ROAD; unitId: string }
+  | { type: CommandType.DEMOLISH; unitId: string }
   | { type: CommandType.BUILD_WALL; q: number; r: number }
   | { type: CommandType.BUILD_ROAD; q: number; r: number }
   | { type: CommandType.BUILD_BRIDGE; q: number; r: number }
@@ -278,6 +279,9 @@ export class Simulator {
         break;
       case CommandType.BURN_ROAD:
         ok = this.doBurnRoad(cmd.unitId);
+        break;
+      case CommandType.DEMOLISH:
+        ok = this.doDemolish(cmd.unitId);
         break;
       case CommandType.BUILD_WALL:
         ok = this.doBuildWall(cmd.q, cmd.r);
@@ -1061,6 +1065,23 @@ export class Simulator {
     const owner = tile.roadOwner;
     if (owner === null || owner === undefined || !burnRoad(tile, unit)) return false;
     this.emit({ type: GameEventType.ROAD_BURNED, unitId, q: tile.q, r: tile.r, playerIndex: unit.owner, owner });
+    return true;
+  }
+
+  /** A unit standing on a mine, sawmill or bridge destroys it in one turn; a unit left on a
+   *  collapsed bridge is moved to a free adjacent land cell, or dies. */
+  private doDemolish(unitId: string): boolean {
+    const unit = this.findUnit(unitId);
+    if (!unit || unit.owner !== this.currentPlayerIndex) return false;
+    const tile = tileAt(this.map, unit.q, unit.r);
+    if (!tile) return false;
+    const { q, r } = tile;
+    const res = demolish(this.map, tile, unit, this.rng);
+    if (!res) return false;
+    this.emit({
+      type: GameEventType.DEMOLISHED, unitId, kind: res.kind, q, r, playerIndex: unit.owner, owner: res.owner,
+      movedTo: res.movedTo ? { q: res.movedTo.q, r: res.movedTo.r } : null, died: res.died,
+    });
     return true;
   }
 

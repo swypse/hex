@@ -972,7 +972,7 @@ export class MapView {
     const edgeMidY = (seg: { ay: number; by: number }): number =>
       (seg.ay + seg.by) / 2 - tileElevation(tile, this.hexSize);
 
-    const orangeEdges: { x: number; y: number; edge: number }[] = [];
+    const orangeEdges: { x: number; y: number; edge: number; far?: { x: number; y: number } }[] = [];
     if (owner !== undefined && owner !== null && !isBridge && !isPort && explored) {
       for (let e = 0; e < 6; e++) {
         const n = this.tileIndex.get(axialKey(hexEdgeNeighbor(tile, e)));
@@ -982,7 +982,16 @@ export class MapView {
           (n?.building && n.building.kind === BuildingKind.PORT && n.ownedBy === owner);
         if (!connected) continue;
         const seg = hexEdge(tile, e, this.hexSize);
-        orangeEdges.push({ x: (seg.ax + seg.bx) / 2, y: edgeMidY(seg), edge: e });
+        // A port or bridge cell draws no road itself: the strip runs on through the
+        // shared edge to its centre.
+        const joint = n && (n.bridge || n.building?.kind === BuildingKind.PORT);
+        const np = joint ? hexToPixel(n, this.hexSize) : null;
+        orangeEdges.push({
+          x: (seg.ax + seg.bx) / 2,
+          y: edgeMidY(seg),
+          edge: e,
+          far: np && n ? { x: np.x, y: np.y - tileElevation(n, this.hexSize) } : undefined,
+        });
       }
     }
 
@@ -1019,10 +1028,16 @@ export class MapView {
     const halfW = 2;
     const drawStrip = (ex: number, ey: number, edge: number, color: number): void => {
       const outline = roadStripOutline(ex, ey, p.x, cy, halfW, { q: tile.q, r: tile.r, edge });
+      drawOutline(outline, color);
+    };
+    const drawOutline = (outline: number[], color: number): void => {
       if (dots) g.poly(outline).fill({ texture: dots, color, textureSpace: 'global' });
       else g.poly(outline).fill(color);
     };
-    for (const e of orangeEdges) drawStrip(e.x, e.y, e.edge, THEME.map.road);
+    for (const e of orangeEdges) {
+      if (e.far) drawOutline(roadStripOutline(e.far.x, e.far.y, p.x, cy, halfW, { q: tile.q, r: tile.r, edge: e.edge }), THEME.map.road);
+      else drawStrip(e.x, e.y, e.edge, THEME.map.road);
+    }
     for (const e of waterEdges) drawStrip(e.x, e.y, e.edge, THEME.map.waterRoad);
   }
 

@@ -8,6 +8,7 @@ export enum CommandType {
   DESTROY_BUILDING = 'destroyBuilding',
   BURN = 'burn',
   BURN_ROAD = 'burnRoad',
+  DEMOLISH = 'demolish',
   BUILD_WALL = 'buildWall',
   BUILD_ROAD = 'buildRoad',
   BUILD_BRIDGE = 'buildBridge',

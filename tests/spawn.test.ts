@@ -32,9 +32,12 @@ function makeMap(): GameMap {
 }
 
 describe('villageCapacity', () => {
-  it('is 1 + level', () => {
+  it('is 2 + floor(level / 2)', () => {
     expect(villageCapacity(1)).toBe(2);
     expect(villageCapacity(2)).toBe(3);
+    expect(villageCapacity(3)).toBe(3);
+    expect(villageCapacity(4)).toBe(4);
+    expect(villageCapacity(6)).toBe(5);
   });
 });
 

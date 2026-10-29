@@ -13,6 +13,7 @@ import { canBuildBridgeHere, BRIDGE_COST } from './bridges';
 import { canBuildRoadHere, ROAD_COST } from './roads';
 import { BuilderBuildStatus, BuilderExtraKind, BuildingKind, PortDirection, SkillId } from '@enums';
 import { droughtOverTile, halvedYield } from '../weather/weather';
+import { pickRandom } from '../../util/random';
 import { heldInBuilding, roomInBuilding } from './building-stock';
 
 export type BuilderBuildKind = BuildingKind | BuilderExtraKind;
@@ -254,6 +255,53 @@ export function burnRoad(tile: MapTile, unit: Unit): boolean {
   unit.hasAttacked = true;
   unit.hasHealed = true;
   return true;
+}
+
+/** What a unit standing on the cell can demolish. */
+export type DemolishKind = BuildingKind.MINE | BuildingKind.SAWMILL | 'bridge';
+
+/** The structure under `unit` that it may demolish: a mine, sawmill or bridge. Takes the
+ *  whole turn, so the unit must not have moved, attacked or healed. */
+export function demolishKindAt(tile: MapTile, unit: Unit): DemolishKind | null {
+  if (tile.unit !== unit || unit.owner < 0 || unit.shipLevel !== undefined) return null;
+  if (unit.hasMoved || unit.hasAttacked || unit.hasHealed || (unit.stunTurns ?? 0) >= 1) return null;
+  const kind = tile.building?.kind;
+  if (kind === BuildingKind.MINE || kind === BuildingKind.SAWMILL) return kind;
+  return tile.bridge ? 'bridge' : null;
+}
+
+/** Destroys the mine, sawmill or bridge under the unit (whatever its hp) and spends its whole
+ *  turn. A unit left on a collapsed bridge lands on a random free adjacent land cell, or dies
+ *  when there is none. */
+export function demolish(
+  map: GameMap,
+  tile: MapTile,
+  unit: Unit,
+  rng: () => number,
+): { kind: DemolishKind; owner: number | null; movedTo: MapTile | null; died: boolean } | null {
+  const kind = demolishKindAt(tile, unit);
+  if (!kind) return null;
+  const owner = kind === 'bridge' ? (tile.roadOwner ?? tile.ownedBy ?? null) : (tile.ownedBy ?? null);
+  unit.hasMoved = true;
+  unit.hasAttacked = true;
+  unit.hasHealed = true;
+  if (kind !== 'bridge') {
+    tile.building = null;
+    return { kind, owner, movedTo: null, died: false };
+  }
+  tile.bridge = null;
+  tile.roadOwner = null;
+  const free = hexNeighbors(tile)
+    .map((n) => neighborTile(map, n))
+    .filter((n): n is MapTile => n !== undefined && isLandType(n.terrain) && n.unit === null);
+  const dest = pickRandom(free, rng) ?? null;
+  tile.unit = null;
+  if (dest) {
+    dest.unit = unit;
+    unit.q = dest.q;
+    unit.r = dest.r;
+  }
+  return { kind, owner, movedTo: dest, died: dest === null };
 }
 
 /** Destroys the food building under the unit and spends its whole turn. */

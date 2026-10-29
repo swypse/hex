@@ -45,10 +45,10 @@ Row unit attacks; cell shows attack-turns needed and the winner of that duel.
 | **Rider** | 2(→rider) | — | 2(→rider) | 1(→swordsman) | 2(→shield) | 1(→rider) | 1(→knight) | 1(→rider) | 1(→rider) | 1(→rider) | 2(→rider) | 2(→rider) | 2(→rider) | 2(→rider) |
 | **Archer** | 2(→archer) | 2(→archer) | — | 1(→swordsman) | 3(→archer) | 1(→catapult) | 1(→knight) | 1(→archer) | 1(→archer) | 1(→archer) | 1(→berserker) | 2(→archer) | 2(→archer) | 2(→archer) |
 | **Swordsman** | 1(→swordsman) | 1(→swordsman) | 1(→swordsman) | — | 1(→swordsman) | 2(→catapult) | 1(→swordsman) | 1(→swordsman) | 1(→swordsman) | 1(→swordsman) | 1(→swordsman) | 1(→swordsman) | 1(→swordsman) | 1(→swordsman) |
-| **Shield** | 2(→shield) | 2(→shield) | 2(→shield) | 1(→swordsman) | — | 2(→catapult) | 2(→knight) | 2(→shield) | 1(→shield) | 1(→shield) | 2(→shield) | 2(→shield) | 2(→shield) | 2(→shield) |
+| **Shield** | 2(→shield) | 2(→shield) | 2(→shield) | 1(→swordsman) | — | 2(→catapult) | 2(→knight) | 1(→shield) | 1(→shield) | 1(→shield) | 2(→shield) | 2(→shield) | 2(→shield) | 2(→shield) |
 | **Catapult** | 1(→catapult) | 1(→catapult) | 1(→catapult) | 2(→catapult) | 2(→catapult) | — | 1(→knight) | 1(→catapult) | 1(→catapult) | 1(→catapult) | 1(→catapult) | 1(→catapult) | 1(→catapult) | 1(→catapult) |
 | **Knight** | 1(→knight) | 1(→knight) | 1(→knight) | 2(→knight) | 2(→knight) | 1(→knight) | — | 1(→knight) | 1(→knight) | 1(→knight) | 1(→knight) | 1(→knight) | 1(→knight) | 1(→knight) |
-| **Stalker** | 1(→stalker) | 1(→stalker) | 1(→stalker) | 1(→swordsman) | 2(→stalker) | 1(→catapult) | 1(→knight) | — | 1(→stalker) | 1(→stalker) | 1(→stalker) | 1(→stalker) | 1(→stalker) | 1(→stalker) |
+| **Stalker** | 1(→warrior) | 1(→stalker) | 1(→stalker) | 1(→swordsman) | 1(→shield) | 1(→catapult) | 1(→knight) | — | 1(→stalker) | 1(→stalker) | 1(→stalker) | 1(→stalker) | 1(→stalker) | 1(→stalker) |
 | **Builder** | 1(→warrior) | 1(→rider) | 1(→archer) | 1(→swordsman) | 1(→shield) | 1(→catapult) | 1(→knight) | 1(→stalker) | — | 2(→builder) | 1(→berserker) | 1(→trapper) | 1(→stormcaller) | 1(→stunner) |
 | **Banner** | 1(→warrior) | 1(→rider) | 1(→archer) | 1(→swordsman) | 1(→shield) | 1(→catapult) | 1(→knight) | 1(→stalker) | 2(→builder) | — | 1(→berserker) | 1(→trapper) | 1(→stormcaller) | 1(→stunner) |
 | **Berserker** | 2(→berserker) | 2(→berserker) | 1(→berserker) | 1(→swordsman) | 2(→shield) | 1(→catapult) | 1(→knight) | 1(→berserker) | 1(→berserker) | 1(→berserker) | — | 1(→berserker) | 1(→berserker) | 1(→berserker) |
@@ -62,14 +62,14 @@ Row unit attacks; cell shows attack-turns needed and the winner of that duel.
 
 | wins over →| Warrior | Rider | Archer | Swordsman | Shield | Catapult | Knight | Stalker | Builder | Banner | Berserker | Trapper | Stormcaller | Stunner |
 |---|----|----|----|----|----|----|----|----|----|----|----|----|----|----|
-| **Warrior** | — | ⚪ 54% | ⚪ 51% | 🔴 0% | 🔴 8% | 🔴 1% | 🔴 0% | ⚪ 51% | 🟢 100% | 🟢 100% | ⚪ 45% | 🟢 96% | 🟢 95% | ⚪ 50% |
+| **Warrior** | — | ⚪ 54% | ⚪ 51% | 🔴 0% | 🔴 8% | 🔴 1% | 🔴 0% | 🟢 96% | 🟢 100% | 🟢 100% | ⚪ 45% | 🟢 96% | 🟢 95% | ⚪ 50% |
 | **Rider** | ⚪ 46% | — | ⚪ 45% | 🔴 0% | 🔴 0% | ⚪ 51% | 🔴 0% | ⚪ 51% | 🟢 100% | 🟢 100% | ⚪ 46% | ⚪ 54% | ⚪ 55% | ⚪ 50% |
 | **Archer** | ⚪ 49% | ⚪ 55% | — | 🔴 0% | ⚪ 45% | 🔴 6% | 🔴 0% | ⚪ 51% | 🟢 100% | 🟢 100% | 🔴 5% | ⚪ 54% | ⚪ 54% | ⚪ 54% |
-| **Swordsman** | 🟢 100% | 🟢 100% | 🟢 100% | — | 🟢 100% | 🔴 10% | ⚪ 54% | 🟢 95% | 🟢 100% | 🟢 100% | 🟢 100% | 🟢 100% | 🟢 100% | 🟢 100% |
-| **Shield** | 🟢 92% | 🟢 100% | ⚪ 55% | 🔴 0% | — | 🔴 0% | 🔴 0% | ⚪ 51% | 🟢 100% | 🟢 100% | 🟢 96% | 🟢 100% | 🟢 100% | ⚪ 59% |
+| **Swordsman** | 🟢 100% | 🟢 100% | 🟢 100% | — | 🟢 100% | 🔴 10% | ⚪ 54% | 🟢 100% | 🟢 100% | 🟢 100% | 🟢 100% | 🟢 100% | 🟢 100% | 🟢 100% |
+| **Shield** | 🟢 92% | 🟢 100% | ⚪ 55% | 🔴 0% | — | 🔴 0% | 🔴 0% | 🟢 100% | 🟢 100% | 🟢 100% | 🟢 96% | 🟢 100% | 🟢 100% | ⚪ 59% |
 | **Catapult** | 🟢 100% | ⚪ 49% | 🟢 94% | 🟢 90% | 🟢 100% | — | 🔴 5% | 🟢 96% | 🟢 100% | 🟢 100% | 🟢 100% | 🟢 100% | 🟢 95% | 🟢 95% |
-| **Knight** | 🟢 100% | 🟢 100% | 🟢 100% | ⚪ 46% | 🟢 100% | 🟢 95% | — | 🟢 96% | 🟢 100% | 🟢 100% | 🟢 99% | 🟢 100% | 🟢 100% | 🟢 100% |
-| **Stalker** | ⚪ 49% | ⚪ 49% | ⚪ 49% | 🔴 5% | ⚪ 49% | 🔴 4% | 🔴 4% | — | 🟢 90% | 🟢 95% | ⚪ 50% | ⚪ 50% | ⚪ 50% | ⚪ 50% |
+| **Knight** | 🟢 100% | 🟢 100% | 🟢 100% | ⚪ 46% | 🟢 100% | 🟢 95% | — | 🟢 100% | 🟢 100% | 🟢 100% | 🟢 99% | 🟢 100% | 🟢 100% | 🟢 100% |
+| **Stalker** | 🔴 4% | ⚪ 49% | ⚪ 49% | 🔴 0% | 🔴 0% | 🔴 4% | 🔴 0% | — | 🟢 90% | 🟢 95% | ⚪ 50% | ⚪ 50% | ⚪ 50% | ⚪ 50% |
 | **Builder** | 🔴 0% | 🔴 0% | 🔴 0% | 🔴 0% | 🔴 0% | 🔴 0% | 🔴 0% | 🔴 10% | — | 🟢 92% | 🔴 0% | 🔴 0% | 🔴 0% | 🔴 0% |
 | **Banner** | 🔴 0% | 🔴 0% | 🔴 0% | 🔴 0% | 🔴 0% | 🔴 0% | 🔴 0% | 🔴 5% | 🔴 8% | — | 🔴 0% | 🔴 0% | 🔴 0% | 🔴 0% |
 | **Berserker** | ⚪ 55% | ⚪ 54% | 🟢 95% | 🔴 0% | 🔴 4% | 🔴 0% | 🔴 1% | ⚪ 50% | 🟢 100% | 🟢 100% | — | 🟢 92% | 🟢 92% | ⚪ 54% |
@@ -81,14 +81,14 @@ Row unit attacks; cell shows attack-turns needed and the winner of that duel.
 
 | Unit | Effective cost | Win-rate | Efficiency |
 |------|---------------:|---------:|-----------:|
-| Warrior | 4 | 0.50 | 18.65 🟢 |
+| Warrior | 4 | 0.54 | 20.10 🟢 |
 | Rider | 9 | 0.46 | 9.19 🟢 |
 | Archer | 9 | 0.44 | 7.35 |
-| Swordsman | 25 | 0.89 | 5.74 |
-| Shield | 15 | 0.66 | 6.02 |
+| Swordsman | 25 | 0.90 | 5.77 |
+| Shield | 15 | 0.69 | 6.44 |
 | Catapult | 42 | 0.86 | 3.29 |
-| Knight | 35 | 0.95 | 4.91 |
-| Stalker | 13 | 0.46 | 5.32 |
+| Knight | 35 | 0.95 | 4.92 |
+| Stalker | 13 | 0.38 | 4.42 |
 | Builder | 15 | 0.08 | 0.76 🔴 |
 | Banner | 11 | 0.01 | 0.16 🔴 |
 | Berserker | 14 | 0.54 | 5.25 |
@@ -193,6 +193,7 @@ Mono-army vs mono-army with the same budget: focus fire, banner aura, knight ext
 - **Before:** Warrior (4) beat the pricier Rider at 92% — cheap-but-strong / expensive-but-weak.
 - **Before:** Swordsman (25) beat the pricier Knight at 96% — cheap-but-strong / expensive-but-weak.
 
+- **After:** Warrior still beats Stalker at 96%.
 - **After:** Warrior still beats Builder at 100%.
 - **After:** Warrior still beats Banner at 100%.
 - **After:** Warrior still beats Trapper at 96%.

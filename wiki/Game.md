@@ -148,7 +148,7 @@ Pirates and tribe special units (builder, banner, berserker, stalker, trapper, s
   - On a kill the attacker moves onto the target's tile, unless it is an archer, a pirate, a ship, or the target was a
     pirate or a ship.
   - Bonuses to attack: banner +5, berserker rage +15, veteran +5 (none for ships). A stealthed stalker's strike
-    doubles its attack (sneak attack) and ignores the defense.
+    doubles its attack (sneak attack).
 - **Heal** — if the unit has not moved/attacked, +15 HP (+10 more on a tile of a village with a university after
   *Medicine*), once per turn.
 - **Capture village** — a unit on an enemy or free village marked capturable captures it. It takes the whole action: a unit that has healed this turn cannot capture.
@@ -159,7 +159,7 @@ Pirates and tribe special units (builder, banner, berserker, stalker, trapper, s
 ## Villages
 
 - **Spawning** — pay the unit's cost in an owned village; blocked if the village tile is occupied or the village's unit
-  capacity (`1 + level`) is full.
+  capacity (`2 + floor(level / 2)`: 2 at level 1, +1 every second level) is full.
 - **Upgrade** — `2×k` wood + `k` stone + `2×k` money with `k = level × (1 + (level/9)³)`, rounded: near-linear at first, then steeply rising (level 1: 2 wood + 1 stone + 2 money; level 2: 4/2/4; level 5: 12/6/12; level 10: 47/24/47; level 15: 169/84/169; level 25: ~1122/561/1122, unreachable in a normal game). Raises income and
   capacity; works while an enemy unit stands on the village. Some upgrades let the player pick a bonus:
   - level 5 → 6: **expand territory** (+1 radius) or **+5 money** (territory stays);

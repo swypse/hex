@@ -4,7 +4,7 @@ import { useGameStore } from '../../store/game-store';
 import { villageUpgradeCost } from '../../game/economy/resources';
 import { canAffordAt, villagesJoinedBy } from '../../game/economy/stock';
 import { costLabel } from '../../game/economy/resources';
-import { buildingCostAt, canBuildUniversity, canBuildSawmill, canBuildFarm, canBuildGranary, canBurnBuilding, canBurnRoad, canBuildForestTemple, canBuildMine, canBuildPort, canBuildTemple, BUILDING_COSTS, canRepairBuilding, REPAIR_COST, canAffordAnyBuilderBuild } from '../../game/economy/buildings';
+import { buildingCostAt, canBuildUniversity, canBuildSawmill, canBuildFarm, canBuildGranary, canBurnBuilding, canBurnRoad, demolishKindAt, canBuildForestTemple, canBuildMine, canBuildPort, canBuildTemple, BUILDING_COSTS, canRepairBuilding, REPAIR_COST, canAffordAnyBuilderBuild } from '../../game/economy/buildings';
 import { canHeal, canDisband, canDealWithPirate, disbandCost, hasPirateDeal, PIRATE_DEAL_COST, UNIT_TYPES, UNIT_TYPE_NAMES } from '../../game/units/units';
 import { SHIP_UPGRADE_COST, canUpgradeShip } from '../../game/units/ship';
 import { unitsInVillage, villageCapacity, canBuildWall, WALL_COST } from '../../game/economy/village';
@@ -158,6 +158,9 @@ export function toolbarSpecs(): ToolbarSpec[] {
     }
     if (canBurnBuilding(tile, unit) && tile.building) {
       out.push({ key: `burn-${tile.building.kind}`, label: t(tile.building.kind === BuildingKind.FARM ? 'action.burnFarm' : 'action.burnGranary'), disabled: false, onClick: () => gameController.actions.burnSelected() });
+    }
+    if (demolishKindAt(tile, unit)) {
+      out.push({ key: 'destroy-building', label: t('action.demolish'), disabled: false, onClick: () => gameController.actions.demolishSelected() });
     }
     if (canBurnRoad(tile, unit)) {
       out.push({ key: 'burn-road', label: t('action.burnRoad'), disabled: false, onClick: () => gameController.actions.burnRoadSelected() });

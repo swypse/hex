@@ -202,8 +202,9 @@ export function upgradeVillage(map: GameMap, tile: MapTile, roll: () => number =
   return result;
 }
 
+/** Units a village can hold: 2 at level 1, +1 for every second level (lvl 2 → 3, lvl 4 → 4, lvl 6 → 5). */
 export function villageCapacity(level: number): number {
-  return 1 + level;
+  return 2 + Math.floor(level / 2);
 }
 
 /** How many buildings a village of this level may support. */

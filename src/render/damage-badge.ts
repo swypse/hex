@@ -2,13 +2,14 @@ import { Application, BitmapText, Container, Graphics } from 'pixi.js';
 import { FONT_REGULAR, sizedFontFamily } from '../gfx/bitmap-fonts';
 import { axialKey, hexToPixel } from '../game/map/hex';
 import { tileElevation } from './elevation';
-import { resolveCombat, counterDamageTo } from '../game/units/combat';
+import { resolveCombat, counterDamageTo, attackBuffSplit } from '../game/units/combat';
 import { makeIcon32 } from '../gfx/icons32';
 import type { GameMap, MapTile } from '../game/map/map-gen';
 import type { Player } from '../game/players';
 import type { Unit } from '../game/units/units';
 import type { Viewport } from './tile-signature';
 import { BadgeAnimPhase, FontSize } from '@enums';
+import { t } from '../i18n';
 import { HP_LABEL_UP } from './hp-bar-layout';
 
 /** Font size of the damage-preview `-N` label. */
@@ -140,7 +141,9 @@ export class DamageBadgeLayer {
     // A lethal hit (damage >= target hp) shows the skull icon; 0 damage shows
     // nothing.
     if (attackerDamage > 0) {
-      this.addBadge(preview.target, targetUnit, players, attackerDamage, localPlayerIndex, attackerDamage >= targetUnit.hp);
+      const split = attackBuffSplit(map, preview.attacker, preview.target);
+      const text = split ? `${split.base} + ${split.extra} ${t(split.sneak ? 'damage.sneak' : 'damage.bonus')}` : `-${attackerDamage}`;
+      this.addBadge(preview.target, targetUnit, players, text, localPlayerIndex, attackerDamage >= targetUnit.hp);
     }
     // Badge over the selected unit: the counter it would take, delayed 100ms
     // so the player sees the target badge first. Mirrors a real attack: the
@@ -148,7 +151,7 @@ export class DamageBadgeLayer {
     // counter-attack — otherwise no retaliation badge is shown.
     const counterDamage = counterDamageTo(map, preview.attacker, preview.target);
     if (counterDamage > 0 && this.attackerVisible) {
-      this.addBadge(attackerTile, preview.attacker, players, counterDamage, localPlayerIndex, counterDamage >= preview.attacker.hp);
+      this.addBadge(attackerTile, preview.attacker, players, `-${counterDamage}`, localPlayerIndex, counterDamage >= preview.attacker.hp);
     }
   }
 
@@ -201,7 +204,7 @@ export class DamageBadgeLayer {
    *  attack (or skull on a lethal hit) icon (14px) + white `-N` text, and a
    *  small `#111` caret pointing down at the bottom — rendered in screen-space
    *  overlay so it stays zoom-independent (just like unit HP bars). */
-  private addBadge(tile: MapTile, unit: Unit, players: Player[], n: number, localPlayerIndex: number, kill = false): void {
+  private addBadge(tile: MapTile, unit: Unit, players: Player[], text: string, localPlayerIndex: number, kill = false): void {
     const key = axialKey(tile);
     // A preview re-render re-runs render(): reuse the badge already shown on
     // this tile (settled or mid fade-in) so it does not blink back to alpha 0.
@@ -219,7 +222,7 @@ export class DamageBadgeLayer {
     const anchor = { x: p.x, y: y - center + HP_BAR_ANCHOR_OFFSET };
 
     const label = new BitmapText({
-      text: `-${n}`,
+      text,
       style: {
         fontSize: DAMAGE_BADGE_FONT_SIZE,
         fill: 0xffffff,

@@ -12,7 +12,8 @@ export function knownTribesFor(map: GameMap, players: Player[], playerIndex: num
   for (const tile of map.tiles) {
     if (!isExploredFor(tile, playerIndex)) continue;
     const unit = tile.unit;
-    if (unit && unit.owner >= 0) {
+    // A stealthed stalker is hidden from everyone but its owner, so it reveals nothing.
+    if (unit && unit.owner >= 0 && (unit.owner === playerIndex || unit.isStealthed !== true)) {
       const owner = players[unit.owner];
       if (owner) known.add(owner.tribe);
     }

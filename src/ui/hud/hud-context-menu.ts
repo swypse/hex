@@ -26,6 +26,8 @@ const BUILD_KEYS = new Set<string>([...Object.values(BuildingKind), 'road', 'bri
 const ICON_SIZE = 34;
 const ICON_GAP = 8;
 const ROW_GAP = 8;
+/** Max icons in the unlabeled upgrade/spawn row; extra icons wrap to further rows. */
+const MAX_SPAWN_PER_ROW = 5;
 const PAD_X = 10;
 const PAD_Y = 8;
 const LABEL_GAP = 10;
@@ -33,6 +35,8 @@ const TRI_H = 6;
 const TRI_W = 12;
 /** Gap between the arrow tip and the hex's top corner. */
 const TIP_GAP = 4;
+/** Min distance between the popup and the screen edge. */
+const EDGE_MARGIN = 5;
 const INFO_ICON = 16;
 const INFO_GAP = 14;
 const INFO_HEIGHT = 20;
@@ -68,7 +72,7 @@ export class HudContextMenu implements Widget {
   private host: UIHost | null = null;
   private root: Container | null = null;
   private unsub: (() => void) | null = null;
-  private current: { el: Container; key: string; q: number; r: number } | null = null;
+  private current: { el: Container; tri: Container; triUp: Graphics; triDown: Graphics; w: number; h: number; key: string; q: number; r: number } | null = null;
   private fading = new Map<Container, { from: number; to: number; start: number }>();
   private tick: ((ticker: Ticker) => void) | null = null;
 
@@ -86,8 +90,8 @@ export class HudContextMenu implements Widget {
       const income = villageIncomeBreakdown(map, tile);
       const food = villageFood(map, tile, human);
       return [
-        { icon: 'gold-32', text: `${income.total} (${income.gross} - ${income.deducted})` },
-        { icon: 'food-32', text: `${food.balance} (${food.production} - ${food.upkeep})` },
+        { icon: 'gold-32', text: String(income.total) },
+        { icon: 'food-32', text: String(food.balance) },
       ];
     }
     const b = tile.building;
@@ -174,8 +178,24 @@ export class HudContextMenu implements Widget {
         },
       });
     }
+    // A bonus under the selected unit it can claim right now (the toolbar spec exists only then).
+    const bonus = toolbarSpecs().find((s) => s.key === 'bonus');
+    if (bonus) {
+      spawn.push({
+        id: 'bonus',
+        round: true,
+        icon: makeActionButtonIcon('bonus', ICON_SIZE),
+        disabled: bonus.disabled,
+        onClick: () => {
+          close();
+          bonus.onClick();
+        },
+      });
+    }
     const rows: MenuRow[] = [];
-    if (spawn.length > 0) rows.push({ label: '', items: spawn });
+    for (let i = 0; i < spawn.length; i += MAX_SPAWN_PER_ROW) {
+      rows.push({ label: '', items: spawn.slice(i, i + MAX_SPAWN_PER_ROW) });
+    }
     if (build.length > 0) rows.push({ label: t('menu.build'), items: build });
     if (skills.length > 0) rows.push({ label: t('menu.openSkill'), items: skills });
     return { info: this.info(map, tile, human), rows };
@@ -236,10 +256,15 @@ export class HudContextMenu implements Widget {
     el.zIndex = 100;
     const body = new Graphics();
     body.roundRect(0, 0, w, h, 6).fill({ color: 0x000000, alpha: 0.92 });
-    const tri = new Graphics();
-    tri.poly([w / 2 - TRI_W / 2, h, w / 2 + TRI_W / 2, h, w / 2, h + TRI_H]).fill(0x000000);
+    // Arrow below the body (popup above the tile) or above it (popup below the tile); place() picks one.
+    const triDown = new Graphics();
+    triDown.poly([w / 2 - TRI_W / 2, h, w / 2 + TRI_W / 2, h, w / 2, h + TRI_H]).fill(0x000000);
+    const triUp = new Graphics();
+    triUp.poly([w / 2 - TRI_W / 2, 0, w / 2 + TRI_W / 2, 0, w / 2, -TRI_H]).fill(0x000000);
+    const tri = new Container();
+    tri.addChild(triDown, triUp);
     el.addChild(body, tri);
-    infoEl.position.set(PAD_X, PAD_Y);
+    infoEl.position.set((w - infoW) / 2, PAD_Y);
     el.addChild(infoEl);
     rows.forEach((row, i) => {
       const y = PAD_Y + infoH + i * (ICON_SIZE + ROW_GAP);
@@ -267,12 +292,10 @@ export class HudContextMenu implements Widget {
         el.addChild(btn);
       });
     });
-    // Anchor at the arrow tip.
-    el.pivot.set(w / 2, h + TRI_H);
     el.eventMode = 'static';
     el.alpha = 0;
     this.root.addChild(el);
-    this.current = { el, key, q, r };
+    this.current = { el, tri, triUp, triDown, w, h, key, q, r };
     this.place();
     this.fading.set(el, { from: 0, to: 1, start: performance.now() });
   }
@@ -291,7 +314,21 @@ export class HudContextMenu implements Widget {
     const cur = this.current;
     if (!cur || !this.host) return;
     const p = gameController.tileTopScreen(cur.q, cur.r);
-    if (p) cur.el.position.set(p.x, p.y - TIP_GAP);
+    if (!p) return;
+    // Target in the top third of the screen: open below the tile, arrow pointing up.
+    const below = p.y < this.host.app.screen.height / 3;
+    const bottom = below ? gameController.tileBottomScreen(cur.q, cur.r) : null;
+    cur.triUp.visible = !!bottom;
+    cur.triDown.visible = !bottom;
+    // Anchor at the arrow tip.
+    cur.el.pivot.set(cur.w / 2, bottom ? -TRI_H : cur.h + TRI_H);
+    // Shift the body into view; the arrow slides back so it still points at the tile.
+    const screenW = this.host.app.screen.width;
+    const left = Math.max(EDGE_MARGIN, Math.min(p.x - cur.w / 2, screenW - EDGE_MARGIN - cur.w));
+    cur.el.position.set(left + cur.w / 2, bottom ? bottom.y + TIP_GAP : p.y - TIP_GAP);
+    const minArrow = TRI_W / 2 + 6;
+    const arrowX = Math.max(minArrow, Math.min(p.x - left, cur.w - minArrow));
+    cur.tri.x = arrowX - cur.w / 2;
   }
 
   private frame(): void {

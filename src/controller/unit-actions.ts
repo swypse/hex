@@ -297,6 +297,17 @@ export class UnitActions {
     this.sendCommand({ type: CommandType.BURN_ROAD, unitId: unit.id });
   }
 
+  /** The selected unit destroys the mine, sawmill or bridge it stands on. */
+  demolishSelected(): void {
+    const store = useGameStore.getState();
+    if (store.aiActive) return;
+    const selection = store.selection;
+    if (!selection || selection.kind !== SelectionKind.UNIT || !this.sim) return;
+    const unit = tileAt(this.sim.map, selection.q, selection.r)?.unit;
+    if (!unit) return;
+    this.sendCommand({ type: CommandType.DEMOLISH, unitId: unit.id });
+  }
+
   repairSelectedBuilding(): void {
     const store = useGameStore.getState();
     if (store.aiActive) return;

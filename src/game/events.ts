@@ -1,4 +1,5 @@
 import type { Axial } from './map/hex';
+import type { DemolishKind } from './economy/buildings';
 import type { WeatherBuildingHit, WeatherEvent, WeatherUnitHit } from './weather/weather';
 import type { Resources } from './economy/resources';
 import { AchievementId, ResourceKind, TradeCloseReason, BonusKind, BottleEffect, BuildingKind, GameEventType, Season, SiegeTargetKind, SkillId, UnitType, VillageUpgradeBonus } from '@enums';
@@ -50,6 +51,7 @@ export type GameEvent =
   | { type: GameEventType.STALKER_SPOTTED; unitId: string; villageQ: number; villageR: number }
   | { type: GameEventType.TRAP_PLACED; q: number; r: number; playerIndex: number }
   | { type: GameEventType.ROAD_BURNED; unitId: string; q: number; r: number; playerIndex: number; owner: number }
+  | { type: GameEventType.DEMOLISHED; unitId: string; kind: DemolishKind; q: number; r: number; playerIndex: number; owner: number | null; movedTo: Axial | null; died: boolean }
   | { type: GameEventType.BURNED; unitId: string; kind: BuildingKind.FARM | BuildingKind.GRANARY; q: number; r: number; playerIndex: number }
   | { type: GameEventType.STARVATION; q: number; r: number; playerIndex: number; units: { q: number; r: number; damage: number }[] }
   | { type: GameEventType.TRAP_TRIGGERED; q: number; r: number; targetId: string; damage: number; attackerIndex: number; trapOwner: number }

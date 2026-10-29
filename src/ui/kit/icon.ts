@@ -4,6 +4,8 @@ import { ICONS32_ATLAS_FRAMES } from '../../atlas-data/icons32-atlas-data.gen';
 import { ensureCanvasResource } from '../../gfx/image-texture';
 import { makeTribeIcon } from '../../gfx/tribe-icons';
 import { makeIcon32 } from '../../gfx/icons32';
+import { ACTION_BUTTON_ATLAS_FRAMES } from '../../atlas-data/action-button-atlas-data.gen';
+import { makeActionButtonIcon } from '../../gfx/action-button-icons';
 import { markDirty } from '../../gfx/render-gate';
 
 const TEXTURE_BASE = `${import.meta.env.BASE_URL}textures/`;
@@ -24,6 +26,8 @@ export function makeIcon(name: string, size: number, onReady?: () => void): Spri
     if (onReady) onReady();
     return sprite;
   }
+  // Action-button icons (`action-get-bonus`, ...) live in the action-buttons atlas.
+  if (ACTION_BUTTON_ATLAS_FRAMES[base]) return makeActionButtonIcon(base, size, onReady);
   const sprite = new Sprite();
   sprite.anchor.set(0.5);
   sprite.width = size;

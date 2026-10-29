@@ -68,15 +68,14 @@ export interface CombatResolution {
  *  A shield counters with SHIELD_COUNTER_SCALE instead of COUNTER_SCALE: wall of
  *  steel, it is dangerous to hit a shield unit head-on (its retaliation uses a
  *  high defense force, so attackers think twice). */
-export function resolveCombat(map: GameMap | null, attacker: Unit, target: MapTile): CombatResolution {
+export function resolveCombat(map: GameMap | null, attacker: Unit, target: MapTile, ignoreBuffs = false): CombatResolution {
   const defender = target.unit!;
-  // A stealthed stalker's strike ignores the defender's armor entirely and
-  // hits for double (sneak attack).
-  const sneak = attacker.isStealthed === true;
-  const def = sneak ? 0 : (defender.defense ?? 0);
+  // A stealthed stalker's strike hits for double (sneak attack).
+  const sneak = !ignoreBuffs && attacker.isStealthed === true;
+  const def = defender.defense ?? 0;
   // Banner aura / berserker rage raise the attack power. Ships receive no
   // bonuses (attackBonus returns 0 at sea), so their numbers stay unchanged.
-  const bonus = attackBonus(attacker, map);
+  const bonus = ignoreBuffs ? 0 : attackBonus(attacker, map);
   const attackForce = ((shipAttack(attacker) + bonus) * (sneak ? SNEAK_ATTACK_MULT : 1) * attacker.hp) / unitMaxHp(attacker);
   const defenseForce =
     (def * defender.hp) / unitMaxHp(defender) *
@@ -90,6 +89,15 @@ export function resolveCombat(map: GameMap | null, attacker: Unit, target: MapTi
   const counterMult = defender.type === UnitType.SHIELD && !isShip(defender) ? SHIELD_COUNTER_SCALE : COUNTER_SCALE;
   const counterDamage = Math.round((defenseForce / total) * def * COMBAT_SCALE * counterMult);
   return { attackerDamage, counterDamage };
+}
+
+/** Split of the damage `attacker` would deal into the part it deals unbuffed and the extra from
+ *  its buff (sneak attack, or banner / rage / veteran bonus); null when it has no buff effect. */
+export function attackBuffSplit(map: GameMap | null, attacker: Unit, target: MapTile): { base: number; extra: number; sneak: boolean } | null {
+  const total = resolveCombat(map, attacker, target).attackerDamage;
+  const base = resolveCombat(map, attacker, target, true).attackerDamage;
+  if (total <= base) return null;
+  return { base, extra: total - base, sneak: attacker.isStealthed === true };
 }
 
 /** Whether a unit retaliates when it survives an attack. Land catapults never

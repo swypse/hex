@@ -803,9 +803,18 @@ class GameController {
 
   /** Screen position of the top corner of a hex's top face (raised by its elevation); null before the camera exists. */
   tileTopScreen(q: number, r: number): { x: number; y: number } | null {
+    return this.tileCornerScreen(q, r, 5);
+  }
+
+  /** Screen position of the tile's bottom corner (elevation applied). */
+  tileBottomScreen(q: number, r: number): { x: number; y: number } | null {
+    return this.tileCornerScreen(q, r, 2);
+  }
+
+  private tileCornerScreen(q: number, r: number, index: number): { x: number; y: number } | null {
     if (!this.camera) return null;
     const tile = this.sim ? tileAt(this.sim.map, q, r) : undefined;
-    const corner = hexCorners({ q, r }, HEX_SIZE)[5]!;
+    const corner = hexCorners({ q, r }, HEX_SIZE)[index]!;
     const lift = tile ? tileElevation(tile, HEX_SIZE) : 0;
     const { pan, scale } = this.camera;
     return { x: pan.x + corner.x * scale, y: pan.y + (corner.y - lift) * scale };

@@ -112,8 +112,6 @@ export interface DuelResult {
 export interface StrikeContext {
   /** Flat attack bonus (banner aura); rage is derived from the attacker's hp. */
   bonus?: number;
-  /** A stealthed stalker's first strike ignores the defender's defense. */
-  ignoreDefense?: boolean;
   /** A stealthed stalker's first strike also hits for double. */
   sneak?: boolean;
   /** Attack distance of this exchange (defender counters only if it reaches). */
@@ -139,7 +137,7 @@ export function strike(
 ): { dmg: number; counter: number } {
   const rage = isRaging(attType, attHp, att.maxHp) ? RAGE_BONUS : 0;
   const attack = (att.attack + rage + (ctx.bonus ?? 0)) * (ctx.sneak ? 2 : 1);
-  const defense = ctx.ignoreDefense ? 0 : (def.defense ?? 0);
+  const defense = def.defense ?? 0;
   const attackForce = (attack * attHp) / att.maxHp;
   const defenseForce = (defense * defHp) / def.maxHp;
   const total = attackForce + defenseForce;
@@ -200,7 +198,6 @@ export function duel(
     if (rng() < MISS_CHANCE) return { dmg: 0, counter: 0 };
     return strike(attType, defType, att, def, attHp, defHp, {
       distance,
-      ignoreDefense: attType === UnitType.STALKER && first,
       sneak: attType === UnitType.STALKER && first,
     });
   };

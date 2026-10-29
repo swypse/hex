@@ -33,6 +33,7 @@ export enum GameEventType {
   STALKER_SPOTTED = 'stalkerSpotted',
   TRAP_PLACED = 'trapPlaced',
   ROAD_BURNED = 'roadBurned',
+  DEMOLISHED = 'demolished',
   BURNED = 'burned',
   STARVATION = 'starvation',
   TRAP_TRIGGERED = 'trapTriggered',

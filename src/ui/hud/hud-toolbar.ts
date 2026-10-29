@@ -34,6 +34,7 @@ const ICON_ACTIONS: Record<string, string> = {
   'burn-farm': 'burn-farm',
   'burn-granary': 'burn-granary',
   'burn-road': 'burn-road',
+  'destroy-building': 'destroy-building',
   road: 'road',
   bridge: 'bridge',
   bonus: 'bonus',

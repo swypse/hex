@@ -768,7 +768,7 @@ describe('special-unit combat hooks', () => {
     return { q, r, terrain: TileType.GrasslandLand, settlement: null, building: null, unit: u, ownedBy: null, claimedByVillage: null, exploredBy: [0, 1] };
   }
 
-  it('a stealthed stalker ignores the target defense entirely', () => {
+  it('a stealthed stalker doubles its attack against the target defense', () => {
     const map = makeMap();
     const stalker = unitOf('s', UnitType.STALKER, 0, 0, 0);
     stalker.isStealthed = true;
@@ -776,9 +776,11 @@ describe('special-unit combat hooks', () => {
     const target = map.tiles[1]!;
     target.unit = unitOf('t', UnitType.SWORDSMAN, 1, 1, 0); // defense 16, full hp
     const { attackerDamage, counterDamage } = resolveCombat(map, stalker, target);
-    // Sneak attack: the stalker's attack (20) is doubled and the 16 defense ignored.
-    expect(attackerDamage).toBe(Math.round(20 * 2 * COMBAT_SCALE));
-    expect(counterDamage).toBe(0);
+    // Sneak attack: the stalker's attack (20) is doubled (40); the 16 defense still applies.
+    const plain = resolveCombat(map, { ...stalker, isStealthed: false }, target);
+    expect(attackerDamage).toBeGreaterThan(plain.attackerDamage);
+    expect(attackerDamage).toBe(Math.round((40 / (40 + 16)) * 40 * COMBAT_SCALE));
+    expect(counterDamage).toBeGreaterThan(0);
   });
 
   it('a raging berserker never counter-attacks', () => {

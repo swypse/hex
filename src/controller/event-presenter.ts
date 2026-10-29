@@ -140,6 +140,9 @@ export interface EventHost {
   promptTrade(): void;
 }
 
+/** Action-buttons atlas frame shown on the bonus center messages. */
+const BONUS_ICON = 'action-get-bonus';
+
 /** The UNIT_MOVED events of a batch whose mover was stealthed while walking.
  *  The sim holds the batch's final state, so a later reveal (spotted beside a
  *  village, bumped, attacked) means it was stealthed during the move, and a
@@ -454,6 +457,24 @@ export class EventPresenter {
               useGameStore.getState().setCenterMessage(t('msg.roadBurned'));
             }
             if (roadTile && isExploredFor(roadTile, local)) this.host.mapView()?.bounceHex(e.q, e.r);
+            break;
+          }
+          case GameEventType.DEMOLISHED: {
+            // The sim already holds the result: the structure is gone and the unit moved or died.
+            this.host.render();
+            const demTile = tileAt(sim.map, e.q, e.r);
+            const seen = demTile !== undefined && isExploredFor(demTile, local);
+            if (seen) this.effects.spawnMuzzleSmokeAt(demTile);
+            if (seen && e.died) {
+              this.effects.spawnDeath(demTile);
+              await sleep(COMBAT_DEATH_GAP_MS);
+            }
+            const store = useGameStore.getState();
+            if (e.owner === local && e.playerIndex !== local) await this.host.centerOnCell(e.q, e.r);
+            if (e.died && e.playerIndex === local) store.setCenterMessage(t('msg.unitLostBridge'));
+            else if (e.owner === local && e.playerIndex !== local) {
+              store.setCenterMessage(e.kind === 'bridge' ? t('msg.bridgeDemolished') : t('msg.demolished', { building: BUILDING_NAMES[e.kind] }));
+            }
             break;
           }
           case GameEventType.BURNED: {
@@ -1209,7 +1230,7 @@ export class EventPresenter {
     }
     if (e.playerIndex !== local) return;
     if (e.kind === BonusKind.SKILL) {
-      if (e.skill) store.setCenterMessage(t('msg.skillOpened', { skill: SKILLS[e.skill].name }));
+      if (e.skill) store.setCenterMessage(t('msg.skillOpened', { skill: SKILLS[e.skill].name }), BONUS_ICON);
       return;
     }
     const messages: Record<Exclude<BonusKind, 'skill'>, string> = {
@@ -1218,7 +1239,7 @@ export class EventPresenter {
       villageUpgrade: t('hud.selected.bonus.villageUpgrade'),
       explorer: t('hud.selected.bonus.explorer'),
     };
-    store.setCenterMessage(t('msg.bonusPrefix', { text: messages[e.kind] }));
+    store.setCenterMessage(t('msg.bonusPrefix', { text: messages[e.kind] }), BONUS_ICON);
   }
 
   private presentBottleCollected(e: Extract<GameEvent, { type: 'bottleCollected' }>): void {
