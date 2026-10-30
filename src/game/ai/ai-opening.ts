@@ -8,6 +8,7 @@ import type { Player } from '../players';
 import { canOpenSkill, hasSkill } from '../skills';
 import { isForestType, isMountainType } from '../map/tile-types';
 import { hexNeighbors } from '../map/hex';
+import { flagsFor } from './ai-flags';
 import { foodPressure } from '../economy/food';
 import { nearestEnemyDistanceFrom } from './ai-patterns';
 import { AiActionType, BuildingKind, FoodPressure, OpeningStage, SkillId } from '@enums';
@@ -64,7 +65,10 @@ function openingStage(map: GameMap, player: Player, planned?: AiPlannerState): O
   if (!v?.settlement) return null;
   if (v.settlement.level < OPENING_VILLAGE_LEVEL && !planned?.upgraded.has(`${v.q},${v.r}`)) return OpeningStage.UPGRADE;
   const tiles = claimedBy(map, v);
-  for (const stage of [OpeningStage.SAWMILL, OpeningStage.MINE, OpeningStage.FARM, OpeningStage.GRANARY]) {
+  const order = flagsFor(player).earlyFarm
+    ? [OpeningStage.SAWMILL, OpeningStage.FARM, OpeningStage.MINE, OpeningStage.GRANARY]
+    : [OpeningStage.SAWMILL, OpeningStage.MINE, OpeningStage.FARM, OpeningStage.GRANARY];
+  for (const stage of order) {
     if (tiles.some((t) => t.building?.kind === STAGE_BUILDING[stage]) || planned?.plannedKinds?.has(STAGE_BUILDING[stage]!)) continue;
     if (!stageFeasible(map, v, stage)) continue;
     // Skills learned and still no place to build it (slots full): skip rather than wait forever.

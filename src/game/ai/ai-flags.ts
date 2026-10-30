@@ -43,6 +43,17 @@ export interface AiFlags {
   /** Group attacks are planned: ordered by role, only as many units as the kill needs, one unit held to take
    *  the village, and the recently hit village is favoured by attacks and hunts. */
   attackPlan: boolean;
+  /** Village upgrades (level 3+) wait while the village still has two or more free unit slots, so money goes
+   *  into units first instead of tall villages holding one unit. */
+  armyFirst: boolean;
+  /** The opening builds the first farm right after the sawmill, before the mine (two skills away), so food is up before winter. */
+  earlyFarm: boolean;
+  /** Focus fire judges the gang-up by the real combat formula (defense, terrain) instead of nominal attack, and among lethal gangs prefers
+   *  valuable targets that cost the fewest counters. */
+  killChains: boolean;
+  /** While an own village stands empty within an enemy's reach and the money cannot buy a warrior, nothing else is bought
+   *  (upgrades, buildings, roads, skills, spawns elsewhere), so the village can raise a defender next turn. */
+  garrisonReserve: boolean; // Off by default until benchmarked (FLAGS=garrisonReserve RAIDER=1).
   /** The AI posts orders for materials it lacks, answers other players' orders with spare stock and picks proposals. */
   trade: boolean;
 }
@@ -52,9 +63,9 @@ export interface AiFlags {
  *  the solo-hunt/naval patterns so it only ever claims units those left idle — an earlier
  *  placement ahead of them regressed the AI (44% wins, fewer enemy villages captured) by pulling
  *  units off easy solo kills to wait for the group. */
-const DEFAULT_AI_FLAGS: AiFlags = { militarySkills: true, berserkerHold: true, stunnerHunt: true, multiSpecial: false, operations: true, composition: false, stoneFocus: true, march: true, finishers: true, raidBuildings: true, lookahead: true, siege: false, attackPlan: true, trade: true };
-export const ALL_AI_FLAGS_ON: AiFlags = { militarySkills: true, berserkerHold: true, stunnerHunt: true, multiSpecial: true, operations: true, composition: true, stoneFocus: true, march: true, finishers: true, raidBuildings: true, lookahead: true, siege: false, attackPlan: true, trade: true };
-export const ALL_AI_FLAGS_OFF: AiFlags = { militarySkills: false, berserkerHold: false, stunnerHunt: false, multiSpecial: false, operations: false, composition: false, stoneFocus: false, march: false, finishers: false, raidBuildings: false, lookahead: false, siege: false, attackPlan: false, trade: false };
+const DEFAULT_AI_FLAGS: AiFlags = { militarySkills: true, berserkerHold: true, stunnerHunt: true, multiSpecial: false, operations: true, composition: false, stoneFocus: true, march: true, finishers: true, raidBuildings: true, lookahead: true, siege: false, attackPlan: true, trade: true, armyFirst: true, earlyFarm: true, killChains: true, garrisonReserve: false };
+export const ALL_AI_FLAGS_ON: AiFlags = { militarySkills: true, berserkerHold: true, stunnerHunt: true, multiSpecial: true, operations: true, composition: true, stoneFocus: true, march: true, finishers: true, raidBuildings: true, lookahead: true, siege: false, attackPlan: true, trade: true, armyFirst: true, earlyFarm: true, killChains: true, garrisonReserve: true };
+export const ALL_AI_FLAGS_OFF: AiFlags = { militarySkills: false, berserkerHold: false, stunnerHunt: false, multiSpecial: false, operations: false, composition: false, stoneFocus: false, march: false, finishers: false, raidBuildings: false, lookahead: false, siege: false, attackPlan: false, trade: false, armyFirst: false, earlyFarm: false, killChains: false, garrisonReserve: false };
 
 export function flagsFor(player: Pick<Player, 'aiFlags'>): AiFlags {
   return player.aiFlags ? { ...DEFAULT_AI_FLAGS, ...player.aiFlags } : DEFAULT_AI_FLAGS;

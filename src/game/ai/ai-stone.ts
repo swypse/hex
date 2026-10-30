@@ -1,3 +1,4 @@
+import { flagsFor } from './ai-flags';
 import type { AiAction } from './ai-types';
 import { foodNetworkStates, networkStateOfTile } from '../economy/food';
 import { landEnemyCanReach, nearestEnemyDistanceFrom } from './ai-patterns';
@@ -62,6 +63,8 @@ export function blockedByStone(map: GameMap, player: Player, action: AiAction, s
         return map.tiles.some((t) => t.building?.kind === BuildingKind.SAWMILL && claimedBy(t, home));
       }
       if (action.kind === BuildingKind.PORT && situation?.navalThreat) return false;
+      // The very first farm is food for the opening and never waits for the mine.
+      if (action.kind === BuildingKind.FARM && flagsFor(player).earlyFarm && !map.tiles.some((t) => t.building?.kind === BuildingKind.FARM && t.ownedBy === player.index)) return false;
       return !foodUrgent();
     }
     case AiActionType.BUILD_ROAD:

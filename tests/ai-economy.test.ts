@@ -71,14 +71,20 @@ describe('AI opening order in the first village', () => {
     expect(order[0]).toBe('upgrade');
   });
 
-  it('then builds sawmill, mine and farm in that order', () => {
+  it('then builds sawmill, farm and mine in that order', () => {
     const { map, ai } = setup(2);
     const order = kinds(planAiActions(map, ai, new SeededRandom(9)));
     const idx = (k: BuildingKind) => order.indexOf(k);
     expect(idx(BuildingKind.SAWMILL)).toBeGreaterThanOrEqual(0);
-    expect(idx(BuildingKind.SAWMILL)).toBeLessThan(idx(BuildingKind.MINE));
-    expect(idx(BuildingKind.MINE)).toBeLessThan(idx(BuildingKind.FARM));
-    expect(idx(BuildingKind.FARM)).toBeGreaterThan(idx(BuildingKind.MINE));
+    expect(idx(BuildingKind.SAWMILL)).toBeLessThan(idx(BuildingKind.FARM));
+    expect(idx(BuildingKind.FARM)).toBeLessThan(idx(BuildingKind.MINE));
+  });
+
+  it('builds the mine before the farm without earlyFarm', () => {
+    const { map, ai } = setup(2);
+    ai.aiFlags = { earlyFarm: false } as never;
+    const order = kinds(planAiActions(map, ai, new SeededRandom(9)));
+    expect(order.indexOf(BuildingKind.MINE)).toBeLessThan(order.indexOf(BuildingKind.FARM));
   });
 
   it('finishes with a granary next to the farm, whatever the food situation', () => {
@@ -284,6 +290,7 @@ describe('AI stone focus', () => {
     const map = makeTestMap(6);
     const ai = makeAI();
     ai.skills = [SkillId.FORESTRY, SkillId.SMITHERY, SkillId.AGRICULTURE];
+    ai.aiFlags = { earlyFarm: false } as never; // this test pins the mine-first stone focus, not the opening order
     village(map, ai);
     tileAt(map, -1, 0)!.terrain = TileType.GrasslandForest;
     const actions = planAiActions(map, ai, new SeededRandom(4));

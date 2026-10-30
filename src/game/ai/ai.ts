@@ -11,10 +11,11 @@ import { reachableTargets } from '../units/selection';
 import { foodNetworkStates, networkStateOfTile, foodPressure, canSustainUnit, eatsFarmMaterials, needsWinterStorage } from '../economy/food';
 import { blockedByOpening, openingAction } from './ai-opening';
 import { blockedByStone, villagesNeedingMine } from './ai-stone';
+import { blockedByGarrisonReserve, garrisonReserveVillages } from './ai-reserve';
 import { planFoodFixes, planGranarySpace, planWinterStorage } from './ai-food';
 import { unitMaxHp, canHeal, unitSpawnCost, UNIT_TYPES, type Unit } from '../units/units';
 import { SeededRandom } from '../../util/random';
-import { buildingsInVillage, villageBuildingLimit } from '../economy/village';
+import { buildingsInVillage, villageBuildingLimit, unitsInVillage, villageCapacity } from '../economy/village';
 import { isMountainType } from '../map/tile-types';
 import { AI_PATTERNS, AI_TUNING, type AiPatternContext, bestSpawnableUnitType, enemyCanAttackNext, enemyCanReach, guardGarrisonAttack, incomingForceAt, isFrontierTile, isLikelyLethal, isSupportUnit, INCOMING_FORCE_WEIGHT, landEnemyCanReach, LETHAL_PENALTY, nearestEnemyDistanceFrom, nearestFreeVillageDistanceFrom, nearestOwnUnitDistanceFrom, nearestVillageDistanceFrom, spawnWouldBeKilled } from './ai-patterns';
 import { type AiAction, type AiDirectives, type AiPlannerState } from './ai-types';
@@ -59,6 +60,8 @@ function withStoneGate<T extends { evaluate(ctx: AiPatternContext): AiAction[] |
       const steps = pattern.evaluate(ctx);
       if (!steps) return steps;
       if (steps.some((a) => blockedByOpening(ctx.map, ctx.player, a, ctx.situation, ctx.state))) return null;
+      const bare = garrisonReserveVillages(ctx.map, ctx.player);
+      if (bare.length > 0 && steps.some((a) => blockedByGarrisonReserve(ctx.map, ctx.player, a, bare))) return null;
       if (!flagsFor(ctx.player).stoneFocus) return steps;
       const needy = ctx.state.plannedKinds?.has(BuildingKind.MINE) ? [] : villagesNeedingMine(ctx.map, ctx.player);
       return steps.some((a) => blockedByStone(ctx.map, ctx.player, a, ctx.situation, needy)) ? null : steps;
@@ -226,7 +229,9 @@ function bestAvailableAction(
       const front = nearestEnemyDistanceFrom(map, player.index, v) <= 4;
       const level = v.settlement!.level;
       const boost = hasPendingMineSlot(map, player, v) ? 260 : level <= 2 && !front ? 90 : 0;
-      candidates.push({ score: (front ? 700 : 400) + boost + jitter(), action: { type: AiActionType.UPGRADE, q: v.q, r: v.r } });
+      // Army first: a level 3+ village with free unit slots spends on units before growing taller.
+      const underManned = flagsFor(player).armyFirst && level >= 3 && boost === 0 && unitsInVillage(map, v) < villageCapacity(level) - 1;
+      candidates.push({ score: (underManned ? 150 : front ? 700 : 400) + boost + jitter(), action: { type: AiActionType.UPGRADE, q: v.q, r: v.r } });
     }
     if (!state.spawned.has(k) && !v.unit) {
       const threatened = landEnemyCanReach(map, v, player.index);
@@ -652,9 +657,14 @@ function bestAvailableAction(
   // A mine first: money-spending candidates wait until every village that can
   // have a mine has one (see ai-stone.ts).
   const needy = flagsFor(player).stoneFocus && !state.plannedKinds?.has(BuildingKind.MINE) ? villagesNeedingMine(map, player) : [];
+  const bareVillages = garrisonReserveVillages(map, player);
   for (let i = candidates.length - 1; i >= 0; i--) {
     const action = candidates[i]!.action;
     const first: AiAction = Array.isArray(action) ? action[0]! : action;
+    if (bareVillages.length > 0 && blockedByGarrisonReserve(map, player, first, bareVillages)) {
+      candidates.splice(i, 1);
+      continue;
+    }
     if (blockedByOpening(map, player, first, situation, state) || blockedByStone(map, player, first, situation, needy)) candidates.splice(i, 1);
   }
 
@@ -786,6 +796,9 @@ export function planAiActions(
   return step.value;
 }
 
+/** Diagnostics hook (benchmarks): called with the id of the pattern (or 'fallback') behind every planned step. */
+export const aiStepTrace: { hook: ((id: string, steps: AiAction[]) => void) | null } = { hook: null };
+
 /** `planAiActions` as a generator that pauses after each planned step when an
  *  executor is given (live engine), so a caller can hand control back to the
  *  browser between steps instead of running the whole turn in one long task. */
@@ -825,17 +838,22 @@ export function* planAiActionsSteps(
     }
     const ctx: AiPatternContext = { map, player, rng, state, situation, difficulty, directives, operation, turn };
     let next: AiAction[] | null = null;
+    let sourceId = 'fallback';
     const review = difficulty.lookahead && flagsFor(player).lookahead;
     for (const pattern of patterns) {
       next = pattern.evaluate(ctx);
       if (next && (seasonVetoed(map, turn, next) || tornadoVetoed(map, next) || (review && stepVetoed(map, player, next, state)))) next = null;
-      if (next) break;
+      if (next) {
+        sourceId = pattern.id;
+        break;
+      }
     }
     if (!next) {
       const source: { kind: AiPickMode } = { kind: AiPickMode.BEST };
       next = bestAvailableAction(map, player, rng, state, situation, difficulty, directives, source);
     }
     if (!next) break;
+    aiStepTrace.hook?.(sourceId, next);
     if (seasonVetoed(map, turn, next) || tornadoVetoed(map, next) || (review && stepVetoed(map, player, next, state))) {
       // The fallback pick is unsafe too: keep its unit where it stands.
       for (const a of next) if (a.type === AiActionType.MOVE) state.moved.add(a.unitId);

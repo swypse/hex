@@ -13,7 +13,8 @@ import { canUpgradeShip } from '../../units/ship';
 import { extinguishCells } from '../../weather/fire';
 import { isForestType } from '../../map/tile-types';
 import { flagsFor } from '../ai-flags';
-import { planGangAttack } from '../ai-attack-plan';
+import { gangForecast, planGangAttack } from '../ai-attack-plan';
+import { UNIT_TYPES } from '../../units/units';
 import { ENTER_VILLAGE_PATTERN } from '../ai-enter-village';
 import { AiActionType, AiStance, BuildingKind, GarrisonGuardKind, SkillId, UnitType } from '@enums';
 
@@ -284,7 +285,7 @@ export const OFFENSE_PATTERNS: AiPattern[] = [
       // reach it with a move first — attacks it. Killable targets win, otherwise
       // the enemy that can be hit by the most units / combined damage is chosen.
       let best:
-        | { t: MapTile; attackers: { unit: Unit; moveTo: MapTile | null }[]; killable: boolean; total: number; hit: boolean }
+        | { t: MapTile; attackers: { unit: Unit; moveTo: MapTile | null }[]; killable: boolean; total: number; hit: boolean; value: number }
         | null = null;
       for (const t of map.tiles) {
         const enemy = t.unit;
@@ -292,17 +293,23 @@ export const OFFENSE_PATTERNS: AiPattern[] = [
         if (!isExploredFor(t, player.index)) continue;
         const attackers = attackersForTile(map, player, t, state);
         if (attackers.length < 2) continue;
-        const total = attackers.reduce((s, a) => s + attackDamage(a.unit), 0);
-        const killable = total >= enemy.hp;
+        // Kill chains: judge the gang by the real combat formula (defense and terrain
+        // included), prefer lethal gangs on valuable targets that cost the fewest counters.
+        const chain = flagsFor(player).killChains ? gangForecast(map, player, t, attackers, state) : null;
+        const total = chain ? chain.damage : attackers.reduce((s, a) => s + attackDamage(a.unit), 0);
+        const killable = chain ? chain.lethal : total >= enemy.hp;
         const hit = isHitVillage(player, t, turn);
+        const value = chain ? UNIT_TYPES[enemy.type].price - chain.counter : 0;
         const better =
           best === null ||
           (killable && !best.killable) ||
           (killable === best.killable &&
             (hit !== best.hit
               ? hit
-              : attackers.length > best.attackers.length || (attackers.length === best.attackers.length && total > best.total)));
-        if (better) best = { t, attackers, killable, total, hit };
+              : chain && killable && value !== best.value
+                ? value > best.value
+                : attackers.length > best.attackers.length || (attackers.length === best.attackers.length && total > best.total)));
+        if (better) best = { t, attackers, killable, total, hit, value };
       }
       if (!best) return null;
       return flagsFor(player).attackPlan
