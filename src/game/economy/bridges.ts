@@ -1,0 +1,76 @@
+import { type GameMap, type MapTile } from '../map/map-gen';
+import { type Player } from '../players';
+import { type Resources } from './resources';
+import { payAt, villagesJoinedBy } from './stock';
+import { hasSkill } from '../skills';
+import { isSolidGround, isWaterType } from '../map/tile-types';
+import { BridgeDir, SkillId } from '@enums';
+import { tileAt } from '../map/tile-index';
+
+export const BRIDGE_COST: Resources = { wood: 10, stone: 5, money: 15, ore: 0, food: 0 };
+
+/** Each axis is a pair of opposite hex neighbours of the water tile. */
+const AXES: { dir: BridgeDir; offsets: { q: number; r: number }[] }[] = [
+  { dir: BridgeDir.WE, offsets: [{ q: 1, r: 0 }, { q: -1, r: 0 }] },
+  { dir: BridgeDir.NE, offsets: [{ q: 1, r: -1 }, { q: -1, r: 1 }] },
+  { dir: BridgeDir.NW, offsets: [{ q: 0, r: -1 }, { q: 0, r: 1 }] },
+];
+
+function isLandShore(map: GameMap, tile: MapTile, offset: { q: number; r: number }): boolean {
+  const t = tileAt(map, tile.q + offset.q, tile.r + offset.r);
+  return t !== undefined && isSolidGround(t.terrain);
+}
+
+export function bridgeDirFor(map: GameMap, tile: MapTile): BridgeDir | null {
+  for (const axis of AXES) {
+    if (isLandShore(map, tile, axis.offsets[0]!) && isLandShore(map, tile, axis.offsets[1]!)) {
+      return axis.dir;
+    }
+  }
+  return null;
+}
+
+/** The two opposite-coast neighbour offsets for a bridge direction. */
+export function bridgeCoastOffsets(dir: BridgeDir): { q: number; r: number }[] {
+  return AXES.find((a) => a.dir === dir)?.offsets ?? [];
+}
+
+export function hasBridge(tile: MapTile): boolean {
+  return tile.bridge !== undefined && tile.bridge !== null;
+}
+
+export function canBuildBridge(map: GameMap, tile: MapTile, player: Player): boolean {
+  if (!hasSkill(player, SkillId.BRIDGES)) return false;
+  return canBuildBridgeHere(map, tile);
+}
+
+/** Water-stretch preconditions for a bridge, without requiring the Bridges
+ *  skill or the money to pay for it (used by the open-Bridges hint). */
+export function canBuildBridgeHere(map: GameMap, tile: MapTile): boolean {
+  if (!isWaterType(tile.terrain)) return false;
+  if (tile.building) return false;
+  if (hasBridge(tile)) return false;
+  if (tile.unit) return false;
+  return bridgeDirFor(map, tile) !== null;
+}
+
+export function buildBridge(map: GameMap, tile: MapTile, player: Player): boolean {
+  if (!canBuildBridge(map, tile, player)) return false;
+  return payAndPlaceBridge(map, tile, player);
+}
+
+/** Places a bridge at its cost without re-validating the Bridges skill — used
+ *  by the Villagers builder, whose eligibility was already checked by
+ *  `canBuildBridgeHere` in `builderBuildable`. */
+export function buildBridgeIgnoringSkill(map: GameMap, tile: MapTile, player: Player): boolean {
+  return canBuildBridgeHere(map, tile) && payAndPlaceBridge(map, tile, player);
+}
+
+function payAndPlaceBridge(map: GameMap, tile: MapTile, player: Player): boolean {
+  const dir = bridgeDirFor(map, tile)!;
+  // A bridge is a road node: it may be paid by the networks it connects.
+  if (!payAt(map, player, tile, BRIDGE_COST, villagesJoinedBy(map, player.index, tile))) return false;
+  tile.bridge = { owner: player.index, dir };
+  tile.roadOwner = player.index;
+  return true;
+}

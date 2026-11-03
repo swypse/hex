@@ -1,0 +1,520 @@
+import { CommandType, GameEventType, GameMode, UnitType } from '@enums';
+import { describe, expect, it } from 'vitest';
+import { hexDistance, hexNeighbors } from '@/game/map/hex';
+import { buildPlayers } from '@/game/players';
+import { Simulator } from '@/game/simulator';
+import { isWaterType, TileType } from '@/game/map/tile-types';
+import { Tribe } from '@/game/tribes';
+import { PIRATE_HP, PIRATE_OWNER, type Unit } from '@/game/units/units';
+import { SeededRandom } from '@/util';
+import { makeTestMap, makeUnit, tileAt } from './helpers/test-map';
+
+function makeWaterMap(radius = 2): ReturnType<typeof makeTestMap> {
+  const map = makeTestMap(radius);
+  for (const t of map.tiles) {
+    if (hexDistance({ q: 0, r: 0 }, t) === radius) t.terrain = TileType.Water;
+  }
+  return map;
+}
+
+function makePirate(id: string, q: number, r: number): Unit {
+  return {
+    id,
+    owner: PIRATE_OWNER,
+    type: UnitType.PIRATE,
+    q,
+    r,
+    hasMoved: false,
+    hasAttacked: false,
+    hasHealed: false,
+    hp: PIRATE_HP,
+    attack: 30,
+    attackDistance: 3,
+    defense: 5,
+    spawnVillage: null,
+  };
+}
+
+function makeShip(id: string, owner: number, q: number, r: number): Unit {
+  const ship = makeUnit(id, owner, UnitType.WARRIOR, q, r);
+  ship.shipLevel = 1;
+  return ship;
+}
+
+describe('Pirates', () => {
+  it('spawn on edge water cells only after turn 5, every second turn', () => {
+    const map = makeWaterMap();
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    const sim = new Simulator(map, players, GameMode.TURNS30, { rng: () => 0 });
+    sim.startGame();
+    sim.drainEvents();
+
+    for (let i = 0; i < 6; i++) {
+      sim.applyCommand({ type: CommandType.END_TURN });
+      sim.drainEvents();
+    }
+    expect(sim.turn).toBe(7);
+    expect(map.tiles.filter((t) => t.unit?.type === UnitType.PIRATE)).toHaveLength(0);
+
+    sim.applyCommand({ type: CommandType.END_TURN });
+    const events = sim.drainEvents();
+    const pirates = map.tiles.filter((t) => t.unit?.type === UnitType.PIRATE);
+    expect(pirates).toHaveLength(1);
+    expect(pirates[0]!.unit!.owner).toBe(PIRATE_OWNER);
+    expect(hexDistance({ q: 0, r: 0 }, pirates[0]!)).toBe(map.radius);
+    expect(events.some((e) => e.type === GameEventType.PIRATE_SPAWNED)).toBe(true);
+  });
+
+  it('a failed capture attempt damages both the pirate and the ship without stealing money', () => {
+    const map = makeTestMap();
+    tileAt(map, 0, 0)!.terrain = TileType.Water;
+    tileAt(map, 0, 1)!.terrain = TileType.Water;
+    const pirate = makePirate('pirate-1', 0, 0);
+    tileAt(map, 0, 0)!.unit = pirate;
+    const ship = makeShip('ship-1', 0, 0, 1);
+    tileAt(map, 0, 1)!.unit = ship;
+
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    players[0]!.resources.money = 100;
+    const before = players[0]!.resources.money;
+    const sim = new Simulator(map, players, GameMode.TURNS30, { rng: () => 0.5 });
+    sim.startGame();
+    sim.drainEvents();
+
+    sim.applyCommand({ type: CommandType.END_TURN });
+    const events = sim.drainEvents();
+    expect(players[0]!.resources.money).toBe(before);
+    expect(pirate.hp).toBe(PIRATE_HP - 20);
+    expect(ship.hp).toBe(50 - 10);
+    expect(events.some((e) => e.type === GameEventType.PIRATE_CAPTURE && (e as { success: boolean }).success === false)).toBe(true);
+  });
+
+  it('removes a pirate that drops to 0 hp on a failed capture', () => {
+    const map = makeTestMap();
+    tileAt(map, 0, 0)!.terrain = TileType.Water;
+    tileAt(map, 0, 1)!.terrain = TileType.Water;
+    const pirate = makePirate('pirate-1', 0, 0);
+    pirate.hp = 20;
+    tileAt(map, 0, 0)!.unit = pirate;
+    const ship = makeShip('ship-1', 0, 0, 1);
+    tileAt(map, 0, 1)!.unit = ship;
+
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    const sim = new Simulator(map, players, GameMode.TURNS30, { rng: () => 0.5 });
+    sim.startGame();
+    sim.drainEvents();
+
+    sim.applyCommand({ type: CommandType.END_TURN });
+    sim.drainEvents();
+    expect(pirate.hp).toBe(0);
+    expect(tileAt(map, 0, 0)!.unit).toBeNull();
+    expect(tileAt(map, 0, 1)!.unit).toBe(ship);
+  });
+
+  it('removes a player ship that drops to 0 hp when a capture fails', () => {
+    const map = makeTestMap();
+    tileAt(map, 0, 0)!.terrain = TileType.Water;
+    tileAt(map, 0, 1)!.terrain = TileType.Water;
+    const pirate = makePirate('pirate-1', 0, 0);
+    tileAt(map, 0, 0)!.unit = pirate;
+    const ship = makeShip('ship-1', 0, 0, 1);
+    ship.hp = 10;
+    ship.hasAttacked = true;
+    tileAt(map, 0, 1)!.unit = ship;
+
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    const sim = new Simulator(map, players, GameMode.TURNS30, { rng: () => 0.5 });
+    sim.startGame();
+    sim.drainEvents();
+
+    sim.applyCommand({ type: CommandType.END_TURN });
+    sim.drainEvents();
+    expect(ship.hp).toBe(0);
+    expect(tileAt(map, 0, 1)!.unit).toBeNull();
+    expect(tileAt(map, 0, 0)!.unit).toBe(pirate);
+  });
+
+  it('a successful capture converts the ship into a pirate ship keeping its hp', () => {
+    const map = makeTestMap();
+    tileAt(map, 0, 0)!.terrain = TileType.Water;
+    tileAt(map, 0, 1)!.terrain = TileType.Water;
+    const pirate = makePirate('pirate-1', 0, 0);
+    tileAt(map, 0, 0)!.unit = pirate;
+    const ship = makeShip('ship-1', 0, 0, 1);
+    tileAt(map, 0, 1)!.unit = ship;
+
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    const sim = new Simulator(map, players, GameMode.TURNS30, { rng: () => 0.1 });
+    sim.startGame();
+    sim.drainEvents();
+
+    sim.applyCommand({ type: CommandType.END_TURN });
+    sim.drainEvents();
+    expect(ship.type).toBe(UnitType.PIRATE);
+    expect(ship.owner).toBe(PIRATE_OWNER);
+    expect(ship.hp).toBe(50);
+    expect(ship.shipLevel).toBe(1);
+  });
+
+  it('take their turn after all players and try to capture the nearest ship', () => {
+    const map = makeTestMap();
+    tileAt(map, 0, 0)!.terrain = TileType.Water;
+    tileAt(map, 0, 1)!.terrain = TileType.Water;
+    const pirate = makePirate('pirate-1', 0, 0);
+    tileAt(map, 0, 0)!.unit = pirate;
+    const ship = makeShip('ship-1', 0, 0, 1);
+    tileAt(map, 0, 1)!.unit = ship;
+
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    const sim = new Simulator(map, players, GameMode.TURNS30, { rng: () => 0.5 });
+    sim.startGame();
+    sim.drainEvents();
+
+    sim.applyCommand({ type: CommandType.END_TURN });
+    const events = sim.drainEvents();
+    const captureIdx = events.findIndex((e) => e.type === GameEventType.PIRATE_CAPTURE);
+    const turnIdx = events.findIndex((e) => e.type === GameEventType.TURN_STARTED);
+    expect(captureIdx).toBeGreaterThan(-1);
+    expect(turnIdx).toBeGreaterThan(captureIdx);
+  });
+
+  it('attack units on land within range', () => {
+    const map = makeTestMap();
+    tileAt(map, 0, 0)!.terrain = TileType.Water;
+    tileAt(map, 0, 0)!.unit = makePirate('pirate-1', 0, 0);
+    const defender = makeUnit('guard', 0, UnitType.WARRIOR, 0, 1);
+    tileAt(map, 0, 1)!.unit = defender;
+
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    const sim = new Simulator(map, players, GameMode.TURNS30, { rng: () => 0.5 });
+    sim.startGame();
+    sim.drainEvents();
+
+    sim.applyCommand({ type: CommandType.END_TURN });
+    sim.drainEvents();
+    // pirate force 30, warrior defenseForce 10, total 40:
+    // round((30/40)*30*1.5) = 34; counter round((10/40)*10*1.5*2) = 8
+    expect(defender.hp).toBe(16);
+    expect(tileAt(map, 0, 0)!.unit!.hp).toBe(72);
+  });
+
+  it('does not step onto the land tile of a unit it kills', () => {
+    const map = makeTestMap();
+    tileAt(map, 0, 0)!.terrain = TileType.Water;
+    const pirate = makePirate('pirate-1', 0, 0);
+    tileAt(map, 0, 0)!.unit = pirate;
+    const defender = makeUnit('guard', 0, UnitType.WARRIOR, 0, 1);
+    defender.hp = 1;
+    tileAt(map, 0, 1)!.unit = defender;
+
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    const sim = new Simulator(map, players, GameMode.TURNS30, { rng: () => 0.5 });
+    sim.startGame();
+    sim.drainEvents();
+
+    sim.applyCommand({ type: CommandType.END_TURN });
+    sim.drainEvents();
+    expect(tileAt(map, 0, 1)!.unit).toBeNull();
+    expect(tileAt(map, 0, 0)!.unit).toBe(pirate);
+  });
+
+  it('counter-attack land units that attack them', () => {
+    const map = makeTestMap();
+    tileAt(map, 0, 0)!.terrain = TileType.Water;
+    tileAt(map, 0, 0)!.unit = makePirate('pirate-1', 0, 0);
+    const attacker = makeUnit('att', 0, UnitType.WARRIOR, 0, 1);
+    tileAt(map, 0, 1)!.unit = attacker;
+
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    const sim = new Simulator(map, players, GameMode.TURNS30, { rng: () => 0.5 });
+    sim.startGame();
+    sim.drainEvents();
+
+    const ok = sim.applyCommand({ type: CommandType.ATTACK, unitId: 'att', q: 0, r: 0 });
+    expect(ok).toBe(true);
+    sim.drainEvents();
+    // warrior force 20, pirate defenseForce 5, total 25:
+    // damage round((20/25)*20*1.5) = 24, counter round((5/25)*5*1.5*2) = 3
+    expect(attacker.hp).toBe(47);
+    expect(tileAt(map, 0, 0)!.unit!.hp).toBe(56);
+  });
+
+  it('moves toward the nearest player unit over sea when it is out of range', () => {
+    const map = makeTestMap(4);
+    tileAt(map, 0, 0)!.terrain = TileType.Water;
+    tileAt(map, 0, 1)!.terrain = TileType.Water;
+    tileAt(map, 0, 2)!.terrain = TileType.Water;
+    tileAt(map, 0, 3)!.terrain = TileType.Water;
+    tileAt(map, 0, 4)!.terrain = TileType.Water;
+    const pirate = makePirate('pirate-1', 0, 0);
+    tileAt(map, 0, 0)!.unit = pirate;
+    const ship = makeShip('ship-1', 0, 0, 4);
+    tileAt(map, 0, 4)!.unit = ship;
+
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    const sim = new Simulator(map, players, GameMode.TURNS30, { rng: () => 0.5 });
+    sim.startGame();
+    sim.drainEvents();
+
+    sim.applyCommand({ type: CommandType.END_TURN });
+    const events = sim.drainEvents();
+    // The pirate closes to within its attack range (3) of the ship.
+    expect(pirate.q).toBe(0);
+    expect(pirate.r).toBe(1);
+    expect(events.some((e) => e.type === GameEventType.UNIT_MOVED && (e as { unitId: string }).unitId === 'pirate-1')).toBe(true);
+  });
+
+  it('moves in a random direction at max distance when no player unit exists', () => {
+    const map = makeTestMap(2);
+    tileAt(map, 0, 0)!.terrain = TileType.Water;
+    for (const n of hexNeighbors({ q: 0, r: 0 })) {
+      const t = tileAt(map, n.q, n.r);
+      if (t) t.terrain = TileType.Water;
+    }
+    const pirate = makePirate('pirate-1', 0, 0);
+    tileAt(map, 0, 0)!.unit = pirate;
+
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    const sim = new Simulator(map, players, GameMode.TURNS30, { rng: () => 0.5 });
+    sim.startGame();
+    sim.drainEvents();
+
+    sim.applyCommand({ type: CommandType.END_TURN });
+    const events = sim.drainEvents();
+    expect(pirate.q !== 0 || pirate.r !== 0).toBe(true);
+    expect(isWaterType(tileAt(map, pirate.q, pirate.r)!.terrain)).toBe(true);
+    expect(events.some((e) => e.type === GameEventType.UNIT_MOVED && (e as { unitId: string }).unitId === 'pirate-1')).toBe(true);
+  });
+
+  it('award 30 points to the player who kills a pirate', () => {
+    const map = makeTestMap();
+    tileAt(map, 0, 0)!.terrain = TileType.Water;
+    const pirate = makePirate('pirate-1', 0, 0);
+    pirate.hp = 1;
+    tileAt(map, 0, 0)!.unit = pirate;
+    const ship = makeShip('ship-1', 0, 1, 0);
+    tileAt(map, 1, 0)!.unit = ship;
+
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    const sim = new Simulator(map, players, GameMode.TURNS30, { rng: () => 0.5 });
+    sim.startGame();
+    sim.drainEvents();
+
+    const ok = sim.applyCommand({ type: CommandType.ATTACK, unitId: 'ship-1', q: 0, r: 0 });
+    expect(ok).toBe(true);
+    const events = sim.drainEvents();
+    expect(tileAt(map, 0, 0)!.unit).toBeNull();
+    expect(players[0]!.score).toBe(30);
+    expect(events.some((e) => e.type === GameEventType.SCORE_FLY && e.amount === 30)).toBe(true);
+  });
+
+  it('accepts a deal for 50 money and the pirate stops attacking the player', () => {
+    const map = makeTestMap();
+    tileAt(map, 0, 0)!.terrain = TileType.Water;
+    tileAt(map, 0, 0)!.ownedBy = 0;
+    const pirate = makePirate('pirate-1', 0, 0);
+    tileAt(map, 0, 0)!.unit = pirate;
+    const ship = makeShip('ship-1', 0, 0, 1);
+    tileAt(map, 0, 1)!.unit = ship;
+
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    players[0]!.resources.money = 100;
+    const sim = new Simulator(map, players, GameMode.TURNS30, { rng: () => 0.5 });
+    sim.startGame();
+    sim.drainEvents();
+
+    expect(sim.applyCommand({ type: CommandType.DEAL, unitId: 'pirate-1' })).toBe(true);
+    const events = sim.drainEvents();
+    expect(players[0]!.resources.money).toBe(50);
+    expect(pirate.paidBy).toContain(0);
+    expect(events.some((e) => e.type === GameEventType.PIRATE_DEAL && e.playerIndex === 0)).toBe(true);
+
+    const shipHp = ship.hp;
+    sim.applyCommand({ type: CommandType.END_TURN });
+    sim.drainEvents();
+    expect(ship.hp).toBe(shipHp);
+    expect(tileAt(map, 0, 1)!.unit).toBe(ship);
+    expect(players[0]!.resources.money).toBe(50);
+  });
+
+  it('does not charge twice for a deal with the same pirate', () => {
+    const map = makeTestMap();
+    tileAt(map, 0, 0)!.terrain = TileType.Water;
+    tileAt(map, 0, 0)!.ownedBy = 0;
+    const pirate = makePirate('pirate-1', 0, 0);
+    tileAt(map, 0, 0)!.unit = pirate;
+
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    players[0]!.resources.money = 100;
+    const sim = new Simulator(map, players, GameMode.TURNS30, { rng: () => 0.5 });
+    sim.startGame();
+    sim.drainEvents();
+
+    expect(sim.applyCommand({ type: CommandType.DEAL, unitId: 'pirate-1' })).toBe(true);
+    sim.drainEvents();
+    expect(sim.applyCommand({ type: CommandType.DEAL, unitId: 'pirate-1' })).toBe(false);
+    expect(players[0]!.resources.money).toBe(50);
+  });
+
+  it('rejects a deal the player cannot afford', () => {
+    const map = makeTestMap();
+    tileAt(map, 0, 0)!.terrain = TileType.Water;
+    const pirate = makePirate('pirate-1', 0, 0);
+    tileAt(map, 0, 0)!.unit = pirate;
+
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    const moneyBefore = players[0]!.resources.money;
+    const sim = new Simulator(map, players, GameMode.TURNS30, { rng: () => 0.5 });
+    sim.startGame();
+    sim.drainEvents();
+
+    expect(sim.applyCommand({ type: CommandType.DEAL, unitId: 'pirate-1' })).toBe(false);
+    expect(players[0]!.resources.money).toBe(moneyBefore);
+    expect(pirate.paidBy).toBeUndefined();
+  });
+
+  it('rejects a deal offer to a unit that is not a pirate', () => {
+    const map = makeTestMap();
+    const ship = makeShip('ship-1', 0, 0, 0);
+    tileAt(map, 0, 0)!.unit = ship;
+
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    players[0]!.resources.money = 100;
+    const sim = new Simulator(map, players, GameMode.TURNS30, { rng: () => 0.5 });
+    sim.startGame();
+    sim.drainEvents();
+
+    expect(sim.applyCommand({ type: CommandType.DEAL, unitId: 'ship-1' })).toBe(false);
+    expect(players[0]!.resources.money).toBe(100);
+  });
+
+  it('cancels the deal when the player attacks the pirate, which then attacks again', () => {
+    const map = makeTestMap();
+    tileAt(map, 0, 0)!.terrain = TileType.Water;
+    tileAt(map, 0, 0)!.ownedBy = 0;
+    const pirate = makePirate('pirate-1', 0, 0);
+    tileAt(map, 0, 0)!.unit = pirate;
+    const ship = makeShip('ship-1', 0, 0, 1);
+    tileAt(map, 0, 1)!.unit = ship;
+
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    players[0]!.resources.money = 100;
+    const sim = new Simulator(map, players, GameMode.TURNS30, { rng: () => 0.5 });
+    sim.startGame();
+    sim.drainEvents();
+
+    sim.applyCommand({ type: CommandType.DEAL, unitId: 'pirate-1' });
+    sim.drainEvents();
+
+    expect(sim.applyCommand({ type: CommandType.ATTACK, unitId: 'ship-1', q: 0, r: 0 })).toBe(true);
+    const attackEvents = sim.drainEvents();
+    expect(pirate.paidBy).toBeUndefined();
+    expect(attackEvents.some((e) => e.type === GameEventType.PIRATE_DEAL_CANCELED && e.playerIndex === 0)).toBe(true);
+
+    const shipHpAfterFight = ship.hp;
+    sim.applyCommand({ type: CommandType.END_TURN });
+    const turnEvents = sim.drainEvents();
+    expect(ship.hp).toBeLessThan(shipHpAfterFight);
+    expect(turnEvents.some((e) => e.type === GameEventType.PIRATE_CAPTURE)).toBe(true);
+  });
+});
+
+describe('Pirate target tribes', () => {
+  type PirateInternals = { pirateTargetTile(u: Unit): ReturnType<typeof tileAt> | null };
+
+  function setup(playerCount: number): { sim: Simulator; pirate: Unit; internals: PirateInternals } {
+    const map = makeWaterMap(5);
+    const players = buildPlayers(Tribe.Villagers, playerCount - 1, new SeededRandom(1));
+    // One unit per tribe on land, at growing distance from the pirate at the edge.
+    const spots: [number, number][] = [[0, 0], [1, 0], [2, 0], [3, 0]];
+    players.forEach((p, i) => {
+      const [q, r] = spots[i]!;
+      tileAt(map, q, r)!.unit = makeUnit(`u${i}`, p.index, UnitType.WARRIOR, q, r);
+    });
+    const pirate = makePirate('pirate-1', 5, 0);
+    tileAt(map, 5, 0)!.unit = pirate;
+    const sim = new Simulator(map, players, GameMode.TURNS30, { rng: () => 0.5 });
+    sim.startGame();
+    return { sim, pirate, internals: (sim as unknown as { pirates: PirateInternals }).pirates };
+  }
+
+  const targetOwner = (internals: PirateInternals, pirate: Unit): number | undefined => {
+    internals.pirateTargetTile(pirate);
+    return pirate.pirateTarget;
+  };
+
+  it('hunts the nearest tribe first and sticks to it until it has attacked three times', () => {
+    const { pirate, internals } = setup(4);
+    expect(targetOwner(internals, pirate)).toBe(3);
+    pirate.pirateAttacks = 2;
+    expect(targetOwner(internals, pirate)).toBe(3);
+  });
+
+  it('after three attacks it picks another tribe that is not among its last two', () => {
+    const { pirate, internals } = setup(4);
+    expect(targetOwner(internals, pirate)).toBe(3);
+    pirate.pirateAttacks = 3;
+    expect(targetOwner(internals, pirate)).toBe(2);
+    expect(pirate.pirateAttacks).toBe(0);
+    pirate.pirateAttacks = 3;
+    // tribes 3 and 2 are remembered: the choice is between 0 and 1, nearest 1
+    expect(targetOwner(internals, pirate)).toBe(1);
+    expect(pirate.pirateTribes).toEqual([2, 1]);
+    pirate.pirateAttacks = 3;
+    // the first tribe (3) may come back only now, after two cycles
+    expect(targetOwner(internals, pirate)).toBe(3);
+    expect(pirate.pirateTribes).toEqual([1, 3]);
+  });
+
+  it('can return to the first tribe after two attack cycles', () => {
+    const { pirate, internals } = setup(4);
+    internals.pirateTargetTile(pirate); // 3
+    for (const expected of [2, 1]) {
+      pirate.pirateAttacks = 3;
+      expect(targetOwner(internals, pirate)).toBe(expected);
+    }
+    pirate.pirateAttacks = 3;
+    expect(targetOwner(internals, pirate)).toBe(3); // 3 is nearer than 0
+  });
+
+  it('with two players it just alternates between the tribes', () => {
+    const { pirate, internals } = setup(2);
+    expect(targetOwner(internals, pirate)).toBe(1);
+    for (const expected of [0, 1, 0]) {
+      pirate.pirateAttacks = 3;
+      expect(targetOwner(internals, pirate)).toBe(expected);
+    }
+  });
+
+  it('switches at once when its tribe has no units left', () => {
+    const { sim, pirate, internals } = setup(4);
+    expect(targetOwner(internals, pirate)).toBe(3);
+    tileAt(sim.map, 3, 0)!.unit = null;
+    expect(targetOwner(internals, pirate)).toBe(2);
+  });
+
+  it('counts every attack and then turns to the new tribe, moving toward it', () => {
+    const { sim, pirate } = setup(4);
+    const pirates = (sim as unknown as { pirates: { pirateAct(u: Unit): void } }).pirates;
+    const act = pirates.pirateAct.bind(pirates);
+    // in range of tribe 3's unit: three attacks on it
+    const map = sim.map;
+    tileAt(map, 5, 0)!.unit = null;
+    tileAt(map, 4, 0)!.terrain = TileType.Water;
+    tileAt(map, 4, 0)!.unit = pirate;
+    pirate.q = 4;
+    pirate.r = 0;
+    for (let i = 0; i < 3; i++) {
+      pirate.hp = PIRATE_HP;
+      tileAt(map, 3, 0)!.unit!.hp = 9999;
+      act(pirate);
+    }
+    expect(pirate.pirateTarget).toBe(3);
+    expect(pirate.pirateAttacks).toBe(3);
+    act(pirate);
+    expect(pirate.pirateTarget).toBe(2); // the nearest tribe that is not tribe 3
+    expect(pirate.pirateTribes).toEqual([3, 2]);
+    // tribe 2's unit is 2 hexes from the pirate: it is attacked, counting from zero again
+    expect(pirate.pirateAttacks).toBe(1);
+  });
+});

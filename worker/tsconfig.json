@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "lib": ["ES2022"],
+    "types": ["@cloudflare/workers-types"],
+    "skipLibCheck": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "esModuleInterop": true
+  },
+  "include": ["src", "../src/auth/auth-types.ts", "../src/auth/auth-validation.ts", "../src/enums/auth-error.enum.ts", "../src/enums/game-mode.enum.ts", "../src/enums/tribe.enum.ts", "../src/results/result-types.ts", "../src/results/result-validation.ts", "../server/relay-core.d.mts", "../server/worker/relay-wiring.d.mts"]
+}

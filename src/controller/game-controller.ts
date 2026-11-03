@@ -1,0 +1,1697 @@
+import { DEFAULT_AI_DIFFICULTY } from '@/game/ai/ai-difficulty';
+import { builderBuildable } from '@/game/economy/buildings';
+import { CheatController, type CheatHost } from './cheat-controller';
+import { UnitActions, type UnitActionsHost } from './unit-actions';
+import { TradeActions } from './trade-actions';
+import { attackableTargets } from '@/game/units/combat';
+import { type GameEvent } from '@/game/events';
+import { initialExplorationFor, isExploredFor } from '@/game/map/explore';
+import { shouldPromptWatch } from '@/game/game-mode';
+import { axialKey, hexCorners, hexDistance, hexNeighbors, hexToPixel, pixelToHex } from '@/game/map/hex';
+import { tileElevation } from '@/render/elevation';
+import { countIceTiles } from '@/game/map/ice';
+import { type GameMap, type MapTile, generateMap } from '@/game/map/map-gen';
+import { buildPlayers } from '@/game/players';
+import { icePhaseAt, seasonForTurn } from '@/game/season';
+import { cycleSelection, reachableTargets } from '@/game/units/selection';
+import { type Command, Simulator } from '@/game/simulator';
+import { hasSkill } from '@/game/skills';
+import { adjacentEnemyVillages, isMoveStealthed } from '@/game/units/stalker';
+import { type GameStateSnapshot } from '@/game/state';
+import { TileType } from '@/game/map/tile-types';
+import { trapCells } from '@/game/units/traps';
+import { extinguishCells } from '@/game/weather/fire';
+import { lightningVillages } from '@/game/units/lightning';
+import { Tribe, tribeById } from '@/game/tribes';
+import {
+  buildTutorialMap, buildTutorialPlayers, TUTORIAL_CAPITAL, TUTORIAL_ENEMY_SHIP_ID, TUTORIAL_ENEMY_WARRIOR_ID,
+  TUTORIAL_START_WARRIOR_ID,
+} from '@/game/tutorial/tutorial-map';
+import { skillPulseStep, STEP_CONFIG } from '@/game/tutorial/tutorial-steps';
+import { canAttack, canMove, movePoints, needsVeteranBonus } from '@/game/units/units';
+import { exploreVillageSights } from '@/game/economy/village';
+import { t } from '@/i18n';
+import { localizeVillageName } from '@/i18n/lists';
+import type { HostMessage } from '@/net/peer-session';
+import { detailHiddenAt, MapView, type OverlayItem } from '@/render/map-renderer';
+import { markDirty } from '@/gfx/render-gate';
+import { adoptTerrainTextures, createTerrainTextures, createTextures, destroyTextureSet, suppressPixiWarnings, type TerrainTextures, type TextureSet } from '@/render/texture-factory';
+import { pickTileAt } from '@/render/tile-pick';
+import { type Viewport } from '@/render/tile-signature';
+import { bonusEligibleFor } from '@/game/map/bonus';
+import { sfx } from '@/sound/sfx';
+import { activeMatchStore } from '@/storage/active-match';
+import { saveRepository } from '@/storage/save-game';
+import { welcomeDismissed } from '@/storage/settings';
+import { beginMatchState, confirmLeaveGame, useGameStore } from '@/store/game-store';
+import { SeededRandom } from '@/util';
+import { AchievementId, AiDifficulty, CommandType, IcePhase, GameMode, NetMode, OverlayKind, Screen, Season, SelectionKind, SkillId, TutorialStepId, UnitType } from '@enums';
+import { Application, Container } from 'pixi.js';
+import { CAMERA_FOLLOW_MS, CameraController } from './camera-controller';
+import { damagePreviewVictim } from './damage-preview';
+import { EventPresenter } from './event-presenter';
+import { HoldTimer } from './hold-timer';
+import { NetworkController } from './network-controller';
+import { TutorialDirector, type TutorialHost } from './tutorial-director';
+import { runSliced, SIM_SLICE_BUDGET_MS } from '@/util/time-slice';
+import { weatherCopies } from '@/game/weather/weather';
+import { clamp01 } from '../util/math';
+import { sleep } from '../util/sleep';
+import { randomSeed } from '../util/random';
+import { tileAt } from '@/game/map/tile-index';
+
+const HEX_SIZE = 40;
+const VILLAGE_START_OFFSET = 200;
+const SPECTATE_ROUND_DELAY_MS = 500;
+/** How long a press must be held (touch or mouse) before the damage preview
+ *  shows, in ms. */
+const DAMAGE_PREVIEW_HOLD_MS = 500;
+/** Minimum interval between full viewport culling / edge-marker rebuilds while
+ *  the camera is busy (drag / zoom / pan). These run per pointermove event
+ *  otherwise; throttling them to one display frame keeps panning smooth. */
+const VIEWPORT_SYNC_MS = 16;
+
+/** Delay before a replaced TextureSet's GPU textures are freed. */
+const TEXTURE_RELEASE_DELAY_MS = 2000;
+
+class GameController {
+  private app: Application | null = null;
+  private mapRoot: Container | null = null;
+  private edgeLayerTarget: Container | null = null;
+  private sim: Simulator | null = null;
+  private textures: Awaited<ReturnType<typeof createTextures>> | null = null;
+  private seasonRebake = false;
+  /** True while an end-turn command plays the AI seats in slices: the sim is
+   *  mid-turn, so the map view must not be rebuilt from it until the events
+   *  are presented. */
+  private turnSliced = false;
+  /** The texture bake `init` started for the current sim, while it runs. */
+  private initBake: Promise<void> | null = null;
+  private unsubSeason: (() => void) | null = null;
+  private mapView: MapView | null = null;
+  private overlayItems: OverlayItem[] = [];
+  private reachableKeys = new Set<string>();
+  private attackableKeys = new Set<string>();
+  /** Keyboard target selection (Space): the highlighted cell, or null when off. */
+  private keyTarget: { q: number; r: number } | null = null;
+  private hiddenUnitIds = new Set<string>();
+  /** Builder placement in progress: highlight candidate cells, wait for a tap. */
+  /** Whether the last render hid detail (hp bars/labels) for the current zoom;
+   *  kept so a zoom crossing the detail threshold forces a re-render. */
+  private detailHidden = false;
+  private knownTribeIds = new Set<number>();
+  private taskQueue: Promise<void> = Promise.resolve();
+  private network: NetworkController | null = null;
+  private initToken = 0;
+  private recovering = false;
+  private startVillageIntroPending = false;
+  private camera: CameraController | null = null;
+  private lastViewportSyncAt = 0;
+  private events: EventPresenter | null = null;
+  private tutorial: TutorialDirector | null = null;
+  private watchingLoopRunning = false;
+  /** Set when the WebGL context has been lost but not yet recovered. */
+  private contextLost = false;
+  private gpuDeviceLost = false;
+  /** Bumped on every GL context loss; a bake that straddles one is blank. */
+  private lossEpoch = 0;
+  private damagePreviewHold: HoldTimer | null = null;
+  private damagePreviewPress: { x: number; y: number } | null = null;
+  private damagePreviewShown = false;
+  private suppressNextTap = false;
+  private damagePreviewWindowUp: ((e: PointerEvent) => void) | null = null;
+  private damagePreviewWindowCancel: ((e: PointerEvent) => void) | null = null;
+  readonly cheats = new CheatController(this.cheatHost());
+  readonly actions = new UnitActions(this.unitActionsHost());
+  readonly trade = new TradeActions(this.unitActionsHost());
+
+  init(app: Application, root: Container, edgeLayerTarget: Container | null = null): void {
+    if (this.mapRoot) return;
+    this.app = app;
+    this.mapRoot = root;
+    // Effects added to the map root (floating text, smoke) carry a zIndex that must win over the map layers.
+    root.sortableChildren = true;
+    this.edgeLayerTarget = edgeLayerTarget;
+    let lastTurn = useGameStore.getState().turn;
+    this.unsubSeason?.();
+    this.unsubSeason = useGameStore.subscribe((s) => {
+      if (s.turn === lastTurn) return;
+      lastTurn = s.turn;
+      this.syncTerrainTextures();
+    });
+    const token = ++this.initToken;
+    const pending = useGameStore.getState().pendingSnapshot;
+    const startIntro = pending !== null || this.startVillageIntroPending;
+    this.startVillageIntroPending = false;
+    if (pending) {
+      useGameStore.getState().setPendingSnapshot(null);
+      if (!this.sim) {
+        this.sim = Simulator.fromSnapshot(pending);
+        this.sim.drainEvents();
+      }
+    }
+    if (this.sim) {
+      this.applyFitToScreen();
+      useGameStore.getState().setTexturesLoading(true);
+      const bake = createTextures(app, this.sim.map, HEX_SIZE * this.getCamera().qualityFactor, new Set(this.sim.players.map((p) => p.tribe)), seasonForTurn(this.sim.turn), icePhaseAt(this.sim.turn)).then((textures) => {
+        if (token === this.initToken) useGameStore.getState().setTexturesLoading(false);
+        if (token !== this.initToken || !this.mapRoot) return;
+        this.replaceTextures(textures);
+        this.render();
+        this.presentPendingClientEvents();
+        if (startIntro) this.centerOnStartVillage();
+      }).catch((e) => {
+        // A bake that fails (e.g. the tab was backgrounded and the GL context
+        // dropped mid-load) must not leave texturesLoading stuck, or recovery
+        // would never be able to run.
+        console.error('[init] texture bake failed', e);
+        if (token === this.initToken) {
+          useGameStore.getState().setTexturesLoading(false);
+          if (this.sim) this.contextLost = true;
+        }
+      });
+      // `startGame` awaits this instead of baking the same set a second time.
+      this.initBake = bake;
+      void bake.finally(() => {
+        if (this.initBake === bake) this.initBake = null;
+      });
+    }
+  }
+
+  /** Whether the baked terrain textures no longer match the sim's season / ice. */
+  private terrainTexturesStale(): boolean {
+    if (!this.sim || !this.textures) return false;
+    return (this.textures.season ?? Season.SPRING) !== seasonForTurn(this.sim.turn) || (this.textures.iceTiles ?? 0) !== countIceTiles(this.sim.map) || (this.textures.icePhase ?? IcePhase.NONE) !== icePhaseAt(this.sim.turn);
+  }
+
+  private bakeTerrain(season: Season, icePhase = icePhaseAt(this.sim!.turn)): Promise<TerrainTextures> {
+    const hexSize = HEX_SIZE * this.getCamera().qualityFactor;
+    return createTerrainTextures(this.app!, this.sim!.map, hexSize, season, icePhase);
+  }
+
+  /** Puts a freshly baked terrain part into the live texture set and points the
+   *  live view's sprites at it: no view rebuild, so no dropped frames. */
+  private applyTerrain(terrain: TerrainTextures): void {
+    if (!this.textures) return;
+    const superseded = adoptTerrainTextures(this.textures, terrain);
+    this.mapView?.refreshTerrainSprites();
+    // Freed a moment later so animations still holding an old sprite texture draw it safely.
+    setTimeout(() => {
+      suppressPixiWarnings(() => {
+        for (const tex of superseded) if (!tex.destroyed) tex.destroy(true);
+      }, 'was destroyed while still bound to a shader');
+    }, TEXTURE_RELEASE_DELAY_MS);
+  }
+
+  /** Season change that freezes or thaws water: bakes the new terrain in the
+   *  background, bounces the changed water/ice rows top to bottom on the old
+   *  view (each row takes its new texture when its bounce ends), then swaps in
+   *  the new set so every other tile changes at once. Without changed tiles,
+   *  or when the textures are not stale, the normal rebake handles it. */
+  async runSeasonTransition(tiles: { q: number; r: number }[]): Promise<void> {
+    if (tiles.length === 0 || !this.app || !this.sim || !this.textures || !this.mapView) return;
+    if (this.seasonRebake || !this.terrainTexturesStale()) return;
+    this.seasonRebake = true;
+    const token = this.initToken;
+    const epoch = this.lossEpoch;
+    try {
+      const textures = await this.bakeTerrain(seasonForTurn(this.sim.turn));
+      if (token !== this.initToken || !this.app || !this.mapRoot) {
+        destroyTextureSet(textures as TextureSet);
+        return;
+      }
+      if (epoch !== this.lossEpoch) {
+        destroyTextureSet(textures as TextureSet, { contextLost: true });
+        return;
+      }
+      await this.mapView?.seasonIceWave(tiles, (row) => this.mapView?.swapTileTextures(row, textures));
+      if (token !== this.initToken || epoch !== this.lossEpoch) {
+        destroyTextureSet(textures as TextureSet, { contextLost: epoch !== this.lossEpoch });
+        return;
+      }
+      this.applyTerrain(textures);
+      this.render();
+    } catch (e) {
+      console.error('[season] ice transition failed', e);
+    } finally {
+      // No syncTerrainTextures() here: it reads the season from the store's
+      // turn, which only catches up after the events are presented, so it
+      // would rebake the OLD season over the new textures (flicker). The turn
+      // subscription runs it once the store turn matches.
+      this.seasonRebake = false;
+    }
+  }
+
+  /** Rebakes the terrain textures right away after the map's terrain changed
+   *  outside a season change (a forest burned down), so the tile shows its new
+   *  look at once. A season rebake already in flight bakes the same map. */
+  async refreshTerrain(): Promise<void> {
+    if (!this.app || !this.sim || !this.textures || !this.mapView || this.seasonRebake) return;
+    this.seasonRebake = true;
+    const token = this.initToken;
+    const epoch = this.lossEpoch;
+    try {
+      const textures = await this.bakeTerrain(seasonForTurn(this.sim.turn));
+      if (token !== this.initToken || !this.app || !this.mapRoot || epoch !== this.lossEpoch) {
+        destroyTextureSet(textures as TextureSet, { contextLost: epoch !== this.lossEpoch });
+        return;
+      }
+      this.applyTerrain(textures);
+      this.render();
+    } catch (e) {
+      console.error('[terrain] texture refresh failed', e);
+    } finally {
+      this.seasonRebake = false;
+      if (token === this.initToken) this.syncTerrainTextures();
+    }
+  }
+
+  /** Rebakes the terrain textures when the displayed season or the set of ice
+   *  tiles no longer matches what they were baked for. The store's turn (not
+   *  sim.turn) drives the season so it follows the presented turn; the ice
+   *  count catches a snapshot adopted after the season already changed. */
+  private syncTerrainTextures = (): void => {
+    if (!this.app || !this.sim || !this.textures || !this.mapView) return;
+    if (this.seasonRebake) return;
+    const season = seasonForTurn(useGameStore.getState().turn);
+    const ice = countIceTiles(this.sim.map);
+    const icePhase = icePhaseAt(useGameStore.getState().turn);
+    if ((this.textures.season ?? Season.SPRING) === season && (this.textures.iceTiles ?? 0) === ice && (this.textures.icePhase ?? IcePhase.NONE) === icePhase) return;
+    this.seasonRebake = true;
+    const token = this.initToken;
+    const epoch = this.lossEpoch;
+    const hexSize = HEX_SIZE * this.getCamera().qualityFactor;
+    void createTerrainTextures(this.app, this.sim.map, hexSize, season, icePhase)
+      .then((textures) => {
+        if (token !== this.initToken || !this.app || !this.mapRoot) {
+          destroyTextureSet(textures as TextureSet);
+          return;
+        }
+        // The context dropped while baking: the result is blank. Keep the old
+        // set; context-loss recovery rebuilds everything.
+        if (epoch !== this.lossEpoch) {
+          destroyTextureSet(textures as TextureSet, { contextLost: true });
+          return;
+        }
+        this.applyTerrain(textures);
+        this.render();
+      })
+      .catch((e) => console.error('[season] texture rebake failed', e))
+      .finally(() => {
+        this.seasonRebake = false;
+        // The turn or map may have changed again while baking.
+        if (token === this.initToken) this.syncTerrainTextures();
+      });
+  };
+
+  shutdown(): void {
+    this.unsubSeason?.();
+    this.unsubSeason = null;
+    this.cancelDamagePreviewHold();
+    useGameStore.getState().setContextMenu(null);
+    this.damagePreviewShown = false;
+    this.mapView?.hideDamagePreview();
+    this.suppressNextTap = false;
+    this.camera?.destroy();
+    this.camera = null;
+    this.initToken++;
+    this.startVillageIntroPending = false;
+    if (this.mapView) {
+      this.mapView.destroy();
+      this.mapView = null;
+    }
+    this.overlayItems = [];
+    this.mapRoot = null;
+    if (this.textures) {
+      destroyTextureSet(this.textures);
+      this.textures = null;
+    }
+    this.app = null;
+    this.tutorial = null;
+  }
+
+  /** Swaps in a freshly baked TextureSet after the previous MapView (which held
+   *  the old set) is gone, so the composited village textures of the discarded
+   *  set are destroyed as soon as nothing references them. */
+  private replaceTextures(textures: Awaited<ReturnType<typeof createTextures>>, contextLost = false): void {
+    if (this.mapView) {
+      this.mapView.destroy();
+      this.mapView = null;
+    }
+    const previous = this.textures;
+    this.textures = textures;
+    // Freed a moment later so in-flight animations that still hold a sprite
+    // from the old set do not draw a destroyed texture.
+    if (previous && previous !== textures) setTimeout(() => destroyTextureSet(previous, { contextLost }), TEXTURE_RELEASE_DELAY_MS);
+  }
+
+  getMap(): GameMap | null {
+    return this.sim?.map ?? null;
+  }
+
+  getSim(): Simulator | null {
+    return this.sim;
+  }
+
+  private syncStore(): void {
+    const store = useGameStore.getState();
+    if (!this.sim) return;
+    store.setPlayers(
+      this.sim.players.map((p) => ({
+        ...p,
+        resources: { ...p.resources },
+        skills: [...p.skills],
+        knownTribes: p.knownTribes ? [...p.knownTribes] : undefined,
+        stats: p.stats ? { ...p.stats } : undefined,
+        achievements: p.achievements ? [...p.achievements] : undefined,
+      })),
+    );
+    store.setTurn(this.sim.turn);
+    store.setWeather(weatherCopies(this.sim.map));
+    store.setCurrentPlayerIndex(this.sim.currentPlayerIndex);
+    store.setGameOver(this.sim.gameOver);
+    store.setWinnerIndex(this.sim.winnerIndex);
+    store.setExpectedTurns(this.sim.expectedTurns);
+    store.setBonusAwarded(this.sim.bonusAwarded);
+    this.promptVeteranBonus();
+    this.trade.promptNextProposal();
+  }
+
+  /** Asks the local player to pick the bonus of a veteran of theirs that is waiting for one
+   *  (only on their own turn, and when no other dialog is open). */
+  private promptVeteranBonus(): void {
+    const store = useGameStore.getState();
+    const sim = this.sim;
+    if (!sim || sim.gameOver || store.overlay !== null || store.aiActive) return;
+    if (sim.currentPlayerIndex !== store.localPlayerIndex) return;
+    const tile = sim.map.tiles.find((t) => t.unit !== null && t.unit.owner === store.localPlayerIndex && needsVeteranBonus(t.unit));
+    if (tile?.unit) store.setOverlay({ kind: OverlayKind.VETERAN_BONUS, unitId: tile.unit.id });
+  }
+
+  private syncTutorialStore(): void {
+    const store = useGameStore.getState();
+    if (!this.tutorial) {
+      store.setTutorialStep(null);
+      store.setTutorialHighlightSkills([]);
+      store.setTutorialHighlightEndTurn(false);
+      return;
+    }
+    const step = this.tutorial.currentStep();
+    const def = STEP_CONFIG[step];
+    store.setTutorialStep(step);
+    store.setTutorialHighlightSkills(def.highlightSkills);
+    store.setTutorialHighlightEndTurn(def.highlightEndTurn);
+  }
+
+  private tutorialMarkerKeys(): Set<string> {
+    if (!this.tutorial || !this.sim) return new Set<string>();
+    const step = this.tutorial.currentStep();
+    const markers = new Set<string>();
+    for (const m of STEP_CONFIG[step].markers) markers.add(axialKey(m));
+    if (step === TutorialStepId.ATTACK_ENEMY) {
+      const enemy = this.sim.map.tiles.find((t) => t.unit?.id === TUTORIAL_ENEMY_WARRIOR_ID);
+      if (enemy) markers.add(axialKey(enemy));
+    }
+    if (step === TutorialStepId.BOARD_SHIP) {
+      const warrior = this.sim.map.tiles.find((t) => t.unit?.id === TUTORIAL_START_WARRIOR_ID);
+      if (warrior) markers.add(axialKey(warrior));
+    }
+    if (step === TutorialStepId.UPGRADE_SHIP) {
+      const ship = this.sim.map.tiles.find(
+        (t) => t.unit && t.unit.owner === 0 && t.unit.shipLevel !== undefined,
+      );
+      if (ship) markers.add(axialKey(ship));
+    }
+    if (step === TutorialStepId.ATTACK_ENEMY_SHIP) {
+      const ship = this.sim.map.tiles.find(
+        (t) => t.unit && t.unit.owner === 0 && t.unit.shipLevel !== undefined,
+      );
+      if (ship) markers.add(axialKey(ship));
+      const enemy = this.sim.map.tiles.find((t) => t.unit?.id === TUTORIAL_ENEMY_SHIP_ID);
+      if (enemy) markers.add(axialKey(enemy));
+    }
+    if (step === TutorialStepId.COLLECT_BONUS) {
+      const bonusTile = this.sim.map.tiles.find((t) => t.bonus !== undefined && t.bonus !== null);
+      if (bonusTile) markers.add(axialKey(bonusTile));
+    }
+    for (const m of this.tutorial.markerTiles()) markers.add(axialKey(m));
+    if (step === TutorialStepId.APPROACH_FREE_VILLAGE || step === TutorialStepId.CAPTURE_FREE_VILLAGE) {
+      const freeVillage = this.sim.map.tiles.find((t) => t.settlement && t.settlement.owner === null);
+      if (freeVillage) markers.add(axialKey(freeVillage));
+    }
+    return markers;
+  }
+
+  exploredKeysFor(playerIndex: number): Set<string> {
+    const keys = new Set<string>();
+    if (!this.sim) return keys;
+    for (const t of this.sim.map.tiles) {
+      if (isExploredFor(t, playerIndex)) keys.add(axialKey(t));
+    }
+    return keys;
+  }
+
+  private deriveKnownTribes(): Set<number> {
+    const store = useGameStore.getState();
+    const local = this.sim?.players[store.localPlayerIndex];
+    if (!local) return new Set<number>();
+    return new Set<number>([local.tribe, ...(local.knownTribes ?? [])]);
+  }
+
+  private syncKnownTribes(notify: boolean): void {
+    if (!this.sim) return;
+    const current = this.deriveKnownTribes();
+    const firstSync = this.knownTribeIds.size === 0;
+    if (notify && !firstSync) {
+      const met = [...current].filter((id) => !this.knownTribeIds.has(id)).map((id) => tribeById(id)).filter((tr): tr is NonNullable<typeof tr> => !!tr);
+      if (met.length > 0) {
+        this.centerOnMetTribe(met[0]!.id);
+        useGameStore.getState().queueMetTribes(
+          met.map((tr) => tr.name),
+          `${met[0]!.code}-icon.png`,
+          (names) => (names.length === 1 ? t('msg.meetTribe', { tribe: names[0]! }) : t('msg.meetTribes', { tribes: names.join(', ') })),
+        );
+      }
+    }
+    this.knownTribeIds = new Set<number>([...this.knownTribeIds, ...current]);
+  }
+
+  /** Centers the camera on a unit or village of a just-met tribe that the local player has explored. */
+  private centerOnMetTribe(tribeId: number): void {
+    if (!this.app || !this.sim) return;
+    const local = useGameStore.getState().localPlayerIndex;
+    const sim = this.sim;
+    const ownedByTribe = (owner: number | null | undefined): boolean =>
+      owner !== null && owner !== undefined && owner >= 0 && sim.players[owner]?.tribe === tribeId;
+    const found = sim.map.tiles.find((tile) => isExploredFor(tile, local) && (ownedByTribe(tile.unit?.owner) || ownedByTribe(tile.settlement?.owner)));
+    if (!found) return;
+    const world = hexToPixel(found, HEX_SIZE);
+    const camera = this.getCamera();
+    void camera.animateTo(
+      { x: this.app.screen.width / 2 - world.x * camera.scale, y: this.mapHeight() / 2 - world.y * camera.scale },
+      true,
+      CAMERA_FOLLOW_MS,
+    );
+  }
+
+  adoptSnapshot(snap: GameStateSnapshot): void {
+    this.sim = Simulator.fromSnapshot(snap);
+    this.syncStore();
+    this.syncKnownTribes(true);
+    this.hiddenUnitIds.clear();
+    if (this.app) this.render();
+    this.syncTerrainTextures();
+  }
+
+  saveGame(): void {
+    if (!this.sim || useGameStore.getState().netMode !== NetMode.SINGLE) return;
+    if (useGameStore.getState().tutorial) return;
+    saveRepository.save(this.sim.snapshot());
+  }
+
+  resumeGame(): void {
+    const snap = saveRepository.load();
+    if (!snap) return;
+    this.sim = Simulator.fromSnapshot(snap);
+    for (const tile of this.sim.map.tiles) {
+      if (tile.settlement?.name) tile.settlement.name = localizeVillageName(tile.settlement.name);
+    }
+    const store = useGameStore.getState();
+    this.tutorial = null;
+    store.setTutorial(false);
+    store.setTutorialStep(null);
+    store.setTutorialHighlightSkills([]);
+    store.setTutorialHighlightEndTurn(false);
+    store.setPlayers(snap.players);
+    store.setMode(snap.mode);
+    store.setTurn(snap.turn);
+    store.setWeather(weatherCopies(snap.map));
+    store.setCurrentPlayerIndex(snap.currentPlayerIndex);
+    store.setGameOver(snap.gameOver);
+    store.setWinnerIndex(snap.winnerIndex);
+    store.setExpectedTurns(snap.expectedTurns);
+    store.setBonusAwarded(snap.bonusAwarded);
+    store.setLocalPlayerIndex(0);
+    store.setNetMode(NetMode.SINGLE);
+    store.setAiActive(snap.currentPlayerIndex !== 0);
+    store.setSelection(null);
+    this.startVillageIntroPending = true;
+    store.setScreen(Screen.GAME);
+    this.syncKnownTribes(false);
+    // The save was made while watching (the local player is out): nothing else
+    // would end the turn, so the AIs would stand still. Carry on watching.
+    if (!snap.gameOver && snap.mode === GameMode.CAPTURE && snap.players[0]?.isActive === false) {
+      store.setAiActive(false);
+      this.watchGame();
+    }
+  }
+
+  /** Marks that the WebGL context was lost. Kept so a later foreground event can
+   *  rebuild even if the browser never fires `webglcontextrestored`. */
+  noteContextLost(): void {
+    this.contextLost = true;
+    this.lossEpoch++;
+    markDirty();
+  }
+
+  /** The WebGPU device was lost (no `webglcontextlost` event exists for it). */
+  noteGpuDeviceLost(): void {
+    this.gpuDeviceLost = true;
+    this.noteContextLost();
+  }
+
+  /** Pixi created a new WebGPU device after a loss: the generated textures are blank, rebuild them. */
+  noteGpuDeviceRestored(): void {
+    this.gpuDeviceLost = false;
+    void this.recoverFromContextLoss();
+  }
+
+  /** Whether the GL context (or the WebGPU device) is currently reported as lost. */
+  private glContextLost(): boolean {
+    if (this.gpuDeviceLost) return true;
+    const r = this.app?.renderer as
+      | { context?: { isLost?: boolean }; gl?: { isContextLost?: () => boolean } }
+      | undefined;
+    if (!r) return false;
+    if (r.context?.isLost) return r.context.isLost;
+    if (r.gl && typeof r.gl.isContextLost === 'function') return r.gl.isContextLost();
+    return false;
+  }
+
+  /** Called when the page comes back to the foreground. Some mobile browsers
+   *  drop the WebGL context while backgrounded without delivering
+   *  `webglcontextrestored` afterwards, so retrigger recovery whenever the
+   *  context was lost. */
+  recoverOnForeground(): void {
+    if (this.contextLost || this.glContextLost()) {
+      void this.recoverFromContextLoss();
+    }
+  }
+
+  /** Mobile browsers drop the WebGL context while the tab is backgrounded.
+   * Pixi restores its GL state on `webglcontextrestored`, and image/canvas
+   * backed textures re-upload automatically, but textures made by
+   * `renderer.generateTexture()` (every terrain/unit/building sprite) are
+   * RenderTextures that live only on the GPU, so they come back blank. Rebuild
+   * the TextureSet from the sim and recreate the MapView on top of it. */
+  async recoverFromContextLoss(retries = 8): Promise<void> {
+    if (this.recovering) return;
+    if (!this.app || !this.sim || !this.textures || !this.mapView) return;
+    this.recovering = true;
+    const store = useGameStore.getState();
+    store.setTexturesLoading(true);
+    const token = this.initToken;
+    try {
+      // The callback may beat the browser actually handing the context back
+      // (especially on the foreground fallback); wait until GL is usable.
+      for (let i = 0; i < retries && this.glContextLost(); i++) {
+        await sleep(250);
+      }
+      if (this.glContextLost()) return;
+      const hexSize = HEX_SIZE * this.getCamera().qualityFactor;
+      // A bake that straddles another loss is blank: bake again (a few times).
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const epoch = this.lossEpoch;
+        const textures = await createTextures(this.app, this.sim.map, hexSize, new Set(this.sim.players.map((p) => p.tribe)), seasonForTurn(this.sim.turn), icePhaseAt(this.sim.turn));
+        if (token !== this.initToken || !this.app || !this.mapRoot) return;
+        if (epoch !== this.lossEpoch || this.glContextLost()) {
+          destroyTextureSet(textures, { contextLost: true });
+          for (let i = 0; i < retries && this.glContextLost(); i++) {
+            await sleep(250);
+          }
+          continue;
+        }
+        this.overlayItems = [];
+        this.replaceTextures(textures, true);
+        this.contextLost = false;
+        this.render();
+        break;
+      }
+    } catch (e) {
+      // Keep the loss flag set so the next restore/foreground event retries
+      // instead of leaving the map blank forever.
+      console.error('[recover] texture rebuild failed', e);
+    } finally {
+      if (token === this.initToken) useGameStore.getState().setTexturesLoading(false);
+      this.recovering = false;
+    }
+  }
+
+  private enqueue(task: () => Promise<void>): Promise<void> {
+    const run = this.taskQueue.then(task, task);
+    this.taskQueue = run.catch((e) => {
+      console.error('[queue] task failed', e);
+    });
+    return run;
+  }
+
+  private presentPendingClientEvents(): void {
+    this.getNetwork().presentPendingClientEvents();
+  }
+
+  runCommand(cmd: Command): Promise<void> {
+    return this.enqueue(async () => {
+      if (!this.sim || this.sim.gameOver) return;
+      const store = useGameStore.getState();
+      if (store.aiActive && cmd.type !== CommandType.END_TURN) return;
+      const preExplored = this.exploredKeysFor(store.localPlayerIndex);
+      // Ending the turn runs every AI seat; do it in short slices so the page stays responsive.
+      let ok: boolean;
+      if (cmd.type === CommandType.END_TURN) {
+        this.turnSliced = true;
+        try {
+          ok = await runSliced(this.sim.applyCommandSteps(cmd), SIM_SLICE_BUDGET_MS);
+        } finally {
+          this.turnSliced = false;
+        }
+      } else {
+        ok = this.sim.applyCommand(cmd);
+      }
+      if (ok) this.saveGame();
+      const events = this.sim.drainEvents();
+      if (store.netMode === NetMode.HOST) this.getNetwork().broadcastBatch(events);
+      await this.presentEvents(events, preExplored);
+      this.syncStore();
+      const storeNow = useGameStore.getState();
+      if (this.sim && shouldPromptWatch({
+        netMode: storeNow.netMode,
+        mode: storeNow.mode,
+        gameOver: storeNow.gameOver,
+        watching: storeNow.watching,
+        localActive: this.sim.players[storeNow.localPlayerIndex]?.isActive ?? true,
+        overlayKind: storeNow.overlay?.kind ?? null,
+      })) {
+        storeNow.setOverlay({ kind: OverlayKind.WATCHING_PROMPT });
+      }
+      this.render();
+      if (useGameStore.getState().tutorial && this.tutorial) {
+        const changed = this.tutorial.afterCommand(events);
+        if (changed) {
+          this.syncStore();
+          this.syncTutorialStore();
+          const s = useGameStore.getState();
+          // Once a skill step completes, close the skill tree so the player can
+          // see the next banner/objective on the map.
+          if (s.overlay?.kind === OverlayKind.SKILL && !skillPulseStep(s.tutorialStep)) {
+            s.setOverlay(null);
+          }
+          this.render();
+        }
+      }
+    });
+  }
+
+  async startGame(tribe: Tribe, enemyCount: number, mode: GameMode, difficulty: AiDifficulty = DEFAULT_AI_DIFFICULTY): Promise<void> {
+    const store = useGameStore.getState();
+    this.tutorial = null;
+    store.setTutorial(false);
+    store.setTutorialStep(null);
+    store.setTutorialHighlightSkills([]);
+    store.setTutorialHighlightEndTurn(false);
+    const players = buildPlayers(tribe, enemyCount, new SeededRandom(randomSeed()), difficulty);
+    const map = generateMap(players.length, randomSeed(), players.map((p) => p.tribe));
+    for (const p of players) {
+      initialExplorationFor(map, p.index);
+      exploreVillageSights(map, p.index);
+    }
+    this.sim = new Simulator(map, players, mode);
+    this.sim.startGame();
+    this.sim.drainEvents();
+    beginMatchState({ players: players, mode: mode, expectedTurns: this.sim.expectedTurns, netMode: NetMode.SINGLE });
+    store.setScreen(Screen.GAME);
+    if (!welcomeDismissed()) store.setOverlay({ kind: OverlayKind.WELCOME });
+    this.syncKnownTribes(false);
+    const start = map.spawns[store.localPlayerIndex]!.start;
+    store.setSelection({ kind: SelectionKind.UNIT, q: start.q, r: start.r });
+    if (this.app) {
+      this.applyFitToScreen();
+      // Mounting the game screen already started baking this sim's textures
+      // (`init`): wait for that instead of baking everything twice. When the
+      // screen was already mounted `init` did not run, so bake here.
+      const inFlight = this.initBake;
+      if (inFlight) await inFlight;
+      else this.replaceTextures(await createTextures(this.app, map, HEX_SIZE * this.getCamera().qualityFactor, new Set(this.sim!.players.map((p) => p.tribe)), seasonForTurn(this.sim!.turn), icePhaseAt(this.sim!.turn)));
+    }
+    this.render();
+    this.centerOnStartVillage();
+    this.saveGame();
+  }
+
+  startTutorial(): Promise<void> {
+    const store = useGameStore.getState();
+    const players = buildTutorialPlayers();
+    const map = buildTutorialMap();
+    this.sim = new Simulator(map, players, GameMode.TURNS30, { disablePirates: true });
+    this.sim.startGame();
+    this.sim.drainEvents();
+    this.tutorial = new TutorialDirector({ sim: () => this.sim, presentPending: () => void this.cheats.presentPending() } satisfies TutorialHost);
+    this.tutorial.start();
+    beginMatchState({ players: players, mode: GameMode.TURNS30, expectedTurns: this.sim.expectedTurns, netMode: NetMode.SINGLE });
+    store.setOverlay(null);
+    store.setTutorial(true);
+    this.syncTutorialStore();
+    this.syncKnownTribes(false);
+    store.setSelection({ kind: SelectionKind.UNIT, q: TUTORIAL_CAPITAL.q, r: TUTORIAL_CAPITAL.r });
+    this.startVillageIntroPending = true;
+    store.setScreen(Screen.GAME);
+    return Promise.resolve();
+  }
+
+  tutorialContinue(): void {
+    if (!this.tutorial) return;
+    if (this.tutorial.continueDialog()) {
+      this.syncStore();
+      this.syncTutorialStore();
+      this.render();
+    }
+  }
+
+  exitTutorial(): void {
+    this.tutorial = null;
+    useGameStore.getState().setOverlay(null);
+    useGameStore.getState().setTutorial(false);
+    useGameStore.getState().setTutorialStep(null);
+    useGameStore.getState().setTutorialHighlightSkills([]);
+    useGameStore.getState().setTutorialHighlightEndTurn(false);
+    useGameStore.getState().setSelection(null);
+    useGameStore.getState().setScreen(Screen.START);
+  }
+
+  private mapHeight(): number {
+    if (!this.app) return 0;
+    // The map always covers the full screen height (including under the
+    // toolbar), regardless of screen width.
+    return this.app.screen.height;
+  }
+
+  /** Labels (hp text, village names) are hidden while more than 60% of the map's
+   *  width and 90% of its height are visible on screen. */
+  private labelsHidden(): boolean {
+    if (!this.camera || !this.app || !this.sim) return false;
+    return detailHiddenAt(this.app.screen.width, this.app.screen.height, this.camera.scale, this.sim.map.radius, HEX_SIZE);
+  }
+
+  /** Current camera pan (screen px); zero before the camera exists. */
+  cameraPan(): { x: number; y: number } {
+    return this.camera?.pan ?? { x: 0, y: 0 };
+  }
+
+  /** Current camera zoom scale (world px -> screen px); 1 before the camera exists. */
+  cameraScale(): number {
+    return this.camera?.scale ?? 1;
+  }
+
+  /** Screen position of the top corner of a hex's top face (raised by its elevation); null before the camera exists. */
+  tileTopScreen(q: number, r: number): { x: number; y: number } | null {
+    return this.tileCornerScreen(q, r, 5);
+  }
+
+  /** Screen position of the tile's bottom corner (elevation applied). */
+  tileBottomScreen(q: number, r: number): { x: number; y: number } | null {
+    return this.tileCornerScreen(q, r, 2);
+  }
+
+  private tileCornerScreen(q: number, r: number, index: number): { x: number; y: number } | null {
+    if (!this.camera) return null;
+    const tile = this.sim ? tileAt(this.sim.map, q, r) : undefined;
+    const corner = hexCorners({ q, r }, HEX_SIZE)[index]!;
+    const lift = tile ? tileElevation(tile, HEX_SIZE) : 0;
+    const { pan, scale } = this.camera;
+    return { x: pan.x + corner.x * scale, y: pan.y + (corner.y - lift) * scale };
+  }
+
+  private getCamera(): CameraController {
+    if (!this.camera) {
+      this.camera = new CameraController({
+        app: this.app,
+        hexSize: HEX_SIZE,
+        screenWidth: () => this.app?.screen.width ?? 0,
+        mapHeight: () => this.mapHeight(),
+        mapRadius: () => this.sim?.map.radius ?? 0,
+        onCameraChange: () => this.applyTransform(),
+        onBusyChange: (busy) => this.mapView?.setCameraBusy(busy),
+      });
+    }
+    return this.camera;
+  }
+
+  private getEvents(): EventPresenter {
+    if (!this.events) {
+      this.events = new EventPresenter({
+        app: () => this.app,
+        mapRoot: () => this.mapRoot,
+        mapView: () => this.mapView,
+        textures: () => this.textures,
+        sim: () => this.sim,
+        hiddenUnitIds: () => this.hiddenUnitIds,
+        camera: () => this.getCamera(),
+        render: () => this.render(),
+        runSeasonTransition: (tiles) => this.runSeasonTransition(tiles),
+        refreshTerrain: () => this.refreshTerrain(),
+        syncKnownTribes: (notify) => this.syncKnownTribes(notify),
+        enqueue: (task) => this.enqueue(task),
+        bringCellIntoView: (q, r) => this.bringCellIntoView(q, r),
+        centerOnCell: (q, r) => this.centerOnTile(q, r),
+        exploredKeysFor: (playerIndex) => this.exploredKeysFor(playerIndex),
+        saveGame: () => this.saveGame(),
+        promptTrade: () => this.trade.promptNextProposal(),
+      });
+    }
+    return this.events;
+  }
+
+  presentEvents(events: GameEvent[], preExplored: Set<string>): Promise<void> {
+    return this.getEvents().present(events, preExplored);
+  }
+
+  private getNetwork(): NetworkController {
+    if (!this.network) {
+      this.network = new NetworkController({
+        app: () => this.app,
+        sim: () => this.sim,
+        setSim: (sim) => {
+          this.sim = sim;
+        },
+        setTextures: (textures) => {
+          this.replaceTextures(textures);
+        },
+        enqueue: (task) => this.enqueue(task),
+        render: () => this.render(),
+        syncStore: () => this.syncStore(),
+        syncKnownTribes: (notify) => this.syncKnownTribes(notify),
+        exploredKeysFor: (playerIndex) => this.exploredKeysFor(playerIndex),
+        presentEvents: (events, pre) => this.presentEvents(events, pre),
+        adoptSnapshot: (snap) => this.adoptSnapshot(snap),
+        applyFitToScreen: () => this.applyFitToScreen(),
+        centerOnStartVillage: () => this.centerOnStartVillage(),
+        cameraQualityFactor: () => this.getCamera().qualityFactor,
+        runCommand: (cmd) => this.runCommand(cmd),
+      });
+    }
+    return this.network;
+  }
+
+  private applyFitToScreen(): void {
+    if (!this.app || !this.sim) return;
+    this.getCamera().applyFitToScreen();
+  }
+
+  /** Re-fit and re-render the map after the window/viewport is resized. */
+  handleResize(): void {
+    if (!this.app || !this.sim || !this.mapView || !this.camera) return;
+    this.applyFitToScreen();
+    this.applyTransform();
+  }
+
+  private applyTransform(): void {
+    if (!this.mapView || !this.camera) return;
+    markDirty();
+    const camera = this.camera;
+    const scale = camera.scale;
+    this.mapView.container.scale.set(scale, scale);
+    this.mapView.container.position.set(camera.pan.x, camera.pan.y);
+    this.mapView.container.hitArea = camera.viewportRect();
+    this.mapView.markerLayer.scale.set(scale, scale);
+    this.mapView.markerLayer.position.set(camera.pan.x, camera.pan.y);
+    this.mapView.badgeLayer.scale.set(scale, scale);
+    this.mapView.badgeLayer.position.set(camera.pan.x, camera.pan.y);
+    this.mapView.syncBadgePositions(camera.pan, scale);
+    this.mapView.syncHpBarPositions(camera.pan, scale);
+    for (const item of this.overlayItems) {
+      item.el.position.set(camera.pan.x + item.world.x * scale, camera.pan.y + item.world.y * scale);
+      if (item.scaled) item.el.scale.set(scale);
+    }
+    if (this.app) {
+      const viewport: Viewport = {
+        x: camera.pan.x,
+        y: camera.pan.y,
+        scale,
+        width: this.app.screen.width,
+        height: this.mapHeight(),
+        labelsHidden: this.labelsHidden(),
+      };
+      // While the camera is busy (drag / zoom / pan) the viewport can jump at
+      // pointermove rate; culling the whole tile map and rebuilding the edge
+      // markers on every event steals frames, so throttle those to ~16ms and
+      // always run them at rest.
+      const nowMs = performance.now();
+      if (!camera.isBusy || nowMs - this.lastViewportSyncAt >= VIEWPORT_SYNC_MS) {
+        this.lastViewportSyncAt = nowMs;
+        this.mapView.setViewport(viewport);
+        this.mapView.repositionEdgeMarkers(viewport);
+      }
+    }
+    // Zoom changes never re-render the overlay, so hp bars/labels stay stale
+    // until the detail threshold is crossed; force a render then.
+    const hidden = this.labelsHidden();
+    if (hidden !== this.detailHidden) {
+      this.detailHidden = hidden;
+      this.render();
+    }
+  }
+
+  private async bringCellIntoView(q: number, r: number): Promise<void> {
+    if (!this.app || !this.sim) return;
+    const local = useGameStore.getState().localPlayerIndex;
+    const tile = tileAt(this.sim.map, q, r);
+    if (tile && !isExploredFor(tile, local)) return;
+    const world = hexToPixel({ q, r }, HEX_SIZE);
+    const camera = this.getCamera();
+    if (camera.isWorldPointVisible(world)) return;
+    const target = {
+      x: this.app.screen.width / 2 - world.x * camera.scale,
+      y: this.mapHeight() / 2 - world.y * camera.scale,
+    };
+    await camera.animateTo(target, true, CAMERA_FOLLOW_MS);
+  }
+
+  /** Centers the camera on a tile (whatever is visible now) and, once it has
+   *  arrived, plays the selected-hex bounce on it. */
+  async focusTile(q: number, r: number): Promise<void> {
+    if (!this.mapView) return;
+    await this.centerOnTile(q, r);
+    this.mapView?.bounceHex(q, r);
+    markDirty();
+  }
+
+  /** Slides the camera so the tile is in the middle of the screen (as far as the
+   *  map edge allows), whatever is visible now. */
+  private async centerOnTile(q: number, r: number): Promise<void> {
+    if (!this.app || !this.sim) return;
+    const camera = this.getCamera();
+    const world = hexToPixel({ q, r }, HEX_SIZE);
+    await camera.animateTo(
+      {
+        x: this.app.screen.width / 2 - world.x * camera.scale,
+        y: this.mapHeight() / 2 - world.y * camera.scale,
+      },
+      true,
+      CAMERA_FOLLOW_MS,
+    );
+  }
+
+  private centerOnStartVillage(): void {
+    if (!this.app || !this.sim) return;
+    const local = useGameStore.getState().localPlayerIndex;
+    const spawn = this.sim.map.spawns[local];
+    if (!spawn) return;
+    const camera = this.getCamera();
+    const world = hexToPixel(spawn.start, HEX_SIZE);
+    const target = {
+      x: this.app.screen.width / 2 - world.x * camera.scale,
+      y: this.mapHeight() / 2 - world.y * camera.scale,
+    };
+    camera.pan = { x: target.x, y: target.y - VILLAGE_START_OFFSET };
+    this.applyTransform();
+    void camera.animateTo(target, false);
+  }
+
+  captureSelectedVillage(): void {
+    const store = useGameStore.getState();
+    if (store.aiActive) return;
+    const selection = store.selection;
+    if (!selection || !this.sim) return;
+    const tile = tileAt(this.sim.map, selection.q, selection.r);
+    if (!tile?.unit || !tile.settlement || tile.settlement.owner === tile.unit.owner || !tile.settlement.captureReady || tile.unit.hasHealed) return;
+    store.setSelection(null);
+    this.sendCommand({ type: CommandType.CAPTURE, q: selection.q, r: selection.r, unitId: tile.unit.id });
+  }
+
+  /** Keyboard arrow: selects the own unit nearest to the selected hex (or the
+   *  screen centre) in direction (`dx`, `dy`) on screen. Pans the camera when it
+   *  is off screen. No unit that way keeps the selection. */
+  get isKeyTargeting(): boolean {
+    return this.keyTarget !== null;
+  }
+
+  /** Starts keyboard target selection on the selected unit's own cell, or leaves it. */
+  toggleKeyTargeting(): void {
+    if (this.keyTarget) {
+      this.keyTarget = null;
+      this.render();
+      return;
+    }
+    // A command just sent (e.g. the move that ended the previous targeting) is still being applied and presented;
+    // the highlighted cells are only current once it has finished and rendered.
+    void this.taskQueue.then(() => {
+      const sel = useGameStore.getState().selection;
+      if (this.keyTarget || !sel || sel.kind !== SelectionKind.UNIT) return;
+      const targets = this.keyTargets();
+      if (targets.length === 0) return;
+      // Move/attack: the cursor starts on the unit itself. Placement: on the cell nearest to it.
+      const start = this.placementPending ? targets.reduce((a, b) => (hexDistance(sel, b) < hexDistance(sel, a) ? b : a)) : sel;
+      this.keyTarget = { q: start.q, r: start.r };
+      this.render();
+    });
+  }
+
+  /** Arrows while targeting: moves the marker to the nearest target cell that way. */
+  moveKeyTarget(dx: number, dy: number): void {
+    if (!this.keyTarget) return;
+    const origin = hexToPixel(this.keyTarget, HEX_SIZE);
+    let best: { tile: MapTile; score: number } | null = null;
+    const sel = useGameStore.getState().selection;
+    const own = sel && !this.placementPending ? tileAt(this.sim!.map, sel.q, sel.r) : undefined;
+    for (const tile of own ? [own, ...this.keyTargets()] : this.keyTargets()) {
+      if (tile.q === this.keyTarget.q && tile.r === this.keyTarget.r) continue;
+      const p = hexToPixel(tile, HEX_SIZE);
+      const rx = p.x - origin.x;
+      const ry = p.y - origin.y;
+      const along = rx * dx + ry * dy;
+      if (along <= 0) continue;
+      const score = along + Math.abs(rx * dy - ry * dx) * 2;
+      if (!best || score < best.score) best = { tile, score };
+    }
+    if (!best) return;
+    this.keyTarget = { q: best.tile.q, r: best.tile.r };
+    this.render();
+  }
+
+  /** Enter while targeting: commits the move/attack on the marked cell; on the unit's own cell it just leaves. */
+  confirmKeyTarget(): void {
+    const target = this.keyTarget;
+    this.keyTarget = null;
+    const sel = useGameStore.getState().selection;
+    if (target && (this.placementPending || !(sel && sel.q === target.q && sel.r === target.r))) void this.handleMapClick(target.q, target.r);
+    else this.render();
+  }
+
+  /** A build / trap / extinguish / lightning target is being chosen (its cells are in `actions.placementKeys`). */
+  private get placementPending(): boolean {
+    const a = this.actions;
+    return !!(a.pendingPlacement || a.pendingTrap || a.pendingExtinguish || a.pendingLightning);
+  }
+
+  /** The cells the keyboard cursor may stand on: the placement cells while one is pending, else the move/attack cells. */
+  private keyTargets(): MapTile[] {
+    if (!this.sim) return [];
+    const pending = this.placementPending;
+    return this.sim.map.tiles.filter((t) => {
+      const key = axialKey(t);
+      return pending ? this.actions.placementKeys.has(key) : this.reachableKeys.has(key) || this.attackableKeys.has(key);
+    });
+  }
+
+  /** Shift+arrows: selects the neighbour of the selected cell (or of the screen centre) in that direction. */
+  selectAdjacentTile(dx: number, dy: number): void {
+    if (!this.sim || !this.app) return;
+    const store = useGameStore.getState();
+    if (store.gameOver || store.paused) return;
+    const camera = this.getCamera();
+    const sel = store.selection;
+    const centre = sel
+      ? { q: sel.q, r: sel.r }
+      : pixelToHex((this.app.screen.width / 2 - camera.pan.x) / camera.scale, (this.mapHeight() / 2 - camera.pan.y) / camera.scale, HEX_SIZE);
+    const origin = hexToPixel(centre, HEX_SIZE);
+    let best: { tile: MapTile; score: number } | null = null;
+    for (const n of sel ? hexNeighbors(centre) : [centre]) {
+      const tile = tileAt(this.sim.map, n.q, n.r);
+      if (!tile || !isExploredFor(tile, store.localPlayerIndex)) continue;
+      const p = hexToPixel(tile, HEX_SIZE);
+      const rx = p.x - origin.x;
+      const ry = p.y - origin.y;
+      const along = rx * dx + ry * dy;
+      if (sel && along <= 0) continue;
+      const score = -along + Math.abs(rx * dy - ry * dx) * 2;
+      if (!best || score < best.score) best = { tile, score };
+    }
+    if (!best) return;
+    this.keyTarget = null;
+    this.actions.cancelPlacement();
+    store.setContextMenu(null);
+    store.setSelection(cycleSelection(null, best.tile));
+    sfx.play('click');
+    if (best.tile.unit) this.mapView?.bounceUnit(best.tile.q, best.tile.r);
+    const camera2 = this.getCamera();
+    if (!camera2.isWorldPointVisible(hexToPixel(best.tile, HEX_SIZE), 0)) void this.centerOnTile(best.tile.q, best.tile.r);
+    this.render();
+  }
+
+  selectUnitInDirection(dx: number, dy: number): void {
+    if (!this.sim || !this.app) return;
+    const store = useGameStore.getState();
+    if (store.gameOver || store.paused || store.aiActive) return;
+    const camera = this.getCamera();
+    const sel = store.selection;
+    const origin = sel
+      ? hexToPixel(sel, HEX_SIZE)
+      : { x: (this.app.screen.width / 2 - camera.pan.x) / camera.scale, y: (this.mapHeight() / 2 - camera.pan.y) / camera.scale };
+    let best: { tile: MapTile; score: number } | null = null;
+    for (const tile of this.sim.map.tiles) {
+      const unit = tile.unit;
+      if (!unit || unit.owner !== store.localPlayerIndex || (sel && tile.q === sel.q && tile.r === sel.r)) continue;
+      const p = hexToPixel(tile, HEX_SIZE);
+      const rx = p.x - origin.x;
+      const ry = p.y - origin.y;
+      const along = rx * dx + ry * dy;
+      if (along <= 0) continue;
+      const across = Math.abs(rx * dy - ry * dx);
+      // Prefer units straight ahead: sideways offset counts double.
+      const score = along + across * 2;
+      if (!best || score < best.score) best = { tile, score };
+    }
+    if (!best) return;
+    this.actions.cancelPlacement();
+    store.setContextMenu(null);
+    store.setSelection({ kind: SelectionKind.UNIT, q: best.tile.q, r: best.tile.r });
+    sfx.play('click');
+    this.mapView?.bounceUnit(best.tile.q, best.tile.r);
+    const world = hexToPixel(best.tile, HEX_SIZE);
+    if (!camera.isWorldPointVisible(world, 0)) void this.centerOnTile(best.tile.q, best.tile.r);
+    this.render();
+  }
+
+  async handleMapClick(q: number, r: number): Promise<void> {
+    if (!this.sim || !this.app) return;
+    const store = useGameStore.getState();
+    if (store.gameOver) return;
+    if (store.paused) return;
+    const canAct = !store.aiActive;
+    const tile = tileAt(this.sim.map, q, r);
+    if (!tile) return;
+    // Placement modes (builder / trapper): a tap on a highlighted cell commits
+    // the build/trap; any other tap cancels the placement.
+    if (this.actions.pendingPlacement || this.actions.pendingTrap || this.actions.pendingExtinguish || this.actions.pendingLightning) {
+      if (this.actions.placementKeys.has(axialKey(tile))) {
+        if (this.actions.pendingPlacement) this.actions.buildAsBuilder(this.actions.pendingPlacement.kind, q, r);
+        else if (this.actions.pendingLightning) this.actions.lightningOn(q, r);
+        else if (this.actions.pendingExtinguish) this.actions.extinguishOn(q, r);
+        else this.actions.placeTrapOn(q, r);
+        store.setSelection(null);
+      } else {
+        this.actions.cancelPlacement();
+      }
+      this.render();
+      return;
+    }
+    if (!isExploredFor(tile, store.localPlayerIndex)) {
+      if (store.selection) {
+        store.setSelection(null);
+        this.render();
+      }
+      return;
+    }
+
+    const selection = store.selection;
+    if (selection && selection.kind === SelectionKind.UNIT && canAct) {
+      const unit = tileAt(this.sim.map, selection.q, selection.r)?.unit;
+      if (unit && unit.type === UnitType.STUNNER && this.attackableKeys.has(axialKey(tile))) {
+        const dist = hexDistance({ q: selection.q, r: selection.r }, tile);
+        if (dist === 2) {
+          // Range-2 targets are always stunned.
+          store.setSelection(null);
+          this.sendCommand({ type: CommandType.STUN, unitId: unit.id, q, r });
+          return;
+        }
+        store.setOverlay({ kind: OverlayKind.STUN_CHOICE, target: { q: tile.q, r: tile.r } });
+        return;
+      }
+      if (
+        unit &&
+        unit.owner === store.localPlayerIndex &&
+        this.attackableKeys.has(axialKey(tile)) &&
+        this.reachableKeys.has(axialKey(tile))
+      ) {
+        // The tile is both a siege/attack target and a reachable move
+        // destination (a catapult next to an enemy building/village): let the
+        // player pick move or attack instead of always attacking.
+        store.setOverlay({ kind: OverlayKind.MOVE_ATTACK, target: { q: tile.q, r: tile.r } });
+        return;
+      }
+      if (unit && unit.owner === store.localPlayerIndex && this.attackableKeys.has(axialKey(tile))) {
+        // Attack immediately, no confirmation dialog.
+        store.setSelection(null);
+        this.sendCommand({ type: CommandType.ATTACK, unitId: unit.id, q, r });
+        return;
+      }
+      if (unit && this.reachableKeys.has(axialKey(tile))) {
+        // A stealthed stalker arriving beside an enemy village will be spotted:
+        // ask before committing the move.
+        if (this.sim && isMoveStealthed(unit) && adjacentEnemyVillages(this.sim.map, tile, unit.owner).length > 0) {
+          store.setOverlay({ kind: OverlayKind.STALKER_REVEAL, target: { q: tile.q, r: tile.r } });
+          return;
+        }
+        if (unit.shipLevel !== undefined && tile.terrain !== TileType.Water) {
+          store.setOverlay({ kind: OverlayKind.SHIP_LANDING, target: { q: tile.q, r: tile.r } });
+          return;
+        }
+        // A unit that can claim the bonus under it is asked before it walks away.
+        const origin = tileAt(this.sim.map, selection.q, selection.r);
+        if (origin && bonusEligibleFor(this.sim.map, store.localPlayerIndex, store.turn).includes(origin)) {
+          store.setOverlay({ kind: OverlayKind.BONUS_LEAVE, target: { q: tile.q, r: tile.r } });
+          return;
+        }
+        this.sendCommand({ type: CommandType.MOVE, unitId: unit.id, q, r });
+        store.setSelection({ kind: SelectionKind.UNIT, q: tile.q, r: tile.r });
+        sfx.play('click');
+        return;
+      }
+    }
+
+    if (!canAct && selection && selection.kind === SelectionKind.UNIT && selection.q === q && selection.r === r) return;
+
+    const next = cycleSelection(selection, tile);
+    store.setSelection(next);
+    sfx.play('click');
+    if (next.kind === SelectionKind.UNIT) {
+      // Any selected unit lifts, enemies and pirates included.
+      if (tileAt(this.sim.map, next.q, next.r)?.unit) this.mapView?.bounceUnit(next.q, next.r);
+    }
+    this.render();
+  }
+
+  /** Begins a long-press (touch hold / click-and-hold) on the map. If the
+   *  pointer stays still for `DAMAGE_PREVIEW_HOLD_MS`, an expected-damage
+   *  preview shows against the enemy under the press — even when it is not a
+   *  reachable attack target. A quick tap is unaffected: the preview only fires
+   *  after the hold delay, and any tap that follows a fired hold is swallowed so
+   *  it does not also select/attack. */
+  private beginDamagePreviewHold(e: { global: { x: number; y: number } }): void {
+    this.cancelDamagePreviewHold();
+    if (!this.mapView || !this.sim) return;
+    const store = useGameStore.getState();
+    if (store.aiActive || store.gameOver || store.paused) return;
+    if (store.currentPlayerIndex !== store.localPlayerIndex) return;
+    if (!this.textures) return;
+    const local = this.mapView.container.toLocal(e.global);
+    this.damagePreviewPress = { x: local.x, y: local.y };
+    this.suppressNextTap = false;
+    const hold = new HoldTimer(DAMAGE_PREVIEW_HOLD_MS);
+    this.damagePreviewHold = hold;
+    hold.start(() => this.fireDamagePreview());
+    this.damagePreviewWindowUp = () => this.hideDamagePreview();
+    this.damagePreviewWindowCancel = () => this.hideDamagePreview();
+    window.addEventListener('pointerup', this.damagePreviewWindowUp);
+    window.addEventListener('pointercancel', this.damagePreviewWindowCancel);
+  }
+
+  private fireDamagePreview(): void {
+    if (!this.sim || !this.mapView) return;
+    if (this.camera?.isDragging) return;
+    const store = useGameStore.getState();
+    if (store.aiActive || store.gameOver || store.paused) return;
+    const press = this.damagePreviewPress;
+    if (!press) return;
+    const tile = pickTileAt(press.x, press.y, HEX_SIZE, this.sim.map.tiles);
+    const victim = damagePreviewVictim(this.sim.map, store.selection, store.localPlayerIndex, tile);
+    if (!victim || !victim.unit) {
+      if (tile) this.openContextMenu(tile);
+      return;
+    }
+    const selection = store.selection!;
+    const attacker = tileAt(this.sim.map, selection.q, selection.r)?.unit;
+    if (!attacker) return;
+    this.suppressNextTap = true;
+    this.damagePreviewShown = true;
+    this.mapView.showDamagePreview(attacker, victim, () => this.render());
+    this.render();
+  }
+
+  /** Long-press / right-click on a hex: selects it (when not yet selected) and
+   *  opens its context menu. The menu widget hides itself when empty. */
+  private openContextMenu(tile: MapTile): void {
+    const store = useGameStore.getState();
+    if (store.aiActive || store.gameOver || store.paused) return;
+    if (store.currentPlayerIndex !== store.localPlayerIndex) return;
+    if (!isExploredFor(tile, store.localPlayerIndex)) return;
+    this.suppressNextTap = true;
+    const sel = store.selection;
+    if (!sel || sel.q !== tile.q || sel.r !== tile.r) {
+      store.setSelection(cycleSelection(null, tile));
+      this.render();
+    }
+    store.setContextMenu({ q: tile.q, r: tile.r });
+  }
+
+  private cancelDamagePreviewHold(): void {
+    if (this.damagePreviewHold) {
+      this.damagePreviewHold.cancel();
+      this.damagePreviewHold = null;
+    }
+    this.damagePreviewPress = null;
+    if (this.damagePreviewWindowUp) {
+      window.removeEventListener('pointerup', this.damagePreviewWindowUp);
+      this.damagePreviewWindowUp = null;
+    }
+    if (this.damagePreviewWindowCancel) {
+      window.removeEventListener('pointercancel', this.damagePreviewWindowCancel);
+      this.damagePreviewWindowCancel = null;
+    }
+  }
+
+  private hideDamagePreview(): void {
+    this.cancelDamagePreviewHold();
+    if (!this.damagePreviewShown) return;
+    this.damagePreviewShown = false;
+    this.mapView?.hideDamagePreview();
+    this.render();
+  }
+
+  private unitActionsHost(): UnitActionsHost {
+    const controller = this;
+    return {
+      get sim() {
+        return controller.sim;
+      },
+      sendCommand: (cmd) => this.sendCommand(cmd),
+      render: () => this.render(),
+    };
+  }
+
+  private cheatHost(): CheatHost {
+    const controller = this;
+    return {
+      get sim() {
+        return controller.sim;
+      },
+      syncStore: () => this.syncStore(),
+      saveGame: () => this.saveGame(),
+      render: () => this.render(),
+      presentEvents: (events, pre) => this.presentEvents(events, pre),
+      exploredKeysFor: (i) => this.exploredKeysFor(i),
+      enqueue: (fn) => this.enqueue(fn),
+      revealMapForLocal: () => this.revealMapForLocal(),
+    };
+  }
+
+  /** Reveal the whole map and every tribe for the local player. */
+  private revealMapForLocal(): void {
+    if (!this.sim) return;
+    const store = useGameStore.getState();
+    const local = this.sim.players[store.localPlayerIndex];
+    if (!local) return;
+    for (const tile of this.sim.map.tiles) {
+      if (!(tile.exploredBy ?? []).includes(store.localPlayerIndex)) (tile.exploredBy ??= []).push(store.localPlayerIndex);
+    }
+    const tribes = this.sim.players.filter((p) => p.index !== local.index).map((p) => p.tribe);
+    local.knownTribes = Array.from(new Set([...(local.knownTribes ?? []), ...tribes]));
+    this.syncStore();
+    this.saveGame();
+    this.render();
+  }
+
+  endTurn(): void {
+    const store = useGameStore.getState();
+    if (store.aiActive || store.gameOver || store.paused) return;
+    store.setAiActive(true);
+    this.sendCommand({ type: CommandType.END_TURN });
+  }
+
+  watchGame(): void {
+    const store = useGameStore.getState();
+    if (store.overlay?.kind === OverlayKind.WATCHING_PROMPT) store.setOverlay(null);
+    // The revealed map must not unlock "Master Cartographer".
+    this.sim?.skipAchievement(store.localPlayerIndex, AchievementId.MASTER_CARTOGRAPHER);
+    this.revealMapForLocal();
+    store.setWatching(true);
+    void this.runWatchLoop();
+  }
+
+  finishGameNow(): void {
+    const store = useGameStore.getState();
+    if (store.overlay?.kind === OverlayKind.WATCHING_PROMPT) store.setOverlay(null);
+    if (!this.sim) return;
+    this.sim.endNow();
+    this.syncStore();
+  }
+
+  exitWatching(): void {
+    useGameStore.getState().setWatching(false);
+    confirmLeaveGame();
+  }
+
+  private async runWatchLoop(): Promise<void> {
+    if (this.watchingLoopRunning) return;
+    this.watchingLoopRunning = true;
+    try {
+      while (useGameStore.getState().watching && this.sim && !this.sim.gameOver) {
+        await this.runCommand({ type: CommandType.END_TURN });
+        await sleep(SPECTATE_ROUND_DELAY_MS);
+      }
+    } finally {
+      this.watchingLoopRunning = false;
+    }
+  }
+
+  hostGame(opts: {
+    mode: GameMode;
+    totalPlayers: number;
+    aiCount: number;
+    name: string;
+    tribe: Tribe;
+  }): string {
+    return this.getNetwork().hostGame(opts);
+  }
+
+  cancelLobby(): void {
+    this.getNetwork().cancelLobby();
+  }
+
+  pickHostTribe(tribe: Tribe): void {
+    this.getNetwork().pickHostTribe(tribe);
+  }
+
+  startHostGame(): Promise<void> {
+    return this.getNetwork().startHostGame();
+  }
+
+  handleClientClosed(peerId: string): void {
+    this.getNetwork().handleClientClosed(peerId);
+  }
+
+  /** Host: dismiss the disconnect modal but keep the game paused (wait). */
+  waitForDisconnected(): void {
+    this.getNetwork().waitForDisconnected();
+  }
+
+  /** Host: hand the offline player's seat to the AI and resume. */
+  giveDisconnectedToAI(): Promise<void> {
+    const index = this.getNetwork().offlinePlayerIndex();
+    if (index === null) {
+      useGameStore.getState().setPaused(null);
+      return Promise.resolve();
+    }
+    return this.getNetwork().giveDisconnectedToAI(index);
+  }
+
+  /** Host: forfeit the offline player and resume. */
+  forfeitDisconnected(): Promise<void> {
+    const index = this.getNetwork().offlinePlayerIndex();
+    if (index === null) {
+      useGameStore.getState().setPaused(null);
+      return Promise.resolve();
+    }
+    return this.getNetwork().forfeitDisconnected(index);
+  }
+
+  joinGame(code: string, name: string, relayUrl?: string): void {
+    this.getNetwork().joinGame(code, name, relayUrl);
+  }
+
+  /** Rejoins the last active multiplayer client match (if still fresh). */
+  rejoinGame(): void {
+    const match = activeMatchStore.loadFresh();
+    if (match) this.getNetwork().joinGame(match.code, match.name, match.relayUrl);
+  }
+
+  pickClientTribe(tribe: Tribe): void {
+    this.getNetwork().pickClientTribe(tribe);
+  }
+
+  readyUp(): void {
+    this.getNetwork().readyUp();
+  }
+
+  claimBonus(): void {
+    const store = useGameStore.getState();
+    if (store.aiActive || store.gameOver) return;
+    this.sendCommand({ type: CommandType.CLAIM_BONUS });
+  }
+
+  getBottle(): void {
+    const store = useGameStore.getState();
+    if (store.aiActive || store.gameOver) return;
+    this.sendCommand({ type: CommandType.GET_BOTTLE });
+  }
+
+  private sendCommand(cmd: Command): void {
+    const store = useGameStore.getState();
+    if (store.netMode === NetMode.CLIENT) {
+      const network = this.getNetwork();
+      if (!this.tryOptimisticClientCommand(cmd)) network.sendClientCommand(cmd);
+    } else {
+      void this.runCommand(cmd);
+    }
+  }
+
+  /** Deterministic commands are predicted locally: the command is applied to a
+   *  clone of the mirror and its events are presented immediately, so the map
+   *  updates without waiting for the host round-trip. The authoritative reply is
+   *  reconciled silently (see NetworkController.onHostMessage). Returns true when
+   *  an optimistic prediction was made. */
+  private tryOptimisticClientCommand(cmd: Command): boolean {
+    const store = useGameStore.getState();
+    if (!this.sim || this.sim.gameOver) return false;
+    if (store.aiActive) return false;
+    if (!this.app || !this.textures) return false;
+    if (store.localPlayerIndex !== this.sim.currentPlayerIndex) return false;
+    if (!Simulator.isPredictable(cmd)) return false;
+    const preExplored = this.exploredKeysFor(store.localPlayerIndex);
+    const predicted = Simulator.fromSnapshot(this.sim.snapshot());
+    if (!predicted.applyCommand(cmd)) return false;
+    const predictedEvents = predicted.drainEvents();
+    const network = this.getNetwork();
+    this.sim = predicted;
+    this.syncStore();
+    network.sendClientCommand(cmd);
+    network.noteClientPrediction();
+    void this.enqueue(async () => {
+      if (useGameStore.getState().netMode !== NetMode.CLIENT) return;
+      await this.presentEvents(predictedEvents, preExplored);
+      this.render();
+    });
+    return true;
+  }
+
+  /** Feeds a host message to the network controller (also the seam tests use). */
+  onHostMessage(msg: HostMessage): void {
+    this.getNetwork().onHostMessage(msg);
+  }
+
+  private render(): void {
+    if (!this.app || !this.sim || !this.textures) return;
+    markDirty();
+    if (this.turnSliced) return;
+    const store = useGameStore.getState();
+
+    if (!this.mapView) {
+      const camera = this.getCamera();
+      this.mapView = new MapView(this.app, this.textures, HEX_SIZE, 1 / camera.qualityFactor);
+      this.mapView.container.eventMode = 'static';
+      this.mapView.container.on('wheel', (e) => {
+        if (!this.mapView) return;
+        camera.handleWheel(e.deltaY, { x: e.global.x, y: e.global.y });
+      });
+      this.mapView.container.on('pointermove', (e) => {
+        camera.handlePointerMove(e.pointerId, { x: e.global.x, y: e.global.y });
+        if (camera.isDragging) {
+          this.hideDamagePreview();
+          useGameStore.getState().setContextMenu(null);
+        }
+      });
+      this.mapView.container.on('pointerdown', (e) => {
+        if (e.button === 2) {
+          const local = this.mapView!.container.toLocal(e.global);
+          const tile = pickTileAt(local.x, local.y, HEX_SIZE, this.sim!.map.tiles);
+          if (tile) this.openContextMenu(tile);
+          return;
+        }
+        useGameStore.getState().setContextMenu(null);
+        camera.handlePointerDown(e.pointerId, { x: e.global.x, y: e.global.y });
+        this.beginDamagePreviewHold(e);
+      });
+      this.mapView.container.on('pointertap', (e) => {
+        if (!this.mapView || camera.isDragging) return;
+        // A hold that fired the damage preview swallows the tap that follows
+        // its release, so releasing the hold does not also select/attack.
+        if (this.suppressNextTap) {
+          this.suppressNextTap = false;
+          return;
+        }
+        const local = this.mapView.container.toLocal(e.global);
+        const tile = pickTileAt(local.x, local.y, HEX_SIZE, this.sim!.map.tiles);
+        if (tile) {
+          this.handleMapClick(tile.q, tile.r);
+        }
+      });
+      this.mapRoot!.addChild(this.mapView.container);
+      this.mapRoot!.addChild(this.mapView.markerLayer);
+      this.mapRoot!.addChild(this.mapView.overlay);
+      this.mapRoot!.addChild(this.mapView.badgeLayer);
+      if (this.edgeLayerTarget) this.mapView.attachEdgeLayerTo(this.edgeLayerTarget);
+    }
+
+    this.reachableKeys = new Set<string>();
+    this.attackableKeys = new Set<string>();
+    this.actions.placementKeys = new Set<string>();
+    if (this.actions.pendingPlacement && store.selection) {
+      const tile = tileAt(this.sim.map, store.selection.q, store.selection.r);
+      const unit = tile?.unit;
+      if (unit && unit.owner === store.localPlayerIndex) {
+        const p = store.players[store.localPlayerIndex]!;
+        this.actions.placementKeys = new Set(builderBuildable(this.sim.map, tile!, this.actions.pendingPlacement.kind, p).map((t) => axialKey(t)));
+      }
+    } else if (this.actions.pendingLightning && store.selection) {
+      const caller = tileAt(this.sim.map, store.selection.q, store.selection.r)?.unit;
+      if (caller && caller.owner === store.localPlayerIndex) {
+        this.actions.placementKeys = new Set(lightningVillages(this.sim.map, store.localPlayerIndex, caller).map((t) => axialKey(t)));
+      }
+    } else if (this.actions.pendingExtinguish && store.selection) {
+      const unit = tileAt(this.sim.map, store.selection.q, store.selection.r)?.unit;
+      if (unit && unit.owner === store.localPlayerIndex) {
+        this.actions.placementKeys = new Set(extinguishCells(this.sim.map, unit).map((t) => axialKey(t)));
+      }
+    } else if (this.actions.pendingTrap && store.selection) {
+      const tile = tileAt(this.sim.map, store.selection.q, store.selection.r);
+      const unit = tile?.unit;
+      if (unit && unit.owner === store.localPlayerIndex) {
+        this.actions.placementKeys = new Set(trapCells(this.sim.map, tile!).map((t) => axialKey(t)));
+      }
+    }
+    const isLocalTurn = store.currentPlayerIndex === store.localPlayerIndex && !store.aiActive;
+    const selection = store.selection;
+    if (isLocalTurn && selection && selection.kind === SelectionKind.UNIT) {
+      const tile = tileAt(this.sim.map, selection.q, selection.r);
+      const unit = tile?.unit;
+      if (unit && unit.owner === store.localPlayerIndex && canMove(unit)) {
+        const canClimb = hasSkill(store.players[unit.owner]!, SkillId.CLIMBING);
+        const canDock = hasSkill(store.players[unit.owner]!, SkillId.NAVIGATION);
+        this.reachableKeys = new Set(reachableTargets(this.sim.map, unit, movePoints(unit), canClimb, canDock, store.localPlayerIndex).map((t) => axialKey(t)));
+      }
+      if (unit && unit.owner === store.localPlayerIndex && canAttack(unit)) {
+        this.attackableKeys = new Set(attackableTargets(this.sim.map, unit, store.localPlayerIndex, true).map((t) => axialKey(t)));
+      }
+    }
+
+    let pickedKey: string | undefined;
+    if (this.keyTarget) {
+      const key = axialKey(this.keyTarget);
+      if (this.placementPending) {
+        // All placement cells stay marked; the cursor cell is drawn brighter.
+        if (this.actions.placementKeys.has(key)) pickedKey = key;
+        else this.keyTarget = null;
+      } else {
+        const own = selection && selection.q === this.keyTarget.q && selection.r === this.keyTarget.r;
+        if (own || this.reachableKeys.has(key) || this.attackableKeys.has(key)) this.actions.placementKeys = new Set([key]);
+        else this.keyTarget = null;
+      }
+    }
+
+    this.mapView.update(
+      this.sim.map,
+      store.players,
+      selection,
+      this.reachableKeys,
+      this.attackableKeys,
+      store.localPlayerIndex,
+      this.hiddenUnitIds,
+      {
+        x: this.camera!.pan.x,
+        y: this.camera!.pan.y,
+        scale: this.camera!.scale,
+        width: this.app.screen.width,
+        height: this.mapHeight(),
+        labelsHidden: this.labelsHidden(),
+      },
+      this.tutorialMarkerKeys(),
+      isLocalTurn,
+      this.actions.placementKeys.size > 0 ? this.actions.placementKeys : undefined,
+      pickedKey,
+    );
+    this.overlayItems = this.mapView.overlayItems;
+    this.detailHidden = this.labelsHidden();
+    this.applyTransform();
+  }
+}
+
+export const gameController = new GameController();

@@ -1,0 +1,262 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { useGameStore, initNavigation, confirmLeaveGame } from '../src/store/game-store';
+import { OverlayKind, PauseReason, Screen, SelectionKind } from '@enums';
+
+describe('gameStore', () => {
+  beforeEach(() => {
+    useGameStore.setState({
+      screen: Screen.START,
+      players: [],
+      turn: 1,
+      currentPlayerIndex: 0,
+      aiActive: false,
+      selection: null,
+      overlay: null,
+    });
+  });
+
+  it('starts on the start screen', () => {
+    const s = useGameStore.getState();
+    expect(s.screen).toBe(Screen.START);
+  });
+
+  it('setScreen updates the screen', () => {
+    useGameStore.getState().setScreen(Screen.SETUP);
+    expect(useGameStore.getState().screen).toBe(Screen.SETUP);
+  });
+
+  it('setOverlay opens and closes a simple overlay', () => {
+    useGameStore.getState().setOverlay({ kind: OverlayKind.STATS });
+    expect(useGameStore.getState().overlay).toEqual({ kind: OverlayKind.STATS });
+    useGameStore.getState().setOverlay(null);
+    expect(useGameStore.getState().overlay).toBeNull();
+  });
+
+  it('setOverlay carries the target for the shipLanding overlay', () => {
+    useGameStore.getState().setOverlay({ kind: OverlayKind.SHIP_LANDING, target: { q: 1, r: 2 } });
+    expect(useGameStore.getState().overlay).toEqual({ kind: OverlayKind.SHIP_LANDING, target: { q: 1, r: 2 } });
+    useGameStore.getState().setOverlay(null);
+    expect(useGameStore.getState().overlay).toBeNull();
+  });
+
+  it('opening one overlay replaces another', () => {
+    useGameStore.getState().setOverlay({ kind: OverlayKind.SPAWN });
+    useGameStore.getState().setOverlay({ kind: OverlayKind.SKILL });
+    expect(useGameStore.getState().overlay).toEqual({ kind: OverlayKind.SKILL });
+  });
+
+  it('setSelection and setAiActive update state', () => {
+    const store = useGameStore;
+    store.getState().setAiActive(true);
+    store.getState().setSelection({ kind: SelectionKind.TILE, q: 1, r: 2 });
+    expect(store.getState().aiActive).toBe(true);
+    expect(store.getState().selection).toEqual({ kind: SelectionKind.TILE, q: 1, r: 2 });
+  });
+
+  it('setLocalPlayerIndex updates localPlayerIndex', () => {
+    useGameStore.getState().setLocalPlayerIndex(2);
+    expect(useGameStore.getState().localPlayerIndex).toBe(2);
+  });
+
+  it('toggles the watching flag', () => {
+    const s = useGameStore.getState();
+    expect(s.watching).toBe(false);
+    s.setWatching(true);
+    expect(useGameStore.getState().watching).toBe(true);
+    useGameStore.getState().setWatching(false);
+    expect(useGameStore.getState().watching).toBe(false);
+  });
+
+  it('setMyPeerId updates myPeerId', () => {
+    useGameStore.getState().setMyPeerId('guest-abc');
+    expect(useGameStore.getState().myPeerId).toBe('guest-abc');
+  });
+
+  it('setPlayersOnline updates playersOnline', () => {
+    useGameStore.getState().setPlayersOnline([true, false, true]);
+    expect(useGameStore.getState().playersOnline).toEqual([true, false, true]);
+  });
+
+  it('setPaused stores the disconnect pause and its label', () => {
+    useGameStore.getState().setPaused(PauseReason.DISCONNECT, 'Guest');
+    expect(useGameStore.getState().paused).toBe(PauseReason.DISCONNECT);
+    expect(useGameStore.getState().pausedName).toBe('Guest');
+    useGameStore.getState().setPaused(null);
+    expect(useGameStore.getState().paused).toBeNull();
+    expect(useGameStore.getState().pausedName).toBe('');
+  });
+
+  it('setTexturesLoading updates texturesLoading', () => {
+    useGameStore.getState().setTexturesLoading(true);
+    expect(useGameStore.getState().texturesLoading).toBe(true);
+    useGameStore.getState().setTexturesLoading(false);
+    expect(useGameStore.getState().texturesLoading).toBe(false);
+  });
+
+  it('queues center messages so none are lost, showing them one at a time', () => {
+    const store = () => useGameStore.getState();
+    store().setCenterMessage('first');
+    expect(store().centerMessage).toBe('first');
+    store().setCenterMessage('second');
+    expect(store().centerMessage).toBe('first');
+    expect(store().centerMessageQueue).toEqual(['second']);
+    store().setCenterMessage('third');
+    expect(store().centerMessageQueue).toEqual(['second', 'third']);
+    // Dismissing advances to the next queued message.
+    store().setCenterMessage(null);
+    expect(store().centerMessage).toBe('second');
+    expect(store().centerMessageQueue).toEqual(['third']);
+    store().setCenterMessage(null);
+    expect(store().centerMessage).toBe('third');
+    store().setCenterMessage(null);
+    expect(store().centerMessage).toBeNull();
+    expect(store().centerMessageQueue).toEqual([]);
+  });
+
+  it('drops a queued duplicate and re-queues the message at the back', () => {
+    const store = () => useGameStore.getState();
+    store().setCenterMessage('shown');
+    store().setCenterMessage('Your turn', 'a.png');
+    store().setCenterMessage('other', 'b.png');
+    store().setCenterMessage('Your turn', 'c.png');
+    expect(store().centerMessageQueue).toEqual(['other', 'Your turn']);
+    expect(store().centerIconQueue).toEqual(['b.png', 'c.png']);
+    useGameStore.setState({ centerMessage: null, centerMessageQueue: [], centerIconFile: null, centerIconQueue: [], centerChipStyle: null, centerChipQueue: [], centerMeetQueue: [] });
+  });
+
+  it('collapses queued "you meet" messages into one', () => {
+    const store = () => useGameStore.getState();
+    const format = (names: string[]) => `You meet ${names.join(', ')}`;
+    store().setCenterMessage('busy');
+    store().queueMetTribes(['Cats'], 'cats-icon.png', format);
+    store().setCenterMessage('between');
+    store().queueMetTribes(['Aqua', 'Cats'], 'aqua-icon.png', format);
+    expect(store().centerMessageQueue).toEqual(['You meet Cats, Aqua', 'between']);
+    expect(store().centerIconQueue[0]).toBe('cats-icon.png');
+    store().setCenterMessage(null);
+    expect(store().centerMessage).toBe('You meet Cats, Aqua');
+    useGameStore.setState({ centerMessage: null, centerMessageQueue: [], centerIconFile: null, centerIconQueue: [], centerChipStyle: null, centerChipQueue: [], centerMeetQueue: [] });
+  });
+
+  it('shows met tribes at once when nothing is on screen', () => {
+    const store = () => useGameStore.getState();
+    store().queueMetTribes(['Cats', 'Aqua'], 'cats-icon.png', (names) => `You meet ${names.join(', ')}`);
+    expect(store().centerMessage).toBe('You meet Cats, Aqua');
+    expect(store().centerIconFile).toBe('cats-icon.png');
+    useGameStore.setState({ centerMessage: null, centerMessageQueue: [], centerIconFile: null, centerIconQueue: [], centerChipStyle: null, centerChipQueue: [], centerMeetQueue: [] });
+  });
+
+  it('keeps the center icon file in sync with the queued center messages', () => {
+    const store = () => useGameStore.getState();
+    store().setCenterMessage('You meet Cats!', 'cats-icon.png');
+    expect(store().centerMessage).toBe('You meet Cats!');
+    expect(store().centerIconFile).toBe('cats-icon.png');
+    store().setCenterMessage('second');
+    expect(store().centerIconFile).toBe('cats-icon.png');
+    expect(store().centerMessageQueue).toEqual(['second']);
+    store().setCenterMessage(null);
+    expect(store().centerMessage).toBe('second');
+    expect(store().centerIconFile).toBeNull();
+    store().setCenterMessage(null);
+    expect(store().centerMessage).toBeNull();
+  });
+
+  it('keeps the center chip style in sync with the queued center messages', () => {
+    const style = { size: 64, bgColor: 0x373748 };
+    const store = () => useGameStore.getState();
+    store().setCenterMessage('Achievement unlocked!', 'achivements/x.png', style);
+    expect(store().centerChipStyle).toEqual(style);
+    store().setCenterMessage('second', null, null);
+    expect(store().centerMessageQueue).toEqual(['second']);
+    store().setCenterMessage(null);
+    expect(store().centerMessage).toBe('second');
+    expect(store().centerChipStyle).toBeNull();
+    store().setCenterMessage(null);
+    expect(store().centerChipStyle).toBeNull();
+    expect(store().centerChipQueue).toEqual([]);
+  });
+
+  it('clears pending center messages when leaving the game screen', () => {
+    useGameStore.setState({ screen: Screen.GAME });
+    const store = () => useGameStore.getState();
+    store().setCenterMessage('a');
+    store().setCenterMessage('b');
+    expect(store().centerMessageQueue).toEqual(['b']);
+    store().setScreen(Screen.START);
+    expect(store().centerMessage).toBeNull();
+    expect(store().centerMessageQueue).toEqual([]);
+  });
+});
+
+describe('browser back from the game screen', () => {
+  function installFakeWindow(): { back: () => void } {
+    const stack: { screen: string }[] = [{ screen: 'start' }];
+    const listeners: Array<{ t: string; cb: (e: { state?: { screen?: string } }) => void }> = [];
+    (globalThis as { window?: unknown }).window = {
+      history: {
+        pushState: (s: { screen: string }, _u: string) => stack.push(s),
+        replaceState: (s: { screen: string }, _u: string) => {
+          stack[stack.length - 1] = s;
+        },
+      },
+      addEventListener: (t: string, cb: (e: unknown) => void) => {
+        listeners.push({ t, cb: cb as (e: { state?: { screen?: string } }) => void });
+      },
+      removeEventListener: () => {},
+    };
+    const back = (): void => {
+      if (stack.length <= 1) return;
+      stack.pop();
+      const event = { state: stack[stack.length - 1]! };
+      for (const l of listeners) {
+        if (l.t === 'popstate') l.cb(event);
+      }
+    };
+    return { back };
+  }
+
+  beforeEach(() => {
+    useGameStore.setState({
+      screen: Screen.START,
+      gameOver: false,
+      overlay: null,
+    });
+  });
+
+  it('entering the game replaces the launcher history entry, so Back leads to main', () => {
+    const { back } = installFakeWindow();
+    initNavigation();
+    const s = useGameStore.getState();
+    s.setScreen(Screen.SETUP);
+    s.setScreen(Screen.GAME);
+    s.setGameOver(true);
+    back();
+    expect(useGameStore.getState().screen).toBe(Screen.START);
+  });
+
+  it('still asks before leaving a live game, and Leave goes to main', () => {
+    const { back } = installFakeWindow();
+    initNavigation();
+    const s = useGameStore.getState();
+    s.setScreen(Screen.SETUP);
+    s.setScreen(Screen.GAME);
+    back();
+    expect(useGameStore.getState().overlay).toEqual({ kind: OverlayKind.LEAVE });
+    confirmLeaveGame();
+    expect(useGameStore.getState().screen).toBe(Screen.START);
+  });
+
+  it('Back closes an open skill tree instead of asking to leave, and a second Back asks', () => {
+    const { back } = installFakeWindow();
+    initNavigation();
+    const s = useGameStore.getState();
+    s.setScreen(Screen.SETUP);
+    s.setScreen(Screen.GAME);
+    s.setOverlay({ kind: OverlayKind.SKILL });
+    back();
+    expect(useGameStore.getState().screen).toBe(Screen.GAME);
+    expect(useGameStore.getState().overlay).toBeNull();
+    back();
+    expect(useGameStore.getState().overlay).toEqual({ kind: OverlayKind.LEAVE });
+  });
+});

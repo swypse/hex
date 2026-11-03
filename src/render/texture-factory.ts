@@ -1,0 +1,765 @@
+import {
+  Application, BlurFilter, ColorMatrixFilter, Container, FillGradient, Graphics, Rectangle, Sprite, Texture
+} from 'pixi.js';
+import { axialKey, HEX_TILT, hexNeighbors } from '../game/map/hex';
+import { type GameMap, type MapTile } from '../game/map/map-gen';
+import { isSolidGround, isWaterType, TileType, TILE_TYPE_COLORS } from '../game/map/tile-types';
+import { TRIBES, Tribe } from '../game/tribes';
+import { UNIT_IMAGE_FILES, UNIT_TYPES } from '../game/units/units';
+import { shadeColor } from '../util/color';
+import { tileElevation } from './elevation';
+import { ensureCanvasResource } from '../gfx/image-texture';
+import { countIceTiles, willFreeze } from '../game/map/ice';
+import { ensureTerrainAtlas, terrainFrameTexture, terrainTileTexture, TERRAIN_TILE_FILES, TERRAIN_FOG_FILE, TERRAIN_CRACKED_ICE_FILE, TERRAIN_WATER_ICE_FILE } from './terrain-atlas';
+import { buildingTileTexture, ensureBuildingsAtlas } from './buildings-atlas';
+import { ensureTribeAtlas, tribeTileTexture } from './tribe-atlas';
+import { ensureActionButtonAtlas, actionButtonFrameTexture } from '../gfx/action-button-icons';
+import { ensureIcons32Atlas, icons32FrameTexture } from '../gfx/icons32';
+import { VillageBuildTextureService } from './village-build-texture';
+import { SLICE_BUDGET_MS, yieldToMain } from '../util/time-slice';
+import { BridgeDir, IcePhase, PortDirection, Season, TileAnchor, TileLayer, UnitType, WeatherType } from '@enums';
+import { tileMapByKey } from '../game/map/tile-index';
+
+const TEXTURE_BASE = `${import.meta.env.BASE_URL}textures/`;
+
+/** Pseudo-height of the visible sides of the map's bottom-edge water cells
+ *  (fraction of hexSize, two land steps). Visual only: elevation stays 0. */
+const WATER_EDGE_SIDE = 16 / 40;
+
+const FOG_LEFT_WALL = 0xd5bbdc;
+const FOG_RIGHT_WALL = 0xc2a4ca;
+
+/** Baked left/right vertical wall colours for each terrain group. */
+const TERRAIN_SIDE_COLORS: Partial<Record<TileType, { left: number; right: number }>> = {
+  [TileType.GrasslandLand]: { left: 0x7a952f, right: 0x4e640e },
+  [TileType.GrasslandForest]: { left: 0x7a952f, right: 0x4e640e },
+  [TileType.GrasslandMountain]: { left: 0x7a952f, right: 0x4e640e },
+  [TileType.DesertLand]: { left: 0xb2a027, right: 0x978612 },
+  [TileType.DesertForest]: { left: 0xb2a027, right: 0x978612 },
+  [TileType.DesertMountain]: { left: 0xb2a027, right: 0x978612 },
+  [TileType.TundraLand]: { left: 0x93508a, right: 0x671d76 },
+  [TileType.TundraForest]: { left: 0x93508a, right: 0x671d76 },
+  [TileType.TundraMountain]: { left: 0x93508a, right: 0x671d76 },
+  [TileType.TaigaLand]: { left: 0x1d7777, right: 0x374e4e },
+  [TileType.TaigaForest]: { left: 0x1d7777, right: 0x374e4e },
+  [TileType.TaigaMountain]: { left: 0x1d7777, right: 0x374e4e },
+  [TileType.RainforestLand]: { left: 0x859f1f, right: 0x1f3c08 },
+  [TileType.RainforestForest]: { left: 0x859f1f, right: 0x1f3c08 },
+  [TileType.RainforestMountain]: { left: 0x859f1f, right: 0x1f3c08 },
+  [TileType.Water]: { left: 0x1f63a1, right: 0x174167 },
+  [TileType.Ice]: { left: 0x8fb8d0, right: 0x6f93ad },
+};
+
+const BRIDGE_TILE_FILES: Record<BridgeDir, string> = {
+  nw: 'bridge-nw',
+  ne: 'bridge-ne',
+  we: 'bridge-we',
+};
+
+const PORT_TILE_FILES: Record<PortDirection, string> = {
+  nw: 'port-nw',
+  ne: 'port-ne',
+  sw: 'port-sw',
+  se: 'port-se',
+  e: 'port-e',
+  w: 'port-w',
+};
+
+const TEMPLE_TILE_FILES: Record<1 | 2 | 3 | 4, string> = {
+  1: 'water-temple-1',
+  2: 'water-temple-2',
+  3: 'water-temple-3',
+  4: 'water-temple-4',
+};
+
+const FOREST_TEMPLE_TILE_FILES: Record<1 | 2 | 3 | 4, string> = {
+  1: 'forest-temple-1',
+  2: 'forest-temple-2',
+  3: 'forest-temple-3',
+  4: 'forest-temple-4',
+};
+
+/** Granary tile art by adjacent farm count (1..6); 0 farms reuses the 1-farm art. */
+const GRANARY_MAX_FARMS = 6;
+const granaryTileFile = (farms: number): string => (farms <= 1 ? 'granary' : `granary-${farms}`);
+
+/** Terrain art frames are 256x448 with the hex face 254 wide and centred 316 px from the top. */
+export const IMAGE_HEX_W = 254;
+export const IMAGE_H = 448;
+export const IMAGE_HEX_CENTER_Y = 316;
+
+export interface TileTexture {
+  texture: Texture;
+  anchorY: number;
+}
+
+/** Terrain part of a TextureSet: what changes with the season, ice and burned forests. */
+export type TerrainTextures = Pick<TextureSet, 'season' | 'iceTiles' | 'icePhase' | 'ownedTextures' | 'tileTextures' | 'fogTextures'>;
+
+export interface TextureSet {
+  /** Season the terrain tile textures were baked for (spring when absent). */
+  season?: Season;
+  /** Number of ice tiles on the map when baked (0 when absent). */
+  iceTiles?: number;
+  /** Ice state the terrain was baked for (none when absent). */
+  icePhase?: IcePhase;
+  /** Render textures baked for this set; freed by destroyTextureSet. */
+  ownedTextures?: Texture[];
+  tileTextures: Map<string, TileTexture>;
+  fogTextures: Map<string, TileTexture>;
+  fogTopTexture: TileTexture;
+  freeVillageTexture: TileTexture;
+  /** Lazily baked composite village textures, one service per composited
+   *  tribe (currently villagers + warriors). */
+  villageBuilds?: Partial<Record<Tribe, VillageBuildTextureService>>;
+  bonusTexture: TileTexture;
+  bottleTexture: TileTexture;
+  unitTextures: Record<Tribe, Record<UnitType, TileTexture>>;
+  pirateTexture: TileTexture;
+  sawmillTexture: TileTexture;
+  mineTexture: TileTexture;
+  /** Missing in hand-built texture sets: the renderer falls back to the mine texture. */
+  universityTexture?: TileTexture;
+  farmTexture: TileTexture;
+  /** Black-and-white farm, shown while the farm yields nothing (winter). Baked so no per-frame filter pass is needed. */
+  farmIdleTexture: TileTexture;
+  /** Weather overlay art (storm / drought), raw terrain-atlas frames drawn over a tile. Shared, not owned by the set. */
+  weatherOverlays?: Partial<Record<WeatherType.STORM | WeatherType.DROUGHT, Texture>>;
+  /** Burnt-ground art drawn over the terrain of tiles where fire destroyed a building or forest. Shared, not owned by the set. */
+  fireTrailTexture?: Texture;
+  /** Indexed by adjacent farm count, 1..GRANARY_MAX_FARMS (index 0 unused). */
+  granaryTextures: TileTexture[];
+  bridgeTextures: Record<BridgeDir, TileTexture>;
+  portTextures: Record<PortDirection, TileTexture>;
+  freePortTexture: Texture;
+  templeTextures: Record<1 | 2 | 3 | 4, TileTexture>;
+  forestTempleTextures: Record<1 | 2 | 3 | 4, TileTexture>;
+  shipTextures: Record<Tribe, Record<1 | 2 | 3, TileTexture>>;
+  /** White silhouette-following glow, keyed by the unit texture it decorates.
+   *  Used as a steady selection highlight behind the selected unit's sprite. */
+  glowFor: Map<Texture, TileTexture>;
+  villageConnectedTexture: Texture | null;
+  captureTexture: Texture | null;
+  wallTexture: TileTexture | null;
+  /** Thorn-trap tile (trap.png) from the buildings atlas. Optional: null until
+   *  the tile is packed into the atlas, and the map then falls back to a plain
+   *  red circle marker. */
+  trapTexture?: TileTexture | null;
+  /** arrow.png projectile texture used by the archer attack animation */
+  arrowTexture: Texture | null;
+  /** cannonball.png projectile texture used by ship attacks */
+  cannonballTexture: Texture | null;
+  /** attack-32 icon sliced from the icons-32 atlas (aura/rage hp-bar chip). */
+  attackIconTexture: Texture | null;
+  /** cannonbal-32 icon sliced from the icons-32 atlas (stun projectile). */
+  cannonbalTexture: Texture | null;
+}
+
+function hexagonPoints(size: number): number[] {
+  const points: number[] = [];
+  for (let i = 0; i < 6; i++) {
+    const angle = (Math.PI / 3) * i - Math.PI / 6;
+    points.push(size * Math.cos(angle), size * Math.sin(angle) * HEX_TILT);
+  }
+  return points;
+}
+
+/** Brightness factor for coast-adjacent water tiles (subtle shallow tint). */
+const COAST_WATER_BRIGHTNESS = 1.5;
+
+/** Brightness factor for a tile's baked texture: coast water is lighter, every
+ *  other tile keeps its natural colour (factor 1). `findNeighbor` resolves an
+ *  axial coordinate to its tile, or `undefined` for off-map coords. */
+export function coastWaterBrightness(
+  tile: { terrain: TileType; q: number; r: number },
+  findNeighbor: (q: number, r: number) => { terrain: TileType } | undefined,
+): number {
+  if (!isWaterType(tile.terrain)) return 1;
+  for (const n of hexNeighbors(tile)) {
+    const nbr = findNeighbor(n.q, n.r);
+    if (nbr && isSolidGround(nbr.terrain)) return COAST_WATER_BRIGHTNESS;
+  }
+  return 1;
+}
+
+function composeHexTexture(
+  app: Application,
+  hexSize: number,
+  height: number,
+  image: Texture | null,
+  fill: number,
+  opts: {
+    walls: boolean;
+    anchor: TileAnchor;
+    sideColors?: { left: number; right: number };
+    brightness?: number;
+    /** Walls hang below the top face, which stays at the sprite position (no elevation). */
+    sunken?: boolean;
+  },
+): TileTexture {
+  const container = new Container();
+  const g = new Graphics();
+  if (opts.walls && height > 0) {
+    const face = hexagonPoints(hexSize);
+    const maxH = height;
+    const left = opts.sideColors?.left ?? shadeColor(fill, 0.7);
+    const right = opts.sideColors?.right ?? shadeColor(fill, 0.45);
+    g.poly([
+      face[8]!, face[9]!,
+      face[10]!, face[11]!,
+      face[4]!, face[5]! + maxH,
+      face[6]!, face[7]! + maxH,
+    ]).fill(left);
+    g.poly([
+      face[10]!, face[11]!,
+      face[0]!, face[1]!,
+      face[2]!, face[3]! + maxH,
+      face[4]!, face[5]! + maxH,
+    ]).fill(right);
+  }
+  if (image) {
+    g.poly(hexagonPoints(hexSize)).fill(fill);
+  } else {
+    const gradient = new FillGradient({
+      type: 'linear',
+      start: { x: 0, y: -hexSize * HEX_TILT },
+      end: { x: 0, y: hexSize * HEX_TILT },
+      colorStops: [
+        { offset: 0, color: shadeColor(fill, 1.35) },
+        { offset: 1, color: fill },
+      ],
+      textureSpace: 'global',
+    });
+    g.poly(hexagonPoints(hexSize)).fill(gradient);
+  }
+  container.addChild(g);
+  if (image) {
+    const sprite = new Sprite(image);
+    sprite.anchor.set(0.5, IMAGE_HEX_CENTER_Y / IMAGE_H);
+    sprite.scale.set((Math.sqrt(3) * hexSize) / IMAGE_HEX_W);
+    sprite.position.set(0, 0);
+    container.addChild(sprite);
+  }
+  if (opts.brightness && opts.brightness !== 1) {
+    const filter = new ColorMatrixFilter();
+    filter.brightness(opts.brightness, false);
+    container.filters = [filter];
+  }
+  // Generate at resolution 1: the renderer resolution is the devicePixelRatio,
+  // and qualityFactor already bakes the zoom/dpr supersampling into hexSize.
+  // Rendering at the device resolution here multiplies texture memory by dpr^2
+  // (e.g. 9x on a dpr-3 phone) and blocks the main thread on every
+  // generateTexture + mipmap pass, which hangs low-memory mobile GPUs.
+  const texture = app.renderer.generateTexture({ target: container, resolution: 1 });
+  container.destroy({ children: true });
+
+  const imageScale = (Math.sqrt(3) * hexSize) / IMAGE_HEX_W;
+  const imageTop = IMAGE_HEX_CENTER_Y * imageScale;
+  const imageBottom = (IMAGE_H - IMAGE_HEX_CENTER_Y) * imageScale;
+  const wallBase = opts.walls
+    ? Math.max(hexSize * HEX_TILT + height, imageBottom)
+    : Math.max(hexSize * HEX_TILT, imageBottom);
+  const textureHeight = imageTop + wallBase;
+  const anchor =
+    opts.anchor === TileAnchor.BASE && !opts.sunken ? (imageTop + height) / textureHeight : imageTop / textureHeight;
+  return { texture, anchorY: anchor };
+}
+
+function loadImageTexture(url: string): Promise<Texture | null> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const tex = Texture.from(img);
+        ensureCanvasResource(tex);
+        resolve(tex);
+      } catch {
+        console.error('[loadImageTexture] Texture.from failed for', url);
+        resolve(null);
+      }
+    };
+    img.onerror = () => {
+      console.error('[loadImageTexture] onerror for', url);
+      resolve(null);
+    };
+    img.src = url;
+  });
+}
+
+/** Key of the freezing-water texture in the loaded tile images (not a tile type). */
+const WATER_ICE_KEY = 'water-ice';
+
+async function loadTileImages(season: Season, icePhase: IcePhase): Promise<Map<string, Texture>> {
+  await ensureTerrainAtlas();
+  const map = new Map<string, Texture>();
+  for (const [key, frameKey] of Object.entries(TERRAIN_TILE_FILES)) {
+    const tex = terrainTileTexture(frameKey, season);
+    if (tex) map.set(key, tex);
+  }
+  if (icePhase === IcePhase.CRACKED) {
+    const cracked = terrainFrameTexture(TERRAIN_CRACKED_ICE_FILE);
+    if (cracked) map.set(String(TileType.Ice), cracked);
+  }
+  const waterIce = terrainFrameTexture(TERRAIN_WATER_ICE_FILE);
+  if (waterIce) map.set(WATER_ICE_KEY, waterIce);
+  const fog = terrainFrameTexture(TERRAIN_FOG_FILE);
+  if (fog) map.set('fog', fog);
+  return map;
+}
+
+function makeUnitImageTexture(
+  app: Application,
+  image: Texture | null,
+  hexSize: number,
+): TileTexture | null {
+  if (!image) return null;
+  const container = new Container();
+  const sprite = new Sprite(image);
+  sprite.anchor.set(0.5, IMAGE_HEX_CENTER_Y / IMAGE_H);
+  sprite.scale.set((Math.sqrt(3) * hexSize) / IMAGE_HEX_W);
+  container.addChild(sprite);
+  const texture = app.renderer.generateTexture({ target: container, resolution: 1 });
+  container.destroy({ children: true });
+  return { texture, anchorY: IMAGE_HEX_CENTER_Y / IMAGE_H };
+}
+
+/** Baked-px padding around a glow texture so the blur (and its anchor math) is
+ *  never clipped at the texture frame edge. */
+const GLOW_PADDING = 4;
+/** Baked-px blur radius of the unit selection glow. */
+const GLOW_BLUR = 12;
+
+/** Bakes a glow that hugs the non-empty pixels of a unit texture: the
+ *  art is flattened to pure color, blurred outward by `GLOW_BLUR`, and baked
+ *  with `GLOW_PADDING` spare room so nothing is clipped. The returned tile
+ *  shares the base texture's footprint, re-anchored so both sprites align when
+ *  placed at the unit's render position. */
+/** Blank transparent tile used when a texture's source image is missing — no
+ *  more hand-drawn geometry stand-ins. */
+function blankTile(anchorY: number): TileTexture {
+  return { texture: Texture.EMPTY, anchorY };
+}
+
+/** Bakes a black-and-white copy of a tile texture with identical footprint and anchor. */
+function makeDesaturatedTexture(app: Application, base: TileTexture): TileTexture {
+  if (base.texture === Texture.EMPTY) return base;
+  const container = new Container();
+  const sprite = new Sprite(base.texture);
+  sprite.anchor.set(0.5, base.anchorY);
+  const gray = new ColorMatrixFilter();
+  gray.desaturate();
+  sprite.filters = [gray];
+  container.addChild(sprite);
+  const W = base.texture.width;
+  const H = base.texture.height;
+  const frame = new Rectangle(-W / 2, -base.anchorY * H, W, H);
+  const texture = app.renderer.generateTexture({ target: container, frame, resolution: 1 });
+  container.destroy({ children: true });
+  return { texture, anchorY: base.anchorY };
+}
+
+function makeUnitGlowTexture(app: Application, base: TileTexture): TileTexture {
+  const W = base.texture.width;
+  const H = base.texture.height;
+  const pad = GLOW_PADDING;
+  const container = new Container();
+  const sprite = new Sprite(base.texture);
+  sprite.anchor.set(0.5, base.anchorY);
+  // Flatten the art to white: the glow sprite is tinted at draw time, so one
+  // baked texture serves the cyan own-unit glow and the red enemy glow.
+  const blurColor = new ColorMatrixFilter();
+  blurColor.matrix = [
+    0, 0, 0, 0, 1,
+    0, 0, 0, 0, 1,
+    0, 0, 0, 0, 1,
+    0, 0, 0, 1, 0,
+  ];
+  const blur = new BlurFilter({ strength: GLOW_BLUR });
+  sprite.filters = [blurColor, blur];
+  container.addChild(sprite);
+  // The frame is the sprite's own bounds plus padding; generateTexture sizes
+  // its output from this instead of the (filter-unaware) local bounds.
+  const frame = new Rectangle(-W / 2 - pad, -base.anchorY * H - pad, W + pad * 2, H + pad * 2);
+  const texture = app.renderer.generateTexture({ target: container, frame, resolution: 1 });
+  container.destroy({ children: true });
+  const anchorY = (base.anchorY * H + pad) / (H + pad * 2);
+  return { texture, anchorY };
+}
+
+/** Glow textures (a blurred silhouette per unit texture) baked on first use.
+ *
+ *  A glow is only drawn behind the selected unit, yet baking one for every unit
+ *  and ship of every tribe took about half of the whole texture load. `get`
+ *  bakes the glow for a registered base texture the first time it is asked for
+ *  and keeps it; after `dispose` it answers nothing, so a late request cannot
+ *  bake a texture nobody would free. */
+class LazyGlowMap extends Map<Texture, TileTexture> {
+  private readonly bases = new Map<Texture, TileTexture>();
+  private disposed = false;
+
+  constructor(private readonly bake: (base: TileTexture) => TileTexture) {
+    super();
+  }
+
+  register(base: TileTexture): void {
+    this.bases.set(base.texture, base);
+  }
+
+  override get(texture: Texture): TileTexture | undefined {
+    const baked = super.get(texture);
+    if (baked || this.disposed) return baked;
+    const base = this.bases.get(texture);
+    if (!base) return undefined;
+    const glow = this.bake(base);
+    super.set(texture, glow);
+    return glow;
+  }
+
+  dispose(): void {
+    this.disposed = true;
+    this.bases.clear();
+  }
+}
+
+/** The storm and drought overlay frames, when the terrain atlas is available. */
+function weatherOverlayTextures(): NonNullable<TextureSet['weatherOverlays']> {
+  const out: NonNullable<TextureSet['weatherOverlays']> = {};
+  const storm = terrainFrameTexture('storm');
+  const drought = terrainFrameTexture('drought');
+  if (storm) out.storm = storm;
+  if (drought) out.drought = drought;
+  return out;
+}
+
+export async function createTextures(
+  app: Application,
+  map: GameMap,
+  hexSize = 40,
+  /** Tribes present in this game. Only their atlases are loaded. */
+  activeTribes: ReadonlySet<Tribe> = new Set(TRIBES.map((t) => t.id)),
+  /** Season whose terrain tile variants are baked. */
+  season: Season = Season.SPRING,
+  /** Ice state: cracked ice before the thaw, freezing water before the freeze. */
+  icePhase: IcePhase = IcePhase.NONE,
+  /** Bake only the terrain and fog tiles (see createTerrainTextures). */
+  terrainOnly = false,
+): Promise<TextureSet> {
+  // Every texture baked with generateTexture lives on the GPU until destroyed;
+  // collect them so destroyTextureSet can free them when the set is replaced.
+  const owned: Texture[] = [];
+  const bakeApp = {
+    renderer: {
+      generateTexture: (opts: Parameters<Application['renderer']['generateTexture']>[0]): Texture => {
+        const tex = app.renderer.generateTexture(opts);
+        owned.push(tex);
+        return tex;
+      },
+    },
+  } as unknown as Application;
+  // The map can change while the bake yields to the browser (an AI turn plays in
+  // slices): read everything the terrain textures depend on up front, so the
+  // set always matches one moment of the map.
+  const iceTiles = countIceTiles(map);
+  let sliceEnd = performance.now() + SLICE_BUDGET_MS;
+  /** Hands the thread back to the browser once the current slice is used up, so
+   *  the bake runs as many short tasks instead of one long one. */
+  const maybeYield = async (): Promise<void> => {
+    if (performance.now() < sliceEnd) return;
+    await yieldToMain();
+    sliceEnd = performance.now() + SLICE_BUDGET_MS;
+  };
+  const images = await loadTileImages(season, icePhase);
+  if (!terrainOnly) await ensureBuildingsAtlas();
+  const tileTextures = new Map<string, TileTexture>();
+  const fogTextures = new Map<string, TileTexture>();
+  const fogImage = images.get('fog') ?? null;
+  const textureCache = new Map<string, TileTexture>();
+  const getTileTexture = (
+    layer: TileLayer,
+    terrain: TileType,
+    heightPx: number,
+    img: Texture | null,
+    fill: number,
+    anchor: TileAnchor,
+    opts?: {
+      sideColors?: { left: number; right: number };
+      brightness?: number;
+      sunken?: boolean;
+    },
+  ): TileTexture => {
+    const brightness = opts?.brightness ?? 1;
+    // A fog texture does not depend on the terrain under it: one per height.
+    const cacheKey = layer === TileLayer.FOG ? `fog|${heightPx}|${anchor}|${brightness}` : `${layer}|${terrain}|${heightPx}|${anchor}|${brightness}|${opts?.sunken ? 's' : ''}`;
+    const cached = textureCache.get(cacheKey);
+    if (cached) return cached;
+    const tex = composeHexTexture(bakeApp, hexSize, heightPx, img, fill, {
+      walls: anchor === TileAnchor.BASE,
+      anchor,
+      sideColors: opts?.sideColors,
+      brightness,
+      sunken: opts?.sunken,
+    });
+    textureCache.set(cacheKey, tex);
+    return tex;
+  };
+  let maxHeightPx = 0;
+  for (const tile of map.tiles) {
+    maxHeightPx = Math.max(maxHeightPx, tileElevation(tile, hexSize));
+  }
+  const tileByKey = tileMapByKey(map);
+  const findNeighbor = (q: number, r: number): MapTile | undefined => tileByKey.get(axialKey({ q, r }));
+  // A water cell with no neighbour below-left or below-right sits on the map's
+  // bottom, bottom-left or bottom-right edge: it gets equal-height vertical sides.
+  const edgeSideHeight = (tile: MapTile): number => {
+    if (!isWaterType(tile.terrain)) return 0;
+    const open = !findNeighbor(tile.q, tile.r + 1) || !findNeighbor(tile.q - 1, tile.r + 1);
+    return open ? WATER_EDGE_SIDE * hexSize : 0;
+  };
+  const tileSpecs = map.tiles.map((tile) => ({
+    key: axialKey(tile),
+    terrain: tile.terrain,
+    heightPx: tileElevation(tile, hexSize),
+    sideHeightPx: edgeSideHeight(tile),
+    brightness: coastWaterBrightness(tile, findNeighbor),
+    freezing: icePhase === IcePhase.FREEZING && willFreeze(map, tile),
+  }));
+  for (const spec of tileSpecs) {
+    const fill = TILE_TYPE_COLORS[spec.terrain];
+    const bottom = isWaterType(spec.terrain) ? shadeColor(fill, 0.7) : fill;
+    const img = (spec.freezing ? images.get(WATER_ICE_KEY) : null) ?? images.get(String(spec.terrain)) ?? null;
+    tileTextures.set(
+      spec.key,
+      getTileTexture(TileLayer.TILE, spec.terrain, spec.heightPx || spec.sideHeightPx, img, bottom, TileAnchor.BASE, {
+        sideColors: TERRAIN_SIDE_COLORS[spec.terrain],
+        brightness: spec.brightness,
+        sunken: spec.sideHeightPx > 0,
+      }),
+    );
+    fogTextures.set(
+      spec.key,
+      getTileTexture(
+        TileLayer.FOG,
+        spec.terrain,
+        maxHeightPx,
+        fogImage,
+        0x7a7a7a,
+        TileAnchor.BASE,
+        { sideColors: { left: FOG_LEFT_WALL, right: FOG_RIGHT_WALL } },
+      ),
+    );
+    await maybeYield();
+  }
+  if (terrainOnly) {
+    return { season, iceTiles, icePhase, ownedTextures: owned, tileTextures, fogTextures } as unknown as TextureSet;
+  }
+  const unitTextures = {} as Record<Tribe, Record<UnitType, TileTexture>>;
+  const glowFor = new LazyGlowMap((base) => makeUnitGlowTexture(bakeApp, base));
+  for (const tribe of TRIBES) {
+    if (!activeTribes.has(tribe.id)) continue;
+    await ensureTribeAtlas(tribe.code);
+    const perTribe = {} as Record<UnitType, TileTexture>;
+    for (const type of Object.keys(UNIT_TYPES) as UnitType[]) {
+      if (type === UnitType.PIRATE) continue;
+      const frameKey = UNIT_IMAGE_FILES[tribe.id][type].replace(/\.png$/, '');
+      const img = tribeTileTexture(tribe.code, frameKey);
+      perTribe[type] = makeUnitImageTexture(bakeApp, img, hexSize) ?? blankTile(1);
+      glowFor.register(perTribe[type]);
+      await maybeYield();
+    }
+    unitTextures[tribe.id] = perTribe;
+  }
+  const shipTextures = {} as Record<Tribe, Record<1 | 2 | 3, TileTexture>>;
+  for (const tribe of TRIBES) {
+    if (!activeTribes.has(tribe.id)) continue;
+    await ensureTribeAtlas(tribe.code);
+    shipTextures[tribe.id] = {} as Record<1 | 2 | 3, TileTexture>;
+    for (const level of [1, 2, 3] as const) {
+      const suffix = level === 1 ? 'ship' : `ship-${level}`;
+      const img = tribeTileTexture(tribe.code, `${tribe.code}-${suffix}`);
+      shipTextures[tribe.id][level] = makeUnitImageTexture(bakeApp, img, hexSize) ?? blankTile(0.5);
+      glowFor.register(shipTextures[tribe.id][level]);
+      await maybeYield();
+    }
+  }
+  const sawmillTexture =
+    makeUnitImageTexture(bakeApp, buildingTileTexture('sawmill'), hexSize) ?? blankTile(0.5);
+  const mineTexture =
+    makeUnitImageTexture(bakeApp, buildingTileTexture('mine'), hexSize) ?? blankTile(0.5);
+  const universityTexture =
+    makeUnitImageTexture(bakeApp, buildingTileTexture('university'), hexSize) ?? blankTile(0.5);
+  const farmTexture =
+    makeUnitImageTexture(bakeApp, buildingTileTexture('farm'), hexSize) ?? blankTile(0.5);
+  const farmIdleTexture = makeDesaturatedTexture(bakeApp, farmTexture);
+  const granaryTextures: TileTexture[] = [];
+  for (let n = 0; n <= GRANARY_MAX_FARMS; n++) {
+    granaryTextures[n] =
+      makeUnitImageTexture(bakeApp, buildingTileTexture(granaryTileFile(n)), hexSize) ?? blankTile(0.5);
+  }
+  const bridgeTextures = {} as Record<BridgeDir, TileTexture>;
+  for (const dir of Object.keys(BRIDGE_TILE_FILES) as BridgeDir[]) {
+    const img = buildingTileTexture(BRIDGE_TILE_FILES[dir]);
+    bridgeTextures[dir] =
+      makeUnitImageTexture(bakeApp, img, hexSize) ?? blankTile(0.5);
+  }
+  const portTextures = {} as Record<PortDirection, TileTexture>;
+  for (const dir of Object.keys(PORT_TILE_FILES) as PortDirection[]) {
+    const img = buildingTileTexture(PORT_TILE_FILES[dir]);
+    portTextures[dir] =
+      makeUnitImageTexture(bakeApp, img, hexSize) ?? blankTile(0.5);
+  }
+  const freePortTexture = Texture.EMPTY;
+  const templeTextures = {} as Record<1 | 2 | 3 | 4, TileTexture>;
+  for (const lvl of [1, 2, 3, 4] as const) {
+    const img = buildingTileTexture(TEMPLE_TILE_FILES[lvl]);
+    templeTextures[lvl] =
+      makeUnitImageTexture(bakeApp, img, hexSize) ?? blankTile(0.5);
+  }
+  const forestTempleTextures = {} as Record<1 | 2 | 3 | 4, TileTexture>;
+  for (const lvl of [1, 2, 3, 4] as const) {
+    const img = buildingTileTexture(FOREST_TEMPLE_TILE_FILES[lvl]);
+    forestTempleTextures[lvl] =
+      makeUnitImageTexture(bakeApp, img, hexSize) ?? blankTile(0.5);
+  }
+  await ensureIcons32Atlas();
+  const villageConnectedTexture = icons32FrameTexture('village-connected-32');
+  await ensureActionButtonAtlas();
+  const captureTexture = actionButtonFrameTexture('action-capture-map');
+  const arrowTexture = await loadImageTexture(TEXTURE_BASE + 'arrow.png');
+  const cannonballTexture = await loadImageTexture(TEXTURE_BASE + 'cannonball.png');
+  ensureIcons32Atlas();
+  const cannonbalTexture = icons32FrameTexture('cannonbal-32');
+  const attackIconTexture = icons32FrameTexture('attack-32');
+  const wallImg = buildingTileTexture('wall');
+  // Bake the wall at the same hex image-scale as villages/units so its on-map
+  // footprint always matches the tile, regardless of the camera quality factor.
+  const wallTexture = wallImg ? makeUnitImageTexture(bakeApp, wallImg, hexSize) : null;
+  const trapImg = buildingTileTexture('trap');
+  const trapTexture = trapImg ? makeUnitImageTexture(bakeApp, trapImg, hexSize) : null;
+  const pirateTexture =
+    makeUnitImageTexture(bakeApp, terrainFrameTexture('pirates-ship'), hexSize) ?? blankTile(0.5);
+  glowFor.register(pirateTexture);
+  // Bake one glow now so the blur pipelines compile behind the loading screen
+  // instead of hitching the first time a unit is selected.
+  glowFor.get(pirateTexture.texture);
+  const villageBuilds: Partial<Record<Tribe, VillageBuildTextureService>> = {};
+  for (const [tribe, prefix] of [[Tribe.Cats, 'cats'], [Tribe.Villagers, 'villagers'], [Tribe.Warriors, 'warriors'], [Tribe.Aqua, 'aqua'], [Tribe.Forest, 'forest'], [Tribe.Sand, 'sand'], [Tribe.Barbarians, 'barbarians']] as const) {
+    if (!activeTribes.has(tribe)) continue;
+    const service = new VillageBuildTextureService(app, hexSize, prefix);
+    villageBuilds[tribe] = service;
+    await service.ensureLoaded();
+  }
+  return {
+    season,
+    iceTiles,
+    icePhase,
+    ownedTextures: owned,
+    tileTextures,
+    fogTextures,
+    fogTopTexture: getTileTexture(TileLayer.FOG, TileType.Water, 0, fogImage, 0x7a7a7a, TileAnchor.TOPFACE),
+    villageBuilds,
+    freeVillageTexture:
+      makeUnitImageTexture(bakeApp, buildingTileTexture('village-empty'), hexSize) ?? blankTile(1),
+    bonusTexture:
+      makeUnitImageTexture(bakeApp, terrainFrameTexture('bonus'), hexSize) ?? blankTile(1),
+    bottleTexture:
+      makeUnitImageTexture(bakeApp, terrainFrameTexture('bottle-on-water'), hexSize) ?? blankTile(0.5),
+    unitTextures,
+    pirateTexture,
+    sawmillTexture,
+    mineTexture,
+    universityTexture,
+    farmTexture,
+    farmIdleTexture,
+    weatherOverlays: weatherOverlayTextures(),
+    fireTrailTexture: terrainFrameTexture('fire-trail') ?? undefined,
+    granaryTextures,
+    bridgeTextures,
+    portTextures,
+    freePortTexture,
+    templeTextures,
+    forestTempleTextures,
+    shipTextures,
+    glowFor,
+    villageConnectedTexture,
+    captureTexture,
+    wallTexture,
+    trapTexture,
+    arrowTexture,
+    cannonballTexture,
+    attackIconTexture,
+    cannonbalTexture,
+  };
+}
+
+/** Runs `fn`, dropping `console.warn` calls whose message contains `subset`.
+ *
+ *  Pixi's WebGPU batch bind groups cache each batched texture's *source*
+ *  process-wide and never release it, so destroying any texture that has been
+ *  rendered makes Pixi emit `[BindGroup] a 'textureSource' was destroyed while
+ *  still bound to a shader…` from `BindGroup.onResourceChange`. That guard is
+ *  benign (Pixi nulls the stale reference) and unavoidable from app code, so
+ *  teardown silences it at the console boundary instead of leaking noise. */
+/** Bakes only the terrain and fog tile textures for the map as it is now, so a
+ *  season, ice or forest change can be applied to a live view without baking
+ *  (or rebuilding) everything else. */
+export function createTerrainTextures(
+  app: Application,
+  map: GameMap,
+  hexSize: number,
+  season: Season,
+  icePhase: IcePhase,
+): Promise<TerrainTextures> {
+  return createTextures(app, map, hexSize, new Set(), season, icePhase, true);
+}
+
+/** Moves a freshly baked terrain part into the live set. The superseded terrain
+ *  textures are returned so the caller can free them once nothing draws them. */
+export function adoptTerrainTextures(live: TextureSet, terrain: TerrainTextures): Texture[] {
+  const superseded = new Set<Texture>();
+  for (const t of live.tileTextures.values()) superseded.add(t.texture);
+  for (const t of live.fogTextures.values()) superseded.add(t.texture);
+  live.tileTextures = terrain.tileTextures;
+  live.fogTextures = terrain.fogTextures;
+  live.season = terrain.season;
+  live.iceTiles = terrain.iceTiles;
+  live.icePhase = terrain.icePhase;
+  const fresh = new Set(terrain.ownedTextures ?? []);
+  // Old terrain textures leave the owned list (they are freed on their own);
+  // the new ones join it so destroyTextureSet still frees them with the set.
+  live.ownedTextures = [...(live.ownedTextures ?? []).filter((t) => !superseded.has(t)), ...fresh];
+  return [...superseded].filter((t) => !fresh.has(t));
+}
+
+export function suppressPixiWarnings(fn: () => void, subset: string): void {
+  const original = console.warn;
+  console.warn = (...args: unknown[]): void => {
+    if (args.some((a) => typeof a === 'string' && a.includes(subset))) return;
+    original(...args);
+  };
+  try {
+    fn();
+  } finally {
+    console.warn = original;
+  }
+}
+
+/** Releases the GPU/canvas memory of every texture baked by a TextureSet's
+ *  village-build services (each village upgrade / owner switch creates new
+ *  baked composites; the old ones must be destroyed once the set is discarded,
+ *  e.g. on game teardown or re-bake after context loss). */
+export function destroyTextureSet(textures: TextureSet, opts: { contextLost?: boolean } = {}): void {
+  // After a GL context loss the baked textures' GPU data is already gone; the
+  // JS objects are simply dropped instead of being destroyed through Pixi.
+  if (!opts.contextLost) {
+    suppressPixiWarnings(() => {
+      for (const tex of textures.ownedTextures ?? []) {
+        if (!tex.destroyed) tex.destroy(true);
+      }
+    }, 'was destroyed while still bound to a shader');
+  }
+  textures.ownedTextures = [];
+  if (textures.glowFor instanceof LazyGlowMap) textures.glowFor.dispose();
+  const builds = textures.villageBuilds;
+  if (!builds) return;
+  for (const service of Object.values(builds)) service?.destroy();
+}

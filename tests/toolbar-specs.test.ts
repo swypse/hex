@@ -1,0 +1,549 @@
+import { giveResources } from './helpers/test-map';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { Simulator } from '../src/game/simulator';
+import { generateMap, type MapTile } from '../src/game/map/map-gen';
+import { buildPlayers } from '../src/game/players';
+import { SeededRandom } from '../src/util/random';
+import { gameController } from '../src/controller/game-controller';
+import { useGameStore } from '../src/store/game-store';
+import { toolbarSpecs } from '../src/ui/hud/toolbar-specs';
+import { isLandType, isWaterType, TileType } from '../src/game/map/tile-types';
+import { hexNeighbors } from '../src/game/map/hex';
+import { UNIT_TYPES } from '../src/game/units/units';
+import { Tribe } from '../src/game/tribes';
+import { addStock } from '../src/game/economy/stock';
+import { sfx } from '../src/sound/sfx';
+import { BuildingKind, GameMode, PauseReason, SelectionKind, SkillId, UnitType } from '@enums';
+import { tileAt } from '../src/game/map/tile-index';
+
+describe('toolbarSpecs', () => {
+  let map: ReturnType<typeof generateMap>;
+
+  beforeEach(() => {
+    map = generateMap(2, 42);
+    const players = buildPlayers(0, 1, new SeededRandom(1));
+    const sim = new Simulator(map, players, GameMode.CAPTURE);
+    sim.startGame();
+    sim.drainEvents();
+    (gameController as unknown as { sim: unknown }).sim = sim;
+    const store = useGameStore.getState();
+    store.setLocalPlayerIndex(0);
+    store.setPlayers(players);
+    store.setSelection(null);
+  });
+
+  function select(tile: MapTile): void {
+    useGameStore.getState().setSelection({ kind: SelectionKind.UNIT, q: tile.q, r: tile.r });
+  }
+
+  function selectCell(tile: MapTile): void {
+    useGameStore.getState().setSelection({ kind: SelectionKind.TILE, q: tile.q, r: tile.r });
+  }
+
+  it('does not offer the extract forest action on a forest tile', () => {
+    const tile = map.tiles.find((t) => t.unit === null)!;
+    tile.terrain = TileType.GrasslandForest;
+    tile.ownedBy = 0;
+    tile.unit = {
+      id: 'u', owner: 0, type: UnitType.WARRIOR, q: tile.q, r: tile.r,
+      hasMoved: false, hasAttacked: false, hasHealed: false,
+      hp: UNIT_TYPES.warrior.maxHp, attack: 2, attackDistance: 1, spawnVillage: null,
+    };
+    select(tile);
+    expect(toolbarSpecs().some((a) => a.key === 'extract')).toBe(false);
+  });
+
+  it('offers the get-bottle action when an own ship stands on a collectable bottle', () => {
+    const tile = map.tiles.find((t) => t.unit === null)!;
+    tile.terrain = TileType.Water;
+    tile.ownedBy = null;
+    tile.unit = {
+      id: 's', owner: 0, type: UnitType.WARRIOR, q: tile.q, r: tile.r,
+      hasMoved: false, hasAttacked: false, hasHealed: false,
+      hp: 5, attack: 2, attackDistance: 1, spawnVillage: null, shipLevel: 1,
+    };
+    tile.bottle = { bornTurn: 1, arrivalTurn: 1 };
+    useGameStore.getState().setTurn(2);
+    // The bottle is a cell action: shown once the ship is unselected (cell).
+    selectCell(tile);
+    const spec = toolbarSpecs().find((a) => a.key === 'bottle');
+    expect(spec).toBeDefined();
+    expect(spec!.disabled).toBe(false);
+  });
+
+  it('does not offer the get-bottle action the turn the ship landed', () => {
+    const tile = map.tiles.find((t) => t.unit === null)!;
+    tile.terrain = TileType.Water;
+    tile.ownedBy = null;
+    tile.unit = {
+      id: 's', owner: 0, type: UnitType.WARRIOR, q: tile.q, r: tile.r,
+      hasMoved: false, hasAttacked: false, hasHealed: false,
+      hp: 5, attack: 2, attackDistance: 1, spawnVillage: null, shipLevel: 1,
+    };
+    tile.bottle = { bornTurn: 1, arrivalTurn: 2 };
+    useGameStore.getState().setTurn(2);
+    selectCell(tile);
+    expect(toolbarSpecs().some((a) => a.key === 'bottle')).toBe(false);
+  });
+
+  it('offers the upgrade-ship action for a level-1 ship unit', () => {
+    const tile = map.tiles.find((t) => t.unit === null)!;
+    tile.ownedBy = 0;
+    tile.unit = {
+      id: 's', owner: 0, type: UnitType.WARRIOR, q: tile.q, r: tile.r,
+      hasMoved: false, hasAttacked: false, hasHealed: false,
+      hp: 5, attack: 2, attackDistance: 1, spawnVillage: null, shipLevel: 1,
+    };
+    select(tile);
+    expect(toolbarSpecs().some((a) => a.key === 'upgrade-ship')).toBe(true);
+  });
+
+  it('offers the disband action for an own unit with its cost', () => {
+    const tile = map.tiles.find((t) => t.unit === null)!;
+    tile.ownedBy = 0;
+    tile.unit = {
+      id: 'w', owner: 0, type: UnitType.WARRIOR, q: tile.q, r: tile.r,
+      hasMoved: false, hasAttacked: false, hasHealed: false,
+      hp: UNIT_TYPES.warrior.maxHp, attack: 2, attackDistance: 1, spawnVillage: null,
+    };
+    select(tile);
+    const spec = toolbarSpecs().find((a) => a.key === 'disband');
+    expect(spec).toBeDefined();
+    expect(spec!.label).toContain('Disband Warrior');
+    expect(spec!.disabled).toBe(false);
+  });
+
+  it('does not offer the disband action once the unit has moved', () => {
+    const tile = map.tiles.find((t) => t.unit === null)!;
+    tile.ownedBy = 0;
+    tile.unit = {
+      id: 'w', owner: 0, type: UnitType.WARRIOR, q: tile.q, r: tile.r,
+      hasMoved: true, hasAttacked: false, hasHealed: false,
+      hp: UNIT_TYPES.warrior.maxHp, attack: 2, attackDistance: 1, spawnVillage: null,
+    };
+    select(tile);
+    expect(toolbarSpecs().some((a) => a.key === 'disband')).toBe(false);
+  });
+
+  it('does not offer the disband action once the unit has attacked', () => {
+    const tile = map.tiles.find((t) => t.unit === null)!;
+    tile.ownedBy = 0;
+    tile.unit = {
+      id: 'w', owner: 0, type: UnitType.WARRIOR, q: tile.q, r: tile.r,
+      hasMoved: false, hasAttacked: true, hasHealed: false,
+      hp: UNIT_TYPES.warrior.maxHp, attack: 2, attackDistance: 1, spawnVillage: null,
+    };
+    select(tile);
+    expect(toolbarSpecs().some((a) => a.key === 'disband')).toBe(false);
+  });
+
+  it('offers heal whether the unit or the cell is selected', () => {
+    const tile = map.tiles.find((t) => t.unit === null)!;
+    tile.ownedBy = 0;
+    tile.unit = {
+      id: 'h', owner: 0, type: UnitType.WARRIOR, q: tile.q, r: tile.r,
+      hasMoved: false, hasAttacked: false, hasHealed: false,
+      hp: 10, attack: 2, attackDistance: 1, spawnVillage: null,
+    };
+    select(tile);
+    expect(toolbarSpecs().some((a) => a.key === 'heal')).toBe(true);
+    const spy = vi
+      .spyOn(gameController as unknown as { runCommand: (c: unknown) => Promise<void> }, 'runCommand')
+      .mockResolvedValue(undefined);
+    gameController.actions.healSelectedUnit();
+    expect(spy).toHaveBeenCalledWith({ type: 'heal', unitId: 'h' });
+    spy.mockRestore();
+    selectCell(tile);
+    expect(toolbarSpecs().some((a) => a.key === 'heal')).toBe(true);
+  });
+
+  it('offers no actions while the game is paused for a disconnect', () => {
+    const tile = map.tiles.find((t) => t.unit === null)!;
+    tile.ownedBy = 0;
+    tile.unit = {
+      id: 'w', owner: 0, type: UnitType.WARRIOR, q: tile.q, r: tile.r,
+      hasMoved: false, hasAttacked: false, hasHealed: false,
+      hp: UNIT_TYPES.warrior.maxHp, attack: 2, attackDistance: 1, spawnVillage: null,
+    };
+    select(tile);
+    expect(toolbarSpecs().length).toBeGreaterThan(0);
+    useGameStore.getState().setPaused(PauseReason.DISCONNECT, 'Other');
+    expect(toolbarSpecs()).toEqual([]);
+    useGameStore.getState().setPaused(null);
+  });
+
+  it('offers the ship upgrade whether the ship or the cell is selected', () => {
+    const tile = map.tiles.find((t) => t.unit === null)!;
+    tile.ownedBy = 0;
+    tile.unit = {
+      id: 's', owner: 0, type: UnitType.WARRIOR, q: tile.q, r: tile.r,
+      hasMoved: false, hasAttacked: false, hasHealed: false,
+      hp: 5, attack: 2, attackDistance: 1, spawnVillage: null, shipLevel: 1,
+    };
+    select(tile);
+    expect(toolbarSpecs().some((a) => a.key === 'upgrade-ship')).toBe(true);
+    const spy = vi
+      .spyOn(gameController as unknown as { runCommand: (c: unknown) => Promise<void> }, 'runCommand')
+      .mockResolvedValue(undefined);
+    gameController.actions.upgradeSelectedShip();
+    expect(spy).toHaveBeenCalledWith({ type: 'upgradeShip', unitId: 's' });
+    spy.mockRestore();
+    selectCell(tile);
+    expect(toolbarSpecs().some((a) => a.key === 'upgrade-ship')).toBe(true);
+  });
+
+  it('attacks an enemy on click without a confirmation dialog', async () => {
+    const own = map.tiles.find((t) => t.unit === null)!;
+    const enemy = map.tiles.find((t) => t !== own && t.unit === null)!;
+    own.exploredBy = [0];
+    enemy.exploredBy = [0];
+    own.unit = {
+      id: 'u1', owner: 0, type: UnitType.WARRIOR, q: own.q, r: own.r,
+      hasMoved: false, hasAttacked: false, hasHealed: false,
+      hp: UNIT_TYPES.warrior.maxHp, attack: 2, attackDistance: 1, spawnVillage: null,
+    };
+    enemy.unit = {
+      id: 'e1', owner: 1, type: UnitType.WARRIOR, q: enemy.q, r: enemy.r,
+      hasMoved: false, hasAttacked: false, hasHealed: false,
+      hp: UNIT_TYPES.warrior.maxHp, attack: 2, attackDistance: 1, spawnVillage: null,
+    };
+    useGameStore.getState().setSelection({ kind: SelectionKind.UNIT, q: own.q, r: own.r });
+    const key = `${enemy.q},${enemy.r}`;
+    (gameController as unknown as { app: unknown; attackableKeys: Set<string> }).app = { screen: {} };
+    (gameController as unknown as { attackableKeys: Set<string> }).attackableKeys = new Set([key]);
+
+    const spy = vi
+      .spyOn(gameController as unknown as { runCommand: (c: unknown) => Promise<void> }, 'runCommand')
+      .mockResolvedValue(undefined);
+    await gameController.handleMapClick(enemy.q, enemy.r);
+    expect(useGameStore.getState().overlay).toBeNull();
+    expect(spy).toHaveBeenCalledWith({ type: 'attack', unitId: 'u1', q: enemy.q, r: enemy.r });
+    spy.mockRestore();
+  });
+
+  it('offers the build water temple action on an own water tile with the skill', () => {
+    const tile = map.tiles.find((t) => t.unit === null)!;
+    tile.terrain = TileType.Water;
+    tile.ownedBy = 0;
+    tile.settlement = null;
+    const store = useGameStore.getState();
+    store.setPlayers(store.players.map((p, i) => (i === 0 ? { ...p, skills: [SkillId.WATER_TEMPLES] } : p)));
+    selectCell(tile);
+    expect(toolbarSpecs().some((a) => a.key === 'temple')).toBe(true);
+  });
+
+  it('offers the build bridge action on a water gap with the skill', () => {
+    const by = (q: number, r: number): MapTile => map.tiles.find((t) => t.q === q && t.r === r)!;
+    const tile = by(1, 0);
+    by(0, 0).terrain = TileType.GrasslandLand;
+    by(2, 0).terrain = TileType.GrasslandLand;
+    tile.terrain = TileType.Water;
+    tile.settlement = null;
+    tile.unit = null;
+    tile.ownedBy = null;
+    const store = useGameStore.getState();
+    store.setPlayers(store.players.map((p, i) => (i === 0 ? { ...p, skills: [SkillId.BRIDGES] } : p)));
+    useGameStore.getState().setSelection({ kind: SelectionKind.TILE, q: 1, r: 0 });
+    expect(toolbarSpecs().some((a) => a.key === 'bridge')).toBe(true);
+  });
+
+  it('does not offer the build bridge action without the skill', () => {
+    const by = (q: number, r: number): MapTile => map.tiles.find((t) => t.q === q && t.r === r)!;
+    const tile = by(1, 0);
+    by(0, 0).terrain = TileType.GrasslandLand;
+    by(2, 0).terrain = TileType.GrasslandLand;
+    tile.terrain = TileType.Water;
+    tile.settlement = null;
+    tile.unit = null;
+    tile.ownedBy = null;
+    useGameStore.getState().setSelection({ kind: SelectionKind.TILE, q: 1, r: 0 });
+    expect(toolbarSpecs().some((a) => a.key === 'bridge')).toBe(false);
+  });
+
+  it('plays the click sound when a hex tap selects a tile', async () => {
+    const tile = map.tiles.find((t) => t.unit === null)!;
+    tile.exploredBy = [0];
+    (gameController as unknown as { app: unknown }).app = { screen: {} };
+    const spy = vi.spyOn(sfx, 'play');
+    await gameController.handleMapClick(tile.q, tile.r);
+    expect(useGameStore.getState().selection).not.toBeNull();
+    expect(spy).toHaveBeenCalledWith('click');
+    spy.mockRestore();
+  });
+
+  it('offers an enabled deal action for an affordable pirate with no active deal', () => {
+    const tile = map.tiles.find((t) => t.unit === null)!;
+    tile.terrain = TileType.Water;
+    tile.ownedBy = 0;
+    tile.unit = {
+      id: 'p', owner: -1, type: UnitType.PIRATE, q: tile.q, r: tile.r,
+      hasMoved: false, hasAttacked: false, hasHealed: false,
+      hp: 80, attack: 30, attackDistance: 3, defense: 5, spawnVillage: null,
+    };
+    const store = useGameStore.getState();
+    store.setPlayers(store.players.map((p, i) => (i === 0 ? { ...p, resources: { ...p.resources, money: 100 } } : p)));
+    select(tile);
+    const spec = toolbarSpecs().find((a) => a.key === 'deal');
+    expect(spec).toBeDefined();
+    expect(spec!.disabled).toBe(false);
+    expect(spec!.label).toContain('50');
+  });
+
+  it('offers no deal action for a pirate on water the player does not own', () => {
+    const tile = map.tiles.find((t) => t.unit === null)!;
+    tile.terrain = TileType.Water;
+    tile.ownedBy = null;
+    tile.unit = {
+      id: 'p', owner: -1, type: UnitType.PIRATE, q: tile.q, r: tile.r,
+      hasMoved: false, hasAttacked: false, hasHealed: false,
+      hp: 80, attack: 30, attackDistance: 3, defense: 5, spawnVillage: null,
+    };
+    select(tile);
+    expect(toolbarSpecs().find((a) => a.key === 'deal')).toBeUndefined();
+  });
+
+  it('disables the deal action when the player cannot afford it', () => {
+    const tile = map.tiles.find((t) => t.unit === null)!;
+    tile.terrain = TileType.Water;
+    tile.ownedBy = 0;
+    tile.unit = {
+      id: 'p', owner: -1, type: UnitType.PIRATE, q: tile.q, r: tile.r,
+      hasMoved: false, hasAttacked: false, hasHealed: false,
+      hp: 80, attack: 30, attackDistance: 3, defense: 5, spawnVillage: null,
+    };
+    select(tile);
+    const spec = toolbarSpecs().find((a) => a.key === 'deal');
+    expect(spec).toBeDefined();
+    expect(spec!.disabled).toBe(true);
+  });
+
+  it('disables the deal action once the deal with the pirate is already active', () => {
+    const tile = map.tiles.find((t) => t.unit === null)!;
+    tile.terrain = TileType.Water;
+    tile.ownedBy = 0;
+    tile.unit = {
+      id: 'p', owner: -1, type: UnitType.PIRATE, q: tile.q, r: tile.r,
+      hasMoved: false, hasAttacked: false, hasHealed: false,
+      hp: 80, attack: 30, attackDistance: 3, defense: 5, spawnVillage: null, paidBy: [0],
+    };
+    const store = useGameStore.getState();
+    store.setPlayers(store.players.map((p, i) => (i === 0 ? { ...p, resources: { ...p.resources, money: 100 } } : p)));
+    select(tile);
+    const spec = toolbarSpecs().find((a) => a.key === 'deal');
+    expect(spec).toBeDefined();
+    expect(spec!.disabled).toBe(true);
+  });
+
+  it('does not offer a deal action for a selected non-pirate unit', () => {
+    const tile = map.tiles.find((t) => t.unit === null)!;
+    tile.ownedBy = 0;
+    tile.unit = {
+      id: 'w', owner: 0, type: UnitType.WARRIOR, q: tile.q, r: tile.r,
+      hasMoved: false, hasAttacked: false, hasHealed: false,
+      hp: UNIT_TYPES.warrior.maxHp, attack: 2, attackDistance: 1, spawnVillage: null,
+    };
+    select(tile);
+    expect(toolbarSpecs().some((a) => a.key === 'deal')).toBe(false);
+  });
+
+  it('offers repair for a damaged own building but not a full one', () => {
+    const tile = map.tiles.find((t) => t.unit === null)!;
+    tile.terrain = TileType.GrasslandLand;
+    tile.ownedBy = 0;
+    tile.settlement = null;
+    tile.building = { kind: BuildingKind.MINE, level: 1, hp: 1 };
+    selectCell(tile);
+    expect(toolbarSpecs().some((a) => a.key === 'repair')).toBe(true);
+
+    tile.building = { kind: BuildingKind.MINE, level: 1 };
+    selectCell(tile);
+    expect(toolbarSpecs().some((a) => a.key === 'repair')).toBe(false);
+  });
+
+  it('offers enable stealth only for a visible idle stalker', () => {
+    const players = useGameStore.getState().players;
+    players[0]!.tribe = Tribe.Cats;
+    giveResources(map, players[0]!, { wood: 100, stone: 100, money: 100, ore: 100, food: 20 });
+    useGameStore.getState().setPlayers(players);
+    const tile = map.tiles.find((t) => t.unit === null)!;
+    tile.ownedBy = 0;
+    tile.unit = {
+      id: 's', owner: 0, type: UnitType.STALKER, q: tile.q, r: tile.r,
+      hasMoved: false, hasAttacked: false, hasHealed: false,
+      hp: UNIT_TYPES.stalker.maxHp, attack: 30, attackDistance: 1, spawnVillage: null,
+    };
+    select(tile);
+    expect(toolbarSpecs().some((a) => a.key === 'stealth')).toBe(true);
+    tile.unit = { ...tile.unit, isStealthed: true };
+    expect(toolbarSpecs().some((a) => a.key === 'stealth')).toBe(false);
+  });
+
+  it('hides enable stealth when the stalker stands beside an enemy village', () => {
+    const players = useGameStore.getState().players;
+    players[0]!.tribe = Tribe.Cats;
+    giveResources(map, players[0]!, { wood: 100, stone: 100, money: 100, ore: 100, food: 20 });
+    useGameStore.getState().setPlayers(players);
+    const tile = map.tiles.find((t) => t.unit === null)!;
+    tile.ownedBy = 0;
+    tile.unit = {
+      id: 's', owner: 0, type: UnitType.STALKER, q: tile.q, r: tile.r,
+      hasMoved: false, hasAttacked: false, hasHealed: false,
+      hp: UNIT_TYPES.stalker.maxHp, attack: 30, attackDistance: 1, spawnVillage: null,
+    };
+    const nb = hexNeighbors(tile).map((n) => map.tiles.find((x) => x.q === n.q && x.r === n.r)).find((t) => t !== undefined)!;
+    nb.settlement = { owner: 1, level: 1, captureReady: false };
+    select(tile);
+    expect(toolbarSpecs().some((a) => a.key === 'stealth')).toBe(false);
+  });
+
+  it('offers build only for a builder, and thorn-trap only for a trapper', () => {
+    const players = useGameStore.getState().players;
+    giveResources(map, players[0]!, { wood: 100, stone: 100, money: 100, ore: 100, food: 20 });
+    useGameStore.getState().setPlayers(players);
+    const tile = map.tiles.find((t) => t.unit === null)!;
+    tile.ownedBy = 0;
+    tile.terrain = TileType.GrasslandLand;
+    // an owned empty land neighbor so the trapper has a trap candidate
+    const nb = hexNeighbors(tile).map((n) => map.tiles.find((x) => x.q === n.q && x.r === n.r)).find((t) => t !== undefined)!;
+    nb.terrain = TileType.GrasslandLand;
+    nb.ownedBy = 0;
+    tile.unit = {
+      id: 'b', owner: 0, type: UnitType.BUILDER, q: tile.q, r: tile.r,
+      hasMoved: false, hasAttacked: false, hasHealed: false,
+      hp: UNIT_TYPES.builder.maxHp, attack: 10, attackDistance: 1, spawnVillage: null,
+    };
+    select(tile);
+    expect(toolbarSpecs().some((a) => a.key === 'build')).toBe(true);
+    expect(toolbarSpecs().some((a) => a.key === 'thorn-trap')).toBe(false);
+
+    tile.unit = {
+      id: 'tr', owner: 0, type: UnitType.TRAPPER, q: tile.q, r: tile.r,
+      hasMoved: false, hasAttacked: false, hasHealed: false,
+      hp: UNIT_TYPES.trapper.maxHp, attack: 20, attackDistance: 1, spawnVillage: null,
+    };
+    expect(toolbarSpecs().some((a) => a.key === 'build')).toBe(false);
+    expect(toolbarSpecs().some((a) => a.key === 'thorn-trap')).toBe(true);
+  });
+
+  it('hides the build action for a builder with no affordable buildable', () => {
+    const players = useGameStore.getState().players;
+    giveResources(map, players[0]!, { wood: 0, stone: 0, money: 0, ore: 0, food: 20 });
+    useGameStore.getState().setPlayers(players);
+    const tile = map.tiles.find((t) => t.unit === null)!;
+    tile.ownedBy = 0;
+    tile.terrain = TileType.GrasslandLand;
+    tile.unit = {
+      id: 'b', owner: 0, type: UnitType.BUILDER, q: tile.q, r: tile.r,
+      hasMoved: false, hasAttacked: false, hasHealed: false,
+      hp: UNIT_TYPES.builder.maxHp, attack: 10, attackDistance: 1, spawnVillage: null,
+    };
+    select(tile);
+    expect(toolbarSpecs().some((a) => a.key === 'build')).toBe(false);
+  });
+
+  it('does not offer storm when no water is within the storm radius', () => {
+    const players = useGameStore.getState().players;
+    players[0]!.tribe = Tribe.Aqua;
+    giveResources(map, players[0]!, { wood: 100, stone: 100, money: 100, ore: 100, food: 20 });
+    useGameStore.getState().setPlayers(players);
+    for (const t of map.tiles) if (isWaterType(t.terrain)) t.terrain = TileType.GrasslandLand;
+    const tile = map.tiles.find((t) => t.unit === null)!;
+    tile.ownedBy = 0;
+    tile.unit = {
+      id: 'st', owner: 0, type: UnitType.STORMCALLER, q: tile.q, r: tile.r,
+      hasMoved: false, hasAttacked: false, hasHealed: false,
+      hp: UNIT_TYPES.stormcaller.maxHp, attack: 20, attackDistance: 1, spawnVillage: null,
+    };
+    select(tile);
+    expect(toolbarSpecs().some((a) => a.key === 'storm')).toBe(false);
+  });
+
+  it('offers build-farm on an own empty land tile once Agriculture is open and affordable', () => {
+    const tile = map.tiles.find((t) => t.unit === null && t.terrain === TileType.GrasslandLand && !t.settlement)!;
+    tile.ownedBy = 0;
+    const players = useGameStore.getState().players;
+    giveResources(map, players[0]!, { wood: 3, stone: 2, money: 10, ore: 0, food: 20 });
+    selectCell(tile);
+    expect(toolbarSpecs().some((a) => a.key === 'farm')).toBe(false);
+    players[0]!.skills.push(SkillId.AGRICULTURE);
+    const spec = toolbarSpecs().find((a) => a.key === 'farm');
+    expect(spec).toBeDefined();
+    expect(spec!.disabled).toBe(false);
+    giveResources(map, players[0]!, { wood: 2 });
+    expect(toolbarSpecs().find((a) => a.key === 'farm')!.disabled).toBe(true);
+  });
+
+  it('offers build-granary next to an own farm once the Granary skill is open', () => {
+    const tile = map.tiles.find((t) => t.unit === null && t.terrain === TileType.GrasslandLand && !t.settlement)!;
+    const farm = map.tiles.find((t) => hexNeighbors(tile).some((n) => n.q === t.q && n.r === t.r) && t.terrain === TileType.GrasslandLand && !t.settlement && !t.unit)!;
+    tile.ownedBy = 0;
+    farm.ownedBy = 0;
+    farm.building = { kind: BuildingKind.FARM, level: 1 };
+    const players = useGameStore.getState().players;
+    giveResources(map, players[0]!, { wood: 10, stone: 10, money: 20, ore: 0, food: 20 });
+    players[0]!.skills.push(SkillId.AGRICULTURE, SkillId.GRANARY);
+    selectCell(tile);
+    expect(toolbarSpecs().some((a) => a.key === 'granary')).toBe(true);
+  });
+
+  it('offers burn-farm to an enemy unit standing on an enemy farm', () => {
+    const tile = map.tiles.find((t) => t.unit === null && t.terrain === TileType.GrasslandLand && !t.settlement)!;
+    tile.ownedBy = 1;
+    tile.building = { kind: BuildingKind.FARM, level: 1 };
+    tile.unit = {
+      id: 'raider', owner: 0, type: UnitType.WARRIOR, q: tile.q, r: tile.r,
+      hasMoved: false, hasAttacked: false, hasHealed: false,
+      hp: UNIT_TYPES.warrior.maxHp, attack: 2, attackDistance: 1, spawnVillage: null,
+    };
+    select(tile);
+    expect(toolbarSpecs().some((a) => a.key === 'burn-farm')).toBe(true);
+    tile.building = { kind: BuildingKind.GRANARY, level: 1, food: 0 };
+    expect(toolbarSpecs().some((a) => a.key === 'burn-granary')).toBe(true);
+  });
+
+  it('offers building a road paid from the joined village network, not the nearest empty village', () => {
+    const players = useGameStore.getState().players;
+    // Layout: A --road-- target -- B. Village A is the capital and holds the
+    // materials; village B (whose territory the target tile belongs to) is empty.
+    const landOf = (t: MapTile | undefined): MapTile | undefined =>
+    t && isLandType(t.terrain) && !t.settlement && !t.unit ? t : undefined;
+    const neighbors = (t: MapTile): (MapTile | undefined)[] => hexNeighbors(t).map((n) => tileAt(map, n.q, n.r));
+    // Find any A --road-- target -- B chain of four empty land tiles.
+    let chain: { target: MapTile; road: MapTile; a: MapTile; b: MapTile } | null = null;
+    for (const target of map.tiles) {
+      if (!landOf(target)) continue;
+      const around = neighbors(target).map(landOf).filter((t): t is MapTile => !!t);
+      for (const b of around) {
+        for (const road of around) {
+          if (road === b) continue;
+          const a = neighbors(road).map(landOf).find((t) => t && t !== target && t !== b);
+          if (a) { chain = { target, road, a, b }; break; }
+        }
+        if (chain) break;
+      }
+      if (chain) break;
+    }
+    expect(chain).not.toBeNull();
+    const { target, road, a, b } = chain!;
+    // Drop the startGame villages so the payer/network logic only sees ours.
+    for (const t of map.tiles) t.settlement = null;
+    a.settlement = { owner: 0, level: 1, captureReady: false, capital: true };
+    a.ownedBy = 0;
+    b.settlement = { owner: 0, level: 1, captureReady: false };
+    b.ownedBy = 0;
+    road.roadOwner = 0;
+    road.ownedBy = 0;
+    target.ownedBy = 0;
+    target.claimedByVillage = { q: b.q, r: b.r };
+    // Money on the player; the only wood/stone sit in village A's stock.
+    players[0]!.resources.money = 100;
+    addStock(a, { wood: 10, stone: 10 });
+    players[0]!.skills.push(SkillId.ROADS);
+    useGameStore.getState().setPlayers(players);
+    selectCell(target);
+    const spec = toolbarSpecs().find((a2) => a2.key === 'road');
+    expect(spec).toBeDefined();
+    // The road joins A's network, so A's stock must pay — the action may not be disabled.
+    expect(spec!.disabled).toBe(false);
+  });
+});

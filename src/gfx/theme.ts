@@ -1,0 +1,89 @@
+
+import { FontSize } from '@enums';export const THEME = {
+  bg: 0x1a1a2e,
+  button: 0x4b516f,
+  buttonHover: 0x5297FF,
+  buttonPressed: 0x3977D8,
+  buttonSelected: 0x5297FF,
+  panelBg: 0x000000,
+  panelAlpha: 0.6,
+  dialogBg: 0x222222,
+  highlight: 0xffd700,
+  /** Flat status button fills: idle, hover and pressed. */
+  success: { base: 0x3f9d5b, hover: 0x57b874, pressed: 0x2f7d46 },
+  warning: { base: 0xd9822b, hover: 0xeb9a47, pressed: 0xb56a1e },
+  radius: 4,
+  fontFamily: 'Roboto, system-ui, sans-serif',
+  text: 0xeeeeee,
+  white: 0xffffff,
+  skillTree: {
+    bg: 0x202032,
+    openedLabelText: 0xffffff,
+    closedLabelText: 0x444444,
+    openedSkillBg: 0x373748,
+    openedSkillStroke: 0xff8c00,
+    closedSkillBg: 0x363636,
+    closedSkillStroke: 0x363636,
+    /** Line to a skill that can't be opened yet. */
+    unreachableLine: 0x1a1a2b,
+    /** Medallion fill/stroke of a skill that can't be opened yet. */
+    unreachableSkill: 0x1a1a2b,
+    /** Price badge fill of every unopened skill. */
+    priceBg: 0x141423,
+    /** Price text of a skill that can't be opened yet (missing parent skill or money). */
+    unreachablePriceText: 0x333333,
+  },
+  /** Map-layer UI palette (selection highlights, route strokes). */
+  map: {
+    /** Selected/attackable or capture-adjacent border highlight. */
+    selected: 0xEB1F00,
+    /** Own road stroke. */
+    road: 0xff8c00,
+    /** Own auto water-route stroke. */
+    waterRoad: 0x7fd8f5,
+  },
+} as const;
+
+export const TEXT_BUTTON = {
+  fontSize: FontSize.NORMAL,
+  paddingX: 16,
+  paddingY: 8,
+  minHeight: 34,
+} as const;
+
+export function parseHexColor(css: string): number {
+  const m = /^#([0-9a-fA-F]{6})$/.exec(css);
+  return m ? parseInt(m[1]!, 16) : THEME.bg;
+}
+
+export function colorCss(color: number): string {
+  return `#${color.toString(16).padStart(6, '0')}`;
+}
+
+export function isLightColor(color: number): boolean {
+  const r = (color >> 16) & 0xff;
+  const g = (color >> 8) & 0xff;
+  const b = color & 0xff;
+  return 0.299 * r + 0.587 * g + 0.114 * b > 150;
+}
+
+
+function srgbToLinear(channel: number): number {
+  const c = channel / 255;
+  return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+}
+
+/** WCAG relative luminance of a 0xRRGGBB colour (0 = black, 1 = white). */
+export function relativeLuminance(color: number): number {
+  const r = srgbToLinear((color >> 16) & 0xff);
+  const g = srgbToLinear((color >> 8) & 0xff);
+  const b = srgbToLinear(color & 0xff);
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+/** Text colour (white or black) with the better contrast on `background`. */
+export function contrastTextColor(background: number): number {
+  // Black wins once the background is brighter than the point where the
+  // contrast ratios against white and black are equal (luminance ≈ 0.179).
+  return relativeLuminance(background) > 0.179 ? 0x000000 : 0xffffff;
+}

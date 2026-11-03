@@ -1,0 +1,39 @@
+import { describe, expect, it } from 'vitest';
+import { useGameStore } from '../src/store/game-store';
+import { gameController } from '../src/controller/game-controller';
+import { SkillId, TutorialStepId } from '@enums';
+
+describe('tutorial store fields', () => {
+  it('defaults to inactive', () => {
+    const s = useGameStore.getState();
+    expect(s.tutorial).toBe(false);
+    expect(s.tutorialStep).toBeNull();
+    expect(s.tutorialHighlightSkills).toEqual([]);
+    expect(s.tutorialHighlightEndTurn).toBe(false);
+  });
+
+  it('persists tutorial state and highlight setters', () => {
+    const s = useGameStore.getState();
+    s.setTutorial(true);
+    s.setTutorialStep(TutorialStepId.MOVE_UNIT);
+    s.setTutorialHighlightSkills([SkillId.FORESTRY]);
+    s.setTutorialHighlightEndTurn(true);
+    const t = useGameStore.getState();
+    expect(t.tutorial).toBe(true);
+    expect(t.tutorialStep).toBe(TutorialStepId.MOVE_UNIT);
+    expect(t.tutorialHighlightSkills).toEqual([SkillId.FORESTRY]);
+    expect(t.tutorialHighlightEndTurn).toBe(true);
+    s.setTutorial(false);
+    s.setTutorialStep(null);
+    s.setTutorialHighlightSkills([]);
+    s.setTutorialHighlightEndTurn(false);
+  });
+});
+
+describe('gameController tutorial API', () => {
+  it('exposes tutorial entry/exit methods', () => {
+    expect(typeof gameController.startTutorial).toBe('function');
+    expect(typeof gameController.tutorialContinue).toBe('function');
+    expect(typeof gameController.exitTutorial).toBe('function');
+  });
+});

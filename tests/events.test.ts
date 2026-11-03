@@ -1,0 +1,24 @@
+import { GameEventType, GameMode } from '@enums';
+import { describe, it, expect } from 'vitest';
+import { type GameEvent } from '../src/game/events';
+import { type GameStateSnapshot } from '../src/game/state';
+import { type GameMap } from '../src/game/map/map-gen';
+import { type Player } from '../src/game/players';
+
+describe('game events & state', () => {
+  it('GameEvent objects survive JSON round-trip', () => {
+    const e: GameEvent = { type: GameEventType.UNIT_MOVED, unitId: 'u1', from: { q: 0, r: 0 }, path: [{ q: 0, r: 1 }], to: { q: 0, r: 1 } };
+    const copy = JSON.parse(JSON.stringify(e)) as GameEvent;
+    expect(copy).toEqual(e);
+  });
+
+  it('GameStateSnapshot survives JSON round-trip', () => {
+    const map: GameMap = { radius: 1, tiles: [], spawns: [] };
+    const players: Player[] = [
+      { index: 0, tribe: 1, isHuman: true, name: 'p0', resources: { wood: 3, stone: 2, money: 5, ore: 0, food: 20 }, score: 0, kills: 0, skills: [], isActive: true },
+    ];
+    const snap: GameStateSnapshot = { map, players, mode: GameMode.CAPTURE, turn: 1, currentPlayerIndex: 0, gameOver: false, winnerIndex: null, expectedTurns: 15, bonusAwarded: false };
+    const copy = JSON.parse(JSON.stringify(snap)) as GameStateSnapshot;
+    expect(copy).toEqual(snap);
+  });
+});

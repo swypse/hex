@@ -1,0 +1,316 @@
+import { describe, expect, it } from 'vitest';
+import { planAiActions } from '../src/game/ai/ai';
+import { Simulator } from '../src/game/simulator';
+import { buildPlayers } from '../src/game/players';
+import { Tribe } from '../src/game/tribes';
+import { SeededRandom } from '../src/util/random';
+import { makeTestMap, tileAt, makeUnit, giveResources } from './helpers/test-map';
+import { TileType } from '../src/game/map/tile-types';
+import { AiActionType, AiDifficulty, BuildingKind, CommandType, GameMode, SkillId, UnitType } from '@enums';
+
+function makeAI(): ReturnType<typeof buildPlayers>[number] {
+  const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(11), AiDifficulty.NORMAL);
+  return players[1]!;
+}
+
+describe('AI keeps villages defended', () => {
+  it('does not march the only defender out of a village an enemy can reach next turn', () => {
+    const map = makeTestMap(6);
+    const ai = makeAI();
+    // Own village (0,0) with its only guard.
+    const home = tileAt(map, 0, 0)!;
+    home.settlement = { owner: 1, level: 1, captureReady: false };
+    home.ownedBy = 1;
+    home.exploredBy = [1];
+    const guard = makeUnit('guard', 1, UnitType.WARRIOR, 0, 0);
+    home.unit = guard;
+    // A fast enemy rider three hexes east: can reach the village next turn.
+    const riderTile = tileAt(map, 3, 0)!;
+    riderTile.unit = makeUnit('rider', 0, UnitType.RIDER, 3, 0);
+    riderTile.exploredBy = [1];
+    // An enemy village adjacent to our guard that it could 'push' into.
+    const enemyVillage = tileAt(map, 0, -1)!;
+    enemyVillage.settlement = { owner: 0, level: 1, captureReady: false };
+    enemyVillage.ownedBy = 0;
+    enemyVillage.exploredBy = [1];
+
+    const actions = planAiActions(map, ai, new SeededRandom(5));
+    expect(actions.some((a) => a.type === AiActionType.MOVE && a.unitId === 'guard')).toBe(false);
+  });
+});
+
+describe('AI opening order in the first village', () => {
+  function setup(level: number) {
+    const map = makeTestMap(6);
+    const ai = makeAI();
+    ai.skills = [SkillId.FORESTRY, SkillId.SMITHERY, SkillId.AGRICULTURE, SkillId.GRANARY];
+    const village = tileAt(map, 0, 0)!;
+    village.settlement = { owner: 1, level, captureReady: false, capital: true };
+    village.ownedBy = 1;
+    village.exploredBy = [1];
+    const claim = (q: number, r: number, terrain?: TileType) => {
+      const t = tileAt(map, q, r)!;
+      if (terrain) t.terrain = terrain;
+      t.ownedBy = 1;
+      t.claimedByVillage = { q: 0, r: 0 };
+    };
+    claim(0, 1, TileType.GrasslandMountain);
+    claim(0, -1, TileType.GrasslandForest);
+    claim(1, 0);
+    claim(-1, 0);
+    claim(1, -1);
+    giveResources(map, ai, { money: 300, wood: 60, stone: 60, food: 30 });
+    return { map, ai };
+  }
+  const kinds = (actions: ReturnType<typeof planAiActions>) =>
+    actions.flatMap((a) => (a.type === AiActionType.UPGRADE ? ['upgrade'] : a.type === AiActionType.BUILD ? [a.kind] : []));
+
+  it('upgrades the first village before building anything', () => {
+    const { map, ai } = setup(1);
+    const order = kinds(planAiActions(map, ai, new SeededRandom(9)));
+    expect(order[0]).toBe('upgrade');
+  });
+
+  it('then builds sawmill, farm and mine in that order', () => {
+    const { map, ai } = setup(2);
+    const order = kinds(planAiActions(map, ai, new SeededRandom(9)));
+    const idx = (k: BuildingKind) => order.indexOf(k);
+    expect(idx(BuildingKind.SAWMILL)).toBeGreaterThanOrEqual(0);
+    expect(idx(BuildingKind.SAWMILL)).toBeLessThan(idx(BuildingKind.FARM));
+    expect(idx(BuildingKind.FARM)).toBeLessThan(idx(BuildingKind.MINE));
+  });
+
+  it('builds the mine before the farm without earlyFarm', () => {
+    const { map, ai } = setup(2);
+    ai.aiFlags = { earlyFarm: false } as never;
+    const order = kinds(planAiActions(map, ai, new SeededRandom(9)));
+    expect(order.indexOf(BuildingKind.MINE)).toBeLessThan(order.indexOf(BuildingKind.FARM));
+  });
+
+  it('finishes with a granary next to the farm, whatever the food situation', () => {
+    const { map, ai } = setup(3);
+    tileAt(map, 0, 1)!.building = { kind: BuildingKind.MINE, level: 1 };
+    tileAt(map, -1, 0)!.building = { kind: BuildingKind.SAWMILL, level: 1 };
+    tileAt(map, 1, 0)!.building = { kind: BuildingKind.FARM, level: 1 };
+    const order = kinds(planAiActions(map, ai, new SeededRandom(9)));
+    expect(order).toContain(BuildingKind.GRANARY);
+  });
+});
+
+describe('AI prepares for winter food', () => {
+  it('builds a granary next to a farm for a network that has none', () => {
+    const map = makeTestMap(6);
+    const ai = makeAI();
+    ai.skills = [SkillId.AGRICULTURE, SkillId.GRANARY];
+    const village = tileAt(map, 0, 0)!;
+    village.settlement = { owner: 1, level: 2, captureReady: false };
+    village.ownedBy = 1;
+    village.settlement.capital = true;
+    giveResources(map, ai, { money: 200, wood: 40, stone: 40, food: 0 });
+    village.unit = makeUnit('w', 1, UnitType.WARRIOR, 0, 0);
+    village.unit.spawnVillage = { q: 0, r: 0 };
+    // Upkeep equals the farm's yield: balance 0, so only winter planning wants a granary.
+    const second = tileAt(map, -1, 0)!;
+    second.unit = makeUnit('w2', 1, UnitType.WARRIOR, -1, 0);
+    second.unit.spawnVillage = { q: 0, r: 0 };
+    const farm = tileAt(map, 1, 0)!;
+    farm.ownedBy = 1;
+    farm.claimedByVillage = { q: 0, r: 0 };
+    farm.building = { kind: BuildingKind.FARM, level: 1 };
+    for (const [q, r] of [[0, 1], [1, -1], [2, -1], [2, 0], [1, 1]] as const) {
+      const t = tileAt(map, q, r)!;
+      t.ownedBy = 1;
+      t.claimedByVillage = { q: 0, r: 0 };
+    }
+    const actions = planAiActions(map, ai, new SeededRandom(3));
+    expect(actions.some((a) => a.type === AiActionType.BUILD && a.kind === BuildingKind.GRANARY)).toBe(true);
+  });
+
+  it('demolishes a sawmill that boxes in its farm to make room for a granary, and does not rebuild it', () => {
+    const map = makeTestMap(6);
+    const ai = makeAI();
+    ai.skills = [SkillId.AGRICULTURE, SkillId.GRANARY, SkillId.FORESTRY];
+    const village = tileAt(map, 0, 0)!;
+    village.settlement = { owner: 1, level: 3, captureReady: false, capital: true };
+    village.ownedBy = 1;
+    giveResources(map, ai, { money: 200, wood: 40, stone: 40, food: 0 });
+    village.unit = makeUnit('w', 1, UnitType.WARRIOR, 0, 0);
+    village.unit.spawnVillage = { q: 0, r: 0 };
+    const second = tileAt(map, -1, 0)!;
+    second.unit = makeUnit('w2', 1, UnitType.WARRIOR, -1, 0);
+    second.unit.spawnVillage = { q: 0, r: 0 };
+    const farm = tileAt(map, 1, 0)!;
+    farm.ownedBy = 1;
+    farm.claimedByVillage = { q: 0, r: 0 };
+    farm.building = { kind: BuildingKind.FARM, level: 1 };
+    // Every other tile next to the farm holds a sawmill.
+    for (const [q, r] of [[0, 1], [1, -1], [2, -1], [2, 0], [1, 1]] as const) {
+      const t = tileAt(map, q, r)!;
+      t.ownedBy = 1;
+      t.claimedByVillage = { q: 0, r: 0 };
+      t.building = { kind: BuildingKind.SAWMILL, level: 1 };
+    }
+    const actions = planAiActions(map, ai, new SeededRandom(3));
+    expect(actions.some((a) => a.type === AiActionType.DESTROY_BUILDING)).toBe(true);
+    expect(actions.some((a) => a.type === AiActionType.BUILD && a.kind === BuildingKind.SAWMILL)).toBe(false);
+  });
+});
+
+describe('AI and the university', () => {
+  /** A level-5 capital with own land around it and the materials for a university. */
+  function setup(skills: SkillId[]) {
+    const map = makeTestMap(6);
+    const ai = makeAI();
+    ai.skills = skills;
+    const village = tileAt(map, 0, 0)!;
+    village.settlement = { owner: 1, level: 5, captureReady: false, capital: true };
+    village.ownedBy = 1;
+    village.exploredBy = [1];
+    for (const [q, r] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, -1], [-1, 1]] as const) {
+      const t = tileAt(map, q, r)!;
+      t.ownedBy = 1;
+      t.claimedByVillage = { q: 0, r: 0 };
+    }
+    // The opening order (farm, granary) is done, so other buildings are not held back.
+    tileAt(map, -1, 0)!.building = { kind: BuildingKind.FARM, level: 1 };
+    tileAt(map, -1, 1)!.building = { kind: BuildingKind.GRANARY, level: 1, food: 0 };
+    giveResources(map, ai, { money: 300, wood: 40, stone: 40, ore: 20, food: 40 });
+    return { map, ai };
+  }
+
+  it('builds a university in a level-5 village once it has Science and the means', () => {
+    const { map, ai } = setup([SkillId.SCIENCE]);
+    const actions = planAiActions(map, ai, new SeededRandom(3));
+    expect(actions.some((a) => a.type === AiActionType.BUILD && a.kind === BuildingKind.UNIVERSITY)).toBe(true);
+  });
+
+  it('saves up for the university over a few turns instead of spending the money on skills and spawns', () => {
+    const map = makeTestMap(6);
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(11), AiDifficulty.NORMAL);
+    const ai = players[1]!;
+    ai.skills = [SkillId.SCIENCE, SkillId.AGRICULTURE];
+    const home = tileAt(map, -5, 0)!;
+    home.settlement = { owner: 0, level: 1, captureReady: false, capital: true };
+    home.ownedBy = 0;
+    home.exploredBy = [0];
+    home.unit = makeUnit('hu', 0, UnitType.WARRIOR, -5, 0);
+    const village = tileAt(map, 3, 0)!;
+    village.settlement = { owner: 1, level: 5, captureReady: false, capital: true };
+    village.ownedBy = 1;
+    village.exploredBy = [1];
+    for (const [q, r] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, -1], [-1, 1]] as const) {
+      const t = tileAt(map, 3 + q, r)!;
+      t.ownedBy = 1;
+      t.claimedByVillage = { q: 3, r: 0 };
+    }
+    giveResources(map, ai, { money: 100, wood: 40, stone: 40, ore: 20, food: 40 });
+    const sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5 });
+    sim.startGame();
+    let built = false;
+    for (let turn = 1; turn <= 15 && !built; turn++) {
+      sim.applyCommand({ type: CommandType.END_TURN });
+      built = map.tiles.some((t) => t.building?.kind === BuildingKind.UNIVERSITY && t.ownedBy === 1);
+    }
+    expect(built).toBe(true);
+  });
+
+  it('does not build a university in a village below level 5', () => {
+    const { map, ai } = setup([SkillId.SCIENCE]);
+    tileAt(map, 0, 0)!.settlement!.level = 4;
+    const actions = planAiActions(map, ai, new SeededRandom(3));
+    expect(actions.some((a) => a.type === AiActionType.BUILD && a.kind === BuildingKind.UNIVERSITY)).toBe(false);
+  });
+
+  it('opens the skills that need a university once it owns one', () => {
+    const { map, ai } = setup([SkillId.SCIENCE, SkillId.AGRICULTURE]);
+    const site = tileAt(map, 1, 0)!;
+    site.building = { kind: BuildingKind.UNIVERSITY, level: 1 };
+    const university = [SkillId.GEOLOGY, SkillId.ENGINEERING, SkillId.MEDICINE, SkillId.AGRONOMY];
+    const opened = new Set<SkillId>();
+    for (let seed = 1; seed <= 12 && opened.size < university.length; seed++) {
+      for (const a of planAiActions(map, { ...ai, skills: [...ai.skills, ...opened] }, new SeededRandom(seed))) {
+        if (a.type === AiActionType.OPEN_SKILL && university.includes(a.skill)) opened.add(a.skill);
+      }
+      if (opened.size > 0) break;
+    }
+    expect(opened.size).toBeGreaterThan(0);
+  });
+
+  describe('against hunger', () => {
+    /** The capital's farm feeds fewer mouths than it needs: the network is short of food. */
+    function hungry(skills: SkillId[], withUniversity: boolean) {
+      const { map, ai } = setup(skills);
+      ai.resources.money = 300;
+      const farm = tileAt(map, 1, 0)!;
+      farm.building = { kind: BuildingKind.FARM, level: 1 };
+      if (withUniversity) tileAt(map, 0, 1)!.building = { kind: BuildingKind.UNIVERSITY, level: 1 };
+      let n = 0;
+      for (const [q, r] of [[0, 0], [-1, 0], [0, -1], [1, -1]] as const) {
+        const t = tileAt(map, q, r)!;
+        t.unit = makeUnit(`k${n++}`, 1, UnitType.KNIGHT, q, r);
+        t.unit.spawnVillage = { q: 0, r: 0 };
+      }
+      return { map, ai };
+    }
+
+    it('opens Agronomy when a university stands and the network is hungry', () => {
+      const { map, ai } = hungry([SkillId.SCIENCE, SkillId.AGRICULTURE], true);
+      const actions = planAiActions(map, ai, new SeededRandom(3));
+      expect(actions.some((a) => a.type === AiActionType.OPEN_SKILL && a.skill === SkillId.AGRONOMY)).toBe(true);
+    });
+
+    it('builds the university first when it has none', () => {
+      const { map, ai } = hungry([SkillId.SCIENCE, SkillId.AGRICULTURE], false);
+      const actions = planAiActions(map, ai, new SeededRandom(3));
+      expect(actions.some((a) => a.type === AiActionType.BUILD && a.kind === BuildingKind.UNIVERSITY)).toBe(true);
+    });
+  });
+});
+
+describe('AI stone focus', () => {
+  function village(map: ReturnType<typeof makeTestMap>, ai: ReturnType<typeof makeAI>) {
+    const v = tileAt(map, 0, 0)!;
+    v.settlement = { owner: 1, level: 3, captureReady: false, capital: true };
+    v.ownedBy = 1;
+    v.exploredBy = [1];
+    const mountain = tileAt(map, 0, 1)!;
+    mountain.terrain = TileType.GrasslandMountain;
+    mountain.ownedBy = 1;
+    mountain.claimedByVillage = { q: 0, r: 0 };
+    for (const [q, r] of [[1, 0], [-1, 0], [0, -1]] as const) {
+      const t = tileAt(map, q, r)!;
+      t.ownedBy = 1;
+      t.claimedByVillage = { q: 0, r: 0 };
+    }
+    giveResources(map, ai, { money: 200, wood: 40, stone: 40, food: 30 });
+    return v;
+  }
+
+  it('builds only a mine (and one sawmill), no spawns or other buildings, until a village has a mine', () => {
+    const map = makeTestMap(6);
+    const ai = makeAI();
+    ai.skills = [SkillId.FORESTRY, SkillId.SMITHERY, SkillId.AGRICULTURE];
+    ai.aiFlags = { earlyFarm: false } as never; // this test pins the mine-first stone focus, not the opening order
+    village(map, ai);
+    tileAt(map, -1, 0)!.terrain = TileType.GrasslandForest;
+    const actions = planAiActions(map, ai, new SeededRandom(4));
+    expect(actions.some((a) => a.type === AiActionType.BUILD && a.kind === BuildingKind.MINE)).toBe(true);
+    const firstMine = actions.findIndex((a) => a.type === AiActionType.BUILD && a.kind === BuildingKind.MINE);
+    const spawn = actions.findIndex((a) => a.type === AiActionType.SPAWN);
+    if (spawn >= 0) expect(spawn).toBeGreaterThan(firstMine);
+    const farm = actions.findIndex((a) => a.type === AiActionType.BUILD && a.kind === BuildingKind.FARM);
+    if (farm >= 0) expect(farm).toBeGreaterThan(firstMine);
+  });
+
+  it('opens Geology (via Science) when it has a mine and little stone', () => {
+    const map = makeTestMap(6);
+    const ai = makeAI();
+    ai.skills = [SkillId.FORESTRY, SkillId.SMITHERY, SkillId.CLIMBING, SkillId.AGRICULTURE];
+    const v = village(map, ai);
+    tileAt(map, 0, 1)!.building = { kind: BuildingKind.MINE, level: 1 };
+    giveResources(map, ai, { money: 200, wood: 40, stone: 2, food: 30 });
+    void v;
+    const actions = planAiActions(map, ai, new SeededRandom(4));
+    expect(actions.some((a) => a.type === AiActionType.OPEN_SKILL && (a.skill === SkillId.SCIENCE || a.skill === SkillId.GEOLOGY))).toBe(true);
+  });
+});

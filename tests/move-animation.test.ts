@@ -1,0 +1,1059 @@
+import { BuildingKind, CommandType, GameEventType, GameMode, NetMode, SelectionKind, UnitFacing, UnitType } from '@enums';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { Application, Container, Graphics, ImageSource, Text, Texture } from 'pixi.js';
+import { RenderGate, installRenderGate, markDirty, type RenderGateApp } from '../src/gfx/render-gate';
+import { gameController } from '../src/controller/game-controller';
+import { Simulator, type Command } from '../src/game/simulator';
+import { type GameMap, type MapTile } from '../src/game/map/map-gen';
+import { TileType } from '../src/game/map/tile-types';
+import { type Player } from '../src/game/players';
+import { START_RESOURCES } from '../src/game/economy/resources';
+import { Tribe } from '../src/game/tribes';
+import { UNIT_TYPES, type Unit } from '../src/game/units/units';
+import { allTiles, axialKey } from '../src/game/map/hex';
+import { type GameEvent } from '../src/game/events';
+import { MapView } from '../src/render/map-renderer';
+import { useGameStore } from '../src/store/game-store';
+import { sfx } from '../src/sound/sfx';
+import { type TextureSet, type TileTexture } from '../src/render/texture-factory';
+import { installCamera } from './helpers/test-map';
+
+function tex(w: number, h: number): Texture {
+  return new Texture({ source: new ImageSource({ width: w, height: h }) });
+}
+
+function tileTex(w: number, h: number, anchorY = 0.5): TileTexture {
+  return { texture: tex(w, h), anchorY };
+}
+
+function buildTextures(map: GameMap): TextureSet {
+  const unitTex = tileTex(100, 100, 0.7);
+  const shipTex = tileTex(100, 100, 0.7);
+  const allTribes: Tribe[] = [Tribe.Cats, Tribe.Warriors, Tribe.Barbarians, Tribe.Villagers];
+  const unitTextures = Object.fromEntries(
+    allTribes.map((t) => [t, { warrior: unitTex, rider: unitTex, archer: unitTex, swordsman: unitTex }]),
+  ) as TextureSet['unitTextures'];
+  const shipTextures = Object.fromEntries(
+    allTribes.map((t) => [t, { 1: shipTex, 2: shipTex, 3: shipTex }]),
+  ) as TextureSet['shipTextures'];
+  const portTextures = {
+    e: tileTex(40, 40, 0.7),
+    ne: tileTex(40, 40, 0.7),
+    nw: tileTex(40, 40, 0.7),
+    w: tileTex(40, 40, 0.7),
+    sw: tileTex(40, 40, 0.7),
+    se: tileTex(40, 40, 0.7),
+  };
+  return {
+    tileTextures: new Map(map.tiles.map((t) => [axialKey(t), tileTex(50, 50)])),
+    fogTextures: new Map(map.tiles.map((t) => [axialKey(t), tileTex(50, 50)])),
+    fogTopTexture: tileTex(50, 50),
+    freeVillageTexture: tileTex(40, 40),
+    unitTextures,
+    pirateTexture: unitTex,
+    sawmillTexture: tileTex(50, 50),
+    mineTexture: tileTex(50, 50),
+    farmTexture: tileTex(50, 50),
+    farmIdleTexture: tileTex(50, 50),
+    granaryTextures: Array.from({ length: 7 }, () => tileTex(50, 50)),
+    portTextures,
+    bridgeTextures: { nw: unitTex, ne: unitTex, we: unitTex },
+    freePortTexture: tex(40, 40),
+    templeTextures: {
+      1: tileTex(40, 40, 0.7),
+      2: tileTex(40, 40, 0.7),
+      3: tileTex(40, 40, 0.7),
+      4: tileTex(40, 40, 0.7),
+    },
+    forestTempleTextures: {
+      1: tileTex(40, 40, 0.7),
+      2: tileTex(40, 40, 0.7),
+      3: tileTex(40, 40, 0.7),
+      4: tileTex(40, 40, 0.7),
+    },
+    shipTextures,
+    bonusTexture: tileTex(50, 50),
+    bottleTexture: tileTex(50, 50),
+    villageConnectedTexture: null,
+    captureTexture: null,
+
+    wallTexture: null,
+    arrowTexture: tex(67, 13),
+    glowFor: new Map(),
+    cannonballTexture: tex(35, 15), 
+    attackIconTexture: null,
+    cannonbalTexture: null,  
+  };
+}
+
+function makeMap(): GameMap {
+  const unitTile: MapTile = {
+    q: 0,
+    r: 0,
+    terrain: TileType.GrasslandLand,
+    height: 0.1,
+    settlement: null,
+    building: null,
+    roadOwner: null,
+    unit: {
+      id: 'u1',
+      owner: 0,
+      type: UnitType.WARRIOR,
+      q: 0,
+      r: 0,
+      hasMoved: false,
+      hasAttacked: false,
+      hasHealed: false,
+      hp: UNIT_TYPES.warrior.maxHp,
+      attack: UNIT_TYPES.warrior.attack,
+      attackDistance: UNIT_TYPES.warrior.attackDistance,
+      spawnVillage: { q: 0, r: 0 },
+    },
+    ownedBy: 0,
+    claimedByVillage: null,
+    exploredBy: [0],
+  };
+  const neighbor = (q: number, r: number): MapTile => ({
+    q,
+    r,
+    terrain: TileType.GrasslandLand,
+    height: 0.1,
+    settlement: null,
+    building: null,
+    roadOwner: null,
+    unit: null,
+    ownedBy: null,
+    claimedByVillage: null,
+    exploredBy: [0],
+  });
+  return {
+    radius: 1,
+    spawns: [],
+    tiles: [
+      unitTile,
+      neighbor(1, 0), neighbor(1, -1), neighbor(0, -1),
+      neighbor(-1, 0), neighbor(-1, 1), neighbor(0, 1),
+    ],
+  };
+}
+
+function makeOpenMap(): GameMap {
+  const tiles: MapTile[] = allTiles(2).map(({ q, r }) => ({
+    q,
+    r,
+    terrain: TileType.GrasslandLand,
+    height: 0.1,
+    settlement: null,
+    building: null,
+    roadOwner: null,
+    unit: null,
+    ownedBy: null,
+    claimedByVillage: null,
+    exploredBy: [0, 1, 2],
+  }));
+  return { radius: 2, spawns: [], tiles };
+}
+
+function unitAt(map: GameMap, q: number, r: number): MapTile {
+  return map.tiles.find((t) => t.q === q && t.r === r)!;
+}
+
+function makeEnemy(id: string, owner: number, q: number, r: number): Unit {
+  return {
+    id,
+    owner,
+    type: UnitType.WARRIOR,
+    q,
+    r,
+    hasMoved: false,
+    hasAttacked: false,
+    hasHealed: false,
+    hp: UNIT_TYPES.warrior.maxHp,
+    attack: UNIT_TYPES.warrior.attack,
+    attackDistance: UNIT_TYPES.warrior.attackDistance,
+    spawnVillage: { q, r },
+  };
+}
+
+async function waitFor(cond: () => boolean, timeout = 2000): Promise<void> {
+  const start = Date.now();
+  while (!cond()) {
+    if (Date.now() - start > timeout) throw new Error('waitFor timed out');
+    await new Promise((r) => setTimeout(r, 5));
+  }
+}
+
+interface Harness {
+  gc: {
+    runCommand: (cmd: Command) => Promise<void>;
+    presentEvents: (events: GameEvent[], pre: Set<string>) => Promise<void>;
+    exploredKeysFor: (player: number) => Set<string>;
+    app: unknown;
+    sim: unknown;
+    mapView: MapView;
+    textures: TextureSet;
+    hiddenUnitIds: Set<string>;
+    taskQueue: Promise<void>;
+  };
+  mapView: MapView;
+  tileViews: () => Map<string, { unitSprite: { visible: boolean; scale: { x: number } } | null }>;
+}
+
+let realRaf: typeof requestAnimationFrame | undefined;
+let rafStep = 30;
+
+function setupGame(map: GameMap, players: Player[]): Harness {
+  const sim = new Simulator(map, players, GameMode.CAPTURE);
+  sim.startGame();
+  sim.drainEvents();
+
+  const app = {
+    screen: { width: 800, height: 600 },
+    ticker: { add: (): void => {}, remove: (): void => {} },
+  } as unknown as Application;
+
+  const textures = buildTextures(map);
+  const mapView = new MapView(app, textures, 40, 0.5);
+  mapView.update(map, players, null, new Set(), new Set(), 0, new Set(), {
+    x: 400, y: 300, scale: 1, width: 800, height: 600,
+  });
+
+  const store = useGameStore.getState();
+  store.setLocalPlayerIndex(0);
+  store.setNetMode(NetMode.SINGLE);
+  store.setAiActive(false);
+  store.setSelection({ kind: SelectionKind.UNIT, q: 0, r: 0 });
+  store.setPlayers(players);
+
+  const gc = gameController as unknown as Harness['gc'];
+  gc.app = app;
+  gc.sim = sim;
+  gc.mapView = mapView;
+  gc.textures = textures;
+  gc.hiddenUnitIds.clear();
+  installCamera(gc, app, map.radius);
+  gc.taskQueue = Promise.resolve();
+
+  let now = 0;
+  realRaf = (globalThis as { requestAnimationFrame?: typeof requestAnimationFrame }).requestAnimationFrame!;
+  (globalThis as { performance: Performance }).performance.now = () => now;
+  (globalThis as { requestAnimationFrame: typeof requestAnimationFrame }).requestAnimationFrame = ((cb: (t: number) => void) => {
+    now += rafStep;
+    return setTimeout(() => cb(now), 0);
+  }) as unknown as typeof requestAnimationFrame;
+
+  return {
+    gc,
+    mapView,
+    tileViews: () =>
+      (mapView as unknown as { tileViews: Map<string, { unitSprite: { visible: boolean; scale: { x: number } } | null }> }).tileViews,
+  };
+}
+
+function player(index: number, tribe: Tribe): Player {
+  return { index, tribe, isHuman: true, name: `P${index}`, resources: { ...START_RESOURCES }, score: 0, kills: 0, skills: [], isActive: true };
+}
+
+describe('move animation', () => {
+  let h: Harness;
+
+  beforeEach(() => {
+    useGameStore.setState({ centerMessage: null, centerMessageQueue: [] });
+    Object.defineProperty(Text.prototype, 'width', { configurable: true, get: () => 40 });
+    Object.defineProperty(Text.prototype, 'height', { configurable: true, get: () => 14 });
+    h = setupGame(makeMap(), [player(0, Tribe.Cats)]);
+  });
+
+  afterEach(() => {
+    if (realRaf) (globalThis as { requestAnimationFrame: typeof requestAnimationFrame }).requestAnimationFrame = realRaf;
+    h.mapView.destroy();
+  });
+
+  it('renders a frame for every tick while a rider walks so the move does not teleport', async () => {
+    const map = makeOpenMap();
+    h = setupGame(map, [player(0, Tribe.Cats)]);
+    const from = unitAt(map, 0, 0);
+    const rider: Unit = {
+      id: 'r1', owner: 0, type: UnitType.RIDER, q: 0, r: 0,
+      hasMoved: false, hasAttacked: false, hasHealed: false,
+      hp: 5, attack: 2, attackDistance: 1, spawnVillage: { q: 0, r: 0 },
+    };
+    from.unit = rider;
+    const dest = unitAt(map, 2, 0);
+    from.unit = null;
+    dest.unit = { ...rider as Unit, q: 2, r: 0 };
+    h.mapView.update(map, [player(0, Tribe.Cats)], null, new Set(), new Set(), 0, new Set(), {
+      x: 0, y: 0, scale: 1, width: 800, height: 600,
+    });
+
+    // A render-gated app whose ticker we can step and whose render records.
+    // Installed through `installRenderGate` (the process-wide install main.ts
+    // uses) so the walk tween's `markDirty()` actually reaches this gate.
+    const cbs: Array<(t: { deltaMS: number }) => void> = [];
+    const renders: number[] = [];
+    const app = {
+      screen: { width: 800, height: 600 },
+      ticker: {
+        add: (fn: (t: { deltaMS: number }) => void): unknown => { cbs.push(fn); return fn; },
+        remove: (fn: (t: { deltaMS: number }) => void): void => {
+          const i = cbs.indexOf(fn);
+          if (i >= 0) cbs.splice(i, 1);
+        },
+      },
+      canvas: { addEventListener: (): void => {} },
+      render: (): void => { renders.push(renders.length + 1); },
+    } as unknown as RenderGateApp;
+    const gate = installRenderGate(app);
+    (h.gc as { app: unknown }).app = app;
+
+    const events: GameEvent[] = [
+      { type: GameEventType.UNIT_MOVED, unitId: 'r1', from: { q: 0, r: 0 }, path: [{ q: 1, r: 0 }, { q: 2, r: 0 }], to: { q: 2, r: 0 } },
+    ];
+    const p = h.gc.presentEvents(events, h.gc.exploredKeysFor(0));
+
+    // Wait until the walking ghost is on the map (walk in flight).
+    await waitFor(() =>
+      [...h.mapView.container.children].some((c) => (c as { texture?: unknown }).texture !== undefined),
+    );
+
+    try {
+      // While the walk is in flight the tween must keep requesting frames
+      // (markDirty per animation frame). Without that, the render gate goes
+      // quiet between the walk's start/end renders and the rider appears to
+      // teleport. Interleave yields so the RAF-driven markDirty calls land
+      // between our manual render-gate ticks.
+      const before = renders.length;
+      for (let i = 0; i < 40; i++) {
+        await new Promise((r) => setTimeout(r, 0));
+        cbs.forEach((cb) => cb({ deltaMS: 16 }));
+      }
+      expect(renders.length).toBeGreaterThan(before + 2);
+    } finally {
+      await p;
+      gate.destroy();
+    }
+  });
+
+  it('keeps the unit off the destination while a ghost walks from the start, then reveals it', async () => {
+    const p = h.gc.runCommand({ type: CommandType.MOVE, unitId: 'u1', q: 1, r: 0 });
+
+    await waitFor(() => h.gc.hiddenUnitIds.has('u1'));
+
+    const destView = h.tileViews().get(axialKey({ q: 1, r: 0 }))!;
+    const srcView = h.tileViews().get(axialKey({ q: 0, r: 0 }))!;
+    const last = h.mapView.container.children[h.mapView.container.children.length - 1] as {
+      texture?: unknown;
+      anchor?: unknown;
+      zIndex?: number;
+      destroyed?: boolean;
+    };
+
+    try {
+      // During the walk the real unit must not be visible on the destination cell.
+      expect(destView.unitSprite?.visible).toBe(false);
+      // ... and the source cell no longer shows it either.
+      expect(srcView.unitSprite).toBeNull();
+
+      // A ghost sprite is walking on the map container, above the tiles.
+      expect(last.texture).toBeDefined();
+      expect(last.zIndex).toBeGreaterThanOrEqual(10);
+    } finally {
+      await p;
+    }
+
+    expect(h.gc.hiddenUnitIds.has('u1')).toBe(false);
+    expect(destView.unitSprite?.visible).toBe(true);
+    expect(last.destroyed).toBe(true);
+  });
+
+  it('does not show a not-yet-animated batch unit on its destination during another unit walk', async () => {
+    const map = makeOpenMap();
+    const players = [player(0, Tribe.Cats), player(1, Tribe.Warriors), player(2, Tribe.Barbarians)];
+    h = setupGame(map, players);
+
+    // Enemy units start on explored cells.
+    const e1 = makeEnemy('e1', 1, 1, 0);
+    const e2 = makeEnemy('e2', 2, -1, 0);
+    unitAt(map, 1, 0).unit = e1;
+    unitAt(map, -1, 0).unit = e2;
+    h.mapView.update(map, players, null, new Set(), new Set(), 0, new Set(), {
+      x: 0, y: 0, scale: 1, width: 800, height: 600,
+    });
+
+    // Apply both moves to the sim state (as an AI turn batch would) and
+    // present them together.
+    unitAt(map, 1, 0).unit = null;
+    unitAt(map, 2, 0).unit = e1;
+    e1.q = 2; e1.r = 0;
+    unitAt(map, -1, 0).unit = null;
+    unitAt(map, -2, 0).unit = e2;
+    e2.q = -2; e2.r = 0;
+
+    const events: GameEvent[] = [
+      { type: GameEventType.UNIT_MOVED, unitId: 'e1', from: { q: 1, r: 0 }, path: [{ q: 2, r: 0 }], to: { q: 2, r: 0 } },
+      { type: GameEventType.UNIT_MOVED, unitId: 'e2', from: { q: -1, r: 0 }, path: [{ q: -2, r: 0 }], to: { q: -2, r: 0 } },
+    ];
+
+    const p = h.gc.presentEvents(events, h.gc.exploredKeysFor(0));
+
+    // Wait until the first unit's walk has begun (its ghost is on the map).
+    await waitFor(() =>
+      [...h.mapView.container.children].some((c) => (c as { texture?: unknown }).texture !== undefined),
+    );
+
+    const d2 = h.tileViews().get(axialKey({ q: -2, r: 0 }))!;
+    try {
+      // While e1 walks, e2 must not already be sitting on its destination.
+      expect(h.gc.hiddenUnitIds.has('e2')).toBe(true);
+      expect(d2.unitSprite?.visible).toBe(false);
+    } finally {
+      await p;
+    }
+
+    // After the batch both units are revealed on their destinations.
+    expect(h.gc.hiddenUnitIds.has('e1')).toBe(false);
+    expect(h.gc.hiddenUnitIds.has('e2')).toBe(false);
+    const d1 = h.tileViews().get(axialKey({ q: 2, r: 0 }))!;
+    expect(d1.unitSprite?.visible).toBe(true);
+    expect(d2.unitSprite?.visible).toBe(true);
+  });
+
+  it('keeps the ship texture while a landing move animates', async () => {
+    const map = makeOpenMap();
+    const players = [player(0, Tribe.Cats)];
+    h = setupGame(map, players);
+    const from = unitAt(map, 0, 0);
+    from.terrain = TileType.Water;
+    const ship: Unit = {
+      id: 's1', owner: 0, type: UnitType.WARRIOR, q: 0, r: 0,
+      hasMoved: false, hasAttacked: false, hasHealed: false,
+      hp: 5, attack: 2, attackDistance: 1, spawnVillage: { q: 0, r: 0 }, shipLevel: 1,
+    };
+    from.unit = ship;
+    const dest = unitAt(map, 1, 0);
+    from.unit = null;
+    const landed: Unit = {
+      id: 's1', owner: 0, type: UnitType.WARRIOR, q: 1, r: 0,
+      hasMoved: false, hasAttacked: false, hasHealed: false,
+      hp: 5, attack: 2, attackDistance: 1, spawnVillage: { q: 0, r: 0 },
+    };
+    dest.unit = landed;
+    h.mapView.update(map, players, null, new Set(), new Set(), 0, new Set(), {
+      x: 0, y: 0, scale: 1, width: 800, height: 600,
+    });
+
+    const events: GameEvent[] = [
+      { type: GameEventType.UNIT_MOVED, unitId: 's1', from: { q: 0, r: 0 }, path: [{ q: 1, r: 0 }], to: { q: 1, r: 0 }, shipLevel: 1 },
+    ];
+    const p = h.gc.presentEvents(events, h.gc.exploredKeysFor(0));
+    await waitFor(() =>
+      [...h.mapView.container.children].some((c) => (c as { texture?: unknown }).texture !== undefined),
+    );
+    const ghost = [...h.mapView.container.children]
+      .reverse()
+      .find((c) => (c as { texture?: unknown }).texture !== undefined) as unknown as { texture: Texture };
+    try {
+      expect(ghost.texture).toBe(h.gc.textures.shipTextures[Tribe.Cats][1].texture);
+    } finally {
+      await p;
+    }
+  });
+
+  it('keeps the walking sprite facing right while the unit moves right', async () => {
+    const map = makeOpenMap();
+    h = setupGame(map, [player(0, Tribe.Cats)]);
+    const from = unitAt(map, 0, 0);
+    const unit: Unit = {
+      id: 'u1', owner: 0, type: UnitType.WARRIOR, q: 0, r: 0,
+      hasMoved: true, hasAttacked: false, hasHealed: false,
+      hp: 5, attack: 2, attackDistance: 1, spawnVillage: { q: 0, r: 0 },
+    };
+    from.unit = unit;
+    const dest = unitAt(map, 2, 0);
+    from.unit = null;
+    const landed: Unit = { ...unit, q: 2, r: 0 };
+    dest.unit = landed;
+    h.mapView.update(map, [player(0, Tribe.Cats)], null, new Set(), new Set(), 0, new Set(), {
+      x: 0, y: 0, scale: 1, width: 800, height: 600,
+    });
+
+    const events: GameEvent[] = [
+      { type: GameEventType.UNIT_MOVED, unitId: 'u1', from: { q: 0, r: 0 }, path: [{ q: 1, r: 0 }, { q: 2, r: 0 }], to: { q: 2, r: 0 } },
+    ];
+    const p = h.gc.presentEvents(events, h.gc.exploredKeysFor(0));
+    await waitFor(() =>
+      [...h.mapView.container.children].some((c) => (c as { texture?: unknown }).texture !== undefined),
+    );
+    const walker = [...h.mapView.container.children]
+      .reverse()
+      .find((c) => (c as { texture?: unknown }).texture !== undefined) as unknown as { scale: { x: number } };
+    try {
+      expect(walker.scale.x).toBeGreaterThan(0);
+    } finally {
+      await p;
+    }
+  });
+
+  it('keeps the unit facing right after a rightward move even if it was flipped left before', async () => {
+    const map = makeOpenMap();
+    h = setupGame(map, [player(0, Tribe.Cats)]);
+    const from = unitAt(map, 0, 0);
+    const unit: Unit = {
+      id: 'u1', owner: 0, type: UnitType.WARRIOR, q: 0, r: 0,
+      hasMoved: true, hasAttacked: false, hasHealed: false,
+      hp: 5, attack: 2, attackDistance: 1, spawnVillage: { q: 0, r: 0 },
+    };
+    from.unit = unit;
+    const dest = unitAt(map, 2, 0);
+    from.unit = null;
+    const landed: Unit = { ...unit, q: 2, r: 0 };
+    dest.unit = landed;
+    h.mapView.update(map, [player(0, Tribe.Cats)], null, new Set(), new Set(), 0, new Set(), {
+      x: 0, y: 0, scale: 1, width: 800, height: 600,
+    });
+    // A prior attack flipped the unit to face left; the upcoming rightward
+    // move should override that and leave it facing right once it settles.
+    h.mapView.setUnitFacing('u1', UnitFacing.LEFT);
+
+    const events: GameEvent[] = [
+      { type: GameEventType.UNIT_MOVED, unitId: 'u1', from: { q: 0, r: 0 }, path: [{ q: 1, r: 0 }, { q: 2, r: 0 }], to: { q: 2, r: 0 } },
+    ];
+    const p = h.gc.presentEvents(events, h.gc.exploredKeysFor(0));
+    // Wait until the walk is over and the unit is revealed on the destination.
+    await waitFor(() => {
+      const v = h.tileViews().get(axialKey({ q: 2, r: 0 }));
+      return v?.unitSprite?.visible === true;
+    });
+    await p;
+    const settled = h.tileViews().get(axialKey({ q: 2, r: 0 }))!.unitSprite!;
+    expect(settled.scale.x).toBeGreaterThan(0);
+  });
+
+  it('flips the walking sprite left before the unit moves left', async () => {
+    const map = makeOpenMap();
+    h = setupGame(map, [player(0, Tribe.Cats)]);
+    const from = unitAt(map, 0, 0);
+    const unit: Unit = {
+      id: 'u1', owner: 0, type: UnitType.WARRIOR, q: 0, r: 0,
+      hasMoved: true, hasAttacked: false, hasHealed: false,
+      hp: 5, attack: 2, attackDistance: 1, spawnVillage: { q: 0, r: 0 },
+    };
+    from.unit = unit;
+    const dest = unitAt(map, -1, 0);
+    from.unit = null;
+    const landed: Unit = { ...unit, q: -1, r: 0 };
+    dest.unit = landed;
+    h.mapView.update(map, [player(0, Tribe.Cats)], null, new Set(), new Set(), 0, new Set(), {
+      x: 0, y: 0, scale: 1, width: 800, height: 600,
+    });
+
+    const events: GameEvent[] = [
+      { type: GameEventType.UNIT_MOVED, unitId: 'u1', from: { q: 0, r: 0 }, path: [{ q: -1, r: 0 }], to: { q: -1, r: 0 } },
+    ];
+    const p = h.gc.presentEvents(events, h.gc.exploredKeysFor(0));
+    await waitFor(() =>
+      [...h.mapView.container.children].some((c) => (c as { texture?: unknown }).texture !== undefined),
+    );
+    const walker = [...h.mapView.container.children]
+      .reverse()
+      .find((c) => (c as { texture?: unknown }).texture !== undefined) as unknown as { scale: { x: number } };
+    try {
+      expect(walker.scale.x).toBeLessThan(0);
+    } finally {
+      await p;
+    }
+  });
+
+  it('flips the walking sprite when the move path changes horizontal direction', async () => {
+    const map = makeOpenMap();
+    h = setupGame(map, [player(0, Tribe.Cats)]);
+    const from = unitAt(map, 0, 0);
+    const unit: Unit = {
+      id: 'u1', owner: 0, type: UnitType.WARRIOR, q: 0, r: 0,
+      hasMoved: true, hasAttacked: false, hasHealed: false,
+      hp: 5, attack: 2, attackDistance: 1, spawnVillage: { q: 0, r: 0 },
+    };
+    from.unit = unit;
+    const dest = unitAt(map, 0, 1);
+    from.unit = null;
+    const landed: Unit = { ...unit, q: 0, r: 1 };
+    dest.unit = landed;
+    h.mapView.update(map, [player(0, Tribe.Cats)], null, new Set(), new Set(), 0, new Set(), {
+      x: 0, y: 0, scale: 1, width: 800, height: 600,
+    });
+
+    const events: GameEvent[] = [
+      {
+        type: GameEventType.UNIT_MOVED,
+        unitId: 'u1',
+        from: { q: 0, r: 0 },
+        path: [{ q: 1, r: 0 }, { q: 1, r: 1 }, { q: 0, r: 1 }],
+        to: { q: 0, r: 1 },
+      },
+    ];
+    const p = h.gc.presentEvents(events, h.gc.exploredKeysFor(0));
+    // The horizontal direction changes on the last step (right → left); the
+    // walk sprite must already be flipped while it is still walking.
+    await waitFor(() =>
+      [...h.mapView.container.children].some((c) => {
+        const s = c as { texture?: unknown; scale?: { x: number }; destroyed?: boolean };
+        return s.texture !== undefined && s.scale !== undefined && s.scale.x < 0 && !s.destroyed;
+      }),
+      3000,
+    );
+    const walker = [...h.mapView.container.children]
+      .reverse()
+      .find((c) => (c as { texture?: unknown }).texture !== undefined) as unknown as { scale: { x: number } };
+    try {
+      expect(walker.scale.x).toBeLessThan(0);
+    } finally {
+      await p;
+    }
+  });
+
+  it('keeps an AI unit that boards at a port looking like a land unit until it walks onto the port', async () => {
+    const map = makeOpenMap();
+    const players = [player(0, Tribe.Cats), player(1, Tribe.Barbarians)];
+    h = setupGame(map, players);
+    // The sim already holds the post-move state: the enemy unit has boarded and
+    // stands on the port cell as a ship.
+    const port = unitAt(map, 1, 0);
+    port.building = { kind: BuildingKind.PORT, level: 1 };
+    const boarded: Unit = {
+      id: 'e1', owner: 1, type: UnitType.WARRIOR, q: 1, r: 0,
+      hasMoved: true, hasAttacked: true, hasHealed: false,
+      hp: 5, attack: 2, attackDistance: 1, spawnVillage: { q: 1, r: 0 }, shipLevel: 1,
+    };
+    port.unit = boarded;
+    h.mapView.update(map, players, null, new Set(), new Set(), 0, new Set(), {
+      x: 0, y: 0, scale: 1, width: 800, height: 600,
+    });
+
+    const events: GameEvent[] = [
+      { type: GameEventType.UNIT_MOVED, unitId: 'e1', from: { q: 0, r: 0 }, path: [{ q: 1, r: 0 }], to: { q: 1, r: 0 } },
+    ];
+    const p = h.gc.presentEvents(events, h.gc.exploredKeysFor(0));
+    // The ghost standing on the starting cell must still show the land unit.
+    const ghost = [...h.mapView.container.children]
+      .find((c) => (c as { texture?: unknown }).texture !== undefined) as unknown as { texture: Texture };
+    try {
+      expect(ghost.texture).toBe(h.gc.textures.unitTextures[Tribe.Barbarians].warrior.texture);
+    } finally {
+      await p;
+    }
+  });
+
+  it('keeps the AI ship texture while a ship that lands at a port is queued to move', async () => {
+    const map = makeOpenMap();
+    const players = [player(0, Tribe.Cats), player(1, Tribe.Barbarians)];
+    h = setupGame(map, players);
+    // The sim holds the post-move state: the ship has docked and stands on the
+    // port cell as a land unit.
+    const port = unitAt(map, 1, 0);
+    port.building = { kind: BuildingKind.PORT, level: 1 };
+    const landed: Unit = {
+      id: 'e1', owner: 1, type: UnitType.WARRIOR, q: 1, r: 0,
+      hasMoved: true, hasAttacked: false, hasHealed: false,
+      hp: 5, attack: 2, attackDistance: 1, spawnVillage: { q: 1, r: 0 },
+    };
+    port.unit = landed;
+    h.mapView.update(map, players, null, new Set(), new Set(), 0, new Set(), {
+      x: 0, y: 0, scale: 1, width: 800, height: 600,
+    });
+
+    const events: GameEvent[] = [
+      { type: GameEventType.UNIT_MOVED, unitId: 'e1', from: { q: 0, r: 1 }, path: [{ q: 1, r: 0 }], to: { q: 1, r: 0 }, shipLevel: 1 },
+    ];
+    const p = h.gc.presentEvents(events, h.gc.exploredKeysFor(0));
+    // The ghost standing on the starting water cell must still show the ship.
+    const ghost = [...h.mapView.container.children]
+      .find((c) => (c as { texture?: unknown }).texture !== undefined) as unknown as { texture: Texture };
+    try {
+      expect(ghost.texture).toBe(h.gc.textures.shipTextures[Tribe.Barbarians][1].texture);
+    } finally {
+      await p;
+    }
+  });
+
+  it('shows a tribe died notification instead of a capture message when the local player takes the last village', async () => {
+    const map = makeOpenMap();
+    h = setupGame(map, [player(0, Tribe.Cats), player(1, Tribe.Barbarians)]);
+    const village = unitAt(map, 1, 0);
+    village.settlement = { owner: 1, level: 1, captureReady: false };
+    village.settlement.owner = 0;
+    const events: GameEvent[] = [
+      { type: GameEventType.CAPTURED, q: 1, r: 0, oldOwner: 1, newOwner: 0, ownerDied: true },
+    ];
+    const p = h.gc.presentEvents(events, h.gc.exploredKeysFor(0));
+    await p;
+    const s = useGameStore.getState();
+    // The local player made the capture: no capture message, just the death notice.
+    expect(s.centerMessage).toBe('Barbarians died!');
+    expect(s.centerIconFile).toBe('barbarians-icon.png');
+  });
+
+  it('spawns a 10-circle death animation on the dead unit hex and removes it after the rise', async () => {
+    const map = makeOpenMap();
+    const players = [player(0, Tribe.Cats), player(1, Tribe.Barbarians)];
+    h = setupGame(map, players);
+    const mapRoot = new Container();
+    (h.gc as unknown as { mapRoot: Container | null }).mapRoot = mapRoot;
+
+    const target = unitAt(map, 1, 0);
+    target.unit = makeEnemy('def', 1, 1, 0);
+    h.mapView.update(map, players, null, new Set(), new Set(), 0, new Set(), {
+      x: 0, y: 0, scale: 1, width: 800, height: 600,
+    });
+
+    const callbacks: Array<() => void> = [];
+    const app = {
+      screen: { width: 800, height: 600 },
+      ticker: { add: (fn: () => void) => callbacks.push(fn), remove: (): void => {} },
+    } as unknown as Application;
+    h.gc.app = app;
+    let now = 0;
+    (globalThis as { performance: Performance }).performance.now = () => now;
+
+    const events: GameEvent[] = [
+      {
+        type: GameEventType.ATTACK, attackerId: 'att', targetId: 'def',
+        attackerIndex: 0, targetIndex: 1,
+        attackerTile: { q: 0, r: 0 }, targetTile: { q: 1, r: 0 },
+        attackerDamage: 0, targetDamage: 0, missed: false,
+        attackerDied: false, targetDied: true,
+      },
+    ];
+    const p = h.gc.presentEvents(events, h.gc.exploredKeysFor(0));
+    await p;
+
+    // The burst lives in the camera-transformed map container, so it follows pan/zoom.
+    const deathEls = (): Container[] =>
+      h.mapView.container.children.filter(
+        (c): c is Container => c instanceof Container && c.children.length === 10 && c.children.every((g) => g instanceof Graphics),
+      );
+    expect(deathEls().length).toBe(1);
+    const deathEl = deathEls()[0]!;
+    const circles = deathEl.children.filter((c) => c instanceof Graphics);
+    expect(circles.length).toBe(10);
+
+    const deathFn = callbacks[callbacks.length - 1]!;
+    now = 2000;
+    deathFn();
+    expect(deathEls().length).toBe(1);
+    now = 4000;
+    deathFn();
+    expect(deathEls().length).toBe(0);
+  });
+
+  it('does not spawn a death animation on an unexplored death tile', async () => {
+    const map = makeOpenMap();
+    const players = [player(0, Tribe.Cats), player(1, Tribe.Barbarians)];
+    h = setupGame(map, players);
+    const mapRoot = new Container();
+    (h.gc as unknown as { mapRoot: Container | null }).mapRoot = mapRoot;
+
+    const target = unitAt(map, 1, 0);
+    target.unit = makeEnemy('def', 1, 1, 0);
+    target.exploredBy = [];
+
+    const app = {
+      screen: { width: 800, height: 600 },
+      ticker: { add: (): void => {}, remove: (): void => {} },
+    } as unknown as Application;
+    h.gc.app = app;
+
+    const events: GameEvent[] = [
+      {
+        type: GameEventType.ATTACK, attackerId: 'att', targetId: 'def',
+        attackerIndex: 0, targetIndex: 1,
+        attackerTile: { q: 0, r: 0 }, targetTile: { q: 1, r: 0 },
+        attackerDamage: 0, targetDamage: 0, missed: false,
+        attackerDied: false, targetDied: true,
+      },
+    ];
+    const p = h.gc.presentEvents(events, h.gc.exploredKeysFor(0));
+    await p;
+
+    expect(mapRoot.children.length).toBe(0);
+  });
+
+  it('plays a water-splash when a ship move starts', async () => {
+    const map = makeOpenMap();
+    const players = [player(0, Tribe.Cats)];
+    h = setupGame(map, players);
+    const from = unitAt(map, 0, 0);
+    from.terrain = TileType.Water;
+    const ship: Unit = {
+      id: 's1', owner: 0, type: UnitType.WARRIOR, q: 0, r: 0,
+      hasMoved: false, hasAttacked: false, hasHealed: false,
+      hp: 5, attack: 2, attackDistance: 1, spawnVillage: { q: 0, r: 0 }, shipLevel: 1,
+    };
+    from.unit = ship;
+    const dest = unitAt(map, 1, 0);
+    dest.terrain = TileType.Water;
+    from.unit = null;
+    dest.unit = { ...ship, q: 1, r: 0 };
+    h.mapView.update(map, players, null, new Set(), new Set(), 0, new Set(), {
+      x: 0, y: 0, scale: 1, width: 800, height: 600,
+    });
+
+    const played: string[] = [];
+    const spy = vi.spyOn(sfx, 'play').mockImplementation((name) => { played.push(name); });
+    try {
+      const events: GameEvent[] = [
+        { type: GameEventType.UNIT_MOVED, unitId: 's1', from: { q: 0, r: 0 }, path: [{ q: 1, r: 0 }], to: { q: 1, r: 0 }, shipLevel: 1 },
+      ];
+      const p = h.gc.presentEvents(events, h.gc.exploredKeysFor(0));
+      await waitFor(() => played.includes('waterSplash'));
+      await p;
+
+      expect(played).toContain('waterSplash');
+      expect(played).not.toContain('waterSquish');
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('plays a water-squish when a unit arrives as a ship (boarding at a port)', async () => {
+    const map = makeOpenMap();
+    const players = [player(0, Tribe.Cats)];
+    h = setupGame(map, players);
+    const from = unitAt(map, 0, 0);
+    const land: Unit = {
+      id: 'u1', owner: 0, type: UnitType.WARRIOR, q: 0, r: 0,
+      hasMoved: false, hasAttacked: false, hasHealed: false,
+      hp: 5, attack: 2, attackDistance: 1, spawnVillage: { q: 0, r: 0 },
+    };
+    from.unit = land;
+    const dest = unitAt(map, 1, 0);
+    from.unit = null;
+    dest.unit = { ...land, q: 1, r: 0, shipLevel: 1 };
+    h.mapView.update(map, players, null, new Set(), new Set(), 0, new Set(), {
+      x: 0, y: 0, scale: 1, width: 800, height: 600,
+    });
+
+    const played: string[] = [];
+    const spy = vi.spyOn(sfx, 'play').mockImplementation((name) => { played.push(name); });
+    try {
+      const events: GameEvent[] = [
+        { type: GameEventType.UNIT_MOVED, unitId: 'u1', from: { q: 0, r: 0 }, path: [{ q: 1, r: 0 }], to: { q: 1, r: 0 } },
+      ];
+      const p = h.gc.presentEvents(events, h.gc.exploredKeysFor(0));
+      await waitFor(() => played.includes('waterSquish'));
+      await p;
+
+      expect(played).toContain('waterSquish');
+      expect(played).not.toContain('waterSplash');
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('plays the spawn sound only when the local player spawns a unit', async () => {
+    const map = makeOpenMap();
+    const players = [player(0, Tribe.Cats), player(1, Tribe.Barbarians)];
+    h = setupGame(map, players);
+
+    const played: string[] = [];
+    const spy = vi.spyOn(sfx, 'play').mockImplementation((name) => { played.push(name); });
+    try {
+      const localSpawn: GameEvent[] = [{ type: GameEventType.SPAWNED, unitType: UnitType.WARRIOR, q: 0, r: 0, playerIndex: 0 }];
+      const enemySpawn: GameEvent[] = [{ type: GameEventType.SPAWNED, unitType: UnitType.WARRIOR, q: 1, r: 0, playerIndex: 1 }];
+      await h.gc.presentEvents(localSpawn, h.gc.exploredKeysFor(0));
+      await h.gc.presentEvents(enemySpawn, h.gc.exploredKeysFor(0));
+
+      expect(played).toContain('spawn');
+      expect(played.filter((n) => n === 'spawn')).toHaveLength(1);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('no longer plays the upgrade animation when a visible village upgrades', async () => {
+    const map = makeOpenMap();
+    const players = [player(0, Tribe.Cats), player(1, Tribe.Barbarians)];
+    h = setupGame(map, players);
+    const v = unitAt(map, 1, 0);
+    v.settlement = { owner: 0, level: 1, captureReady: false };
+    h.mapView.update(map, players, null, new Set(), new Set(), 0, new Set(), {
+      x: 0, y: 0, scale: 1, width: 800, height: 600,
+    });
+
+    const bounce = vi.spyOn(h.mapView, 'bounceHex');
+    try {
+      const events: GameEvent[] = [
+        { type: GameEventType.VILLAGE_UPGRADED, q: 1, r: 0, level: 2, playerIndex: 0 },
+      ];
+      const p = h.gc.presentEvents(events, h.gc.exploredKeysFor(0));
+      await p;
+
+      expect(bounce).not.toHaveBeenCalled();
+    } finally {
+      bounce.mockRestore();
+    }
+  });
+
+  it('plays no upgrade effect for any player\u2019s village upgrade', async () => {
+    const map = makeOpenMap();
+    const players = [player(0, Tribe.Cats), player(1, Tribe.Barbarians)];
+    h = setupGame(map, players);
+    const v = unitAt(map, 1, 0);
+    v.settlement = { owner: 1, level: 1, captureReady: false };
+    h.mapView.update(map, players, null, new Set(), new Set(), 0, new Set(), {
+      x: 0, y: 0, scale: 1, width: 800, height: 600,
+    });
+
+    const bounce = vi.spyOn(h.mapView, 'bounceHex');
+    try {
+      const other: GameEvent[] = [
+        { type: GameEventType.VILLAGE_UPGRADED, q: 1, r: 0, level: 2, playerIndex: 1 },
+      ];
+      await h.gc.presentEvents(other, h.gc.exploredKeysFor(0));
+      expect(bounce).not.toHaveBeenCalledWith(1, 0);
+
+      const local: GameEvent[] = [
+        { type: GameEventType.VILLAGE_UPGRADED, q: 1, r: 0, level: 3, playerIndex: 0 },
+      ];
+      await h.gc.presentEvents(local, h.gc.exploredKeysFor(0));
+      expect(bounce).not.toHaveBeenCalledWith(1, 0);
+    } finally {
+      bounce.mockRestore();
+    }
+  });
+
+  it('ripples the storm across the village water tiles when a storm fires', async () => {
+    const map = makeOpenMap();
+    const players = [player(0, Tribe.Cats), player(1, Tribe.Barbarians)];
+    h = setupGame(map, players);
+
+    const village = unitAt(map, 0, 0);
+    village.settlement = { owner: 0, level: 1, captureReady: false };
+    village.ownedBy = 0;
+    village.claimedByVillage = { q: 0, r: 0 };
+    village.unit = {
+      id: 'sc', owner: 0, type: UnitType.STORMCALLER, q: 0, r: 0,
+      hasMoved: true, hasAttacked: true, hasHealed: true,
+      hp: 40, attack: 20, attackDistance: 1, spawnVillage: { q: 0, r: 0 },
+    };
+    const w1 = unitAt(map, 1, 0);
+    w1.terrain = TileType.Water;
+    w1.ownedBy = 0;
+    w1.claimedByVillage = { q: 0, r: 0 };
+    const w2 = unitAt(map, 2, 0);
+    w2.terrain = TileType.Water;
+    w2.ownedBy = 0;
+    w2.claimedByVillage = { q: 0, r: 0 };
+    h.mapView.update(map, players, null, new Set(), new Set(), 0, new Set(), {
+      x: 400, y: 300, scale: 1, width: 800, height: 600,
+    });
+
+    const pulse = vi.spyOn(h.mapView, 'stormWaterPulse');
+    try {
+      const events: GameEvent[] = [{ type: GameEventType.STORM, unitId: 'sc', q: 0, r: 0, targets: [] }];
+      await h.gc.presentEvents(events, h.gc.exploredKeysFor(0));
+      expect(pulse).toHaveBeenCalledTimes(1);
+      const [waterTiles, origin] = pulse.mock.calls[0]!;
+      expect(origin).toEqual({ q: 0, r: 0 });
+      expect(waterTiles.map((t) => [t.q, t.r])).toEqual(expect.arrayContaining([[1, 0], [2, 0]]));
+    } finally {
+      pulse.mockRestore();
+    }
+  });
+
+  it('spawns wake squares on water tiles while a ship sails', async () => {
+    const map = makeOpenMap();
+    const players = [player(0, Tribe.Cats)];
+    h = setupGame(map, players);
+    const ship: Unit = {
+      id: 's1', owner: 0, type: UnitType.WARRIOR, q: 0, r: 0,
+      hasMoved: false, hasAttacked: false, hasHealed: false,
+      hp: 5, attack: 2, attackDistance: 1, spawnVillage: { q: 0, r: 0 }, shipLevel: 1,
+    };
+    const fromTile = unitAt(map, 0, 0);
+    fromTile.terrain = TileType.Water;
+    fromTile.unit = ship;
+    const dest = unitAt(map, 1, 0);
+    dest.terrain = TileType.Water;
+    fromTile.unit = null;
+    dest.unit = { ...ship, q: 1, r: 0 };
+    h.mapView.update(map, players, null, new Set(), new Set(), 0, new Set(), {
+      x: 0, y: 0, scale: 1, width: 800, height: 600,
+    });
+
+    const events: GameEvent[] = [
+      { type: GameEventType.UNIT_MOVED, unitId: 's1', from: { q: 0, r: 0 }, path: [{ q: 1, r: 0 }], to: { q: 1, r: 0 }, shipLevel: 1 },
+    ];
+    const p = h.gc.presentEvents(events, h.gc.exploredKeysFor(0));
+    await waitFor(() =>
+      [...h.mapView.container.children].some((c) => c instanceof Graphics && c.zIndex === 5),
+    );
+    await p;
+
+    const wakeRects = [...h.mapView.container.children].filter(
+      (c) => c instanceof Graphics && c.zIndex === 5,
+    );
+    expect(wakeRects.length).toBeGreaterThanOrEqual(20);
+    expect(wakeRects.length).toBeLessThanOrEqual(40);
+  });
+
+  it('does not spawn wake squares on a landing step onto land', async () => {
+    const map = makeOpenMap();
+    const players = [player(0, Tribe.Cats)];
+    h = setupGame(map, players);
+    const ship: Unit = {
+      id: 's1', owner: 0, type: UnitType.WARRIOR, q: 0, r: 0,
+      hasMoved: false, hasAttacked: false, hasHealed: false,
+      hp: 5, attack: 2, attackDistance: 1, spawnVillage: { q: 0, r: 0 }, shipLevel: 1,
+    };
+    unitAt(map, 0, 0).terrain = TileType.Water;
+    unitAt(map, 0, 0).unit = null;
+    unitAt(map, 1, 0).unit = { ...ship, q: 1, r: 0 };
+    h.mapView.update(map, players, null, new Set(), new Set(), 0, new Set(), {
+      x: 0, y: 0, scale: 1, width: 800, height: 600,
+    });
+
+    const events: GameEvent[] = [
+      { type: GameEventType.UNIT_MOVED, unitId: 's1', from: { q: 0, r: 0 }, path: [{ q: 1, r: 0 }], to: { q: 1, r: 0 }, shipLevel: 1 },
+    ];
+    await h.gc.presentEvents(events, h.gc.exploredKeysFor(0));
+
+    const wakeRects = [...h.mapView.container.children].filter(
+      (c) => c instanceof Graphics && c.zIndex === 5,
+    );
+    expect(wakeRects.length).toBe(0);
+  });
+
+  it('spawns wake squares while a pirate sails', async () => {
+    const map = makeOpenMap();
+    const players = [player(0, Tribe.Cats)];
+    h = setupGame(map, players);
+    const pirate: Unit = {
+      id: 'p1', owner: -1, type: UnitType.PIRATE, q: 0, r: 0,
+      hasMoved: false, hasAttacked: false, hasHealed: false,
+      hp: 5, attack: 2, attackDistance: 1, spawnVillage: null,
+    };
+    unitAt(map, 0, 0).terrain = TileType.Water;
+    unitAt(map, 0, 0).unit = pirate;
+    unitAt(map, 0, 0).unit = null;
+    unitAt(map, 1, 0).terrain = TileType.Water;
+    unitAt(map, 1, 0).unit = { ...pirate, q: 1, r: 0 };
+    h.mapView.update(map, players, null, new Set(), new Set(), 0, new Set(), {
+      x: 0, y: 0, scale: 1, width: 800, height: 600,
+    });
+
+    const events: GameEvent[] = [
+      { type: GameEventType.UNIT_MOVED, unitId: 'p1', from: { q: 0, r: 0 }, path: [{ q: 1, r: 0 }], to: { q: 1, r: 0 } },
+    ];
+    const p = h.gc.presentEvents(events, h.gc.exploredKeysFor(0));
+    await waitFor(() =>
+      [...h.mapView.container.children].some((c) => c instanceof Graphics && c.zIndex === 5),
+    );
+    await p;
+
+    const wakeRects = [...h.mapView.container.children].filter(
+      (c) => c instanceof Graphics && c.zIndex === 5,
+    );
+    expect(wakeRects.length).toBeGreaterThanOrEqual(20);
+    expect(wakeRects.length).toBeLessThanOrEqual(40);
+  });
+});

@@ -1,0 +1,1321 @@
+import { WeatherType } from '@enums';
+import type { WeatherEvent } from '../src/game/weather/weather';
+import { afterEach, describe, expect, it } from 'vitest';
+import { Circle, Rectangle, Container, Graphics, Sprite, BitmapText } from 'pixi.js';
+import { HudSelected } from '../src/ui/hud/hud-selected';
+import { useGameStore } from '../src/store/game-store';
+import { gameController } from '../src/controller/game-controller';
+import { type UIHost } from '../src/ui/host';
+import { makeTestMap, tileAt, makeUnit } from './helpers/test-map';
+import { buildPlayers } from '../src/game/players';
+import { Tribe } from '../src/game/tribes';
+import { SeededRandom } from '../src/util/random';
+import { Simulator } from '../src/game/simulator';
+import { TileType } from '../src/game/map/tile-types';
+import { UNIT_TYPES } from '../src/game/units/units';
+import { TRAP_TURNS } from '../src/game/units/traps';
+import { hexNeighbors } from '../src/game/map/hex';
+import { t } from '../src/i18n';
+import type { GameMap, MapTile } from '../src/game/map/map-gen';
+import { BonusKind, BridgeDir, BuildingKind, GameMode, NetMode, Screen, SelectionKind, SkillId, TutorialStepId, UnitType } from '@enums';
+
+function fakeCanvasContext() {
+  return {
+    measureText: (s: string) => ({
+      width: s.length * 8,
+      actualBoundingBoxLeft: 0,
+      actualBoundingBoxRight: s.length * 8,
+      actualBoundingBoxAscent: 12,
+      actualBoundingBoxDescent: 3,
+    }),
+  };
+}
+
+function makeHost(): UIHost {
+  return {
+    app: { screen: { width: 1280, height: 800 }, stage: new Container() },
+    screenLayer: new Container(),
+    overlayLayer: new Container(),
+  } as unknown as UIHost;
+}
+
+describe('HudSelected village building constraints', () => {
+  let hud: HudSelected;
+  const originalSim = (gameController as unknown as { sim: unknown }).sim;
+
+  const texts = (): string[] => {
+    const el = (hud as unknown as { el: Container }).el!;
+    const out: string[] = [];
+    const walk = (c: Container): void => {
+      for (const ch of c.children) {
+        if (ch instanceof BitmapText) out.push((ch as BitmapText).text);
+        if (ch instanceof Container) walk(ch as Container);
+      }
+    };
+    walk(el);
+    return out;
+  };
+
+  const mount = (level: number, buildingCount: number, owner: number | null, opts: { unitOnVillage?: boolean; wall?: boolean; veteran?: boolean } = {}): void => {
+    (globalThis as { CanvasRenderingContext2D?: unknown }).CanvasRenderingContext2D = class {};
+    (globalThis as { document?: unknown }).document = {
+      createElement: () => ({ getContext: () => fakeCanvasContext(), width: 0, height: 0 }),
+    };
+
+    const map = makeTestMap(2);
+    const village = tileAt(map, 0, 0)!;
+    village.settlement = { owner, level, captureReady: false, name: 'Alpha', ...(opts.wall ? { wall: true } : {}) };
+    if (opts.unitOnVillage) village.unit = makeUnit('u1', 0, UnitType.WARRIOR, 0, 0);
+    if (opts.unitOnVillage && opts.veteran) Object.assign(village.unit!, { veteran: true, kills: 4 });
+    const buildingTiles = [
+      [1, 0],
+      [0, 1],
+      [1, -1],
+      [-1, 0],
+    ] as const;
+    for (let i = 0; i < buildingCount; i++) {
+      const [q, r] = buildingTiles[i]!;
+      const t = tileAt(map, q, r)!;
+      t.ownedBy = owner;
+      t.claimedByVillage = { q: 0, r: 0 };
+      t.building = { kind: BuildingKind.MINE, level: 1 };
+    }
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    const sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5 });
+    (gameController as unknown as { sim: Simulator | null }).sim = sim;
+    useGameStore.setState({
+      screen: Screen.GAME,
+      players,
+      localPlayerIndex: 0,
+      selection: { kind: SelectionKind.TILE, q: 0, r: 0 },
+      tutorial: false,
+      tutorialStep: null,
+    });
+    hud = new HudSelected();
+    hud.mount(makeHost(), new Container());
+  };
+
+  const helpButtons = (): number => {
+    const el = (hud as unknown as { el: Container }).el!;
+    let n = 0;
+    const walk = (c: Container): void => {
+      for (const ch of c.children) {
+        if (ch instanceof Container && ch.hitArea instanceof Circle) {
+          const hasSprite = (ch as Container).children.some((x) => x instanceof Sprite);
+          if (hasSprite) n++;
+        }
+        if (ch instanceof Container) walk(ch as Container);
+      }
+    };
+    walk(el);
+    return n;
+  };
+
+  afterEach(() => {
+    hud?.destroy();
+    (gameController as unknown as { sim: unknown }).sim = originalSim;
+  });
+
+  it('shows the food balance of an own village and a red starvation line when it starves', () => {
+    mount(2, 0, 0);
+    expect(texts().some((s) => s.includes('(0 - 1)'))).toBe(true);
+    expect(texts().some((s) => s.startsWith('Starving!'))).toBe(false);
+    const village = tileAt(gameController.getMap()!, 0, 0)!;
+    village.settlement!.starving = true;
+    useGameStore.setState({ selection: { kind: SelectionKind.TILE, q: 0, r: 0 } });
+    expect(texts().some((s) => s.startsWith('Starving!'))).toBe(true);
+  });
+
+  it('suggests opening Agriculture on an own empty land tile, then Granary next to a farm', () => {
+    mount(1, 0, 0);
+    const map = gameController.getMap()!;
+    const tile = tileAt(map, 1, 0)!;
+    tile.ownedBy = 0;
+    const human = useGameStore.getState().players[0]!;
+    useGameStore.setState({ selection: { kind: SelectionKind.TILE, q: 1, r: 0 } });
+    expect(texts()).toContain('Open Agriculture');
+    human.skills.push(SkillId.AGRICULTURE);
+    const farm = tileAt(map, 1, -1)!;
+    farm.ownedBy = 0;
+    farm.building = { kind: BuildingKind.FARM, level: 1 };
+    useGameStore.setState({ selection: { kind: SelectionKind.TILE, q: 1, r: 0 } });
+    expect(texts()).not.toContain('Open Agriculture');
+    expect(texts()).toContain('Open Granary');
+  });
+
+  it('shows the stored food of a selected granary', () => {
+    mount(1, 0, 0);
+    const map = gameController.getMap()!;
+    const granary = tileAt(map, 1, 0)!;
+    granary.ownedBy = 0;
+    granary.building = { kind: BuildingKind.GRANARY, level: 1, food: 7 };
+    tileAt(map, 1, -1)!.ownedBy = 0;
+    tileAt(map, 1, -1)!.building = { kind: BuildingKind.FARM, level: 1 };
+    useGameStore.setState({ selection: { kind: SelectionKind.TILE, q: 1, r: 0 } });
+    // One adjacent farm: capacity 15.
+    expect(texts()).toContain('Stored food: 7/15 (collects what adjacent farms do not use)');
+  });
+
+  it('shows what a selected sawmill and mine hold and their capacity', () => {
+    mount(1, 0, 0);
+    const map = gameController.getMap()!;
+    const sawmill = tileAt(map, 1, 0)!;
+    sawmill.ownedBy = 0;
+    sawmill.building = { kind: BuildingKind.SAWMILL, level: 1, wood: 12 };
+    useGameStore.setState({ selection: { kind: SelectionKind.TILE, q: 1, r: 0 } });
+    expect(texts().some((x) => x.startsWith('Stored wood: 12/20'))).toBe(true);
+
+    const mine = tileAt(map, 1, -1)!;
+    mine.ownedBy = 0;
+    mine.building = { kind: BuildingKind.MINE, level: 1, stone: 5, ore: 9 };
+    useGameStore.setState({ selection: { kind: SelectionKind.TILE, q: 1, r: -1 } });
+    expect(texts().some((x) => x.startsWith('Stored: 5/20 stone, 9/20 ore'))).toBe(true);
+  });
+
+  it('lays the drop shadow beneath the info panel background', () => {
+    mount(1, 1, 0);
+    const el = (hud as unknown as { el: Container }).el!;
+    const panels = el.children.filter(
+      (c): c is Graphics => c instanceof Graphics && (c as Graphics).context.instructions.some((i) => i.action === 'fill'),
+    );
+    const fills = (g: Graphics): number[] =>
+      g.context.instructions
+        .filter((i) => i.action === 'fill')
+        .map((i) => (i as { data: { style: { alpha: number } } }).data.style.alpha);
+    const shadow = panels.find((g) => fills(g).includes(0.3))!;
+    const bg = panels.find((g) => fills(g).includes(1))!;
+    expect(shadow).toBeDefined();
+    expect(bg).toBeDefined();
+    expect(el.children.indexOf(shadow)).toBeLessThan(el.children.indexOf(bg));
+  });
+
+  it('shows a circle per slot and an upgrade hint when the village is full', () => {
+    mount(2, 2, 0);
+    const all = texts().join('\n');
+    // Two buildings of the same kind share one circle with a count badge 2; no free slots remain.
+    expect(slotCircles((hud as unknown as { el: Container }).el!)).toHaveLength(1);
+    expect(texts()).toContain('2');
+    expect(all).toContain('Full — upgrade to level 3 for more building slots');
+  });
+
+  it('shows a circle per slot without a hint when the village has free slots', () => {
+    mount(3, 1, 0);
+    const all = texts().join('\n');
+    // One built circle plus a single collapsed circle for the free slots.
+    expect(slotCircles((hud as unknown as { el: Container }).el!)).toHaveLength(2);
+    expect(texts()).toContain('+1');
+    expect(all).not.toContain('Full');
+  });
+
+  it('shows 1 circle at level 1 when full and hints at upgrading', () => {
+    mount(1, 1, 0);
+    const all = texts().join('\n');
+    expect(slotCircles((hud as unknown as { el: Container }).el!)).toHaveLength(1);
+    expect(all).toContain('upgrade to level 2');
+  });
+
+  it('omits building info for a free village', () => {
+    mount(2, 1, null);
+    expect(texts().join('\n')).not.toContain('Buildings:');
+  });
+
+  it('hides the name of a free village until it is captured', () => {
+    mount(1, 0, null);
+    expect(texts().join('\n')).toContain('Free village');
+    expect(texts().join('\n')).not.toContain('Alpha');
+    hud.destroy();
+    mount(1, 0, 0);
+    expect(texts().join('\n')).toContain('Alpha');
+  });
+
+  it('does not show Owner or Village lines for an owned village with a unit', () => {
+    mount(1, 1, 0, { unitOnVillage: true });
+    const all = texts().join('\n');
+    expect(all).toContain('Warrior');
+    expect(all).toContain('Alpha');
+    expect(all).not.toContain('Village:');
+    expect(all).not.toContain('Owner:');
+  });
+
+  it('shows the unit defense and walled-village buff on the selected unit', () => {
+    mount(1, 1, 0, { unitOnVillage: true, wall: true });
+    const all = texts().join('\n');
+    const labels = texts();
+    // The unit hp no longer appears in the selected-cell panel.
+    expect(labels.some((x) => x.startsWith('50/50'))).toBe(false);
+    expect(labels).toContain('20');
+    // Unit defense 10 plus 9 from the village (8) and its wall (3).
+    expect(labels).toContain('10 + 11');
+    expect(labels).toContain('1');
+    expect(all).toContain('+3 — village wall');
+    expect(all).toContain('+8 — village');
+    expect(all).not.toContain('DEF');
+    expect(all).not.toContain('UPKEEP');
+  });
+
+  it('does not append a bullet to the unit name', () => {
+    mount(1, 1, 0, { unitOnVillage: true });
+    const labels = texts();
+    expect(labels.some((x) => x.includes('•'))).toBe(false);
+  });
+
+  it('renders 3 stat icons inline on the selected unit line plus the income icon', () => {
+    mount(1, 1, 0, { unitOnVillage: true });
+    const widths = findSprites((hud as unknown as { el: Container }).el!)
+      .map((s) => s.width)
+      .filter((w) => w === 16);
+    // 3 unit stats (attack/defense/gold, hp removed) + the money and food icons
+    // on the income line, the units icon on the village line, the defense icon of
+    // the village buff row, plus the three 16px help
+    // buttons (unit / settlement / building limit) and the 16px close icon.
+    expect(widths).toEqual([16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16]);
+  });
+
+  it('adds a star with the kill count to the unit line of a veteran only', () => {
+    mount(1, 1, 0, { unitOnVillage: true });
+    const plain = findSprites((hud as unknown as { el: Container }).el!).length;
+    hud.destroy();
+    mount(1, 1, 0, { unitOnVillage: true, veteran: true });
+    const withStar = findSprites((hud as unknown as { el: Container }).el!).length;
+    expect(withStar).toBe(plain + 1);
+    expect(texts()).toContain('4');
+  });
+
+  it('shows the unit kill count on its own line below the characteristics', () => {
+    mount(1, 1, 0, { unitOnVillage: true, veteran: true });
+    const all = texts();
+    expect(all).toContain(t('hud.selected.kills', { n: 4 }));
+    mount(1, 1, 0, { unitOnVillage: true });
+    expect(texts()).toContain(t('hud.selected.kills', { n: 0 }));
+  });
+
+  it('draws a button-style drop shadow behind the info panel', () => {
+    mount(1, 1, 0, { unitOnVillage: true });
+    const el = (hud as unknown as { el: Container }).el!;
+    const shapes = el.children.filter((c) => c instanceof Graphics) as Graphics[];
+    const shadow = shapes[0]!;
+    const panel = shapes[1]!;
+    expect(shadow.position.x).toBe(4);
+    expect(shadow.position.y).toBe(4);
+    // The shadow card has the same footprint as the panel (before its 4px offset).
+    expect(shadow.getLocalBounds().maxX).toBeGreaterThan(0);
+    expect(shadow.getLocalBounds().maxX).toBeCloseTo(panel.getLocalBounds().maxX, 0);
+    expect(shadow.getLocalBounds().maxY).toBeCloseTo(panel.getLocalBounds().maxY, 0);
+  });
+
+  it('shows one help button on the Buildings line of an owned village', () => {
+    mount(1, 1, 0);
+    expect(slotCircles((hud as unknown as { el: Container }).el!)).toHaveLength(1);
+    // settlement line + Buildings line each carry a help button.
+    expect(helpButtons()).toBe(2);
+  });
+
+  it('shows only the settlement help button for a free village', () => {
+    mount(1, 1, null);
+    expect(helpButtons()).toBe(1);
+  });
+
+  it('highlights the Buildings line in gold during the upgradeVillage3 step', () => {
+    mount(2, 2, 0);
+    const st = useGameStore.getState();
+    st.setTutorial(true);
+    st.setTutorialStep(TutorialStepId.UPGRADE_VILLAGE3);
+    const circles = slotCircles((hud as unknown as { el: Container }).el!);
+    expect(circles.length).toBeGreaterThan(0);
+    expect(strokeColors(circles[0]!)).toContain(0xffd700);
+  });
+
+  it('does not highlight the Buildings line during other tutorial steps', () => {
+    mount(2, 2, 0);
+    const st = useGameStore.getState();
+    st.setTutorial(true);
+    st.setTutorialStep(TutorialStepId.BUILD_PORT);
+    const circles = slotCircles((hud as unknown as { el: Container }).el!);
+    expect(circles.length).toBeGreaterThan(0);
+    expect(strokeColors(circles[0]!)).not.toContain(0xffd700);
+  });
+});
+
+describe('HudSelected building produce and bridge info lines', () => {
+  let hud: HudSelected;
+  const originalSim = (gameController as unknown as { sim: unknown }).sim;
+
+  const texts = (): string[] => {
+    const el = (hud as unknown as { el: Container }).el!;
+    const out: string[] = [];
+    const walk = (c: Container): void => {
+      for (const ch of c.children) {
+        if (ch instanceof BitmapText) out.push((ch as BitmapText).text);
+        if (ch instanceof Container) walk(ch as Container);
+      }
+    };
+    walk(el);
+    return out;
+  };
+
+  const helpButtons = (): number => {
+    const el = (hud as unknown as { el: Container }).el!;
+    let n = 0;
+    const walk = (c: Container): void => {
+      for (const ch of c.children) {
+        if (ch instanceof Container && ch.hitArea instanceof Circle) {
+          const hasSprite = (ch as Container).children.some((x) => x instanceof Sprite);
+          if (hasSprite) n++;
+        }
+        if (ch instanceof Container) walk(ch as Container);
+      }
+    };
+    walk(el);
+    return n;
+  };
+
+  /** The green 8x8 hp squares drawn on the building row (x positions). */
+  const hpSquares = (): { w: number; h: number; x: number }[] => {
+    const el = (hud as unknown as { el: Container }).el!;
+    const out: { w: number; h: number; x: number }[] = [];
+    const walk = (c: Container): void => {
+      for (const ch of c.children) {
+        if (ch instanceof Graphics) {
+          for (const ins of ch.context.instructions) {
+            const data = ins.data as { style?: { color?: number }; path?: { shapePath: { shapePrimitives: { shape: { x: number; y: number; width: number; height: number } }[] } } };
+            if (ins.action !== 'fill' || data.style?.color !== 0x49cc5d) continue;
+            for (const prim of data.path!.shapePath.shapePrimitives) out.push({ w: prim.shape.width, h: prim.shape.height, x: prim.shape.x });
+          }
+        }
+        if (ch instanceof Container) walk(ch as Container);
+      }
+    };
+    walk(el);
+    return out;
+  };
+
+  const boot = (setup: (map: GameMap) => MapTile): void => {
+    (globalThis as { CanvasRenderingContext2D?: unknown }).CanvasRenderingContext2D = class {};
+    (globalThis as { document?: unknown }).document = {
+      createElement: () => ({ getContext: () => fakeCanvasContext(), width: 0, height: 0 }),
+    };
+    const map = makeTestMap(2);
+    const tile = setup(map);
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    const sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5 });
+    (gameController as unknown as { sim: Simulator | null }).sim = sim;
+    useGameStore.setState({
+      screen: Screen.GAME,
+      players,
+      localPlayerIndex: 0,
+      selection: { kind: SelectionKind.TILE, q: tile.q, r: tile.r },
+      tutorial: false,
+      tutorialStep: null,
+    });
+    hud = new HudSelected();
+    hud.mount(makeHost(), new Container());
+  };
+
+  afterEach(() => {
+    hud?.destroy();
+    (gameController as unknown as { sim: unknown }).sim = originalSim;
+  });
+
+  it('lists only the mine yield (stone and ore) on the building row', () => {
+    boot((map) => {
+      const t = map.tiles.find((x) => x.settlement === null && x.unit === null)!;
+      t.ownedBy = 0;
+      t.building = { kind: BuildingKind.MINE, level: 1 };
+      return t;
+    });
+    const all = texts().join('\n');
+    expect(texts().filter((x) => x === '1')).toHaveLength(2); // plain N, no plus sign
+    expect(all).not.toMatch(/wood/);
+  });
+
+  it('shows the full hp next to a pristine building', () => {
+    boot((map) => {
+      const t = map.tiles.find((x) => x.settlement === null && x.unit === null)!;
+      t.ownedBy = 0;
+      t.building = { kind: BuildingKind.MINE, level: 1 };
+      return t;
+    });
+    const squares = hpSquares();
+    expect(squares).toHaveLength(2);
+    expect(squares.every((q) => q.w === 6 && q.h === 6)).toBe(true);
+    expect(squares[1]!.x - squares[0]!.x).toBe(9); // 6px square + 3px gap
+    expect(texts().join('\n')).not.toContain('2/2');
+  });
+
+  it('shows the reduced hp next to a damaged building', () => {
+    boot((map) => {
+      const t = map.tiles.find((x) => x.settlement === null && x.unit === null)!;
+      t.ownedBy = 0;
+      t.building = { kind: BuildingKind.MINE, level: 1, hp: 1 };
+      return t;
+    });
+    expect(hpSquares()).toHaveLength(1);
+  });
+
+  it('lists only the sawmill yield (wood) on the building row', () => {
+    boot((map) => {
+      const t = map.tiles.find((x) => x.settlement === null && x.unit === null)!;
+      const neighbor = map.tiles.find((n) =>
+        hexNeighbors(t).some((h) => h.q === n.q && h.r === n.r),
+      )!;
+      neighbor.terrain = TileType.GrasslandForest;
+      t.ownedBy = 0;
+      t.building = { kind: BuildingKind.SAWMILL, level: 1 };
+      return t;
+    });
+    const all = texts().join('\n');
+    expect(texts().filter((x) => x === '1')).toHaveLength(1);
+    expect(all).not.toMatch(/stone \d/);
+    expect(all).not.toMatch(/ore \d/);
+  });
+
+  it('shows a Bridge row with a help button on a bridged tile', () => {
+    boot((map) => {
+      const t = tileAt(map, 0, 0)!;
+      t.terrain = TileType.Water;
+      t.bridge = { owner: 0, dir: BridgeDir.WE };
+      t.roadOwner = 0;
+      return t;
+    });
+    const all = texts().join('\n');
+    expect(all).toContain('Water');
+    expect(all).toContain('Bridge');
+    expect(helpButtons()).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe('HudSelected connected village income bonus', () => {
+  let hud: HudSelected;
+  const originalSim = (gameController as unknown as { sim: unknown }).sim;
+
+  const texts = (): string[] => {
+    const el = (hud as unknown as { el: Container }).el!;
+    const out: string[] = [];
+    const walk = (c: Container): void => {
+      for (const ch of c.children) {
+        if (ch instanceof BitmapText) out.push((ch as BitmapText).text);
+        if (ch instanceof Container) walk(ch as Container);
+      }
+    };
+    walk(el);
+    return out;
+  };
+
+  const boot = (setupConnected: boolean): void => {
+    (globalThis as { CanvasRenderingContext2D?: unknown }).CanvasRenderingContext2D = class {};
+    (globalThis as { document?: unknown }).document = {
+      createElement: () => ({ getContext: () => fakeCanvasContext(), width: 0, height: 0 }),
+    };
+    const map = makeTestMap(2);
+    const village = tileAt(map, 0, 0)!;
+    village.settlement = { owner: 0, level: 1, captureReady: false, name: 'Alpha' };
+    if (setupConnected) {
+      const other = tileAt(map, 1, 0)!;
+      other.settlement = { owner: 0, level: 1, captureReady: false, name: 'Beta' };
+    }
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    const sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5 });
+    (gameController as unknown as { sim: Simulator | null }).sim = sim;
+    useGameStore.setState({
+      screen: Screen.GAME,
+      players,
+      localPlayerIndex: 0,
+      selection: { kind: SelectionKind.TILE, q: 0, r: 0 },
+      tutorial: false,
+      tutorialStep: null,
+    });
+    hud = new HudSelected();
+    hud.mount(makeHost(), new Container());
+  };
+
+  afterEach(() => {
+    hud?.destroy();
+    (gameController as unknown as { sim: unknown }).sim = originalSim;
+  });
+
+  it('shows the income line as result (raw - upkeep) when connected', () => {
+    boot(true);
+    const all = texts().join('\n');
+    expect(all).toContain('6 (6 - 0)');
+    const width16 = findSprites((hud as unknown as { el: Container }).el!)
+      .map((s) => s.width)
+      .filter((w) => w === 16);
+    expect(width16).not.toHaveLength(0);
+  });
+
+  it('shows base income with no connection bonus when not connected', () => {
+    boot(false);
+    const all = texts().join('\n');
+    expect(all).toContain('5 (5 - 0)');
+  });
+});
+
+describe('HudSelected pirate deal info', () => {
+  let hud: HudSelected;
+  const originalSim = (gameController as unknown as { sim: unknown }).sim;
+
+  const texts = (): string[] => {
+    const el = (hud as unknown as { el: Container }).el!;
+    const out: string[] = [];
+    const walk = (c: Container): void => {
+      for (const ch of c.children) {
+        if (ch instanceof BitmapText) out.push((ch as BitmapText).text);
+        if (ch instanceof Container) walk(ch as Container);
+      }
+    };
+    walk(el);
+    return out;
+  };
+
+  const boot = (paidBy: number[] | null): void => {
+    (globalThis as { CanvasRenderingContext2D?: unknown }).CanvasRenderingContext2D = class {};
+    (globalThis as { document?: unknown }).document = {
+      createElement: () => ({ getContext: () => fakeCanvasContext(), width: 0, height: 0 }),
+    };
+    const map = makeTestMap(2);
+    const tile = tileAt(map, 0, 0)!;
+    tile.terrain = TileType.Water;
+    tile.unit = {
+      id: 'p1', owner: -1, type: UnitType.PIRATE, q: 0, r: 0,
+      hasMoved: false, hasAttacked: false, hasHealed: false,
+      hp: 80, attack: 30, attackDistance: 3, defense: 5, spawnVillage: null,
+      ...(paidBy ? { paidBy } : {}),
+    };
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    const sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5 });
+    (gameController as unknown as { sim: Simulator | null }).sim = sim;
+    useGameStore.setState({
+      screen: Screen.GAME,
+      players,
+      localPlayerIndex: 0,
+      selection: { kind: SelectionKind.UNIT, q: 0, r: 0 },
+      tutorial: false,
+      tutorialStep: null,
+    });
+    hud = new HudSelected();
+    hud.mount(makeHost(), new Container());
+  };
+
+  afterEach(() => {
+    hud?.destroy();
+    (gameController as unknown as { sim: unknown }).sim = originalSim;
+  });
+
+  it('shows a deal line on a pirate without an active deal', () => {
+    boot(null);
+    const all = texts().join('\n');
+    expect(all).toContain('Pirate: no deal');
+  });
+
+  it('names the friend tribe on the active-deal line', () => {
+    boot([0]);
+    const all = texts().join('\n');
+    expect(all).toContain('Pirate: deal active');
+    expect(all).toContain('Villagers');
+  });
+
+  it('lists every friend tribe of the pirate', () => {
+    boot([0, 1]);
+    const all = texts().join('\n');
+    expect(all).toContain('Villagers');
+    expect(all).toContain('Cats');
+    expect(all).not.toContain('Pirate: no deal');
+  });
+});
+
+describe('HudSelected berserker rage attack info', () => {
+  let hud: HudSelected;
+  const originalSim = (gameController as unknown as { sim: unknown }).sim;
+
+  const texts = (): string[] => {
+    const el = (hud as unknown as { el: Container }).el!;
+    const out: string[] = [];
+    const walk = (c: Container): void => {
+      for (const ch of c.children) {
+        if (ch instanceof BitmapText) out.push((ch as BitmapText).text);
+        if (ch instanceof Container) walk(ch as Container);
+      }
+    };
+    walk(el);
+    return out;
+  };
+
+  const boot = (hp: number): void => {
+    (globalThis as { CanvasRenderingContext2D?: unknown }).CanvasRenderingContext2D = class {};
+    (globalThis as { document?: unknown }).document = {
+      createElement: () => ({ getContext: () => fakeCanvasContext(), width: 0, height: 0 }),
+    };
+    const map = makeTestMap(2);
+    const tile = tileAt(map, 0, 0)!;
+    tile.unit = makeUnit('b1', 0, UnitType.BERSERKER, 0, 0);
+    tile.unit.hp = hp;
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    const sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5 });
+    (gameController as unknown as { sim: Simulator | null }).sim = sim;
+    useGameStore.setState({
+      screen: Screen.GAME,
+      players,
+      localPlayerIndex: 0,
+      selection: { kind: SelectionKind.UNIT, q: 0, r: 0 },
+      tutorial: false,
+      tutorialStep: null,
+    });
+    hud = new HudSelected();
+    hud.mount(makeHost(), new Container());
+  };
+
+  afterEach(() => {
+    hud?.destroy();
+    (gameController as unknown as { sim: unknown }).sim = originalSim;
+  });
+
+  it('appends the +15 rage bonus to the attack value while rage is active', () => {
+    boot(10); // 10 <= 50% of 50 → raging
+    const all = texts().join('\n');
+    expect(all).toMatch(/\+15/);
+    // No hp readout in the panel anymore.
+    expect(all).not.toMatch(/\/50/);
+  });
+
+  it('shows a plain attack value when not raging', () => {
+    boot(40); // above the 50% rage threshold
+    const all = texts().join('\n');
+    expect(all).not.toMatch(/\+15/);
+  });
+});
+
+describe('HudSelected stealth info', () => {
+  let hud: HudSelected;
+  const originalSim = (gameController as unknown as { sim: unknown }).sim;
+
+  const texts = (): string[] => {
+    const el = (hud as unknown as { el: Container }).el!;
+    const out: string[] = [];
+    const walk = (c: Container): void => {
+      for (const ch of c.children) {
+        if (ch instanceof BitmapText) out.push((ch as BitmapText).text);
+        if (ch instanceof Container) walk(ch as Container);
+      }
+    };
+    walk(el);
+    return out;
+  };
+
+  const boot = (stealthed: boolean): void => {
+    (globalThis as { CanvasRenderingContext2D?: unknown }).CanvasRenderingContext2D = class {};
+    (globalThis as { document?: unknown }).document = {
+      createElement: () => ({ getContext: () => fakeCanvasContext(), width: 0, height: 0 }),
+    };
+    const map = makeTestMap(2);
+    const tile = tileAt(map, 0, 0)!;
+    tile.terrain = TileType.GrasslandLand;
+    tile.ownedBy = 0;
+    tile.unit = {
+      id: 'st', owner: 0, type: UnitType.STALKER, q: 0, r: 0,
+      hasMoved: true, hasAttacked: true, hasHealed: true,
+      hp: UNIT_TYPES.stalker.maxHp, attack: 10, attackDistance: 1, spawnVillage: null,
+      ...(stealthed ? { isStealthed: true } : {}),
+    };
+    const players = buildPlayers(Tribe.Cats, 1, new SeededRandom(1));
+    const sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5 });
+    (gameController as unknown as { sim: Simulator | null }).sim = sim;
+    useGameStore.setState({
+      screen: Screen.GAME,
+      players,
+      localPlayerIndex: 0,
+      selection: { kind: SelectionKind.UNIT, q: 0, r: 0 },
+      tutorial: false,
+      tutorialStep: null,
+    });
+    hud = new HudSelected();
+    hud.mount(makeHost(), new Container());
+  };
+
+  afterEach(() => {
+    hud?.destroy();
+    (gameController as unknown as { sim: unknown }).sim = originalSim;
+  });
+
+  it('shows a stealth tag on the owner stealthed stalker', () => {
+    boot(true);
+    const all = texts().join('\n');
+    expect(all).toContain('stealth');
+  });
+
+  it('omits the stealth tag when the stalker is not stealthed', () => {
+    boot(false);
+    const all = texts().join('\n');
+    expect(all).not.toContain('stealth');
+  });
+});
+
+describe('HudSelected trap info', () => {
+  let hud: HudSelected;
+  const originalSim = (gameController as unknown as { sim: unknown }).sim;
+
+  const texts = (): string[] => {
+    const el = (hud as unknown as { el: Container }).el!;
+    const out: string[] = [];
+    const walk = (c: Container): void => {
+      for (const ch of c.children) {
+        if (ch instanceof BitmapText) out.push((ch as BitmapText).text);
+        if (ch instanceof Container) walk(ch as Container);
+      }
+    };
+    walk(el);
+    return out;
+  };
+
+  const boot = (trapOwner: number | null, turn: number): void => {
+    (globalThis as { CanvasRenderingContext2D?: unknown }).CanvasRenderingContext2D = class {};
+    (globalThis as { document?: unknown }).document = {
+      createElement: () => ({ getContext: () => fakeCanvasContext(), width: 0, height: 0 }),
+    };
+    const map = makeTestMap(2);
+    const tile = tileAt(map, 0, 0)!;
+    tile.ownedBy = 0;
+    if (trapOwner !== null) tile.trap = { owner: trapOwner, placedTurn: 2 };
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    const sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5 });
+    (gameController as unknown as { sim: Simulator | null }).sim = sim;
+    useGameStore.setState({
+      screen: Screen.GAME,
+      players,
+      localPlayerIndex: 0,
+      turn,
+      selection: { kind: SelectionKind.TILE, q: 0, r: 0 },
+      tutorial: false,
+      tutorialStep: null,
+    });
+    hud = new HudSelected();
+    hud.mount(makeHost(), new Container());
+  };
+
+  afterEach(() => {
+    hud?.destroy();
+    useGameStore.setState({ turn: 1 });
+    (gameController as unknown as { sim: unknown }).sim = originalSim;
+  });
+
+  it('shows the trap for its owner with the turns left on the map', () => {
+    boot(0, 2);
+    expect(texts().join('\n')).toContain(`Thorn trap: ${TRAP_TURNS} turns left`);
+  });
+
+  it('counts down as the game advances beyond the placement turn', () => {
+    boot(0, 4);
+    expect(texts().join('\n')).toContain(`Thorn trap: ${TRAP_TURNS - 2} turns left`);
+  });
+
+  it('never shows a negative count once a trap has expired', () => {
+    boot(0, 2 + TRAP_TURNS + 5);
+    expect(texts().join('\n')).toContain('Thorn trap: 0 turns left');
+  });
+
+  it('does not reveal a foreign trap to the selected owner', () => {
+    boot(1, 2);
+    expect(texts().join('\n')).not.toContain('Thorn trap');
+  });
+
+  it('shows no trap line on a tile without a trap', () => {
+    boot(null, 2);
+    expect(texts().join('\n')).not.toContain('Thorn trap');
+  });
+});
+
+describe('HudSelected bonus info', () => {
+  let hud: HudSelected;
+  const originalSim = (gameController as unknown as { sim: unknown }).sim;
+
+  const texts = (): string[] => {
+    const el = (hud as unknown as { el: Container }).el!;
+    const out: string[] = [];
+    const walk = (c: Container): void => {
+      for (const ch of c.children) {
+        if (ch instanceof BitmapText) out.push((ch as BitmapText).text);
+        if (ch instanceof Container) walk(ch as Container);
+      }
+    };
+    walk(el);
+    return out;
+  };
+
+  const boot = (kind: BonusKind): void => {
+    (globalThis as { CanvasRenderingContext2D?: unknown }).CanvasRenderingContext2D = class {};
+    (globalThis as { document?: unknown }).document = {
+      createElement: () => ({ getContext: () => fakeCanvasContext(), width: 0, height: 0 }),
+    };
+    const map = makeTestMap(2);
+    const tile = tileAt(map, 0, 0)!;
+    tile.bonus = { kind, claimer: null, arrivalTurn: 0 };
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    const sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5 });
+    (gameController as unknown as { sim: Simulator | null }).sim = sim;
+    useGameStore.setState({
+      screen: Screen.GAME,
+      players,
+      localPlayerIndex: 0,
+      selection: { kind: SelectionKind.TILE, q: 0, r: 0 },
+      tutorial: false,
+      tutorialStep: null,
+    });
+    hud = new HudSelected();
+    hud.mount(makeHost(), new Container());
+  };
+
+  afterEach(() => {
+    hud?.destroy();
+    (gameController as unknown as { sim: unknown }).sim = originalSim;
+  });
+
+  it('describes a money bonus', () => {
+    boot(BonusKind.MONEY);
+    expect(texts().join('\n')).toContain(t('hud.selected.bonus.info'));
+  });
+
+  it('describes an explorer bonus', () => {
+    boot(BonusKind.EXPLORER);
+    expect(texts().join('\n')).toContain(t('hud.selected.bonus.info'));
+  });
+
+  it('describes a skill bonus', () => {
+    boot(BonusKind.SKILL);
+    expect(texts().join('\n')).toContain(t('hud.selected.bonus.info'));
+  });
+
+  it('does not describe a bonus on a plain tile', () => {
+    boot(BonusKind.MONEY);
+    const map = makeTestMap(2);
+    tileAt(map, 0, 0)!.bonus = null;
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    const sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5 });
+    (gameController as unknown as { sim: Simulator | null }).sim = sim;
+    useGameStore.setState({
+      screen: Screen.GAME,
+      players,
+      localPlayerIndex: 0,
+      selection: { kind: SelectionKind.TILE, q: 0, r: 0 },
+      tutorial: false,
+      tutorialStep: null,
+    });
+    hud = new HudSelected();
+    hud.mount(makeHost(), new Container());
+    expect(texts().join('\n')).not.toContain(t('hud.selected.bonus.info'));
+  });
+});
+
+describe('HudSelected turn visibility', () => {
+  let hud: HudSelected;
+  const originalSim = (gameController as unknown as { sim: unknown }).sim;
+
+  const boot = (currentPlayerIndex: number): void => {
+    (globalThis as { CanvasRenderingContext2D?: unknown }).CanvasRenderingContext2D = class {};
+    (globalThis as { document?: unknown }).document = {
+      createElement: () => ({ getContext: () => fakeCanvasContext(), width: 0, height: 0 }),
+    };
+    const map = makeTestMap(2);
+    const tile = tileAt(map, 0, 0)!;
+    tile.unit = makeUnit('u1', 0, UnitType.WARRIOR, 0, 0);
+    const players = buildPlayers(Tribe.Villagers, 2, new SeededRandom(1));
+    const sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5 });
+    (gameController as unknown as { sim: Simulator | null }).sim = sim;
+    useGameStore.setState({
+      screen: Screen.GAME,
+      players,
+      localPlayerIndex: 0,
+      currentPlayerIndex,
+      selection: { kind: SelectionKind.UNIT, q: 0, r: 0 },
+      netMode: NetMode.SINGLE,
+      tutorial: false,
+      tutorialStep: null,
+    });
+    hud = new HudSelected();
+    hud.mount(makeHost(), new Container());
+  };
+
+  afterEach(() => {
+    hud?.destroy();
+    useGameStore.setState({ currentPlayerIndex: 0 });
+    (gameController as unknown as { sim: unknown }).sim = originalSim;
+  });
+
+  const visible = (): boolean => ((hud as unknown as { el: Container }).el!.visible);
+
+  it('shows the selected info panel during the local player turn', () => {
+    boot(0);
+    expect(visible()).toBe(true);
+  });
+
+  it('hides the selected info panel while another player is acting', () => {
+    boot(1);
+    expect(visible()).toBe(false);
+  });
+});
+
+describe('HudSelected close button and collapsed state', () => {
+  let hud: HudSelected;
+  const originalSim = (gameController as unknown as { sim: unknown }).sim;
+
+  const texts = (): string[] => {
+    const el = (hud as unknown as { el: Container }).el!;
+    const out: string[] = [];
+    const walk = (c: Container): void => {
+      for (const ch of c.children) {
+        if (ch instanceof BitmapText) out.push((ch as BitmapText).text);
+        if (ch instanceof Container) walk(ch as Container);
+      }
+    };
+    walk(el);
+    return out;
+  };
+
+  const closeButton = (): Container | undefined => {
+    const el = (hud as unknown as { el: Container }).el!;
+    const walk = (c: Container): Container | undefined => {
+      for (const ch of c.children) {
+        if (
+          ch instanceof Container &&
+          ch.hitArea instanceof Rectangle &&
+          ch.children.length === 1 &&
+          ch.children[0] instanceof Sprite
+        ) {
+          return ch as Container;
+        }
+        if (ch instanceof Container) {
+          const found = walk(ch as Container);
+          if (found) return found;
+        }
+      }
+      return undefined;
+    };
+    return walk(el);
+  };
+
+  const collapsedIcon = (): Container | undefined => {
+    const el = (hud as unknown as { el: Container }).el!;
+    const walk = (c: Container): Container | undefined => {
+      for (const ch of c.children) {
+        if (ch instanceof Container && ch.hitArea instanceof Circle && ch.children.length === 1 && ch.children[0] instanceof Sprite) {
+          return ch as Container;
+        }
+        if (ch instanceof Container) {
+          const found = walk(ch as Container);
+          if (found) return found;
+        }
+      }
+      return undefined;
+    };
+    return walk(el);
+  };
+
+  const boot = (): void => {
+    (globalThis as { CanvasRenderingContext2D?: unknown }).CanvasRenderingContext2D = class {};
+    (globalThis as { document?: unknown }).document = {
+      createElement: () => ({ getContext: () => fakeCanvasContext(), width: 0, height: 0 }),
+    };
+    const map = makeTestMap(2);
+    const village = tileAt(map, 0, 0)!;
+    village.unit = makeUnit('u1', 0, UnitType.WARRIOR, 0, 0);
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    const sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5 });
+    (gameController as unknown as { sim: Simulator | null }).sim = sim;
+    useGameStore.setState({
+      screen: Screen.GAME,
+      players,
+      localPlayerIndex: 0,
+      selection: { kind: SelectionKind.UNIT, q: 0, r: 0 },
+      tutorial: false,
+      tutorialStep: null,
+    });
+    hud = new HudSelected();
+    hud.mount(makeHost(), new Container());
+  };
+
+  afterEach(() => {
+    hud?.destroy();
+    (gameController as unknown as { sim: unknown }).sim = originalSim;
+  });
+
+  it('draws a close button in the open popup', () => {
+    boot();
+    expect(texts().join('\n')).toContain('Warrior');
+    expect(closeButton()).toBeDefined();
+  });
+
+  it('collapses to the action-info icon when closed', () => {
+    boot();
+    (closeButton()! as unknown as { emit: (e: string) => void }).emit('pointertap');
+    expect(texts()).toHaveLength(0);
+    const icon = collapsedIcon();
+    expect(icon).toBeDefined();
+    const sprites = findSprites((hud as unknown as { el: Container }).el!);
+    expect(sprites).toHaveLength(1);
+    expect(sprites[0]!.width).toBe(32);
+  });
+
+  it('re-opens the full popup when the collapsed icon is tapped', () => {
+    boot();
+    (closeButton()! as unknown as { emit: (e: string) => void }).emit('pointertap');
+    (collapsedIcon()! as unknown as { emit: (e: string) => void }).emit('pointertap');
+    expect(texts().join('\n')).toContain('Warrior');
+    expect(closeButton()).toBeDefined();
+  });
+});
+
+/** The building-slot circles drawn on the Buildings line, in order. */
+function slotCircles(root: Container): Graphics[] {
+  const out: Graphics[] = [];
+  const walk = (c: Container): void => {
+    for (const ch of c.children) {
+      if (ch instanceof Graphics) {
+        const b = ch.getLocalBounds();
+        const w = b.maxX - b.minX;
+        // Slot circles are the only roughly square shapes above 30px (count badges are smaller).
+        if (w > 30 && w < 46 && Math.abs(w - (b.maxY - b.minY)) < 3) out.push(ch);
+      } else if (ch instanceof Container) walk(ch);
+    }
+  };
+  walk(root);
+  return out;
+}
+
+function strokeColors(g: Graphics): number[] {
+  return g.context.instructions.map((i) => (i.data as { style?: { color?: number } }).style?.color).filter((c): c is number => typeof c === 'number');
+}
+
+function findText(root: Container, prefix: string): BitmapText | undefined {
+  for (const ch of root.children) {
+    if (ch instanceof BitmapText) {
+      if ((ch as BitmapText).text.startsWith(prefix)) return ch as BitmapText;
+    } else if (ch instanceof Container) {
+      const found = findText(ch as Container, prefix);
+      if (found) return found;
+    }
+  }
+  return undefined;
+}
+
+function findSprites(root: Container): Sprite[] {
+  const out: Sprite[] = [];
+  const walk = (c: Container): void => {
+    for (const ch of c.children) {
+      if (ch instanceof Sprite) out.push(ch as Sprite);
+      if (ch instanceof Container) walk(ch as Container);
+    }
+  };
+  walk(root);
+  return out;
+}
+
+describe('HudSelected building destroy and tile extras', () => {
+  let hud: HudSelected;
+  const originalSim = (gameController as unknown as { sim: unknown }).sim;
+
+  const texts = (): string[] => {
+    const el = (hud as unknown as { el: Container }).el!;
+    const out: string[] = [];
+    const walk = (c: Container): void => {
+      for (const ch of c.children) {
+        if (ch instanceof BitmapText) out.push((ch as BitmapText).text);
+        if (ch instanceof Container) walk(ch as Container);
+      }
+    };
+    walk(el);
+    return out;
+  };
+
+  const mount = (q: number, r: number, opts: { ownedBy?: number | null; bottle?: boolean; village?: boolean } = {}): void => {
+    (globalThis as { CanvasRenderingContext2D?: unknown }).CanvasRenderingContext2D = class {};
+    (globalThis as { document?: unknown }).document = {
+      createElement: () => ({ getContext: () => fakeCanvasContext(), width: 0, height: 0 }),
+    };
+    const map = makeTestMap(2);
+    const tile = tileAt(map, q, r)!;
+    tile.ownedBy = opts.ownedBy ?? null;
+    if (opts.village) {
+      tile.settlement = { owner: opts.ownedBy ?? null, level: 1, captureReady: false, name: 'Alpha' };
+    } else {
+      tile.building = { kind: BuildingKind.MINE, level: 1 };
+    }
+    if (opts.bottle) tile.bottle = { bornTurn: 1, arrivalTurn: 1 };
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    const sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5 });
+    (gameController as unknown as { sim: Simulator | null }).sim = sim;
+    useGameStore.setState({
+      screen: Screen.GAME,
+      players,
+      localPlayerIndex: 0,
+      selection: { kind: SelectionKind.TILE, q, r },
+      tutorial: false,
+      tutorialStep: null,
+    });
+    hud = new HudSelected();
+    hud.mount(makeHost(), new Container());
+  };
+
+  afterEach(() => {
+    hud?.destroy();
+    (gameController as unknown as { sim: unknown }).sim = originalSim;
+  });
+
+  it('offers destroy for an own building but not a foreign one', () => {
+    mount(1, 0, { ownedBy: 0 });
+    expect(texts()).toContain('Destroy building (5m)');
+    hud.destroy();
+    mount(1, 0, { ownedBy: 1 });
+    expect(texts()).not.toContain('Destroy building (5m)');
+  });
+
+  it('shows a bottle line when a bottle floats on the selected tile', () => {
+    mount(1, 0, { ownedBy: 0, bottle: true });
+    expect(texts()).toContain('A message in a bottle floats here');
+  });
+
+  it('shows the next-level upgrade cost for an own village', () => {
+    mount(0, 0, { ownedBy: 0, village: true });
+    expect(texts().some((s) => s.startsWith('Upgrade to level 2:'))).toBe(true);
+  });
+});
+
+describe('HudSelected weather effects', () => {
+  let hud: HudSelected;
+  const originalSim = (gameController as unknown as { sim: unknown }).sim;
+
+  const texts = (): string[] => {
+    const el = (hud as unknown as { el: Container }).el!;
+    const out: string[] = [];
+    const walk = (c: Container): void => {
+      for (const ch of c.children) {
+        if (ch instanceof BitmapText) out.push((ch as BitmapText).text);
+        if (ch instanceof Container) walk(ch as Container);
+      }
+    };
+    walk(el);
+    return out;
+  };
+
+  /** Selects (0,0) on a map whose (1,0) is water and (0,0) land, with `weather` active. */
+  const boot = (weather: WeatherEvent[], select = { q: 0, r: 0 }): void => {
+    (globalThis as { CanvasRenderingContext2D?: unknown }).CanvasRenderingContext2D = class {};
+    (globalThis as { document?: unknown }).document = {
+      createElement: () => ({ getContext: () => fakeCanvasContext(), width: 0, height: 0 }),
+    };
+    const map = makeTestMap(2);
+    tileAt(map, 1, 0)!.terrain = TileType.Water;
+    tileAt(map, 0, 0)!.unit = makeUnit('u1', 0, UnitType.WARRIOR, 0, 0);
+    map.weather = weather;
+    const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(1));
+    const sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5 });
+    (gameController as unknown as { sim: Simulator | null }).sim = sim;
+    useGameStore.setState({
+      screen: Screen.GAME,
+      players,
+      localPlayerIndex: 0,
+      selection: { kind: SelectionKind.TILE, ...select },
+      tutorial: false,
+      tutorialStep: null,
+    });
+    hud = new HudSelected();
+    hud.mount(makeHost(), new Container());
+  };
+
+  const event = (type: WeatherType, q: number, r: number, lifetime: number): WeatherEvent =>
+    ({ id: `${type}@9`, type, q, r, radius: 2, startTurn: 9, age: 1, lifetime });
+
+  afterEach(() => {
+    hud?.destroy();
+    (gameController as unknown as { sim: unknown }).sim = originalSim;
+  });
+
+  it('describes a drought on a land tile inside it', () => {
+    boot([event(WeatherType.DROUGHT, 0, 0, 5)]);
+    expect(texts().join('\n')).toContain(t('weather.effect.drought'));
+  });
+
+  it('describes a storm on a water tile inside it, with the real numbers', () => {
+    boot([event(WeatherType.STORM, 1, 0, 6)], { q: 1, r: 0 });
+    const text = texts().join('\n');
+    expect(text).toContain('Storm: ships take 10 damage each turn');
+    expect(text).toContain('2x moves');
+  });
+
+  it('says nothing about a storm on a land tile (a storm only acts on water)', () => {
+    boot([event(WeatherType.STORM, 1, 0, 6)]);
+    expect(texts().join('\n')).not.toContain('Storm:');
+  });
+
+  it('describes an earthquake on any tile in its scope', () => {
+    boot([event(WeatherType.EARTHQUAKE, 0, 0, 1)]);
+    expect(texts().join('\n')).toContain(t('weather.effect.earthquake'));
+  });
+
+  it('shows no weather line for a tile outside the scope or in calm weather', () => {
+    boot([{ ...event(WeatherType.DROUGHT, 5, 5, 5), radius: 1 }]);
+    expect(texts().join('\n')).not.toContain('Drought:');
+    hud.destroy();
+    boot([]);
+    expect(texts().join('\n')).not.toMatch(/Drought:|Storm:|Earthquake:/);
+  });
+});
+
+
+describe('HudSelected stormcaller lightning recharge line', () => {
+  let hud: HudSelected;
+  const originalSim = (gameController as unknown as { sim: unknown }).sim;
+
+  const texts = (): string[] => {
+    const el = (hud as unknown as { el: Container }).el!;
+    const out: string[] = [];
+    const walk = (c: Container): void => {
+      for (const ch of c.children) {
+        if (ch instanceof BitmapText) out.push((ch as BitmapText).text);
+        if (ch instanceof Container) walk(ch as Container);
+      }
+    };
+    walk(el);
+    return out;
+  };
+
+  /** Selects an own stormcaller whose lightning is ready `readyIn` turns from the current turn. */
+  const boot = (readyIn: number | null): void => {
+    (globalThis as { CanvasRenderingContext2D?: unknown }).CanvasRenderingContext2D = class {};
+    (globalThis as { document?: unknown }).document = {
+      createElement: () => ({ getContext: () => fakeCanvasContext(), width: 0, height: 0 }),
+    };
+    const map = makeTestMap(2);
+    tileAt(map, 0, 0)!.unit = makeUnit('s1', 0, UnitType.STORMCALLER, 0, 0);
+    const players = buildPlayers(Tribe.Aqua, 1, new SeededRandom(1));
+    const sim = new Simulator(map, players, GameMode.CAPTURE, { rng: () => 0.5 });
+    if (readyIn !== null) players[0]!.lightningReadyTurn = sim.turn + readyIn;
+    (gameController as unknown as { sim: Simulator | null }).sim = sim;
+    useGameStore.setState({
+      screen: Screen.GAME,
+      players,
+      localPlayerIndex: 0,
+      turn: sim.turn,
+      selection: { kind: SelectionKind.UNIT, q: 0, r: 0 },
+      tutorial: false,
+      tutorialStep: null,
+    });
+    hud = new HudSelected();
+    hud.mount(makeHost(), new Container());
+  };
+
+  afterEach(() => {
+    hud?.destroy();
+    (gameController as unknown as { sim: unknown }).sim = originalSim;
+  });
+
+  it('shows the turns left while the lightning recharges', () => {
+    boot(2);
+    expect(texts()).toContain('2 turns until lightning can be used');
+  });
+
+  it('shows no line when the lightning is ready', () => {
+    boot(null);
+    expect(texts().some((x) => x.includes('until lightning'))).toBe(false);
+    hud.destroy();
+    boot(0);
+    expect(texts().some((x) => x.includes('until lightning'))).toBe(false);
+  });
+});

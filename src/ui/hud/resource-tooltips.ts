@@ -1,0 +1,15 @@
+import { t } from '../../i18n';
+import { ResourceKind } from '@enums';
+
+interface ResourceTooltipInfo {
+  name: string;
+  requiredFor: string;
+}
+
+export const RESOURCE_TOOLTIPS: Record<ResourceKind, ResourceTooltipInfo> = {
+  money: { name: t('res.money'), requiredFor: t('res.req.money') },
+  wood: { name: t('res.wood'), requiredFor: t('res.req.wood') },
+  stone: { name: t('res.stone'), requiredFor: t('res.req.stone') },
+  ore: { name: t('res.ore'), requiredFor: t('res.req.ore') },
+  food: { name: t('res.food'), requiredFor: t('res.req.food') },
+};
