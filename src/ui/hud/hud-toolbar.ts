@@ -18,6 +18,7 @@ import { toolbarSpecs } from './toolbar-specs';
 const ICON_ACTIONS: Record<string, string> = {
   upgrade: 'upgrade',
   wall: 'wall',
+  tower: 'tower',
   'upgrade-ship': 'upgrade-ship',
   heal: 'heal',
   disband: 'disband',

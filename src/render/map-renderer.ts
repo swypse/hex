@@ -3,17 +3,18 @@ import { FONT_OUTLINED, FONT_REGULAR } from '../gfx/bitmap-fonts';
 import {
   type Axial, axialKey, compareTileY, hexCorners, HEX_TILT, hexDistance, hexEdge, hexEdgeNeighbor, hexNeighbors, hexToPixel, splitHexBorder
 } from '../game/map/hex';
-import { type GameMap, type MapTile } from '../game/map/map-gen';
+import { type Building, type GameMap, type MapTile } from '../game/map/map-gen';
 import { bridgeCoastOffsets } from '../game/economy/bridges';
 import { granaryCapacity } from '../game/economy/food';
 import { buildingCapacity, heldInBuilding } from '../game/economy/building-stock';
-import { portDirection, buildingHp, BUILDING_MAX_HP } from '../game/economy/buildings';
+import { portDirection, buildingHp, buildingMaxHp, TOWER_AURA_DEFENSE } from '../game/economy/buildings';
 import { type Player } from '../game/players';
 import { type Selection } from '../game/units/selection';
 import { TRIBES, tribeById } from '../game/tribes';
 import { PIRATE_COLOR, unitMaxHp, type Unit } from '../game/units/units';
 import { unitCanAct } from '../game/units/unit-actions';
 import { attackBonus, berserkerRage } from '../game/units/abilities';
+import { nearOwnTower } from '../game/units/buffs';
 import { isExploredFor } from '../game/map/explore';
 import { territoryColor } from '../game/discovery';
 import { villageCapacity, unitsInVillage } from '../game/economy/village';
@@ -218,6 +219,8 @@ export class MapView {
   private hpOverrides = new Map<string, number>();
   /** Height of the hp `hp/maxHp` label, measured when the first bar is drawn. */
   private unitOverrides: Map<string, Unit | null> = new Map();
+  /** Staged buildings (a tower mid-fight): shown instead of the sim's, `null` = none. */
+  private buildingOverrides: Map<string, Building | null> = new Map();
   private shipBobs: BobEntry[] = [];
   private shipBobRemove: (() => void) | null = null;
   private shipBusy = new Set<string>();
@@ -379,17 +382,23 @@ export class MapView {
     this.waterRouteNeighbors = waterRouteEdges(map);
     this.waterJumps = portWaterClusterJumps(map);
     const baseIndex = tileMapByKey(map);
-    if (this.unitOverrides.size > 0) {
+    if (this.unitOverrides.size > 0 || this.buildingOverrides.size > 0) {
       // Replace only the overridden tiles (a handful) instead of re-keying the
       // whole map; the index is a copy of the cached one patched the same way.
       const tiles = map.tiles.slice();
       const index = new Map(baseIndex);
-      for (const [key, override] of this.unitOverrides) {
-        const base = baseIndex.get(key);
-        if (!base) continue;
-        const staged = override ? { ...base, unit: { ...override, q: base.q, r: base.r } } : { ...base, unit: null };
-        tiles[tiles.indexOf(base)] = staged;
+      const stage = (key: string, patch: (base: MapTile) => Partial<MapTile>): void => {
+        const base = index.get(key);
+        if (!base) return;
+        const staged = { ...base, ...patch(base) };
+        tiles[tiles.indexOf(baseIndex.get(key)!)] = staged;
         index.set(key, staged);
+      };
+      for (const [key, override] of this.unitOverrides) {
+        stage(key, (base) => ({ unit: override ? { ...override, q: base.q, r: base.r } : null }));
+      }
+      for (const [key, override] of this.buildingOverrides) {
+        stage(key, () => ({ building: override ? { ...override } : null }));
       }
       map = { ...map, tiles };
       this.tileIndex = index;
@@ -453,6 +462,7 @@ export class MapView {
             label: `${hp}/${maxHp}${unit.owner === localPlayerIndex && localTurn && canAct ? ' •' : ''}${stunned ? ' stunned' : ''}${raging ? ' rage' : ''}`,
             dim: unit.owner === localPlayerIndex && (!localTurn || !canAct),
             bonus: attackBonus(unit, map),
+            defenseBonus: nearOwnTower(map, tile, unit.owner) ? TOWER_AURA_DEFENSE : 0,
             starving: unit.starving === true,
             veteran: unit.veteran === true,
             side: unit.owner === localPlayerIndex ? HpBarSide.OWN : HpBarSide.ENEMY,
@@ -469,14 +479,15 @@ export class MapView {
       }
       // Damaged buildings (hp < max) show an hp bar + text like a unit's.
       const building = tile.building;
-      if (building && explored && !detailHidden && buildingHp(building) < BUILDING_MAX_HP) {
+      if (building && explored && !detailHidden && (this.buildingOverrides.has(axialKey(tile)) || buildingHp(building) < buildingMaxHp(building))) {
+        const maxHp = buildingMaxHp(building);
         const bhp = buildingHp(building);
         buildingHpBarSpecs.push({
           key: `building:${tile.q},${tile.r}`,
           world: { x: p.x, y: y - this.hexSize * 0.6 },
           hp: bhp,
-          maxHp: BUILDING_MAX_HP,
-          label: `${bhp}/${BUILDING_MAX_HP}`,
+          maxHp,
+          label: `${bhp}/${maxHp}`,
           dim: false,
           bonus: 0,
           side: tile.ownedBy === null ? HpBarSide.NEUTRAL : tile.ownedBy === localPlayerIndex ? HpBarSide.OWN : HpBarSide.ENEMY,
@@ -1059,6 +1070,8 @@ export class MapView {
         return tx.forestTempleTextures[b.level as 1 | 2 | 3 | 4];
       case BuildingKind.UNIVERSITY:
         return tx.universityTexture ?? tx.mineTexture;
+      case BuildingKind.TOWER:
+        return tx.towerTexture ?? tx.mineTexture;
       default:
         return tx.mineTexture;
     }
@@ -1472,6 +1485,10 @@ export class MapView {
   /** Temporarily render a different unit (or no unit) on specific tiles. Used
    * by the event presenter to stage pre-attack positions while combat animates;
    * the sim map itself is never mutated. Call with null/empty to stop staging. */
+  setBuildingOverrides(overrides: Map<string, Building | null> | null): void {
+    this.buildingOverrides = overrides ? new Map(overrides) : new Map();
+  }
+
   setUnitOverrides(overrides: Map<string, Unit | null> | null): void {
     this.unitOverrides = overrides ? new Map(overrides) : new Map();
   }

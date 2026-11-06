@@ -1,4 +1,7 @@
 import { type GameMap, type MapTile } from '../map/map-gen';
+import { hexNeighbors } from '../map/hex';
+import { tileAt } from '../map/tile-index';
+import { isTower, TOWER_AURA_DEFENSE } from '../economy/buildings';
 import { isShip } from './ship';
 import { isForestType } from '../map/tile-types';
 import { type Unit } from './units';
@@ -41,6 +44,12 @@ export function activeBuffs(map: GameMap, playerIndex: number): BuffId[] {
   return buffs;
 }
 
+/** Whether the tile or a neighbour holds a tower of `owner` (its radius-1 defense aura). */
+export function nearOwnTower(map: GameMap, tile: MapTile, owner: number): boolean {
+  const isOwnTower = (t: MapTile | undefined): boolean => t !== undefined && isTower(t.building) && t.ownedBy === owner;
+  return isOwnTower(tile) || hexNeighbors(tile).some((n) => isOwnTower(tileAt(map, n.q, n.r)));
+}
+
 export function damageReduction(map: GameMap, unit: Unit, tile: MapTile): number {
   if (unit.owner < 0) return 0;
   const buffs = activeBuffs(map, unit.owner);
@@ -49,5 +58,6 @@ export function damageReduction(map: GameMap, unit: Unit, tile: MapTile): number
   if (buffs.includes(BuffId.FOREST_PROTECTION) && isForestType(tile.terrain)) reduction += 10;
   if (tile.settlement?.wall && tile.settlement.owner === unit.owner) reduction += 3;
   if (tile.settlement && tile.settlement.owner === unit.owner) reduction += VILLAGE_DEFENSE;
+  if (nearOwnTower(map, tile, unit.owner)) reduction += TOWER_AURA_DEFENSE;
   return reduction;
 }

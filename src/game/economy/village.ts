@@ -219,7 +219,8 @@ export function buildingKindsInVillage(map: GameMap, villageTile: MapTile): Buil
   for (const t of map.tiles) {
     if (!t.building || !t.claimedByVillage) continue;
     // Farms and granaries are land improvements: they never use a building slot.
-    if (t.building.kind === BuildingKind.FARM || t.building.kind === BuildingKind.GRANARY) continue;
+    // A tower is a defensive structure and uses none either.
+    if (t.building.kind === BuildingKind.FARM || t.building.kind === BuildingKind.GRANARY || t.building.kind === BuildingKind.TOWER) continue;
     if (`${t.claimedByVillage.q},${t.claimedByVillage.r}` === villageKey) kinds.push(t.building.kind);
   }
   return kinds;

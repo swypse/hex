@@ -120,6 +120,7 @@ export interface TextureSet {
   mineTexture: TileTexture;
   /** Missing in hand-built texture sets: the renderer falls back to the mine texture. */
   universityTexture?: TileTexture;
+  towerTexture?: TileTexture;
   farmTexture: TileTexture;
   /** Black-and-white farm, shown while the farm yields nothing (winter). Baked so no per-frame filter pass is needed. */
   farmIdleTexture: TileTexture;
@@ -151,6 +152,7 @@ export interface TextureSet {
   cannonballTexture: Texture | null;
   /** attack-32 icon sliced from the icons-32 atlas (aura/rage hp-bar chip). */
   attackIconTexture: Texture | null;
+  defenseIconTexture?: Texture | null;
   /** cannonbal-32 icon sliced from the icons-32 atlas (stun projectile). */
   cannonbalTexture: Texture | null;
 }
@@ -587,6 +589,8 @@ export async function createTextures(
     makeUnitImageTexture(bakeApp, buildingTileTexture('mine'), hexSize) ?? blankTile(0.5);
   const universityTexture =
     makeUnitImageTexture(bakeApp, buildingTileTexture('university'), hexSize) ?? blankTile(0.5);
+  const towerTexture =
+    makeUnitImageTexture(bakeApp, buildingTileTexture('tower'), hexSize) ?? blankTile(0.5);
   const farmTexture =
     makeUnitImageTexture(bakeApp, buildingTileTexture('farm'), hexSize) ?? blankTile(0.5);
   const farmIdleTexture = makeDesaturatedTexture(bakeApp, farmTexture);
@@ -629,6 +633,7 @@ export async function createTextures(
   ensureIcons32Atlas();
   const cannonbalTexture = icons32FrameTexture('cannonbal-32');
   const attackIconTexture = icons32FrameTexture('attack-32');
+  const defenseIconTexture = icons32FrameTexture('def-32');
   const wallImg = buildingTileTexture('wall');
   // Bake the wall at the same hex image-scale as villages/units so its on-map
   // footprint always matches the tile, regardless of the camera quality factor.
@@ -668,6 +673,7 @@ export async function createTextures(
     sawmillTexture,
     mineTexture,
     universityTexture,
+    towerTexture,
     farmTexture,
     farmIdleTexture,
     weatherOverlays: weatherOverlayTextures(),
@@ -687,6 +693,7 @@ export async function createTextures(
     arrowTexture,
     cannonballTexture,
     attackIconTexture,
+    defenseIconTexture,
     cannonbalTexture,
   };
 }

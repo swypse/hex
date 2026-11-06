@@ -2,7 +2,7 @@ import { BUILDING_NAMES } from '../game/economy/buildings';
 import { Application, Container, Sprite } from 'pixi.js';
 import { Simulator } from '../game/simulator';
 import { type AttackUnitPre, type GameEvent } from '../game/events';
-import { type MapTile } from '../game/map/map-gen';
+import { type Building, type MapTile } from '../game/map/map-gen';
 import { type Player } from '../game/players';
 import { tribeById } from '../game/tribes';
 import { resourceTokens } from '../game/economy/resources';
@@ -27,7 +27,7 @@ import { attackPresenceParticipants, type AttackPresenceParticipant } from './at
 import { t } from '../i18n';
 import { sfx } from '../sound/sfx';
 import { attackSound } from '../sound/attack-sounds';
-import { AttackImpact, BonusKind, GameEventType, NetMode, SelectionKind, SiegeTargetKind, UnitFacing, UnitType, WeatherType } from '@enums';
+import { AttackImpact, BonusKind, BuildingKind, GameEventType, NetMode, SelectionKind, SiegeTargetKind, UnitFacing, UnitType, WeatherType } from '@enums';
 import { sleep } from '../util/sleep';
 import { tileAt } from '../game/map/tile-index';
 import { EventEffects, RAYS_DAMAGE_COLOR } from './event-effects';
@@ -44,6 +44,8 @@ const ACH_CHIP_BG = 0x373748;
 const ACH_CHIP_SIZE = 64;
 
 /** Pause after one of the local player's own (or visible ally) events. */
+/** How long a destroyed tower stays on the map for its hp bar to drain. */
+const TOWER_HP_DROP_MS = 450;
 const EVENT_PAUSE_MS = 150;
 /** Pause after a visible enemy/AI event: shorter so AI turns don't crawl. */
 const ENEMY_EVENT_PAUSE_MS = 50;
@@ -71,6 +73,18 @@ const INSTANT_EVENTS: ReadonlySet<GameEvent['type']> = new Set<GameEvent['type']
 ]);
 
 /** Tiles an event happens on (empty when it has no location). */
+/** Each tower hit in the batch, staged at its hp before the first blow (the sim map already
+ *  holds the final state, so without this a killed tower would vanish before it is hit). */
+function initialTowerOverrides(events: GameEvent[]): Map<string, Building> {
+  const out = new Map<string, Building>();
+  for (const e of events) {
+    if (e.type !== GameEventType.SIEGE || !e.towerHit) continue;
+    const key = axialKey(e.targetTile);
+    if (!out.has(key)) out.set(key, { kind: BuildingKind.TOWER, level: 1, hp: e.towerHit.pre });
+  }
+  return out;
+}
+
 function eventTiles(e: GameEvent): { q: number; r: number }[] {
   const out: { q: number; r: number }[] = [];
   const rec = e as unknown as Record<string, unknown>;
@@ -165,6 +179,8 @@ function stealthedMoveEvents(events: GameEvent[], isStealthedNow: (unitId: strin
 
 export class EventPresenter {
   private readonly effects: EventEffects;
+  /** Towers shown at their pre-hit state while this batch's hits are presented (see `initialTowerOverrides`). */
+  private towerStage = new Map<string, Building>();
 
   constructor(private readonly host: EventHost) {
     this.effects = new EventEffects(host);
@@ -305,6 +321,9 @@ export class EventPresenter {
     }
     const initialPresence = this.presenceOverrides(events, 0);
     if (initialPresence.size > 0) this.host.mapView()?.setUnitOverrides(initialPresence);
+    // Same for towers: keep each one standing at its pre-hit state until the hit is shown.
+    this.towerStage = initialTowerOverrides(events);
+    if (this.towerStage.size > 0) this.host.mapView()?.setBuildingOverrides(this.towerStage);
     const incomeDelays = incomeBadgeDelays(events, local);
     let hadAttack = false;
     try {
@@ -325,7 +344,7 @@ export class EventPresenter {
             break;
           case GameEventType.SIEGE:
             hadAttack = true;
-            this.presentSiege(e);
+            await this.presentSiege(e, events.slice(i + 1));
             break;
           case GameEventType.SPAWNED:
             if (e.playerIndex === local) sfx.play('spawn');
@@ -672,6 +691,8 @@ export class EventPresenter {
       this.host.syncKnownTribes(true);
       for (const id of movedIds) this.host.hiddenUnitIds().delete(id);
       if (hadAttack) this.host.mapView()?.clearHpOverrides();
+      if (this.towerStage.size > 0) this.host.mapView()?.setBuildingOverrides(null);
+      this.towerStage = new Map();
     }
     if (movedIds.size > 0 || hadAttack) this.host.render();
   }
@@ -821,7 +842,7 @@ export class EventPresenter {
   /** A catapult volley against a structure tile: lob a cannonball at it when
    *  visible, then re-render so the destroyed wall/building/bridge/village
    *  level change shows. A miss only renders the (un)explained event. */
-  private async presentSiege(e: Extract<GameEvent, { type: 'siege' }>): Promise<void> {
+  private async presentSiege(e: Extract<GameEvent, { type: 'siege' }>, later: GameEvent[] = []): Promise<void> {
     const sim = this.host.sim();
     const mapView = this.host.mapView();
     if (!sim || !mapView) return;
@@ -831,19 +852,45 @@ export class EventPresenter {
     const attackerVisible = attackerTile !== undefined && isExploredFor(attackerTile, local);
     const targetVisible = targetTile !== undefined && isExploredFor(targetTile, local);
     const audible = attackerVisible || targetVisible;
-    if (audible) sfx.play('arcShot');
+    const attacker = attackerTile?.unit;
+    const ranged = attacker !== undefined && attacker !== null && (attacker.type === UnitType.CATAPULT || attacker.shipLevel !== undefined);
+    // Only catapults and ships lob a cannonball; any other unit strikes the structure (a tower) directly.
+    if (audible) sfx.play(ranged || !e.towerHit ? 'arcShot' : AttackImpact.HIT);
     let shot: Promise<void> | null = null;
     if (audible && attackerVisible && attackerTile !== undefined && targetTile !== undefined) {
-      this.effects.spawnMuzzleSmokeAt(attackerTile);
-      shot = this.effects.spawnCannonballFromTo(attackerTile, targetTile, true);
+      if (ranged || !e.towerHit) {
+        this.effects.spawnMuzzleSmokeAt(attackerTile);
+        shot = this.effects.spawnCannonballFromTo(attackerTile, targetTile, true);
+      } else {
+        shot = this.host.mapView()?.lungeUnit(axialKey(attackerTile), axialKey(targetTile), 10 / this.host.camera().scale) ?? null;
+      }
     }
     if (shot) await shot;
+    if (e.towerHit) await this.settleTower(e, later, targetVisible ? targetTile : undefined);
     if (!e.missed && targetVisible && targetTile !== undefined) {
       this.host.render();
       mapView.bounceHex(e.targetTile.q, e.targetTile.r);
       // A building razed by the volley goes up in smoke on its tile.
       if (e.destroyed === SiegeTargetKind.BUILDING) this.effects.spawnMuzzleSmokeAt(targetTile);
     }
+  }
+
+  /** The hit lands on a staged tower: show the damage and let its hp bar drop; the
+   *  tower is then stepped forward to its next staged state (gone after the killing blow). */
+  private async settleTower(e: Extract<GameEvent, { type: 'siege' }>, later: GameEvent[], tile: MapTile | undefined): Promise<void> {
+    const mapView = this.host.mapView();
+    if (!mapView || !e.towerHit) return;
+    const key = axialKey(e.targetTile);
+    const hitAgain = later.some((l) => l.type === GameEventType.SIEGE && l.towerHit && axialKey(l.targetTile) === key);
+    if (tile && !e.missed) this.effects.spawnHpText(tile, `-${e.towerHit.damage}`, 0xff4444);
+    const hp = e.buildingHp ?? e.towerHit.pre;
+    this.towerStage.set(key, { kind: BuildingKind.TOWER, level: 1, hp });
+    mapView.setBuildingOverrides(this.towerStage);
+    this.host.render();
+    if (hp <= 0) await sleep(TOWER_HP_DROP_MS);
+    if (!hitAgain) this.towerStage.delete(key);
+    mapView.setBuildingOverrides(this.towerStage);
+    this.host.render();
   }
 
   private presenceOverrides(events: GameEvent[], fromIndex: number): Map<string, Unit> {

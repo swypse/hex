@@ -9,7 +9,8 @@ import { canAffordAt } from '../../economy/stock';
 import { villageUpgradeCost } from '../../economy/resources';
 import { isExploredFor } from '../../map/explore';
 import { type AiAction } from '../ai-types';
-import { AiActionType, SkillId, SpawnPreference, UnitType, VillageUpgradeBonus } from '@enums';
+import { bestTowerSite } from '../ai-tower';
+import { AiActionType, BuildingKind, SkillId, SpawnPreference, UnitType, VillageUpgradeBonus } from '@enums';
 
 import { type AiPattern, berserkerShouldPress, bestSpawnableUnitType, enemyCanAttackNext, enemyCanReach, isSupportUnit, key, landEnemyCanReach, nearestEnemyDistanceFrom, spawnWouldBeKilled, unitHoldsVillage } from '../ai-pattern-helpers';
 
@@ -144,6 +145,19 @@ export const DEFENSE_PATTERNS: AiPattern[] = [
           }
           if (best) return [{ type: AiActionType.MOVE, unitId: unit.id, q: best.q, r: best.r }];
         }
+      }
+      return null;
+    },
+  },
+  {
+    // Many enemies near a village: a tower between them and it, on the enemy's side.
+    id: 'build-tower',
+    priority: 93,
+    evaluate({ map, player, state }): AiAction[] | null {
+      for (const v of map.tiles) {
+        if (!v.settlement || v.settlement.owner !== player.index) continue;
+        const site = bestTowerSite(map, player, v, state);
+        if (site) return [{ type: AiActionType.BUILD, q: site.tile.q, r: site.tile.r, kind: BuildingKind.TOWER }];
       }
       return null;
     },

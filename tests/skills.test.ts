@@ -19,8 +19,8 @@ function player(money: number, skills: SkillId[] = []): Player {
 }
 
 describe('skills', () => {
-  it('defines the twenty-three skills with base costs 3 and 6 and correct parents', () => {
-    expect(Object.keys(SKILLS)).toHaveLength(23);
+  it('defines the twenty-four skills with base costs 3 and 6 and correct parents', () => {
+    expect(Object.keys(SKILLS)).toHaveLength(24);
     expect(skillCost(SkillId.ARCHER, 0)).toBe(3);
     expect(SKILLS.archer.parent).toBeNull();
     expect(skillCost(SkillId.CLIMBING, 0)).toBe(3);

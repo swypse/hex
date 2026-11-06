@@ -1,5 +1,5 @@
 import { BuildingKind, UnitType } from '@enums';
-import { BUILDING_MAX_HP } from '../economy/buildings';
+import { BUILDING_MAX_HP, buildingHp } from '../economy/buildings';
 import { type Axial, axialKey, tilesInRange } from '../map/hex';
 import { type GameMap, type MapTile } from '../map/map-gen';
 import { isShip } from '../units/ship';
@@ -38,7 +38,7 @@ export function hurtUnit(tile: MapTile, damage: number): WeatherUnitHit {
 /** Takes `damage` hp off the building on `tile`; removes it at 0 hp. */
 export function hurtBuilding(tile: MapTile, damage: number): WeatherBuildingHit {
   const building = tile.building!;
-  const hp = (building.hp ?? BUILDING_MAX_HP) - damage;
+  const hp = buildingHp(building) - damage;
   const destroyed = hp <= 0;
   if (destroyed) tile.building = null;
   else building.hp = hp;

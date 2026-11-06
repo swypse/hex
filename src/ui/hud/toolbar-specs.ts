@@ -4,7 +4,7 @@ import { useGameStore } from '../../store/game-store';
 import { villageUpgradeCost } from '../../game/economy/resources';
 import { canAffordAt, villagesJoinedBy } from '../../game/economy/stock';
 import { costLabel } from '../../game/economy/resources';
-import { buildingCostAt, canBuildUniversity, canBuildSawmill, canBuildFarm, canBuildGranary, canBurnBuilding, canBurnRoad, demolishKindAt, canBuildForestTemple, canBuildMine, canBuildPort, canBuildTemple, BUILDING_COSTS, canRepairBuilding, REPAIR_COST, canAffordAnyBuilderBuild } from '../../game/economy/buildings';
+import { buildingCostAt, canBuildUniversity, canBuildSawmill, canBuildFarm, canBuildGranary, canBurnBuilding, canBurnRoad, demolishKindAt, canBuildForestTemple, canBuildMine, canBuildPort, canBuildTower, isTower, TOWER_REPAIR_HP, canBuildTemple, BUILDING_COSTS, canRepairBuilding, REPAIR_COST, canAffordAnyBuilderBuild } from '../../game/economy/buildings';
 import { canHeal, canDisband, canDealWithPirate, disbandCost, hasPirateDeal, PIRATE_DEAL_COST, UNIT_TYPES, UNIT_TYPE_NAMES } from '../../game/units/units';
 import { SHIP_UPGRADE_COST, canUpgradeShip } from '../../game/units/ship';
 import { unitsInVillage, villageCapacity, canBuildWall, WALL_COST } from '../../game/economy/village';
@@ -78,10 +78,11 @@ export function toolbarSpecs(): ToolbarSpec[] {
 
   if (settlement === null) {
     if (tile.building && canRepairBuilding(map, tile, player)) {
+      const towerRepair = isTower(tile.building);
       out.push({
         key: 'repair',
-        label: t('action.repairBuilding', { wood: REPAIR_COST.wood, stone: REPAIR_COST.stone, ore: REPAIR_COST.ore, money: REPAIR_COST.money }),
-        disabled: !canAffordAt(map, player, tile, REPAIR_COST),
+        label: towerRepair ? t('action.repairTower', { hp: TOWER_REPAIR_HP }) : t('action.repairBuilding', { wood: REPAIR_COST.wood, stone: REPAIR_COST.stone, ore: REPAIR_COST.ore, money: REPAIR_COST.money }),
+        disabled: towerRepair ? false : !canAffordAt(map, player, tile, REPAIR_COST),
         onClick: () => gameController.actions.repairSelectedBuilding(),
       });
     }
@@ -94,6 +95,7 @@ export function toolbarSpecs(): ToolbarSpec[] {
       BuildingKind.FARM,
       BuildingKind.GRANARY,
       BuildingKind.UNIVERSITY,
+      BuildingKind.TOWER,
     ];
     for (const kind of kinds) {
       const ok = kind === BuildingKind.SAWMILL
@@ -110,7 +112,9 @@ export function toolbarSpecs(): ToolbarSpec[] {
                   ? canBuildGranary(map, tile, player)
                   : kind === BuildingKind.UNIVERSITY
                     ? canBuildUniversity(map, tile, player)
-                    : canBuildForestTemple(map, tile, player);
+                    : kind === BuildingKind.TOWER
+                      ? canBuildTower(map, tile, player)
+                      : canBuildForestTemple(map, tile, player);
       if (!ok) continue;
       // A port is a road/water-cluster node: it may be paid by the networks it
       // would join, just like a road or bridge.

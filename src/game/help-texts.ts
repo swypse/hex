@@ -1,5 +1,5 @@
 import { type GameMap, type MapTile } from './map/map-gen';
-import { BUILDING_COSTS, BUILDING_NAMES, buildingYield } from './economy/buildings';
+import { BUILDING_COSTS, BUILDING_NAMES, buildingYield, TOWER_ARCHER_RANGE_BONUS, TOWER_AURA_DEFENSE, TOWER_COST, TOWER_MAX_HP, TOWER_REPAIR_HP } from './economy/buildings';
 import { UNIVERSITY_UPKEEP, villageIncome } from './economy/capture';
 import { AGRONOMY_FOOD, FARM_FOOD, granaryCapacity, GRANARY_CAPACITY_PER_FARM, STARVATION_DAMAGE } from './economy/food';
 import { buildingCapacity, heldInBuilding } from './economy/building-stock';
@@ -141,6 +141,14 @@ export function buildingHelpLines(map: GameMap, tile: MapTile): string[] {
         t('help.building.farm.produce', { food: FARM_FOOD, agronomy: AGRONOMY_FOOD }),
         t('help.building.farm.skill', { money: BUILDING_COSTS.farm.money, wood: BUILDING_COSTS.farm.wood }),
         t('help.building.farm.place'),
+      ];
+    }
+    case BuildingKind.TOWER: {
+      return [
+        t('help.building.tower.effect', { def: TOWER_AURA_DEFENSE, range: TOWER_ARCHER_RANGE_BONUS }),
+        t('help.building.tower.hp', { hp: TOWER_MAX_HP, repair: TOWER_REPAIR_HP }),
+        t('help.building.tower.skill', { money: TOWER_COST.money, stone: TOWER_COST.stone, ore: TOWER_COST.ore }),
+        t('help.building.tower.place'),
       ];
     }
     case BuildingKind.UNIVERSITY: {

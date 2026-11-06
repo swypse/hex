@@ -22,4 +22,5 @@ export enum SkillId {
   AGRONOMY = 'agronomy',
   ENGINEERING = 'engineering',
   MEDICINE = 'medicine',
+  TOWER = 'tower',
 }

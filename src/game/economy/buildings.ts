@@ -31,8 +31,50 @@ export const BUILDING_MAX_HP = 2;
 export const REPAIR_COST: Resources = { wood: 2, stone: 2, ore: 2, money: 3, food: 0 };
 
 /** A building's current hp; `undefined` (new/undamaged) reads as full. */
-export function buildingHp(building: { hp?: number } | null | undefined): number {
-  return building?.hp ?? BUILDING_MAX_HP;
+export function buildingHp(building: { kind?: BuildingKind; hp?: number } | null | undefined): number {
+  return building?.hp ?? buildingMaxHp(building);
+}
+
+/** Tower: hp, defense (it never counters), the defense it lends and its price. */
+export const TOWER_MAX_HP = 150;
+export const TOWER_DEFENSE = 0;
+export const TOWER_AURA_DEFENSE = 10;
+export const TOWER_REPAIR_HP = 20;
+/** Extra attack range of an archer standing on its own tower. */
+export const TOWER_ARCHER_RANGE_BONUS = 1;
+export const TOWER_COST: Resources = { money: 15, wood: 0, stone: 10, ore: 5, food: 0 };
+
+/** Maximum hp of a building: a tower is far sturdier than the rest. */
+export function buildingMaxHp(building: { kind?: BuildingKind } | null | undefined): number {
+  return building?.kind === BuildingKind.TOWER ? TOWER_MAX_HP : BUILDING_MAX_HP;
+}
+
+export function isTower(building: { kind: BuildingKind } | null | undefined): boolean {
+  return building?.kind === BuildingKind.TOWER;
+}
+
+/** An enemy tower on a tile that no unit stands on (a unit there is attacked instead). */
+export function isEnemyTowerTile(tile: MapTile, attackerOwner: number): boolean {
+  return isTower(tile.building) && !tile.unit && tile.ownedBy !== null && tile.ownedBy !== attackerOwner;
+}
+
+/** Whether a unit of `playerIndex` is barred from the tile: an enemy tower blocks it. */
+export function blockedByEnemyTower(tile: MapTile, playerIndex: number): boolean {
+  return isTower(tile.building) && tile.ownedBy !== playerIndex;
+}
+
+/** Whether `unit` (own, idle) standing on its own damaged tower may repair it for its whole turn. */
+export function canRepairTowerWith(tile: MapTile, unit: Unit | null | undefined): boolean {
+  if (!unit || !isTower(tile.building) || tile.ownedBy !== unit.owner || tile.unit !== unit) return false;
+  if (unit.hasMoved || unit.hasAttacked || unit.hasHealed) return false;
+  return buildingHp(tile.building) < TOWER_MAX_HP;
+}
+
+export function canBuildTower(map: GameMap, tile: MapTile, player: Player): boolean {
+  if (!hasSkill(player, SkillId.TOWER)) return false;
+  if (tile.ownedBy !== player.index || tile.settlement || tile.building) return false;
+  if (!isLandType(tile.terrain) && !isMountainType(tile.terrain)) return false;
+  return canAffordAt(map, player, tile, buildingCostAt(map, player, tile, BuildingKind.TOWER));
 }
 
 
@@ -62,6 +104,7 @@ export const BUILDING_NAMES: Record<BuildingKind, string> = {
   farm: t('building.farm'),
   granary: t('building.granary'),
   university: t('building.university'),
+  tower: t('building.tower'),
 };
 
 export const BUILDING_COSTS: Record<BuildingKind, Resources> = {
@@ -73,6 +116,7 @@ export const BUILDING_COSTS: Record<BuildingKind, Resources> = {
   farm: { wood: 3, stone: 0, money: 10, ore: 0, food: 0 },
   granary: { wood: 10, stone: 10, money: 20, ore: 0, food: 0 },
   university: { wood: 0, stone: 10, money: 40, ore: 5, food: 0 },
+  tower: TOWER_COST,
 };
 
 /** Share of wood and stone an Engineering player saves on buildings in a village with a university. */
@@ -387,6 +431,7 @@ export function builderBuildStatus(map: GameMap, tile: MapTile, kind: BuilderBui
 export function canRepairBuilding(map: GameMap, tile: MapTile, player: Player): boolean {
   if (!tile.building) return false;
   if (tile.ownedBy !== player.index) return false;
+  if (isTower(tile.building)) return canRepairTowerWith(tile, tile.unit);
   return buildingHp(tile.building) < BUILDING_MAX_HP;
 }
 
@@ -409,6 +454,13 @@ export function destroyBuilding(map: GameMap, tile: MapTile, player: Player): bo
  *  true when the repair happened (validated + affordable). */
 export function repairBuilding(map: GameMap, tile: MapTile, player: Player): boolean {
   if (!canRepairBuilding(map, tile, player)) return false;
+  if (isTower(tile.building)) {
+    // Free: the unit standing on the tower spends its whole turn mending it.
+    const unit = tile.unit!;
+    unit.hasMoved = unit.hasAttacked = unit.hasHealed = true;
+    tile.building!.hp = Math.min(TOWER_MAX_HP, buildingHp(tile.building) + TOWER_REPAIR_HP);
+    return true;
+  }
   if (!payAt(map, player, tile, REPAIR_COST)) return false;
   delete tile.building!.hp;
   return true;
@@ -473,7 +525,9 @@ export function buildBuilding(
                 ? canBuildGranary(map, tile, player)
                 : kind === BuildingKind.UNIVERSITY
                   ? canBuildUniversity(map, tile, player)
-                  : canBuildForestTemple(map, tile, player);
+                  : kind === BuildingKind.TOWER
+                    ? canBuildTower(map, tile, player)
+                    : canBuildForestTemple(map, tile, player);
   if (!allowed) return false;
   return payAndPlaceBuilding(map, tile, kind, player);
 }

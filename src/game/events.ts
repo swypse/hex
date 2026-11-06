@@ -18,7 +18,7 @@ export interface AttackUnitPre {
 export type GameEvent =
   | { type: GameEventType.UNIT_MOVED; unitId: string; from: Axial; path: Axial[]; to: Axial; shipLevel?: 1 | 2 | 3 }
   | { type: GameEventType.ATTACK; attackerId: string; targetId: string; attackerIndex: number; targetIndex: number; attackerTile: Axial; targetTile: Axial; attackerDamage: number; targetDamage: number; missed: boolean; attackerDied: boolean; targetDied: boolean; attackerPre?: AttackUnitPre; targetPre?: AttackUnitPre }
-  | { type: GameEventType.SIEGE; attackerId: string; attackerIndex: number; targetIndex: number; targetTile: Axial; missed: boolean; destroyed: SiegeTargetKind | null; buildingHp?: number }
+  | { type: GameEventType.SIEGE; attackerId: string; attackerIndex: number; targetIndex: number; targetTile: Axial; missed: boolean; destroyed: SiegeTargetKind | null; buildingHp?: number; towerHit?: { pre: number; damage: number } }
   | { type: GameEventType.SPAWNED; unitType: UnitType; q: number; r: number; playerIndex: number }
   | { type: GameEventType.CAPTURED; q: number; r: number; oldOwner: number | null; newOwner: number; ownerDied: boolean }
   | { type: GameEventType.VILLAGE_UPGRADED; q: number; r: number; level: number; playerIndex: number; bonus?: VillageUpgradeBonus }

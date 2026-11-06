@@ -40,6 +40,8 @@ export interface HpBarSpec {
   label: string;
   dim: boolean;
   bonus: number;
+  /** Defense a nearby tower lends (shield icon + N after the hp text); 0 for none. */
+  defenseBonus?: number;
   /** The unit gets too little food: show a red S before the hp text. */
   starving?: boolean;
   /** A veteran: a star icon before the hp text. */
@@ -62,6 +64,9 @@ interface HpBarEntry {
   label: BitmapText;
   bonusIcon: Sprite | null;
   bonusText: BitmapText | null;
+  /** Tower defense marker (shield icon + N), created and dropped as the aura comes and goes. */
+  defenseIcon: Sprite | null;
+  defenseText: BitmapText | null;
   /** Red "S" before the hp text of a starving unit. */
   starveTag: BitmapText | null;
   /** Star icon before the hp text of a veteran. */
@@ -241,6 +246,8 @@ export class HpBarLayer {
       label,
       bonusIcon,
       bonusText,
+      defenseIcon: null,
+      defenseText: null,
       starveTag: null,
       star: null,
       // A bar is born at the unit's actual hp, not full: a unit that already
@@ -264,9 +271,45 @@ export class HpBarLayer {
     bar.label.alpha = textAlpha;
     if (bar.bonusIcon) bar.bonusIcon.alpha = textAlpha;
     if (bar.bonusText) bar.bonusText.alpha = textAlpha;
+    this.updateDefenseMarker(bar, spec, textAlpha);
     const starW = this.updateStar(bar, spec);
     this.labelHeight = bar.label.height;
     this.updateStarveTag(bar, spec, starW);
+  }
+
+  /** Keeps the tower's "shield +N" marker after the hp text (and the attack bonus) in sync. */
+  private updateDefenseMarker(bar: HpBarEntry, spec: HpBarSpec, alpha: number): void {
+    const value = spec.defenseBonus ?? 0;
+    const tex = this.deps.textures().defenseIconTexture;
+    if (value <= 0 || !tex) {
+      if (bar.defenseIcon) { bar.defenseIcon.destroy(); bar.defenseIcon = null; }
+      if (bar.defenseText) { bar.defenseText.parent?.removeChild(bar.defenseText); bar.defenseText.destroy(); bar.defenseText = null; }
+      return;
+    }
+    if (!bar.defenseIcon) {
+      const icon = new Sprite(tex);
+      icon.anchor.set(0.5, 1);
+      icon.width = BONUS_ICON_SIZE;
+      icon.height = BONUS_ICON_SIZE;
+      icon.zIndex = 1;
+      bar.el.addChild(icon);
+      bar.defenseIcon = icon;
+    }
+    if (!bar.defenseText) {
+      const text = this.deps.pool.takeText(`+${value}`, { fontSize: FontSize.VERY_SMALL, fill: 0x7fc8ff, fontFamily: FONT_OUTLINED });
+      text.anchor.set(0, 1);
+      text.zIndex = 1;
+      bar.el.addChild(text);
+      bar.defenseText = text;
+    }
+    bar.defenseText.text = `+${value}`;
+    // After the hp text, past the attack-bonus marker when there is one.
+    let x = bar.label.x + bar.label.width / 2;
+    if (bar.bonusText) x = bar.bonusText.x + bar.bonusText.width;
+    bar.defenseIcon.position.set(x + BONUS_ICON_GAP + BONUS_ICON_SIZE / 2, bar.label.y);
+    bar.defenseText.position.set(x + BONUS_ICON_GAP + BONUS_ICON_SIZE + BONUS_TEXT_GAP, bar.label.y);
+    bar.defenseIcon.alpha = alpha;
+    bar.defenseText.alpha = alpha;
   }
 
   /** Keeps the veteran star left of the hp text in sync with the unit. Returns the

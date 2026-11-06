@@ -1,4 +1,5 @@
 import { hexDistance } from '../map/hex';
+import { tileAt } from '../map/tile-index';
 import { type GameMap, type MapTile } from '../map/map-gen';
 import { isShip, shipAttack, shipAttackDistance } from './ship';
 import { isExploredFor } from '../map/explore';
@@ -7,7 +8,7 @@ import type { Player } from '../players';
 import { unitMaxHp, type Unit } from './units';
 import { attackBonus, effectiveAttack, berserkerRage, isStunned } from './abilities';
 import { damageReduction } from './buffs';
-import { BUILDING_MAX_HP, raidPriority } from '../economy/buildings';
+import { BUILDING_MAX_HP, blockedByEnemyTower, buildingHp, isEnemyTowerTile, isTower, raidPriority, TOWER_ARCHER_RANGE_BONUS, TOWER_MAX_HP } from '../economy/buildings';
 import { SiegeTargetKind, SkillId, UnitType } from '@enums';
 
 interface AttackResult {
@@ -124,7 +125,7 @@ export function counterDamageTo(
   const { attackerDamage, counterDamage } = resolveCombat(map, attacker, targetTile);
   if (attackerDamage >= target.hp) return 0;
   const dist = hexDistance({ q: attacker.q, r: attacker.r }, targetTile);
-  if (dist > (target.attackDistance ?? 0)) return 0;
+  if (dist > attackRange(map, target)) return 0;
   if (!canCounterAttack(target, dist)) return 0;
   return counterDamage;
 }
@@ -157,6 +158,29 @@ interface SiegeOutcome {
   /** Remaining hp of a building hit by the volley (undefined for non-building
    *  or non-damaging hits). */
   buildingHp?: number;
+  /** A tower hit: its hp before the blow and the damage dealt. */
+  towerHit?: { pre: number; damage: number };
+}
+
+/** Any unit's blow on an enemy tower: its normal damage against 0 defense, no counter-attack. */
+export function hitTower(attacker: Unit, tower: MapTile): SiegeOutcome {
+  attacker.hasAttacked = true;
+  const building = tower.building!;
+  const pre = buildingHp(building);
+  const damage = towerDamage(attacker);
+  const towerHit = { pre, damage };
+  const hp = pre - damage;
+  if (hp <= 0) {
+    tower.building = null;
+    return { missed: false, destroyed: SiegeTargetKind.BUILDING, buildingHp: 0, towerHit };
+  }
+  building.hp = hp;
+  return { missed: false, destroyed: null, buildingHp: hp, towerHit };
+}
+
+/** Damage `attacker` deals to a tower: the full attack force (defense 0). */
+export function towerDamage(attacker: Unit): number {
+  return Math.max(1, Math.round(attackDamage(attacker) * COMBAT_SCALE));
 }
 
 /** A catapult volley against a structure tile. Misses apply the same chance as
@@ -170,6 +194,7 @@ export function performSiege(catapult: Unit, target: MapTile, rng: () => number 
     return { missed: true, destroyed: null };
   }
   const s = target.settlement;
+  if (isEnemyTowerTile(target, catapult.owner)) return hitTower(catapult, target);
   if (s && s.owner !== null && s.owner !== catapult.owner) {
     if (s.wall) {
       s.wall = false;
@@ -206,6 +231,14 @@ export function performSiege(catapult: Unit, target: MapTile, rng: () => number 
   return { missed: false, destroyed: null };
 }
 
+/** Reach of `unit` from where it stands: an archer on its own tower sees one hex further. */
+export function attackRange(map: GameMap, unit: Unit): number {
+  const base = shipAttackDistance(unit);
+  if (unit.type !== UnitType.ARCHER || isShip(unit)) return base;
+  const here = tileAt(map, unit.q, unit.r);
+  return here && isTower(here.building) && here.ownedBy === unit.owner ? base + TOWER_ARCHER_RANGE_BONUS : base;
+}
+
 /** Tiles `unit` can attack. `includeFreeStructures` (a player's own targeting) also
  *  lists roads and bridges on unowned tiles for a catapult; the AI leaves it off. */
 export function attackableTargets(map: GameMap, unit: Unit, playerIndex = 0, includeFreeStructures = false): MapTile[] {
@@ -213,17 +246,24 @@ export function attackableTargets(map: GameMap, unit: Unit, playerIndex = 0, inc
     if (!t.unit) return false;
     if (t.unit.isStealthed === true) return false;
     if (t.unit.owner === unit.owner) return false;
-    if (hexDistance({ q: unit.q, r: unit.r }, t) > shipAttackDistance(unit)) return false;
+    if (hexDistance({ q: unit.q, r: unit.r }, t) > attackRange(map, unit)) return false;
     if (!isExploredFor(t, playerIndex)) return false;
     return true;
   });
+  // Any unit can hit an enemy tower (no unit standing on it) within its range.
+  for (const t of map.tiles) {
+    if (!isEnemyTowerTile(t, unit.owner)) continue;
+    if (hexDistance({ q: unit.q, r: unit.r }, t) > attackRange(map, unit)) continue;
+    if (!isExploredFor(t, playerIndex)) continue;
+    if (!result.includes(t)) result.push(t);
+  }
   // Land catapults are the sole siege unit: they can also target enemy
   // buildings (villages, mines, sawmills, ports, temples, bridges) within
   // their attack range, using the same range/fog logic as enemy units.
   if (unit.type === UnitType.CATAPULT) {
     for (const t of map.tiles) {
       if (t.unit) continue;
-      if (hexDistance({ q: unit.q, r: unit.r }, t) > shipAttackDistance(unit)) continue;
+      if (hexDistance({ q: unit.q, r: unit.r }, t) > attackRange(map, unit)) continue;
       if (!isExploredFor(t, playerIndex)) continue;
       if (isEnemySiegeTarget(t, unit.owner) || (includeFreeStructures && isFreeSiegeTarget(t))) result.push(t);
     }
@@ -231,23 +271,28 @@ export function attackableTargets(map: GameMap, unit: Unit, playerIndex = 0, inc
   return result;
 }
 
-/** Best structure tile for a catapult, or null when none are reachable. Only
+/** Best structure tile for the AI to hit, or null when none are reachable: any
+ *  unit's enemy tower, and for a catapult every structure. Only
  *  called once no enemy units are available, so the AI sieges villages and
  *  production buildings rather than sitting idle. Villages (and their walls)
  *  are worth more than a standalone building; a bridge is last. */
 function chooseBestSiegeTarget(map: GameMap, unit: Unit, playerIndex = 0): MapTile | null {
-  if (unit.type !== UnitType.CATAPULT) return null;
+  const catapult = unit.type === UnitType.CATAPULT;
   let best: MapTile | null = null;
   let bestScore = -Infinity;
   for (const t of map.tiles) {
     if (t.unit) continue; // unit targets are handled by chooseBestAttack
-    if (!isEnemySiegeTarget(t, unit.owner)) continue;
-    if (hexDistance({ q: unit.q, r: unit.r }, t) > shipAttackDistance(unit)) continue;
+    // Any unit may take down an enemy tower; only catapults siege the rest.
+    if (!(catapult ? isEnemySiegeTarget(t, unit.owner) : isEnemyTowerTile(t, unit.owner))) continue;
+    if (hexDistance({ q: unit.q, r: unit.r }, t) > attackRange(map, unit)) continue;
     if (!isExploredFor(t, playerIndex)) continue;
     let s = 0;
     if (t.settlement) {
       s = 400 + t.settlement.level * 50;
       if (t.settlement.wall) s += 80;
+    } else if (isEnemyTowerTile(t, unit.owner)) {
+      // Below villages, above other buildings; a weaker tower falls sooner.
+      s = 250 + (TOWER_MAX_HP - buildingHp(t.building)) / 10;
     } else if (t.building) {
       // Production and food buildings first (granary > university > farm > mine > sawmill).
       s = 150 + raidPriority(t.building.kind) * 8;
@@ -257,7 +302,7 @@ function chooseBestSiegeTarget(map: GameMap, unit: Unit, playerIndex = 0): MapTi
       s = 60; // a road
     }
     const dist = hexDistance({ q: unit.q, r: unit.r }, t);
-    s += shipAttackDistance(unit) - dist;
+    s += attackRange(map, unit) - dist;
     if (s > bestScore) {
       bestScore = s;
       best = t;
@@ -295,7 +340,7 @@ export function chooseBestAttack(map: GameMap, unit: Unit, playerIndex = 0): Map
     if (target.shipLevel !== undefined) s += 90;
     if (t.settlement && t.settlement.owner !== unit.owner) s += 150;
     const dist = hexDistance({ q: unit.q, r: unit.r }, { q: t.q, r: t.r });
-    if (dist > target.attackDistance || !canCounterAttack(target, dist)) s += 40;
+    if (dist > attackRange(map, target) || !canCounterAttack(target, dist)) s += 40;
     if (s > bestScore) {
       bestScore = s;
       best = t;
@@ -352,7 +397,7 @@ export function performAttack(
     { q: attacker.q, r: attacker.r },
     { q: target.q, r: target.r },
   );
-  if (!targetDied && distance <= targetUnit.attackDistance && canCounterAttack(targetUnit, distance)) {
+  if (!targetDied && distance <= attackRange(map, targetUnit) && canCounterAttack(targetUnit, distance)) {
     targetDamage = counterDamage;
     attackerDied = attacker.hp - targetDamage <= 0;
     attacker.hp = Math.max(0, attacker.hp - targetDamage);
@@ -366,7 +411,8 @@ export function performAttack(
     if (target.settlement && target.settlement.owner !== attacker.owner && target.settlement.captureReady) {
       target.settlement.captureReady = false;
     }
-    if (attackerTile && attacker.type !== UnitType.ARCHER && attacker.type !== UnitType.CATAPULT && attacker.type !== UnitType.PIRATE && targetUnit.type !== UnitType.PIRATE && !isShip(attacker) && !isShip(targetUnit)) {
+    if (attackerTile && attacker.type !== UnitType.ARCHER && attacker.type !== UnitType.CATAPULT && attacker.type !== UnitType.PIRATE && targetUnit.type !== UnitType.PIRATE && !isShip(attacker) && !isShip(targetUnit) && !blockedByEnemyTower(target, attacker.owner)) {
+      // (An enemy tower's cell is never taken, even over the unit that stood on it.)
       attackerTile.unit = null;
       attacker.q = target.q;
       attacker.r = target.r;

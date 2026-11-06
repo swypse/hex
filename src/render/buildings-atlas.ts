@@ -35,6 +35,7 @@ export const BUILDING_TILE_FILES: string[] = [
   'forest-temple-4',
   'village-empty',
   'wall',
+  'tower',
 ];
 
 const atlas = createAtlas({ file: BUILDINGS_ATLAS_FILE, frames: BUILDINGS_ATLAS_FRAMES, tag: 'buildingsAtlas' });

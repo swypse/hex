@@ -19,6 +19,7 @@ export const SKILL_ICON_FILES: Partial<Record<SkillId, string>> = {
   shields: 'skill-shields',
   archer: 'skill-archer',
   defense: 'skill-defense',
+  tower: 'skill-tower',
   catapult: 'skill-catapult',
   riding: 'skill-riding',
   bridges: 'skill-bridges',

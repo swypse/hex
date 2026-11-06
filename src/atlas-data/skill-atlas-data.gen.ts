@@ -26,6 +26,7 @@ export const SKILL_ATLAS_FRAMES: Record<string, { x: number; y: number }> = {
   'skill-shields': { x: 360, y: 360 },
   'skill-smithery': { x: 480, y: 360 },
   'skill-swordsman': { x: 0, y: 480 },
-  'skill-water': { x: 120, y: 480 },
-  'skill-water-temples': { x: 240, y: 480 },
+  'skill-tower': { x: 120, y: 480 },
+  'skill-water': { x: 240, y: 480 },
+  'skill-water-temples': { x: 360, y: 480 },
 };

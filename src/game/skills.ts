@@ -109,6 +109,13 @@ export const SKILLS: Record<SkillId, SkillInfo> = {
     parent: SkillId.SHIELDS,
     description: t('skill.defense.desc'),
   },
+  tower: {
+    id: SkillId.TOWER,
+    name: t('skill.tower.name'),
+    level: 3,
+    parent: SkillId.DEFENSE,
+    description: t('skill.tower.desc'),
+  },
   archer: {
     id: SkillId.ARCHER,
     name: t('skill.archer.name'),

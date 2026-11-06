@@ -26,6 +26,7 @@ import { type AiDifficultyProfile, profileFor } from './ai-difficulty';
 import { isShip } from '../units/ship';
 import { updateStrategy, deriveDirectives } from './ai-strategy';
 import { flagsFor } from './ai-flags';
+import { towerSkillWanted } from './ai-tower';
 import { analyzeWater, bestOpenPortSite } from './ai-water';
 import { planLinks } from './ai-links';
 import { stepVetoed } from './ai-review';
@@ -632,6 +633,12 @@ function bestAvailableAction(
       candidates.push({ score: 450 + jitter(), action: { type: AiActionType.OPEN_SKILL, skill: id } });
       break;
     }
+  }
+
+  // Villages under pressure head for towers (Shields -> Defense -> Tower).
+  const towerSkill = towerSkillWanted(map, player);
+  if (towerSkill && !state.opened.has(towerSkill) && canOpenSkill(player, towerSkill, map)) {
+    candidates.push({ score: 330 + jitter(), action: { type: AiActionType.OPEN_SKILL, skill: towerSkill } });
   }
 
   // A directive skill chain (economy/naval strategy) is opened before the

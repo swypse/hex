@@ -6,7 +6,7 @@ import { isForestType, isMountainType, isWaterType } from '../../game/map/tile-t
 import { UNIT_TYPE_NAMES, unitFoodEaten, unitMaintenance, type Unit } from '../../game/units/units';
 import { attackDamage } from '../../game/units/combat';
 import { berserkerRage } from '../../game/units/abilities';
-import { activeBuffs, VILLAGE_DEFENSE } from '../../game/units/buffs';
+import { activeBuffs, nearOwnTower, VILLAGE_DEFENSE } from '../../game/units/buffs';
 import { isShip } from '../../game/units/ship';
 import { villageCapacity, villageBuildingLimit, buildingKindsInVillage, unitsInVillage } from '../../game/economy/village';
 import { tileUpkeep, villageIncomeBreakdown } from '../../game/economy/capture';
@@ -15,7 +15,7 @@ import { stormTurnsLeft } from '../../game/units/storm';
 import { buildingCapacity, heldInBuilding } from '../../game/economy/building-stock';
 import { farmYield, granaryCapacity, STARVATION_DAMAGE, villageFood, villageGranaries } from '../../game/economy/food';
 import { villageUpgradeCost } from '../../game/economy/resources';
-import { buildingYield, buildingHp, canPlaceFoodBuilding, BUILDING_NAMES, DESTROY_BUILDING_COST } from '../../game/economy/buildings';
+import { TOWER_AURA_DEFENSE, buildingYield, buildingHp, buildingMaxHp, canPlaceFoodBuilding, BUILDING_NAMES, DESTROY_BUILDING_COST } from '../../game/economy/buildings';
 import { TRAP_TURNS } from '../../game/units/traps';
 import { isExploredFor } from '../../game/map/explore';
 import { hexNeighbors } from '../../game/map/hex';
@@ -56,6 +56,7 @@ function unitDefenseBuffs(map: GameMap, unit: Unit, tile: MapTile): { key: strin
   if (buffs.includes(BuffId.FOREST_PROTECTION) && isForestType(tile.terrain)) out.push({ key: 'hud.buff.forestProtection', amount: 10 });
   if (tile.settlement && tile.settlement.owner === unit.owner) out.push({ key: 'hud.buff.village', amount: VILLAGE_DEFENSE });
   if (tile.settlement?.wall && tile.settlement.owner === unit.owner) out.push({ key: 'hud.buff.wall', amount: 3 });
+  if (nearOwnTower(map, tile, unit.owner)) out.push({ key: 'hud.buff.tower', amount: TOWER_AURA_DEFENSE });
   return out;
 }
 
@@ -296,10 +297,12 @@ export class HudSelected implements Widget {
       // pairs, like the unit characteristics row, so damage and production
       // read at a glance.
       buildingRow = {
-        name: b.kind === BuildingKind.SAWMILL || b.kind === BuildingKind.MINE || b.kind === BuildingKind.FARM || b.kind === BuildingKind.GRANARY || b.kind === BuildingKind.UNIVERSITY
+        name: b.kind === BuildingKind.TOWER
+          ? `${BUILDING_NAMES[b.kind]} ${buildingHp(b)}/${buildingMaxHp(b)}`
+          : b.kind === BuildingKind.SAWMILL || b.kind === BuildingKind.MINE || b.kind === BuildingKind.FARM || b.kind === BuildingKind.GRANARY || b.kind === BuildingKind.UNIVERSITY
           ? BUILDING_NAMES[b.kind]
           : t('hud.selected.building', { name: BUILDING_NAMES[b.kind], level: b.level }),
-        hp: buildingHp(b),
+        hp: b.kind === BuildingKind.TOWER ? undefined : buildingHp(b),
         pairs: !own ? [] : [
           ...(y.wood > 0 ? [{ icon: 'wood-32', value: String(y.wood) }] : []),
           ...(y.stone > 0 ? [{ icon: 'stone-32', value: String(y.stone) }] : []),

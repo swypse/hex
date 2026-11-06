@@ -27,7 +27,7 @@ import {
   SKILL_SCORE, UPGRADE_SCORE
 } from './score';
 import { SEASON_LENGTH, seasonForTurn, SEASONS } from './season';
-import { moveUnit, pathBetween, reachableTargets } from './units/selection';
+import { cannotEnterTower, moveUnit, pathBetween, reachableTargets } from './units/selection';
 import { gainShipAbility, revertShip, upgradeShip } from './units/ship';
 import { hasSkill, openSkill as applySkill } from './skills';
 import { spawnUnit } from './units/spawn';
@@ -525,7 +525,7 @@ export class Simulator {
     const path = pathBetween(this.map, from, {
       q,
       r
-    }, canClimb, unit.shipLevel !== undefined, canDock, unit.owner, movePoints(unit));
+    }, canClimb, unit.shipLevel !== undefined, canDock, unit.owner, movePoints(unit), false, cannotEnterTower(unit));
     const shipLevel = unit.shipLevel;
     const fromTile = tileAt(this.map, from.q, from.r);
     // Walk the path one step at a time: an enemy that steps onto an invisible
@@ -846,6 +846,7 @@ export class Simulator {
         missed: outcome.missed,
         destroyed: outcome.destroyed,
         ...(outcome.buildingHp !== undefined ? { buildingHp: outcome.buildingHp } : {}),
+        ...(outcome.towerHit ? { towerHit: outcome.towerHit } : {}),
       });
       return true;
     }

@@ -6,6 +6,7 @@ import { isExploredFor } from '../map/explore';
 import { movePoints as unitMovePoints, type Unit } from './units';
 import { tileMoveCost, waterRouteKeys } from './movement-cost';
 import { isMoveStealthed } from './stalker';
+import { blockedByEnemyTower, isTower } from '../economy/buildings';
 import { BuildingKind, SelectionKind, UnitType } from '@enums';
 
 
@@ -52,9 +53,12 @@ function isEnterable(
   canDock: boolean,
   playerIndex: number,
   stealthed = false,
+  towerBarred = false,
 ): boolean {
   if (!isExploredFor(tile, playerIndex)) return false;
   if (!isEffectivelyEmpty(tile, playerIndex)) return false;
+  if (blockedByEnemyTower(tile, playerIndex)) return false;
+  if (towerBarred && isTower(tile.building)) return false;
   if (stealthed && tile.settlement && tile.settlement.owner !== null && tile.settlement.owner !== playerIndex) {
     return false;
   }
@@ -79,6 +83,11 @@ function isAdjacentToEnemy(map: GameMap, tile: MapTile, playerIndex: number): bo
     const t = tileAt(map, n.q, n.r);
     return t !== undefined && t.unit != null && t.unit.isStealthed !== true && t.unit.owner !== playerIndex;
   });
+}
+
+/** Riders, knights and catapults (land) cannot step onto any tower cell, even their own. */
+export function cannotEnterTower(unit: Unit): boolean {
+  return unit.shipLevel === undefined && (unit.type === UnitType.RIDER || unit.type === UnitType.KNIGHT || unit.type === UnitType.CATAPULT);
 }
 
 function tkey(a: Axial): string {
@@ -110,6 +119,7 @@ export function reachableTargets(
   const from = { q: unit.q, r: unit.r };
   const canSail = unit.shipLevel !== undefined;
   const stealthed = isMoveStealthed(unit);
+  const towerBarred = cannotEnterTower(unit);
   const waterKeys = waterRouteKeys(map);
   const start = tileAt(map, from.q, from.r);
   if (!start) return [];
@@ -143,7 +153,7 @@ export function reachableTargets(
         if (!tile) continue;
         const nk = tkey(n);
         if (reached.has(nk)) continue;
-        if (!isEnterable(map, tile, canSail, canClimb, canDock, playerIndex, stealthed)) continue;
+        if (!isEnterable(map, tile, canSail, canClimb, canDock, playerIndex, stealthed, towerBarred)) continue;
         const next = cost + tileMoveCost(map, cur, unit.owner, waterKeys);
         if (next > points) continue;
         if (dist.get(nk) !== undefined && dist.get(nk)! <= next) continue;
@@ -159,7 +169,7 @@ export function reachableTargets(
     if (!t) continue;
     const nk = tkey(t);
     if (reached.has(nk)) continue;
-    if (isEnterable(map, t, canSail, canClimb, canDock, playerIndex, stealthed)) {
+    if (isEnterable(map, t, canSail, canClimb, canDock, playerIndex, stealthed, towerBarred)) {
       reached.add(nk);
       result.push(t);
     }
@@ -178,6 +188,7 @@ function pathBetweenSteps(
   canDock = false,
   playerIndex = 0,
   stealthed = false,
+  towerBarred = false,
 ): Axial[] {
   if (from.q === to.q && from.r === to.r) return [];
   const key = (a: Axial): string => `${a.q},${a.r}`;
@@ -236,6 +247,7 @@ function pathBetweenCost(
   playerIndex: number,
   waterKeys: Set<string>,
   stealthed = false,
+  towerBarred = false,
 ): Axial[] {
   const start = tileAt(map, from.q, from.r);
   if (!start) return [];
@@ -273,7 +285,7 @@ function pathBetweenCost(
         if (!tile) continue;
         const nk = tkey(n);
         if (done.has(nk)) continue;
-        if (!isEnterable(map, tile, canSail, canClimb, canDock, playerIndex, stealthed)) continue;
+        if (!isEnterable(map, tile, canSail, canClimb, canDock, playerIndex, stealthed, towerBarred)) continue;
         const next = cost + tileMoveCost(map, cur, playerIndex, waterKeys);
         if (next > cap) continue;
         if (best.get(nk) !== undefined && best.get(nk)! <= next) continue;
@@ -296,10 +308,11 @@ export function pathBetween(
   playerIndex = 0,
   movePoints: number | undefined = undefined,
   stealthed = false,
+  towerBarred = false,
 ): Axial[] {
   if (from.q === to.q && from.r === to.r) return [];
   const waterKeys = waterRouteKeys(map);
-  const quick = pathBetweenSteps(map, from, to, canClimb, canSail, canDock, playerIndex, stealthed);
+  const quick = pathBetweenSteps(map, from, to, canClimb, canSail, canDock, playerIndex, stealthed, towerBarred);
   if (quick.length === 0) return quick;
   // Always-move-one: a direct neighbour is reachable even when the first step
   // costs more than the unit's move points (e.g. leaving a 14-20 cost tile
@@ -309,7 +322,7 @@ export function pathBetween(
     return quick;
   }
   // The shortest-step route overspends the budget: look for a cheaper route.
-  return pathBetweenCost(map, from, to, movePoints, canClimb, canSail, canDock, playerIndex, waterKeys, stealthed);
+  return pathBetweenCost(map, from, to, movePoints, canClimb, canSail, canDock, playerIndex, waterKeys, stealthed, towerBarred);
 }
 
 export function moveUnit(map: GameMap, unit: Unit, target: MapTile): void {
