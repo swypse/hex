@@ -72,6 +72,11 @@ const ACTION_BTN = {
   transparentDisabled: true,
 } as const;
 
+/** The bar slides down by its own height and the turn bar's, so it leaves the screen entirely. */
+const SLIDE_DISTANCE = TOOLBAR_HEIGHT + TURN_BAR_HEIGHT;
+/** Full slide duration (ms). */
+const SLIDE_MS = 220;
+
 export class HudToolbar implements Widget {
   private el: Container | null = null;
   private row: Container | null = null;
@@ -100,6 +105,12 @@ export class HudToolbar implements Widget {
   /** Index into `focusables` while keyboard focus mode is on, else null. */
   private focusIndex: number | null = null;
   private focusRing: Graphics | null = null;
+  /** Slide state of the whole bar: 0 is in place, 1 is fully below the screen. */
+  private slide = 0;
+  private slideTarget = 0;
+  /** Whether the bar has been placed once; later changes animate. */
+  private slid = false;
+  private stopSlide: (() => void) | null = null;
 
   mount(host: UIHost, root: Container): void {
     this.host = host;
@@ -213,7 +224,8 @@ export class HudToolbar implements Widget {
     if (!this.el || !this.row || !this.host) return;
     const screenW = this.host.app.screen.width;
     const screenH = this.host.app.screen.height;
-    this.el.position.set(0, screenH - TURN_BAR_HEIGHT - TOOLBAR_HEIGHT);
+    this.el.position.set(0, screenH - TURN_BAR_HEIGHT - TOOLBAR_HEIGHT + this.slide * SLIDE_DISTANCE);
+    this.el.visible = this.slide < 1;
     const barY = (TOOLBAR_HEIGHT - 48) / 2;
     const maxW = Math.max(0, screenW - SIDE_PADDING * 2);
     const rowW = this.row.width;
@@ -284,12 +296,39 @@ export class HudToolbar implements Widget {
     window.removeEventListener('pointercancel', this.onWindowUp);
   }
 
+  /** Slides the bar toward `target` (0 in place, 1 hidden); the first call just places it. */
+  private slideTo(target: number): void {
+    if (!this.host) return;
+    if (!this.slid) {
+      this.slid = true;
+      this.slide = this.slideTarget = target;
+      this.layout();
+      return;
+    }
+    if (this.slideTarget === target) return;
+    this.slideTarget = target;
+    this.stopSlide?.();
+    this.stopSlide = null;
+    const ticker = this.host.app.ticker;
+    const fn = (): void => {
+      const step = ticker.deltaMS / SLIDE_MS;
+      this.slide = this.slideTarget > this.slide ? Math.min(this.slideTarget, this.slide + step) : Math.max(this.slideTarget, this.slide - step);
+      this.layout();
+      if (this.slide === this.slideTarget) {
+        ticker.remove(fn);
+        this.stopSlide = null;
+      }
+    };
+    ticker.add(fn);
+    this.stopSlide = () => ticker.remove(fn);
+  }
+
   private update(): void {
     if (!this.el || !this.row || !this.host) return;
     const store = useGameStore.getState();
     // While another player (or the AI) is taking their move the actions are not
-    // usable, so hide the whole toolbar instead of showing disabled buttons.
-    this.el.visible = !store.aiActive;
+    // usable, so the whole toolbar slides down off the screen and back up on our turn.
+    this.slideTo(store.aiActive ? 1 : 0);
     if (this.stopEndTurnPulse) {
       this.stopEndTurnPulse();
       this.stopEndTurnPulse = null;
@@ -509,6 +548,8 @@ export class HudToolbar implements Widget {
       this.stopSkillsPulse = null;
     }
     this.skillsPulse = null;
+    this.stopSlide?.();
+    this.stopSlide = null;
     if (this.unsub) this.unsub();
     if (this.onResize) window.removeEventListener('resize', this.onResize);
     window.removeEventListener('keydown', this.onKeyDown, true);

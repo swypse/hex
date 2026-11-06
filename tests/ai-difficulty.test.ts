@@ -1,6 +1,6 @@
-import { describe, it, expect } from 'vitest';
-import { AI_DIFFICULTY_PROFILES, DEFAULT_AI_DIFFICULTY, difficultyFor, profileFor } from '../src/game/ai/ai-difficulty';
 import { AiDifficulty } from '@enums';
+import { describe, expect, it } from 'vitest';
+import { AI_DIFFICULTY_PROFILES, DEFAULT_AI_DIFFICULTY, difficultyFor, profileFor } from '../src/game/ai/config/difficulty';
 
 describe('AI difficulty', () => {
   it('defaults to normal', () => {

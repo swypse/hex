@@ -1,4 +1,5 @@
-import { hexNeighbors } from './hex';
+import { waterRouteEdges } from '../economy/water-roads';
+import { axialKey, hexNeighbors } from './hex';
 import type { Axial } from './hex';
 import type { GameMap, MapTile } from './map-gen';
 import { revertShip } from '../units/ship';
@@ -27,10 +28,11 @@ export interface ThawReport {
 }
 
 /** Whether a water tile may turn to ice: it touches solid land and carries no
- *  port/building or bridge. */
-function canFreeze(map: GameMap, byKey: Map<string, MapTile>, tile: MapTile): boolean {
+ *  port/building or bridge, and is not part of a port water route (ships keep sailing it). */
+function canFreeze(byKey: Map<string, MapTile>, routes: Map<string, string[]>, tile: MapTile): boolean {
   if (tile.terrain !== TileType.Water) return false;
   if (tile.building || tile.bridge) return false;
+  if (routes.has(axialKey(tile))) return false;
   return hexNeighbors(tile).some((n) => {
     const t = byKey.get(`${n.q},${n.r}`);
     return t !== undefined && t.terrain !== TileType.Water && t.terrain !== TileType.Ice;
@@ -39,7 +41,7 @@ function canFreeze(map: GameMap, byKey: Map<string, MapTile>, tile: MapTile): bo
 
 /** Whether this water tile will freeze when winter starts. */
 export function willFreeze(map: GameMap, tile: MapTile): boolean {
-  return canFreeze(map, tileMapByKey(map), tile);
+  return canFreeze(tileMapByKey(map), waterRouteEdges(map), tile);
 }
 
 /** Winter: coast water tiles turn to ice. Ships on them land as land units,
@@ -47,7 +49,8 @@ export function willFreeze(map: GameMap, tile: MapTile): boolean {
  *  spread inward by more than one tile. */
 export function freezeCoast(map: GameMap): FreezeReport {
   const byKey = new Map(map.tiles.map((t) => [`${t.q},${t.r}`, t] as const));
-  const targets = map.tiles.filter((t) => canFreeze(map, byKey, t));
+  const routes = waterRouteEdges(map);
+  const targets = map.tiles.filter((t) => canFreeze(byKey, routes, t));
   const report: FreezeReport = { frozen: [], landed: [], removed: [] };
   for (const tile of targets) {
     tile.terrain = TileType.Ice;

@@ -1,8 +1,8 @@
-import { planAiActions } from '@/game/ai/ai';
-import { buildPlayers } from '@/game/players';
-import { Simulator } from '@/game/simulator';
+import { planAiActions } from '@/game/ai/planner/plan-ai-actions';
 import { migrateLegacyResources } from '@/game/economy/stock';
 import { TileType } from '@/game/map/tile-types';
+import { buildPlayers } from '@/game/players';
+import { Simulator } from '@/game/simulator';
 import { Tribe } from '@/game/tribes';
 import { PIRATE_OWNER, type Unit } from '@/game/units/units';
 import { SeededRandom } from '@/util';

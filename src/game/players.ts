@@ -1,11 +1,13 @@
-import { SeededRandom } from '../util/random';
-import { generatePlayerNames } from './names';
-import { type PlayerResources, START_RESOURCES } from './economy/resources';
-import { EMPTY_STATS, type PlayerStats } from './score';
-import { Tribe, TRIBES, tribeById } from './tribes';
-import { DEFAULT_AI_DIFFICULTY } from './ai/ai-difficulty';
-import type { AiOperation, AiStrategyState } from './ai/ai-types';
 import { AchievementId, AiDifficulty, AiEngine, SkillId } from '@enums';
+import { SeededRandom } from '../util/random';
+import { DEFAULT_AI_DIFFICULTY } from './ai/config/difficulty';
+import type { AiFlags } from './ai/config/flags';
+import type { AiOperation } from './ai/types/operation';
+import type { AiStrategyState } from './ai/types/strategy-state';
+import { type PlayerResources, START_RESOURCES } from './economy/resources';
+import { generatePlayerNames } from './names';
+import { EMPTY_STATS, type PlayerStats } from './score';
+import { Tribe, tribeById, TRIBES } from './tribes';
 
 export interface Player {
   index: number;
@@ -23,7 +25,7 @@ export interface Player {
   /** AI planning engine: 'live' (default) applies each step before planning the next; 'batch' plans the whole turn on a frozen board (legacy, kept for benchmarking). */
   aiEngine?: AiEngine;
   /** Per-behaviour AI switches (default: all on). */
-  aiFlags?: Partial<import('./ai/ai-flags').AiFlags>;
+  aiFlags?: Partial<AiFlags>;
   achievements?: AchievementId[];
   strategy?: AiStrategyState;
   /** Current squad operation (AI only), rebuilt at the start of each AI turn. */

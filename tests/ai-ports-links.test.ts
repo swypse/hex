@@ -1,11 +1,13 @@
-import { describe, expect, it } from 'vitest';
-import { analyzeWater, bestOpenPortSite, portSiteValue } from '../src/game/ai/ai-water';
-import { planLinks } from '../src/game/ai/ai-links';
-import { makeTestMap, tileAt } from './helpers/test-map';
+import { AiDifficulty,SkillId } from '@enums';
+import { describe,expect,it } from 'vitest';
+import { analyzeWater } from '../src/game/ai/economy/analyze-water';
+import { bestOpenPortSite } from '../src/game/ai/economy/best-open-port-site';
+import { planLinks } from '../src/game/ai/economy/network-links';
+import { portSiteValue } from '../src/game/ai/economy/port-site-value';
 import { TileType } from '../src/game/map/tile-types';
-import { Tribe } from '../src/game/tribes';
 import type { Player } from '../src/game/players';
-import { AiDifficulty, SkillId } from '@enums';
+import { Tribe } from '../src/game/tribes';
+import { makeTestMap,tileAt } from './helpers/test-map';
 
 function ai(skills: SkillId[] = []): Player {
   return {

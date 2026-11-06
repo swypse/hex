@@ -1,7 +1,8 @@
-import { SKILLS, canOpenSkill, hasSkill } from '../../skills';
-import { type AiAction } from '../ai-types';
-import { type AiPattern, visibleEnemyCatapults } from '../ai-pattern-helpers';
 import { AiActionType, SkillId } from '@enums';
+import { SKILLS, canOpenSkill, hasSkill } from '../../skills';
+import { visibleEnemyCatapults } from '../situation/visible-enemy-catapults';
+import type { AiAction } from '../types/action';
+import type { AiPattern } from './pattern-types';
 
 /** Skills to open for `goal`, root first (the goal's missing ancestors, then the goal). */
 function missingPath(goal: SkillId, has: (id: SkillId) => boolean): SkillId[] {

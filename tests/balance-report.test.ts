@@ -1,11 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { readFileSync, writeFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { runDuels, PLAYABLE_UNITS, cheapBeatsCostly } from '../src/game/balance/balance';
 import { buildReport, CAPTION } from '../src/game/balance/balance-report';
 import { UnitType } from '@enums';
-
-const OUT = resolve(__dirname, '../combat-balance.md');
 
 /** The 7 base combat units; tribe special units are utility unlocks and sit
  *  outside the raw duel-balance verdict. */
@@ -21,18 +17,6 @@ describe('combat-balance report', () => {
     expect(report).toContain('Balance flags');
     expect(report).toContain('Applied changes');
     for (const t of PLAYABLE_UNITS) expect(report).toContain(CAPTION[t]);
-  });
-
-  it('regenerates combat-balance.md so it always matches the live stats', () => {
-    const report = buildReport();
-    let prev = '';
-    try {
-      prev = readFileSync(OUT, 'utf8');
-    } catch {
-      // First run / deleted file: write unconditionally.
-    }
-    if (prev !== report) writeFileSync(OUT, report);
-    expect(readFileSync(OUT, 'utf8')).toBe(report);
   });
 
   it('reports a post-rebalance pass on the cheap-beats-costly check', () => {

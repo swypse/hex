@@ -1,14 +1,17 @@
-import { type MapTile } from '../../map/map-gen';
-import { hexDistance } from '../../map/hex';
+import { AiActionType,AiStance,UnitType } from '@enums';
 import { isExploredFor } from '../../map/explore';
-import { reachableTargets } from '../../units/selection';
-import { hasSkill } from '../../skills';
+import { hexDistance } from '../../map/hex';
+import { type MapTile } from '../../map/map-gen';
 import { attackDamage } from '../../units/combat';
-import { unitMaxHp, type Unit } from '../../units/units';
-import { type AiAction } from '../ai-types';
-import { flagsFor } from '../ai-flags';
-import { type AiPattern, attackersForTile, enemyCanAttackNext, enemyCanReach, gangAttackActions, isSupportUnit, key } from '../ai-pattern-helpers';
-import { AiActionType, AiStance, SkillId, UnitType } from '@enums';
+import { unitMaxHp,type Unit } from '../../units/units';
+import { flagsFor } from '../config/flags';
+import { attackersForTile,gangAttackActions } from '../military/gang-attack';
+import { enemyCanAttackNext,enemyCanReach } from '../situation/enemy-reach';
+import { reachableCells } from '../situation/reachable-cells';
+import type { AiAction } from '../types/action';
+import { isSupportUnit } from '../unit-roles/is-support-unit';
+import { key } from '../util/tile-key';
+import type { AiPattern } from './pattern-types';
 
 /** Own units within this many hexes of an enemy village take part in its siege. */
 const SIEGE_RADIUS = 6;
@@ -45,8 +48,6 @@ export const SIEGE_PATTERN: AiPattern = {
   evaluate({ map, player, state, situation, turn = 0 }): AiAction[] | null {
     if (!flagsFor(player).siege) return null;
     if (situation?.stance === AiStance.DEFEND || situation?.endangered) return null;
-    const canClimb = hasSkill(player, SkillId.CLIMBING);
-    const canDock = hasSkill(player, SkillId.NAVIGATION);
 
     const units = map.tiles.filter((t) => besieger(map, player.index, t) !== null);
     if (units.length < SIEGE_MIN) return null;
@@ -101,7 +102,7 @@ export const SIEGE_PATTERN: AiPattern = {
       let best: { unit: Unit; d: number } | null = null;
       for (const t of squad) {
         if (state.moved.has(t.unit!.id)) continue;
-        if (!reachableTargets(map, t.unit!, undefined, canClimb, canDock, player.index).some((c) => c.q === target!.q && c.r === target!.r)) continue;
+        if (!reachableCells(map, player, t.unit!).some((c) => c.q === target!.q && c.r === target!.r)) continue;
         const d = hexDistance(t, target);
         if (!best || d < best.d) best = { unit: t.unit!, d };
       }
@@ -120,7 +121,7 @@ export const SIEGE_PATTERN: AiPattern = {
         continue;
       }
       let best: { c: MapTile; score: number } | null = null;
-      for (const c of reachableTargets(map, unit, undefined, canClimb, canDock, player.index)) {
+      for (const c of reachableCells(map, player, unit)) {
         if (state.occupied.has(key(c.q, c.r))) continue;
         if (c.settlement && c.settlement.owner === player.index) continue;
         if (c.settlement && c.settlement.owner !== player.index) continue;

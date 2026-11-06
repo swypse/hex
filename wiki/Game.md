@@ -3,6 +3,7 @@
 Gameplay rules for the hex strategy game. Tribe pages (special units, tribe overview) live in
 [tribes/](tribes/): [Cats](tribes/Cats.md), [Villagers](tribes/Villagers.md), [Warriors](tribes/Warriors.md),
 [Barbarians](tribes/Barbarians.md), [Forest](tribes/Forest.md), [Aqua](tribes/Aqua.md), [Sand](tribes/Sand.md).
+Computer players: [AI.md](AI.md).
 
 Contents: [Modes](#game-modes) · [Multiplayer](#multiplayer) · [Tribes](#tribes) · [Map](#map) · [Units](#units) ·
 [Unit actions](#unit-actions) · [Villages](#villages) · [Skills](#skills) · [Buildings](#buildings) ·

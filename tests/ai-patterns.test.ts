@@ -1,18 +1,22 @@
-import { describe, it, expect } from 'vitest';
+import { AiActionType, AiStance, BonusKind, BuildingKind, GameMode, GarrisonGuardKind, SkillId, SpawnPreference, UnitType } from '@enums';
+import { describe, expect, it } from 'vitest';
+import { AI_DIFFICULTY_PROFILES } from '../src/game/ai/config/difficulty';
+import { guardGarrisonAttack } from '../src/game/ai/military/garrison-guard';
+import { AI_PATTERNS } from '../src/game/ai/patterns/all-patterns';
+import type { AiPatternContext } from '../src/game/ai/patterns/pattern-types';
+import { analyzeSituation } from '../src/game/ai/situation/analyze-situation';
+import { enemyCanAttackNext, enemyCanReach } from '../src/game/ai/situation/enemy-reach';
+import { nearestEnemyDistanceFrom } from '../src/game/ai/situation/nearest-distances';
+import { bestSpawnableUnitType } from '../src/game/ai/spawn/best-spawnable-unit-type';
+import type { AiPlannerState } from '../src/game/ai/types/planner-state';
+import { migrateLegacyResources } from '../src/game/economy/stock';
 import { type GameMap, type MapTile, type Settlement } from '../src/game/map/map-gen';
 import { TileType } from '../src/game/map/tile-types';
-import { Tribe } from '../src/game/tribes';
 import { type Player } from '../src/game/players';
+import { Tribe, TRIBE_SPECIAL_UNIT } from '../src/game/tribes';
 import { type Unit } from '../src/game/units/units';
 import { SeededRandom } from '../src/util/random';
-import { migrateLegacyResources } from '../src/game/economy/stock';
-import { AI_PATTERNS, type AiPatternContext, bestSpawnableUnitType, enemyCanAttackNext, enemyCanReach, guardGarrisonAttack, nearestEnemyDistanceFrom } from '../src/game/ai/ai-patterns';
-import { type AiPlannerState } from '../src/game/ai/ai-types';
-import { analyzeSituation } from '../src/game/ai/ai-situation';
-import { AI_DIFFICULTY_PROFILES } from '../src/game/ai/ai-difficulty';
-import { TRIBE_SPECIAL_UNIT } from '../src/game/tribes';
 import { makeTestMap, tileAt } from './helpers/test-map';
-import { AiActionType, AiStance, BonusKind, BuildingKind, GameMode, GarrisonGuardKind, SkillId, SpawnPreference, UnitType } from '@enums';
 
 function tile(
   q: number,

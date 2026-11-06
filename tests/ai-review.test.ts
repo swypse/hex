@@ -1,8 +1,8 @@
-import { describe, expect, it } from 'vitest';
 import { AiActionType, UnitType } from '@enums';
-import { stepVetoed } from '../src/game/ai/ai-review';
-import { AI_DIFFICULTY_PROFILES } from '../src/game/ai/ai-difficulty';
-import { type AiPlannerState } from '../src/game/ai/ai-types';
+import { describe, expect, it } from 'vitest';
+import { AI_DIFFICULTY_PROFILES } from '../src/game/ai/config/difficulty';
+import { stepVetoed } from '../src/game/ai/review/step-veto';
+import type { AiPlannerState } from '../src/game/ai/types/planner-state';
 import { type GameMap } from '../src/game/map/map-gen';
 import { type Player } from '../src/game/players';
 import { Tribe } from '../src/game/tribes';

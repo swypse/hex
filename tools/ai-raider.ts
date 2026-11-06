@@ -5,16 +5,15 @@
  * under-garrisoned villages, so village-defense and economy changes can be
  * measured against it (`RAIDER=1 npx vite-node tools/ai-bench.ts`).
  */
-import { CommandType, UnitType } from '@enums';
-import type { Simulator } from '../src/game/simulator';
-import type { MapTile } from '../src/game/map/map-gen';
-import { hexDistance } from '../src/game/map/hex';
-import { reachableTargets } from '../src/game/units/selection';
+import { CommandType, SkillId, UnitType } from '@enums';
+import { walkDistance, walkDistances } from '../src/game/ai/situation/walk-distances';
 import { villageCapacity } from '../src/game/economy/village';
-import { canSpawnType } from '../src/game/units/spawn';
-import { walkDistances, walkDistance } from '../src/game/ai/ai-walk';
+import { hexDistance } from '../src/game/map/hex';
+import type { MapTile } from '../src/game/map/map-gen';
+import type { Simulator } from '../src/game/simulator';
 import { hasSkill } from '../src/game/skills';
-import { SkillId } from '@enums';
+import { reachableTargets } from '../src/game/units/selection';
+import { canSpawnType } from '../src/game/units/spawn';
 
 /** Units the raider gathers before it marches out. */
 const RAID_SQUAD = 4;

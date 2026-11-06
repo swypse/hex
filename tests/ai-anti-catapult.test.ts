@@ -1,9 +1,10 @@
-import { describe, expect, it } from 'vitest';
 import { AiActionType, SkillId, SpawnPreference, UnitType } from '@enums';
-import { migrateLegacyResources } from '../src/game/economy/stock';
+import { describe, expect, it } from 'vitest';
 import { ANTI_CATAPULT_PATTERNS } from '../src/game/ai/patterns/anti-catapult';
-import { bestSpawnableUnitType, knightsWanted } from '../src/game/ai/ai-pattern-helpers';
-import { type AiPlannerState } from '../src/game/ai/ai-types';
+import { bestSpawnableUnitType } from '../src/game/ai/spawn/best-spawnable-unit-type';
+import { knightsWanted } from '../src/game/ai/spawn/knights-wanted';
+import type { AiPlannerState } from '../src/game/ai/types/planner-state';
+import { migrateLegacyResources } from '../src/game/economy/stock';
 import { type Player } from '../src/game/players';
 import { Tribe } from '../src/game/tribes';
 import { makeTestMap, makeUnit, tileAt } from './helpers/test-map';

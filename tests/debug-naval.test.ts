@@ -1,12 +1,12 @@
 import { AiActionType, GameMode, SkillId, UnitType } from '@enums';
-import { describe, it, expect } from 'vitest';
-import { makeTestMap, tileAt, makeUnit } from './helpers/test-map';
-import { PIRATE_OWNER, type Unit } from '../src/game/units/units';
+import { describe, expect, it } from 'vitest';
+import { planAiActions } from '../src/game/ai/planner/plan-ai-actions';
 import { TileType } from '../src/game/map/tile-types';
-import { SeededRandom } from '../src/util/random';
-import { planAiActions } from '../src/game/ai/ai';
-import { Tribe } from '../src/game/tribes';
 import { type Player } from '../src/game/players';
+import { Tribe } from '../src/game/tribes';
+import { PIRATE_OWNER, type Unit } from '../src/game/units/units';
+import { SeededRandom } from '../src/util/random';
+import { makeTestMap, makeUnit, tileAt } from './helpers/test-map';
 
 describe('Debug naval hunt', () => {
   it('hunts a pirate with the ship over water', () => {

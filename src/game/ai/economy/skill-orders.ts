@@ -1,0 +1,53 @@
+import { SkillId } from '@enums';
+
+/** Skill-open order the AI prefers: economy/production first so it can build
+ *  mines (stone/ore) and sawmills early instead of opening random leaves. */
+export const MILITARY_SKILL_ORDER: SkillId[] = [
+  SkillId.FORESTRY,
+  SkillId.AGRICULTURE,
+  SkillId.ARCHER,
+  SkillId.CLIMBING,
+  SkillId.SMITHERY,
+  SkillId.SWORDSMAN,
+  SkillId.RIDING,
+  SkillId.KNIGHTS,
+  SkillId.SHIELDS,
+  SkillId.SCIENCE,
+  SkillId.GEOLOGY,
+  SkillId.ROADS,
+  SkillId.WATER,
+  SkillId.WATER_TEMPLES,
+  SkillId.NAVIGATION,
+  SkillId.CATAPULT,
+  SkillId.FOREST_TEMPLE,
+  SkillId.BRIDGES,
+  SkillId.GRANARY,
+  SkillId.MEDICINE,
+  SkillId.ENGINEERING,
+  SkillId.AGRONOMY,
+];
+
+export const AI_SKILL_ORDER: SkillId[] = [
+  SkillId.FORESTRY,
+  SkillId.AGRICULTURE,
+  SkillId.ARCHER,
+  SkillId.CLIMBING,
+  SkillId.SMITHERY,
+  SkillId.SCIENCE,
+  SkillId.GEOLOGY,
+  SkillId.ROADS,
+  SkillId.SHIELDS,
+  SkillId.SWORDSMAN,
+  SkillId.WATER,
+  SkillId.RIDING,
+  SkillId.WATER_TEMPLES,
+  SkillId.NAVIGATION,
+  SkillId.CATAPULT,
+  SkillId.FOREST_TEMPLE,
+  SkillId.BRIDGES,
+  SkillId.KNIGHTS,
+  SkillId.GRANARY,
+  SkillId.AGRONOMY,
+  SkillId.ENGINEERING,
+  SkillId.MEDICINE,
+];

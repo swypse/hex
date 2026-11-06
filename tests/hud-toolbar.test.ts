@@ -26,11 +26,19 @@ function fakeCanvasContext() {
   };
 }
 
+/** Ticker callbacks the fake host collected; tests run them by hand. */
+let tickerFns: Array<() => void> = [];
+const runTicker = (): void => {
+  for (const fn of [...tickerFns]) fn();
+};
+
 function makeHost(): UIHost {
+  tickerFns = [];
   return {
     app: {
       screen: { width: 1280, height: 800 },
-      ticker: { add: () => {}, remove: () => {} },
+      // deltaMS exceeds the slide time, so one tick finishes a slide.
+      ticker: { deltaMS: 1000, add: (fn: () => void) => tickerFns.push(fn), remove: (fn: () => void) => { tickerFns = tickerFns.filter((f) => f !== fn); } },
     },
     screenLayer: new Container(),
     overlayLayer: new Container(),
@@ -169,13 +177,19 @@ describe('HudToolbar build actions', () => {
     useGameStore.getState().setAiActive(false);
   });
 
-  it('hides the whole toolbar while another player is moving', () => {
+  it('slides the whole toolbar down while another player is moving and back up on our turn', () => {
     const el = (toolbar as unknown as { el: Container }).el!;
+    const shownY = el.y;
     expect(el.visible).toBe(true);
     useGameStore.getState().setAiActive(true);
+    runTicker();
     expect(el.visible).toBe(false);
+    expect(el.y).toBeGreaterThan(shownY);
     useGameStore.getState().setAiActive(false);
+    expect(el.visible).toBe(false);
+    runTicker();
     expect(el.visible).toBe(true);
+    expect(el.y).toBe(shownY);
   });
 
   it('pulses the end turn button when no action is available anywhere', () => {

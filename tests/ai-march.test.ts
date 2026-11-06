@@ -1,15 +1,15 @@
-import { describe, it, expect } from 'vitest';
-import { type GameMap, type MapTile, type Settlement } from '../src/game/map/map-gen';
+import { AiActionType,UnitType } from '@enums';
+import { describe,expect,it } from 'vitest';
+import { MARCH_PATTERN } from '../src/game/ai/patterns/march';
+import type { AiPatternContext } from '../src/game/ai/patterns/pattern-types';
+import type { AiPlannerState } from '../src/game/ai/types/planner-state';
+import { migrateLegacyResources } from '../src/game/economy/stock';
+import { type GameMap,type MapTile,type Settlement } from '../src/game/map/map-gen';
 import { TileType } from '../src/game/map/tile-types';
-import { Tribe } from '../src/game/tribes';
 import { type Player } from '../src/game/players';
+import { Tribe } from '../src/game/tribes';
 import { type Unit } from '../src/game/units/units';
 import { SeededRandom } from '../src/util/random';
-import { migrateLegacyResources } from '../src/game/economy/stock';
-import { MARCH_PATTERN } from '../src/game/ai/ai-march';
-import { type AiPlannerState } from '../src/game/ai/ai-types';
-import { type AiPatternContext } from '../src/game/ai/ai-patterns';
-import { AiActionType, UnitType } from '@enums';
 
 function tile(q: number, r: number, settlement: Settlement | null = null, unit: Unit | null = null): MapTile {
   return { q, r, terrain: TileType.GrasslandLand, settlement, unit, ownedBy: null, claimedByVillage: null, building: null, exploredBy: [0, 1] };

@@ -1,12 +1,16 @@
-import { describe, expect, it } from 'vitest';
 import { AiActionType, BuildingKind, SkillId, SpawnPreference, UnitType } from '@enums';
+import { describe, expect, it } from 'vitest';
+import { attackersForTile } from '../src/game/ai/military/gang-attack';
+import { AI_PATTERNS } from '../src/game/ai/patterns/all-patterns';
+import type { AiPatternContext } from '../src/game/ai/patterns/pattern-types';
+import { bestSpawnableUnitType } from '../src/game/ai/spawn/best-spawnable-unit-type';
+import { spawnWouldBeKilled } from '../src/game/ai/spawn/spawn-would-be-killed';
+import type { AiPlannerState } from '../src/game/ai/types/planner-state';
 import { migrateLegacyResources } from '../src/game/economy/stock';
 import { type GameMap } from '../src/game/map/map-gen';
 import { type Player } from '../src/game/players';
 import { Tribe } from '../src/game/tribes';
-import { attackDamage, isPoorTrapperTarget, chooseBestAttack } from '../src/game/units/combat';
-import { AI_PATTERNS, type AiPatternContext, attackersForTile, bestSpawnableUnitType, spawnWouldBeKilled } from '../src/game/ai/ai-patterns';
-import { type AiPlannerState } from '../src/game/ai/ai-types';
+import { attackDamage, chooseBestAttack, isPoorTrapperTarget } from '../src/game/units/combat';
 import { SeededRandom } from '../src/util/random';
 import { makeTestMap, makeUnit, tileAt } from './helpers/test-map';
 

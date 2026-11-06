@@ -1,44 +1,44 @@
 import { BuildingKind, CommandType, FoodPressure, GameEventType, GameMode, Season, SiegeTargetKind, SkillId, UnitType } from '@enums';
-import { describe, it, expect } from 'vitest';
-import { makeTestMap, tileAt, makeUnit } from './helpers/test-map';
-import type { GameMap, MapTile } from '../src/game/map/map-gen';
-import type { Player } from '../src/game/players';
-import { buildPlayers } from '../src/game/players';
-import { Tribe } from '../src/game/tribes';
-import { TileType } from '../src/game/map/tile-types';
-import { SeededRandom } from '../src/util/random';
-import { isEnemySiegeTarget, performSiege } from '../src/game/units/combat';
-import { planFoodFixes } from '../src/game/ai/ai-food';
-import { Simulator } from '../src/game/simulator';
-import { START_RESOURCES, START_STOCK } from '../src/game/economy/resources';
-import { generateMap } from '../src/game/map/map-gen';
-import { unitFoodUpkeep } from '../src/game/units/units';
-import { buildingsInVillage } from '../src/game/economy/village';
-import { SKILLS } from '../src/game/skills';
+import { describe, expect, it } from 'vitest';
+import { planFoodFixes } from '../src/game/ai/economy/food/plan-food-fixes';
 import {
-  BUILDING_COSTS,
-  buildBuilding,
-  burnBuilding,
-  canBuildFarm,
-  canBuildGranary,
-  canBurnBuilding,
-  canBurnRoad,
-  burnRoad,
+BUILDING_COSTS,
+buildBuilding,
+burnBuilding,
+burnRoad,
+canBuildFarm,
+canBuildGranary,
+canBurnBuilding,
+canBurnRoad,
 } from '../src/game/economy/buildings';
 import {
-  FARM_FOOD,
-  GRANARY_CAPACITY_PER_FARM,
-  granaryCapacity,
-  STARVATION_DAMAGE,
-  applyFood,
-  farmYield,
-  foodNetIncome,
-  villageFood,
-  villageFoodUpkeep,
-  canSustainUnit,
-  foodNetworkStates,
-  foodPressure,
+FARM_FOOD,
+GRANARY_CAPACITY_PER_FARM,
+STARVATION_DAMAGE,
+applyFood,
+canSustainUnit,
+farmYield,
+foodNetIncome,
+foodNetworkStates,
+foodPressure,
+granaryCapacity,
+villageFood,
+villageFoodUpkeep,
 } from '../src/game/economy/food';
+import { START_RESOURCES, START_STOCK } from '../src/game/economy/resources';
+import { buildingsInVillage } from '../src/game/economy/village';
+import type { GameMap, MapTile } from '../src/game/map/map-gen';
+import { generateMap } from '../src/game/map/map-gen';
+import { TileType } from '../src/game/map/tile-types';
+import type { Player } from '../src/game/players';
+import { buildPlayers } from '../src/game/players';
+import { Simulator } from '../src/game/simulator';
+import { SKILLS } from '../src/game/skills';
+import { Tribe } from '../src/game/tribes';
+import { isEnemySiegeTarget, performSiege } from '../src/game/units/combat';
+import { unitFoodUpkeep } from '../src/game/units/units';
+import { SeededRandom } from '../src/util/random';
+import { makeTestMap, makeUnit, tileAt } from './helpers/test-map';
 
 /** Two-player test map: player 0 owns a village at (0,0) claiming radius 1. */
 function setup(): { map: GameMap; p: Player; village: MapTile } {

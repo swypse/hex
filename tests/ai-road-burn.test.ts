@@ -1,12 +1,12 @@
+import { AiActionType, AiDifficulty, UnitType } from '@enums';
 import { describe, expect, it } from 'vitest';
-import { planAiActions } from '../src/game/ai/ai';
+import { planAiActions } from '../src/game/ai/planner/plan-ai-actions';
 import { roadCutSplits } from '../src/game/economy/roads';
+import type { GameMap } from '../src/game/map/map-gen';
 import { buildPlayers } from '../src/game/players';
 import { Tribe } from '../src/game/tribes';
 import { SeededRandom } from '../src/util/random';
-import { makeTestMap, tileAt, makeUnit } from './helpers/test-map';
-import type { GameMap } from '../src/game/map/map-gen';
-import { AiActionType, AiDifficulty, UnitType } from '@enums';
+import { makeTestMap, makeUnit, tileAt } from './helpers/test-map';
 
 function makeAI(): ReturnType<typeof buildPlayers>[number] {
   return buildPlayers(Tribe.Villagers, 1, new SeededRandom(11), AiDifficulty.NORMAL)[1]!;

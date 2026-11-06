@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest';
 import { AiActionType, WeatherType } from '@enums';
-import { tornadoVetoed } from '../src/game/ai/ai-weather';
+import { describe, expect, it } from 'vitest';
+import { tornadoVetoed } from '../src/game/ai/review/tornado-veto';
 import { makeTestMap } from './helpers/test-map';
 
 describe('tornadoVetoed', () => {

@@ -1,10 +1,10 @@
-import { describe, expect, it } from 'vitest';
 import { AiActionType, UnitType } from '@enums';
+import { describe, expect, it } from 'vitest';
 import { SIEGE_PATTERN } from '../src/game/ai/patterns/siege';
-import { type AiPlannerState } from '../src/game/ai/ai-types';
+import type { AiPlannerState } from '../src/game/ai/types/planner-state';
+import { hexDistance } from '../src/game/map/hex';
 import { type GameMap } from '../src/game/map/map-gen';
 import { type Player } from '../src/game/players';
-import { hexDistance } from '../src/game/map/hex';
 import { Tribe } from '../src/game/tribes';
 import { makeTestMap, makeUnit, tileAt } from './helpers/test-map';
 

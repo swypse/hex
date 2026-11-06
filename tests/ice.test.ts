@@ -31,6 +31,49 @@ function strip(): GameMap {
 
 const at = (m: GameMap, q: number) => m.tiles.find((t) => t.q === q)!;
 
+describe('ice and port water routes', () => {
+  it('never freezes a tile on a route between two own ports', () => {
+    // land(0,0) | water(1,0) port-less coast tile on the route | port(2,0) ... port(4,0)
+    const m: GameMap = {
+      radius: 5,
+      spawns: [],
+      tiles: [
+        tile(0, 0, TileType.GrasslandLand),
+        tile(1, 0, TileType.Water),
+        tile(2, 0, TileType.Water),
+        tile(3, 0, TileType.Water),
+        tile(4, 0, TileType.Water),
+        tile(1, 1, TileType.Water),
+      ],
+    };
+    for (const t of m.tiles) if (t.terrain === TileType.Water) t.ownedBy = 0;
+    at(m, 2).building = { kind: BuildingKind.PORT, level: 1 };
+    at(m, 4).building = { kind: BuildingKind.PORT, level: 1 };
+    // (1,0) is not on the 2->4 route, so it still freezes; the route tile (3,0) stays water.
+    const r = freezeCoast(m);
+    expect(at(m, 3).terrain).toBe(TileType.Water);
+    expect(r.frozen.some((f) => f.q === 3)).toBe(false);
+  });
+
+  it('keeps a coast tile on the route open', () => {
+    const m: GameMap = {
+      radius: 5,
+      spawns: [],
+      tiles: [
+        tile(1, -1, TileType.GrasslandLand),
+        tile(0, 0, TileType.Water),
+        tile(1, 0, TileType.Water),
+        tile(2, 0, TileType.Water),
+      ],
+    };
+    for (const t of m.tiles) if (t.terrain === TileType.Water) t.ownedBy = 0;
+    at(m, 0).building = { kind: BuildingKind.PORT, level: 1 };
+    at(m, 2).building = { kind: BuildingKind.PORT, level: 1 };
+    freezeCoast(m);
+    expect(m.tiles.find((t) => t.q === 1 && t.r === 0)!.terrain).toBe(TileType.Water); // touches land (1,-1) but carries the route
+  });
+});
+
 describe('freezeCoast / thawIce', () => {
   it('freezes only water that touches land', () => {
     const m = strip();

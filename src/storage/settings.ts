@@ -1,6 +1,6 @@
-import { storageService } from './storage-service';
-import { DEFAULT_AI_DIFFICULTY } from '../game/ai/ai-difficulty';
 import { AiDifficulty, Language } from '@enums';
+import { DEFAULT_AI_DIFFICULTY } from '../game/ai/config/difficulty';
+import { storageService } from './storage-service';
 
 const SETTINGS_KEY = 'hex-settings-v1';
 

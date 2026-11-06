@@ -1,18 +1,21 @@
-import { planAiActions } from '@/game/ai/ai';
-import { AI_DIFFICULTY_PROFILES, profileFor } from '@/game/ai/ai-difficulty';
-import { AI_PERSONALITIES, personalityFor } from '@/game/ai/ai-personality';
-import { bestSpawnableUnitType } from '@/game/ai/ai-patterns';
-import { analyzeSituation } from '@/game/ai/ai-situation';
-import {
-  chooseArmyTarget, deriveDirectives, ensurePlayerStrategy, goalTargetKey, productionBuildings, updateStrategy
-} from '@/game/ai/ai-strategy';
-import { type AiStrategyState } from '@/game/ai/ai-types';
+import { AI_DIFFICULTY_PROFILES, profileFor } from '@/game/ai/config/difficulty';
+import { AI_PERSONALITIES, personalityFor } from '@/game/ai/config/personality';
+import { planAiActions } from '@/game/ai/planner/plan-ai-actions';
+import { analyzeSituation } from '@/game/ai/situation/analyze-situation';
+import { bestSpawnableUnitType } from '@/game/ai/spawn/best-spawnable-unit-type';
+import { chooseArmyTarget } from '@/game/ai/strategy/choose-army-target';
+import { deriveDirectives } from '@/game/ai/strategy/derive-directives';
+import { ensurePlayerStrategy } from '@/game/ai/strategy/ensure-player-strategy';
+import { goalTargetKey } from '@/game/ai/strategy/goal-target-key';
+import { productionBuildings } from '@/game/ai/strategy/production-buildings';
+import { updateStrategy } from '@/game/ai/strategy/update-strategy';
+import type { AiStrategyState } from '@/game/ai/types/strategy-state';
 import { type GameMap, type MapTile, type Settlement } from '@/game/map/map-gen';
-import { type Player } from '@/game/players';
 import { TileType } from '@/game/map/tile-types';
+import { type Player } from '@/game/players';
 import { type Unit } from '@/game/units/units';
 import { SeededRandom } from '@/util';
-import { AiActionType, AiGoalId, AiPace, AiPersonalityId, BuildingKind, SkillId, GameMode, SpawnPreference, UnitType } from '@enums';
+import { AiActionType, AiGoalId, AiPace, AiPersonalityId, BuildingKind, GameMode, SkillId, SpawnPreference, UnitType } from '@enums';
 import { describe, expect, it } from 'vitest';
 
 function aiPlayer(name: string): Player {

@@ -519,8 +519,8 @@ export class EventPresenter {
           case GameEventType.TRAP_TRIGGERED: {
             this.host.render();
             const trapTile = tileAt(sim.map, e.q, e.r);
-            // Your own trap went off: bring it into view and let the damage play out.
-            if (trapTile && e.trapOwner === local) {
+            // Your trap went off, or you stepped on one: bring the cell into view and let the damage play out.
+            if (trapTile && (e.trapOwner === local || e.attackerIndex === local)) {
               await this.host.centerOnCell(e.q, e.r);
               await sleep(100);
             }

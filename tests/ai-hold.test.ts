@@ -1,11 +1,13 @@
-import { describe, expect, it } from 'vitest';
 import { AiActionType, SkillId, SpawnPreference, UnitType } from '@enums';
+import { describe, expect, it } from 'vitest';
+import { AI_PATTERNS } from '../src/game/ai/patterns/all-patterns';
+import { bestSpawnableUnitType } from '../src/game/ai/spawn/best-spawnable-unit-type';
+import { holdMargin, unitHoldsVillage } from '../src/game/ai/spawn/hold-village';
+import type { AiPlannerState } from '../src/game/ai/types/planner-state';
 import { migrateLegacyResources } from '../src/game/economy/stock';
 import { type GameMap } from '../src/game/map/map-gen';
 import { type Player } from '../src/game/players';
 import { Tribe } from '../src/game/tribes';
-import { AI_PATTERNS, bestSpawnableUnitType, holdMargin, unitHoldsVillage } from '../src/game/ai/ai-patterns';
-import { type AiPlannerState } from '../src/game/ai/ai-types';
 import { SeededRandom } from '../src/util/random';
 import { makeTestMap, makeUnit, tileAt } from './helpers/test-map';
 

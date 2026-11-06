@@ -88,7 +88,7 @@ describe('stormcaller Call lightning', () => {
 
 describe('AI stormcaller lightning', () => {
   it('calls lightning onto an explored enemy village once, then waits for the recharge', async () => {
-    const { planAiActions } = await import('@/game/ai/ai');
+    const { planAiActions } = await import('@/game/ai/planner/plan-ai-actions');
     const { AiActionType } = await import('@enums');
     sim.players[0]!.isHuman = false;
     tileAt(map, 2, -1)!.unit = makeUnit('e', 1, UnitType.WARRIOR, 2, -1); // something worth striking
@@ -100,7 +100,7 @@ describe('AI stormcaller lightning', () => {
   });
 
   it('does nothing without an explored enemy village or enough money', async () => {
-    const { planAiActions } = await import('@/game/ai/ai');
+    const { planAiActions } = await import('@/game/ai/planner/plan-ai-actions');
     const { AiActionType } = await import('@enums');
     sim.players[0]!.isHuman = false;
     const plan = () => planAiActions(map, sim.players[0]!, new SeededRandom(1), GameMode.TURNS30, sim.turn)

@@ -26,7 +26,7 @@ See [pixijs-typescript-game-development-rules.md](docs/pixijs-typescript-game-de
 
 ## Code organization
 
-- `src/game/` — rules engine, no UI imports. Core files at the root (`simulator`, `events`, `players`, `skills`, `score`, …) plus `ai/` (planner, `patterns/`), `map/`, `economy/`, `units/`, `weather/`, `balance/` (tuning tools). The simulator delegates to `pirates`, `bonuses`, `environment` through `SimContext`.
+- `src/game/` — rules engine, no UI imports. Core files at the root (`simulator`, `events`, `players`, `skills`, `score`, …) plus `ai/` (one concept per file, see `src/game/ai/README.md`), `map/`, `economy/`, `units/`, `weather/`, `balance/` (tuning tools). The simulator delegates to `pirates`, `bonuses`, `environment` through `SimContext`.
 - `src/controller/` — glue between sim, store and views: `GameController` (+ `cheats`, `actions`), `NetworkController`, `EventPresenter` (+ `EventEffects`), `CameraController`.
 - `src/render/` — `MapView` and its layers (`hp-bar-layer`, `edge-marker-layer`, `damage-badge`), texture baking, atlas loaders.
 - `src/gfx/` — shared graphics infrastructure used by both `render` and `ui` (atlas, icons, bitmap fonts, theme, tooltip, render gate).

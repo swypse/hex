@@ -1,12 +1,13 @@
-import { describe, it, expect } from 'vitest';
-import { type GameMap, type MapTile } from '../src/game/map/map-gen';
+import { BuildingKind,SkillId,UnitType } from '@enums';
+import { describe,expect,it } from 'vitest';
+import { bestTowerSite } from '../src/game/ai/defense/best-tower-site';
+import { towerSkillWanted } from '../src/game/ai/defense/tower-skill-wanted';
+import type { AiPlannerState } from '../src/game/ai/types/planner-state';
+import { hexDistance } from '../src/game/map/hex';
+import { type GameMap,type MapTile } from '../src/game/map/map-gen';
 import { TileType } from '../src/game/map/tile-types';
 import { Tribe } from '../src/game/tribes';
 import { makeUnit } from '../src/game/units/units';
-import { bestTowerSite, towerSkillWanted } from '../src/game/ai/ai-tower';
-import type { AiPlannerState } from '../src/game/ai/ai-types';
-import { hexDistance } from '../src/game/map/hex';
-import { BuildingKind, SkillId, UnitType } from '@enums';
 
 function tile(q: number, r: number): MapTile {
   return { q, r, terrain: TileType.GrasslandLand, settlement: null, unit: null, ownedBy: 0, claimedByVillage: null, building: null, exploredBy: [0, 1] };

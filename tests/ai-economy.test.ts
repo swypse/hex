@@ -1,12 +1,12 @@
+import { AiActionType, AiDifficulty, BuildingKind, CommandType, GameMode, SkillId, UnitType } from '@enums';
 import { describe, expect, it } from 'vitest';
-import { planAiActions } from '../src/game/ai/ai';
-import { Simulator } from '../src/game/simulator';
+import { planAiActions } from '../src/game/ai/planner/plan-ai-actions';
+import { TileType } from '../src/game/map/tile-types';
 import { buildPlayers } from '../src/game/players';
+import { Simulator } from '../src/game/simulator';
 import { Tribe } from '../src/game/tribes';
 import { SeededRandom } from '../src/util/random';
-import { makeTestMap, tileAt, makeUnit, giveResources } from './helpers/test-map';
-import { TileType } from '../src/game/map/tile-types';
-import { AiActionType, AiDifficulty, BuildingKind, CommandType, GameMode, SkillId, UnitType } from '@enums';
+import { giveResources, makeTestMap, makeUnit, tileAt } from './helpers/test-map';
 
 function makeAI(): ReturnType<typeof buildPlayers>[number] {
   const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(11), AiDifficulty.NORMAL);
@@ -71,20 +71,20 @@ describe('AI opening order in the first village', () => {
     expect(order[0]).toBe('upgrade');
   });
 
-  it('then builds sawmill, farm and mine in that order', () => {
+  it('then builds sawmill, mine and farm in that order', () => {
     const { map, ai } = setup(2);
     const order = kinds(planAiActions(map, ai, new SeededRandom(9)));
     const idx = (k: BuildingKind) => order.indexOf(k);
     expect(idx(BuildingKind.SAWMILL)).toBeGreaterThanOrEqual(0);
-    expect(idx(BuildingKind.SAWMILL)).toBeLessThan(idx(BuildingKind.FARM));
-    expect(idx(BuildingKind.FARM)).toBeLessThan(idx(BuildingKind.MINE));
+    expect(idx(BuildingKind.SAWMILL)).toBeLessThan(idx(BuildingKind.MINE));
+    expect(idx(BuildingKind.MINE)).toBeLessThan(idx(BuildingKind.FARM));
   });
 
-  it('builds the mine before the farm without earlyFarm', () => {
+  it('builds the farm right after the sawmill with earlyFarm', () => {
     const { map, ai } = setup(2);
-    ai.aiFlags = { earlyFarm: false } as never;
+    ai.aiFlags = { earlyFarm: true } as never;
     const order = kinds(planAiActions(map, ai, new SeededRandom(9)));
-    expect(order.indexOf(BuildingKind.MINE)).toBeLessThan(order.indexOf(BuildingKind.FARM));
+    expect(order.indexOf(BuildingKind.FARM)).toBeLessThan(order.indexOf(BuildingKind.MINE));
   });
 
   it('finishes with a granary next to the farm, whatever the food situation', () => {
@@ -94,6 +94,59 @@ describe('AI opening order in the first village', () => {
     tileAt(map, 1, 0)!.building = { kind: BuildingKind.FARM, level: 1 };
     const order = kinds(planAiActions(map, ai, new SeededRandom(9)));
     expect(order).toContain(BuildingKind.GRANARY);
+  });
+});
+
+describe('AI settles captured villages', () => {
+  /** A finished first village at (0,0) plus a captured level-3 village at (5,0) with forest, mountain and open land. */
+  function setup() {
+    const map = makeTestMap(8);
+    const ai = makeAI();
+    ai.skills = [SkillId.FORESTRY, SkillId.CLIMBING, SkillId.SMITHERY, SkillId.AGRICULTURE, SkillId.GRANARY];
+    const home = tileAt(map, 0, 0)!;
+    home.settlement = { owner: 1, level: 2, captureReady: false, capital: true };
+    home.ownedBy = 1;
+    home.exploredBy = [1];
+    const claimHome = (q: number, r: number, building: BuildingKind) => {
+      const t = tileAt(map, q, r)!;
+      t.ownedBy = 1;
+      t.claimedByVillage = { q: 0, r: 0 };
+      t.building = { kind: building, level: 1 };
+    };
+    claimHome(0, 1, BuildingKind.MINE);
+    claimHome(-1, 0, BuildingKind.SAWMILL);
+    claimHome(1, 0, BuildingKind.FARM);
+    claimHome(1, -1, BuildingKind.GRANARY);
+    const captured = tileAt(map, 5, 0)!;
+    captured.settlement = { owner: 1, level: 3, captureReady: false };
+    captured.ownedBy = 1;
+    captured.exploredBy = [1];
+    const claim = (q: number, r: number, terrain?: TileType) => {
+      const t = tileAt(map, q, r)!;
+      if (terrain) t.terrain = terrain;
+      t.ownedBy = 1;
+      t.claimedByVillage = { q: 5, r: 0 };
+    };
+    claim(5, 1, TileType.GrasslandMountain);
+    claim(5, -1, TileType.GrasslandForest);
+    claim(6, 0);
+    claim(4, 0);
+    giveResources(map, ai, { money: 300, wood: 60, stone: 60, food: 30 });
+    return { map, ai };
+  }
+  const builds = (actions: ReturnType<typeof planAiActions>) =>
+    actions.flatMap((a) => (a.type === AiActionType.BUILD && a.q >= 4 ? [a.kind] : []));
+
+  it('builds its sawmill and mine before a farm', () => {
+    const { map, ai } = setup();
+    const order = builds(planAiActions(map, ai, new SeededRandom(9)));
+    expect(order).toContain(BuildingKind.SAWMILL);
+    expect(order).toContain(BuildingKind.MINE);
+    const farm = order.indexOf(BuildingKind.FARM);
+    if (farm >= 0) {
+      expect(order.indexOf(BuildingKind.SAWMILL)).toBeLessThan(farm);
+      expect(order.indexOf(BuildingKind.MINE)).toBeLessThan(farm);
+    }
   });
 });
 

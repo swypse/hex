@@ -1,16 +1,16 @@
 import { villageUpgradeCost } from '@/game/economy/resources';
-import { describe, expect, it } from 'vitest';
 import { AiActionType, CommandType, GameMode, UnitType, VillageUpgradeBonus } from '@enums';
+import { describe, expect, it } from 'vitest';
+import { AI_PATTERNS } from '../src/game/ai/patterns/all-patterns';
+import type { AiPlannerState } from '../src/game/ai/types/planner-state';
 import { villageIncomeBreakdown } from '../src/game/economy/capture';
 import { migrateLegacyResources } from '../src/game/economy/stock';
 import {
-  settlementIncomeLevel, settlementRadius, UPGRADE_MONEY_BONUS, upgradeVillage, villageUpgradeChoices,
+settlementIncomeLevel, settlementRadius, UPGRADE_MONEY_BONUS, upgradeVillage, villageUpgradeChoices,
 } from '../src/game/economy/village';
 import { buildPlayers } from '../src/game/players';
 import { Simulator } from '../src/game/simulator';
 import { Tribe } from '../src/game/tribes';
-import { AI_PATTERNS } from '../src/game/ai/ai-patterns';
-import { type AiPlannerState } from '../src/game/ai/ai-types';
 import { SeededRandom } from '../src/util/random';
 import { makeTestMap, makeUnit, tileAt } from './helpers/test-map';
 

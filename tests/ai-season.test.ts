@@ -1,11 +1,13 @@
-import { describe, expect, it } from 'vitest';
-import { AiActionType, IcePhase, UnitType } from '@enums';
-import { SEASON_SAFETY_PATTERN, seasonUnsafe, seasonVetoed } from '../src/game/ai/ai-season';
-import { type AiPlannerState } from '../src/game/ai/ai-types';
-import { type Player } from '../src/game/players';
+import { AiActionType,IcePhase,UnitType } from '@enums';
+import { describe,expect,it } from 'vitest';
+import { SEASON_SAFETY_PATTERN } from '../src/game/ai/patterns/season-safety';
+import { seasonUnsafe } from '../src/game/ai/review/season-unsafe';
+import { seasonVetoed } from '../src/game/ai/review/season-vetoed';
+import type { AiPlannerState } from '../src/game/ai/types/planner-state';
 import { TileType } from '../src/game/map/tile-types';
+import { type Player } from '../src/game/players';
 import { Tribe } from '../src/game/tribes';
-import { makeTestMap, makeUnit, tileAt } from './helpers/test-map';
+import { makeTestMap,makeUnit,tileAt } from './helpers/test-map';
 
 const AI = 1;
 const LAST_AUTUMN = 18;

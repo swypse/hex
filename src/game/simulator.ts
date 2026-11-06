@@ -1,55 +1,60 @@
 import { SeededRandom } from '@/util';
-import { AchievementId, VeteranBonus, VillageUpgradeBonus, AiActionType, AiEngine, BuilderExtraKind, BuildingKind, CommandType, GameEventType, GameMode, ResourceKind, Season, SkillId, UnitType, WeatherType } from '@enums';
-import { awardAchievementScores, currentlyMetIds, evaluateAchievements } from './achievements';
-import { planAiActions, planAiActionsSteps } from './ai/ai';
-import type { AiAction } from './ai/ai-types';
-import { touchBottle } from './map/bottles';
-import { buildBridge, buildBridgeIgnoringSkill } from './economy/bridges';
-import {
-  buildBuilding, buildBuildingIgnoringSkill, builderBuildable, type BuilderBuildKind, buildingGains, storeBuildingGains,
-  burnBuilding, burnRoad, demolish, canUsePort, destroyBuilding, repairBuilding
-} from './economy/buildings';
-import { captureVillage, villageIncome, villageIncomeTotal } from './economy/capture';
-import { attackableTargets, missChanceFor, performAttack, performSiege } from './units/combat';
+import { AchievementId,AiActionType,AiEngine,BuilderExtraKind,BuildingKind,CommandType,GameEventType,GameMode,ResourceKind,Season,SkillId,UnitType,VeteranBonus,VillageUpgradeBonus,WeatherType } from '@enums';
+import { randomSeed } from '../util/random';
+import { awardAchievementScores,currentlyMetIds,evaluateAchievements } from './achievements';
+import { flagsFor } from './ai/config/flags';
+import { runAiTrading } from './ai/economy/run-ai-trading';
+import { planAiActions } from './ai/planner/plan-ai-actions';
+import { planAiActionsSteps } from './ai/planner/plan-ai-actions-steps';
+import type { AiAction } from './ai/types/action';
+import { Bonuses } from './bonuses';
 import { knownTribesFor } from './discovery';
-import { type GameEvent } from './events';
-import { exploreUnitPath } from './map/explore';
-import { applyFood, refreshStarving } from './economy/food';
-import { trackNetworkEpoch, untrackedNetworks } from './economy/network-fingerprint';
-import { captureWinnerIndex, computeWinner, quickCaptureScore, quickCaptureTurnsCount } from './game-mode';
-import { hexDistance, hexNeighbors } from './map/hex';
-import type { GameMap, MapTile } from './map/map-gen';
-import type { Player } from './players';
-import { type Resources, START_RESOURCES, villageUpgradeCost } from './economy/resources';
-import { buildRoad, buildRoadIgnoringSkill } from './economy/roads';
+import { buildBridge,buildBridgeIgnoringSkill } from './economy/bridges';
 import {
-  awardScore, awardTempleScores, CAPTURE_SCORE, COMBO_SCORE, EMPTY_STATS, KILL_SCORE, PIRATE_KILL_SCORE, type PlayerStats,
-  SKILL_SCORE, UPGRADE_SCORE
+buildBuilding,buildBuildingIgnoringSkill,builderBuildable,type BuilderBuildKind,buildingGains,
+burnBuilding,burnRoad,
+canUsePort,
+demolish,
+destroyBuilding,repairBuilding,
+storeBuildingGains
+} from './economy/buildings';
+import { captureVillage,villageIncome,villageIncomeTotal } from './economy/capture';
+import { applyFood,refreshStarving } from './economy/food';
+import { trackNetworkEpoch,untrackedNetworks } from './economy/network-fingerprint';
+import { type Resources,START_RESOURCES,villageUpgradeCost } from './economy/resources';
+import { buildRoad,buildRoadIgnoringSkill } from './economy/roads';
+import { migrateLegacyResources,payAt } from './economy/stock';
+import { aiUpgradeBonus,buildWall as applyWall,canBuildWall,tileHasUniversity,upgradeVillage,villageUpgradeChoices } from './economy/village';
+import { Environment } from './environment';
+import { type GameEvent } from './events';
+import { captureWinnerIndex,computeWinner,quickCaptureScore,quickCaptureTurnsCount } from './game-mode';
+import { touchBottle } from './map/bottles';
+import { exploreUnitPath } from './map/explore';
+import { hexDistance,hexNeighbors } from './map/hex';
+import type { GameMap,MapTile } from './map/map-gen';
+import { tileAt } from './map/tile-index';
+import { TileType } from './map/tile-types';
+import { Pirates,provokePirate } from './pirates';
+import type { Player } from './players';
+import {
+awardScore,awardTempleScores,CAPTURE_SCORE,COMBO_SCORE,EMPTY_STATS,KILL_SCORE,PIRATE_KILL_SCORE,type PlayerStats,
+SKILL_SCORE,UPGRADE_SCORE
 } from './score';
-import { SEASON_LENGTH, seasonForTurn, SEASONS } from './season';
-import { cannotEnterTower, moveUnit, pathBetween, reachableTargets } from './units/selection';
-import { gainShipAbility, revertShip, upgradeShip } from './units/ship';
-import { hasSkill, openSkill as applySkill } from './skills';
+import { SEASON_LENGTH,seasonForTurn,SEASONS } from './season';
+import type { SimContext } from './sim-context';
+import { openSkill as applySkill,hasSkill } from './skills';
+import type { GameStateSnapshot } from './state';
+import { emptyTradeState,Trading } from './trade';
+import { attackableTargets,missChanceFor,performAttack,performSiege } from './units/combat';
+import { LIGHTNING_COOLDOWN_TURNS,LIGHTNING_COST,lightningReady,lightningStrikeCell,lightningVillages } from './units/lightning';
+import { cannotEnterTower,moveUnit,pathBetween,reachableTargets } from './units/selection';
+import { gainShipAbility,revertShip,upgradeShip } from './units/ship';
 import { spawnUnit } from './units/spawn';
 import { adjacentEnemyVillages } from './units/stalker';
-import type { GameStateSnapshot } from './state';
-import { migrateLegacyResources, payAt } from './economy/stock';
-import { STORM_COOLDOWN_TURNS, stormDamage, stormEligible, stormReady, stormTargetShips } from './units/storm';
-import { LIGHTNING_COOLDOWN_TURNS, LIGHTNING_COST, lightningReady, lightningStrikeCell, lightningVillages } from './units/lightning';
-import { TileType } from './map/tile-types';
-import { canPlaceTrapOn, TRAP_COST, trapAlive, trapDamage } from './units/traps';
-import { applyVeteranBonus, canAttack, canDisband, canHeal, canMove, disbandCost, aiVeteranBonus, needsVeteranBonus, recordKill, canDealWithPirate, hasPirateDeal, healUnit, HEAL_AMOUNT, MEDICINE_HEAL_BONUS, movePoints, PIRATE_DEAL_COST, PIRATE_OWNER, type Unit } from './units/units';
-import { aiUpgradeBonus, buildWall as applyWall, canBuildWall, tileHasUniversity, upgradeVillage, villageUpgradeChoices } from './economy/village';
-import { randomSeed } from '../util/random';
-import { Bonuses } from './bonuses';
-import { Environment } from './environment';
-import { Pirates, provokePirate } from './pirates';
-import { emptyTradeState, Trading } from './trade';
-import { runAiTrading } from './ai/ai-trade';
-import { flagsFor } from './ai/ai-flags';
-import type { SimContext } from './sim-context';
-import { tileAt } from './map/tile-index';
-import { extinguishCells, ignite } from './weather/fire';
+import { STORM_COOLDOWN_TURNS,stormDamage,stormEligible,stormReady,stormTargetShips } from './units/storm';
+import { canPlaceTrapOn,TRAP_COST,trapAlive,trapDamage } from './units/traps';
+import { aiVeteranBonus,applyVeteranBonus,canAttack,canDealWithPirate,canDisband,canHeal,canMove,disbandCost,hasPirateDeal,HEAL_AMOUNT,healUnit,MEDICINE_HEAL_BONUS,movePoints,needsVeteranBonus,PIRATE_DEAL_COST,PIRATE_OWNER,recordKill,type Unit } from './units/units';
+import { extinguishCells,ignite } from './weather/fire';
 
 export type Command =
   | { type: CommandType.MOVE; unitId: string; q: number; r: number }

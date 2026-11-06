@@ -6,24 +6,23 @@
  *
  *   npx vite-node tools/ai-bench.ts -- [games=20] [players=4] [maxTurns=60] [difficulty=hard]
  */
+import { AiActionType, UnitType } from '@enums';
+import type { AiDifficulty } from '../src/game/ai/ai-difficulty';
+import { ALL_AI_FLAGS_OFF, ALL_AI_FLAGS_ON, type AiFlags } from '../src/game/ai/config/flags';
+import { AI_TUNING } from '../src/game/ai/config/tuning';
+import { aiStepTrace } from '../src/game/ai/planner/ai-step-trace';
+import { spawnWouldBeKilled } from '../src/game/ai/spawn/spawn-would-be-killed';
+import { exploreVillageSights, unitsInVillage, villageCapacity } from '../src/game/economy/village';
+import { initialExplorationFor } from '../src/game/map/explore';
+import { hexDistance } from '../src/game/map/hex';
 import { generateMap } from '../src/game/map/map-gen';
 import { buildPlayers } from '../src/game/players';
 import { Simulator } from '../src/game/simulator';
 import { Tribe, TRIBES } from '../src/game/tribes';
-import { SeededRandom } from '../src/util/random';
-import { initialExplorationFor } from '../src/game/map/explore';
-import { exploreVillageSights } from '../src/game/economy/village';
-import { hexDistance } from '../src/game/map/hex';
-import { ALL_AI_FLAGS_OFF, ALL_AI_FLAGS_ON, type AiFlags } from '../src/game/ai/ai-flags';
-import { AI_TUNING } from '../src/game/ai/ai-patterns';
-import type { AiDifficulty } from '../src/game/ai/ai-difficulty';
-import { runRaiderTurn } from './ai-raider';
-import { aiStepTrace } from '../src/game/ai/ai';
 import { reachableTargets } from '../src/game/units/selection';
-import { AiActionType, UnitType } from '@enums';
 import { canSpawnType } from '../src/game/units/spawn';
-import { spawnWouldBeKilled } from '../src/game/ai/ai-pattern-helpers';
-import { unitsInVillage, villageCapacity } from '../src/game/economy/village';
+import { SeededRandom } from '../src/util/random';
+import { runRaiderTurn } from './ai-raider';
 
 // RAIDER=1: one seat per game (seed % players) plays the scripted raider (tools/ai-raider.ts); it is not tallied,
 // the other seats alternate A/B as usual, so a flag is measured against a hostile opponent.

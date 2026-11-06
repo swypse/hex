@@ -1,13 +1,13 @@
-import { describe, expect, it } from 'vitest';
-import { AiActionType, UnitType } from '@enums';
-import { planGangAttack } from '../src/game/ai/ai-attack-plan';
-import { ENTER_VILLAGE_PATTERN } from '../src/game/ai/ai-enter-village';
-import { attackersForTile } from '../src/game/ai/ai-pattern-helpers';
-import { type AiPlannerState } from '../src/game/ai/ai-types';
+import { AiActionType,UnitType } from '@enums';
+import { describe,expect,it } from 'vitest';
+import { attackersForTile } from '../src/game/ai/military/gang-attack';
+import { planGangAttack } from '../src/game/ai/military/plan-gang-attack';
+import { ENTER_VILLAGE_PATTERN } from '../src/game/ai/patterns/enter-village';
+import type { AiPlannerState } from '../src/game/ai/types/planner-state';
 import { type GameMap } from '../src/game/map/map-gen';
 import { type Player } from '../src/game/players';
 import { Tribe } from '../src/game/tribes';
-import { makeTestMap, makeUnit, tileAt } from './helpers/test-map';
+import { makeTestMap,makeUnit,tileAt } from './helpers/test-map';
 
 const AI = 1;
 
