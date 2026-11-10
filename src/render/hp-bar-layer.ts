@@ -213,29 +213,6 @@ export class HpBarLayer {
 
     el.addChild(label);
 
-    let bonusIcon: Sprite | null = null;
-    let bonusText: BitmapText | null = null;
-    const attackIcon = this.deps.textures().attackIconTexture;
-    if (spec.bonus > 0 && attackIcon) {
-      const icon = new Sprite(attackIcon);
-      icon.anchor.set(0.5, 1);
-      icon.width = BONUS_ICON_SIZE;
-      icon.height = BONUS_ICON_SIZE;
-      icon.position.set(label.x + label.width / 2 + BONUS_ICON_GAP + BONUS_ICON_SIZE / 2, label.y);
-      icon.zIndex = 1;
-      el.addChild(icon);
-      bonusIcon = icon;
-      bonusText = this.deps.pool.takeText(`+${spec.bonus}`, {
-        fontSize: FontSize.VERY_SMALL,
-        fill: 0xffcc00,
-        fontFamily: FONT_OUTLINED,
-      });
-      bonusText.anchor.set(0, 1);
-      bonusText.position.set(label.x + label.width / 2 + BONUS_ICON_GAP + BONUS_ICON_SIZE + BONUS_TEXT_GAP, label.y);
-      bonusText.zIndex = 1;
-      el.addChild(bonusText);
-    }
-
     const entry: HpBarEntry = {
       el,
       world: spec.world,
@@ -244,8 +221,8 @@ export class HpBarLayer {
       ghost,
       green,
       label,
-      bonusIcon,
-      bonusText,
+      bonusIcon: null,
+      bonusText: null,
       defenseIcon: null,
       defenseText: null,
       starveTag: null,
@@ -271,10 +248,43 @@ export class HpBarLayer {
     bar.label.alpha = textAlpha;
     if (bar.bonusIcon) bar.bonusIcon.alpha = textAlpha;
     if (bar.bonusText) bar.bonusText.alpha = textAlpha;
+    this.updateBonusMarker(bar, spec, textAlpha);
     this.updateDefenseMarker(bar, spec, textAlpha);
     const starW = this.updateStar(bar, spec);
     this.labelHeight = bar.label.height;
     this.updateStarveTag(bar, spec, starW);
+  }
+
+  /** Keeps the attack-bonus marker ("icon +N") after the hp text in sync. */
+  private updateBonusMarker(bar: HpBarEntry, spec: HpBarSpec, alpha: number): void {
+    const tex = this.deps.textures().attackIconTexture;
+    if (spec.bonus <= 0 || !tex) {
+      if (bar.bonusIcon) { bar.bonusIcon.destroy(); bar.bonusIcon = null; }
+      if (bar.bonusText) { bar.bonusText.parent?.removeChild(bar.bonusText); bar.bonusText.destroy(); bar.bonusText = null; }
+      return;
+    }
+    if (!bar.bonusIcon) {
+      const icon = new Sprite(tex);
+      icon.anchor.set(0.5, 1);
+      icon.width = BONUS_ICON_SIZE;
+      icon.height = BONUS_ICON_SIZE;
+      icon.zIndex = 1;
+      bar.el.addChild(icon);
+      bar.bonusIcon = icon;
+    }
+    if (!bar.bonusText) {
+      const text = this.deps.pool.takeText(`+${spec.bonus}`, { fontSize: FontSize.VERY_SMALL, fill: 0xffcc00, fontFamily: FONT_OUTLINED });
+      text.anchor.set(0, 1);
+      text.zIndex = 1;
+      bar.el.addChild(text);
+      bar.bonusText = text;
+    }
+    bar.bonusText.text = `+${spec.bonus}`;
+    const x = bar.label.x + bar.label.width / 2;
+    bar.bonusIcon.position.set(x + BONUS_ICON_GAP + BONUS_ICON_SIZE / 2, bar.label.y);
+    bar.bonusText.position.set(x + BONUS_ICON_GAP + BONUS_ICON_SIZE + BONUS_TEXT_GAP, bar.label.y);
+    bar.bonusIcon.alpha = alpha;
+    bar.bonusText.alpha = alpha;
   }
 
   /** Keeps the tower's "shield +N" marker after the hp text (and the attack bonus) in sync. */

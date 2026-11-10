@@ -1,6 +1,6 @@
 import { BuildingKind, CompassDirection, UnitType, WeatherType } from '@enums';
 import { type Axial, axialKey, hexDistance, hexNeighbors, hexToPixel, tilesInRange } from '../map/hex';
-import { type GameMap, type MapTile } from '../map/map-gen';
+import { type Building, type GameMap, type MapTile } from '../map/map-gen';
 import { isMountainType, isSolidGround, isWaterType } from '../map/tile-types';
 import { pickRandom, randomInt } from '../../util/random';
 import { tileMapByKey } from '../map/tile-index';
@@ -95,6 +95,8 @@ export interface WeatherBuildingHit {
   q: number;
   r: number;
   destroyed: boolean;
+  /** The building as it stood before the hit, so a presenter can keep drawing it until the effect has played. */
+  before?: Building;
 }
 
 export function activeWeather(map: Pick<GameMap, 'weather'>): WeatherEvent[] {

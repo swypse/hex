@@ -1,11 +1,10 @@
 import { t } from '../../i18n';
-import { Container, Graphics, Sprite, Texture } from 'pixi.js';
+import { Container, Graphics } from 'pixi.js';
 import { gameController } from '../../controller/game-controller';
 import { SKILLS, hasSkill, canOpenSkill, skillCost } from '../../game/skills';
 import { type Player } from '../../game/players';
 import { tribeById } from '../../game/tribes';
 import { clampZoom, zoomAroundCursor, decayVelocity, INERTIA_START_SPEED, INERTIA_STOP_SPEED } from '../../controller/zoom';
-import { ensureCanvasResource } from '../../gfx/image-texture';
 import { useGameStore } from '../../store/game-store';
 import { type UIHost } from '../host';
 import { Button } from '../kit/button';
@@ -99,6 +98,16 @@ const ARROW_DIRECTIONS: Record<string, { dx: number; dy: number }> = {
 const CURSOR_MARGIN_X = 70;
 const CURSOR_MARGIN_Y = 130;
 const CURSOR_COLOR = 0xffd54a;
+/** Medallion zoom while hovered / under the keyboard cursor, and while pressed. */
+const HOVER_SCALE = 1.12;
+const PRESSED_SCALE = 1.2;
+/** How fast a medallion eases to its target zoom (1/s). */
+const SCALE_EASE_RATE = 18;
+/** Opening animation: the orange line grows parent -> child, then the medallion zooms up and bounces in. */
+const GROW_MS = 250;
+const POP_MS = 400;
+const POP_PEAK = 0.35;
+const GROW_LINE_COLOR = 0xff8c00;
 /** Gap below a button row to the key-hint line. */
 const HINT_GAP = 14;
 
@@ -131,6 +140,19 @@ export class SkillTree {
   private inertiaRemove: (() => void) | null = null;
   private gestureMoved = false;
   private sawPinch = false;
+  /** Skill under the mouse / the pressed skill (drive the medallion zoom). */
+  private hovered: SkillId | null = null;
+  private pressed: SkillId | null = null;
+  /** Skills already seen opened; null until the first build (no animation for skills opened before the tree was shown). */
+  private seenOpened: Set<SkillId> | null = null;
+  /** Skills whose connecting line is still growing, and their start times. */
+  private growing = new Map<SkillId, number>();
+  /** Skills whose medallion is playing the zoom-up bounce, and their start times. */
+  private popping = new Map<SkillId, number>();
+  private growLines = new Map<SkillId, Graphics>();
+  private medallions = new Map<SkillId, Container>();
+  private medallionScale = new Map<SkillId, number>();
+  private tickFn: ((t: { deltaMS: number }) => void) | null = null;
 
   mount(host: UIHost, root: Container): void {
     this.host = host;
@@ -162,7 +184,53 @@ export class SkillTree {
     // under it. Pixi wheel events do not bubble through the non-interactive
     // ring container to the background surface.
     window.addEventListener('pointerdown', this.onPointerDown);
+    window.addEventListener('pointermove', this.onHoverMove);
     window.addEventListener('wheel', this.onDomWheel, { passive: false });
+    const ticker = host.app.ticker;
+    if (ticker) {
+      this.tickFn = (tk) => this.tick(tk.deltaMS);
+      ticker.add(this.tickFn);
+    }
+  }
+
+  private onHoverMove = (e: PointerEvent): void => {
+    if (e.pointerType !== 'mouse' || this.detailPopup || this.pointers.size > 0) return;
+    this.hovered = this.skillAt(e.clientX, e.clientY);
+  };
+
+  /** Per frame: grows opening lines, plays the pop and eases each medallion to its hover/pressed/cursor zoom. */
+  private tick(deltaMS: number): void {
+    const now = performance.now();
+    for (const [id, start] of this.growing) {
+      const k = Math.min(1, (now - start) / GROW_MS);
+      const parent = SKILLS[id].parent;
+      const from = parent ? POS[parent] : { x: CX, y: CY };
+      const to = POS[id];
+      const e = k < 0.5 ? 2 * k * k : 1 - (-2 * k + 2) ** 2 / 2;
+      this.growLines.get(id)?.clear().moveTo(from.x, from.y).lineTo(from.x + (to.x - from.x) * e, from.y + (to.y - from.y) * e)
+        .stroke({ width: medallionStrokeWidth(MEDALLION_SIZE), color: GROW_LINE_COLOR });
+      if (k >= 1) {
+        this.growing.delete(id);
+        this.popping.set(id, now);
+        this.build();
+        return;
+      }
+    }
+    const ease = Math.min(1, (deltaMS / 1000) * SCALE_EASE_RATE);
+    for (const [id, node] of this.medallions) {
+      const target = this.pressed === id ? PRESSED_SCALE : this.hovered === id || this.cursor === id ? HOVER_SCALE : 1;
+      const cur = this.medallionScale.get(id) ?? 1;
+      const next = cur + (target - cur) * ease;
+      this.medallionScale.set(id, next);
+      let pop = 1;
+      const popStart = this.popping.get(id);
+      if (popStart !== undefined) {
+        const u = (now - popStart) / POP_MS;
+        if (u >= 1) this.popping.delete(id);
+        else pop = popScale(u);
+      }
+      node.scale.set(next * pop);
+    }
   }
 
   private onDomWheel = (e: WheelEvent): void => {
@@ -183,6 +251,7 @@ export class SkillTree {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     const pos = { x: e.clientX, y: e.clientY };
     this.pointers.set(e.pointerId, { ...pos });
+    this.pressed = this.pointers.size === 1 ? this.skillAt(pos.x, pos.y) : null;
     this.gestureMoved = false;
     this.sawPinch = false;
     this.stopInertia();
@@ -205,6 +274,7 @@ export class SkillTree {
     if (this.pointers.size !== 1) return;
     if (!this.gestureMoved && Math.hypot(pos.x - this.dragStart.x, pos.y - this.dragStart.y) > 6) {
       this.gestureMoved = true;
+      this.pressed = null;
     }
     const now = performance.now();
     const dt = Math.max(0.0001, (now - this.dragLastTime) / 1000);
@@ -223,6 +293,7 @@ export class SkillTree {
 
   private onWindowUp = (e: PointerEvent): void => {
     if (!this.pointers.delete(e.pointerId)) return;
+    this.pressed = null;
     if (this.pinchActive && this.pointers.size < 2) {
       this.pinchActive = false;
       // Continue panning with the remaining finger.
@@ -240,8 +311,9 @@ export class SkillTree {
     }
   };
 
-  private handleTap(x: number, y: number): void {
-    if (!this.ring) return;
+  /** The skill whose medallion is under the screen point, if any. */
+  private skillAt(x: number, y: number): SkillId | null {
+    if (!this.ring) return null;
     const s = this.ring.scale.x;
     let best: SkillId | null = null;
     let bestD = Infinity;
@@ -256,6 +328,11 @@ export class SkillTree {
         best = id;
       }
     }
+    return best;
+  }
+
+  private handleTap(x: number, y: number): void {
+    const best = this.skillAt(x, y);
     if (best !== null) {
       this.selected = best;
       this.build();
@@ -452,6 +529,15 @@ export class SkillTree {
     this.el.visible = true;
     const tribe = tribeById(human.tribe)!;
     const highlight = new Set(useGameStore.getState().tutorialHighlightSkills);
+    const openedNow = new Set((Object.keys(SKILLS) as SkillId[]).filter((id) => hasSkill(human, id)));
+    if (this.seenOpened) {
+      const now = performance.now();
+      for (const id of openedNow) if (!this.seenOpened.has(id)) this.growing.set(id, now);
+    }
+    this.seenOpened = openedNow;
+    for (const id of [...this.growing.keys()]) if (!openedNow.has(id)) this.growing.delete(id);
+    this.growLines.clear();
+    this.medallions.clear();
 
     const scale = Math.min(host.app.screen.width / 900, host.app.screen.height / 760, 1);
     this.fitScale = scale;
@@ -461,14 +547,21 @@ export class SkillTree {
     this.el.addChild(ring);
 
     for (const id of Object.keys(SKILLS) as SkillId[]) {
-      const opened = hasSkill(human, id);
+      const growing = this.growing.has(id);
+      const opened = hasSkill(human, id) && !growing;
       const parent = SKILLS[id].parent;
       const p = parent ? POS[parent] : { x: CX, y: CY };
       const c = POS[id];
       const line = new Graphics();
-      const lineColor = opened ? 0xff8c00 : canOpenSkill(human, id, gameController.getMap()) ? THEME.skillTree.closedSkillStroke : THEME.skillTree.unreachableLine;
+      const lineColor = opened ? GROW_LINE_COLOR : growing || canOpenSkill(human, id, gameController.getMap()) ? THEME.skillTree.closedSkillStroke : THEME.skillTree.unreachableLine;
       line.moveTo(p.x, p.y).lineTo(c.x, c.y).stroke({ width: opened ? medallionStrokeWidth(MEDALLION_SIZE) : 2, color: lineColor });
       ring.addChild(line);
+      if (growing) {
+        // Overlay redrawn every frame by `tick` until it reaches the child.
+        const grow = new Graphics();
+        this.growLines.set(id, grow);
+        ring.addChild(grow);
+      }
     }
 
     const rootChip = makeIconChip(`${tribe.code}-icon.png`, MEDALLION_SIZE, { bgColor: 0xffffff, border: { width: 4, color: THEME.skillTree.openedSkillStroke, alignment: 0 } });
@@ -477,7 +570,8 @@ export class SkillTree {
 
     for (const id of Object.keys(SKILLS) as SkillId[]) {
       const pos = POS[id];
-      const opened = hasSkill(human, id);
+      const growing = this.growing.has(id);
+      const opened = hasSkill(human, id) && !growing;
       if (!opened && highlight.has(id)) {
         const halo = new Graphics();
         halo.circle(pos.x, pos.y, 35).stroke({ width: 5, color: 0xffd700, alpha: 0.95 });
@@ -496,18 +590,20 @@ export class SkillTree {
       const medallion = makeSkillMedallion({
         skill: id,
         opened,
-        priceText: opened ? '\u2713' : String(skillCost(id, human.skills.length)),
-        reachable: canOpenSkill(human, id, gameController.getMap()),
+        priceText: growing ? undefined : opened ? '\u2713' : String(skillCost(id, human.skills.length)),
+        reachable: growing || canOpenSkill(human, id, gameController.getMap()),
         size: MEDALLION_SIZE,
         app: host.app,
         textBake: TREE_TEXT_BAKE,
       });
       medallion.position.set(pos.x, pos.y);
+      medallion.scale.set(this.medallionScale.get(id) ?? 1);
+      this.medallions.set(id, medallion);
       node.addChild(medallion);
 
       const name = makeLabel(SKILLS[id].name, {
         fontSize: FontSize.VERY_SMALL,
-        fill: opened || canOpenSkill(human, id, gameController.getMap()) ? THEME.skillTree.openedLabelText : THEME.skillTree.closedLabelText,
+        fill: opened || growing || canOpenSkill(human, id, gameController.getMap()) ? THEME.skillTree.openedLabelText : THEME.skillTree.closedLabelText,
         bake: TREE_TEXT_BAKE,
       });
       name.anchor.set(0.5, 0.5);
@@ -563,51 +659,17 @@ export class SkillTree {
 
     const content = popup.content;
     let y = 0;
-    // Cover block: 800x400 base aspect, fitted to the content width. A skill
-    // cover image (public/skill-covers/<skill>.jpg) is used as its background
-    // when it exists; otherwise the block falls back to its solid #111111 bg.
-    // The skill medallion sits in the top-right corner of the cover.
-    const coverW = popup.contentWidth;
-    const coverH = Math.round(coverW / 2);
-    const cover = new Container();
-    const coverBg = new Graphics();
-    coverBg.rect(0, 0, coverW, coverH).fill(0x111111);
-    cover.addChild(coverBg);
-
-    const coverImg = new Image();
-    coverImg.onload = () => {
-      if (cover.destroyed) return;
-      let tex: Texture;
-      try {
-        tex = Texture.from(coverImg);
-        ensureCanvasResource(tex);
-      } catch {
-        return;
-      }
-      const sprite = new Sprite(tex);
-      sprite.anchor.set(0.5);
-      const scale = Math.max(coverW / coverImg.width, coverH / coverImg.height);
-      sprite.width = coverImg.width * scale;
-      sprite.height = coverImg.height * scale;
-      sprite.position.set(coverW / 2, coverH / 2);
-      cover.addChildAt(sprite, 1);
-    };
-    coverImg.onerror = () => {
-      // No cover art for this skill; the solid bg remains.
-    };
-    coverImg.src =
-      `${import.meta.env.BASE_URL}skill-covers/${id}.jpg`;
-
+    // The skill medallion, centred above the description.
+    const MEDALLION_DETAIL_SIZE = 72;
     const medallion = makeSkillMedallion({
       skill: id,
       opened,
-      size: 48,
+      size: MEDALLION_DETAIL_SIZE,
       app: host.app,
     });
-    medallion.position.set(coverW - 10 - 24, 10 + 24);
-    cover.addChild(medallion);
-    content.addChild(cover);
-    y = coverH + 8;
+    medallion.position.set(popup.contentWidth / 2, MEDALLION_DETAIL_SIZE / 2);
+    content.addChild(medallion);
+    y = MEDALLION_DETAIL_SIZE + 12;
     const desc = makeRichLabel(info.description, { fontSize: FontSize.SMALL, fill: 0xcccccc, width: popup.contentWidth });
     desc.position.set(0, y);
     content.addChild(desc);
@@ -647,6 +709,9 @@ export class SkillTree {
     this.hudMoney?.destroy();
     this.hudMoney = null;
     this.stopInertia();
+    if (this.tickFn) this.host?.app.ticker?.remove(this.tickFn);
+    this.tickFn = null;
+    window.removeEventListener('pointermove', this.onHoverMove);
     this.detachPointerListeners();
     this.pointers.clear();
     this.pinchActive = false;
@@ -662,5 +727,24 @@ export class SkillTree {
     this.selected = null;
     this.cursor = null;
     this.detailOpen = null;
+    this.hovered = null;
+    this.pressed = null;
+    this.seenOpened = null;
+    this.growing.clear();
+    this.popping.clear();
+    this.growLines.clear();
+    this.medallions.clear();
+    this.medallionScale.clear();
   }
+}
+
+/** Zoom factor of the opening pop at progress u in [0, 1]: zooms up to the peak, then settles back to 1 with a bounce. */
+function popScale(u: number): number {
+  const rise = 0.3;
+  if (u < rise) {
+    const k = u / rise;
+    return 1 + POP_PEAK * (1 - (1 - k) ** 3);
+  }
+  const v = (u - rise) / (1 - rise);
+  return 1 + POP_PEAK * Math.cos(v * Math.PI * 2.5) * (1 - v);
 }

@@ -242,7 +242,7 @@ describe('storm effects', () => {
     expect(second.buildings).toEqual([{ q: 2, r: 0, destroyed: false }]);
     expect(portTile.building!.hp).toBe(1);
     const fourth = applyStormTurn(map, storm(3, 0, { radius: 2, age: 4 }));
-    expect(fourth.buildings).toEqual([{ q: 2, r: 0, destroyed: true }]);
+    expect(fourth.buildings).toEqual([{ q: 2, r: 0, destroyed: true, before: { kind: BuildingKind.PORT, level: 1, hp: 1 } }]);
     expect(portTile.building).toBeNull();
   });
 });
@@ -263,7 +263,7 @@ describe('earthquake effects', () => {
     const report = applyEarthquake(map, quake, () => 0.1);
     expect(farm.building).toBeNull();
     expect(unit.hp).toBe(30);
-    expect(report.buildings).toEqual([{ q: -2, r: 0, destroyed: true }]);
+    expect(report.buildings).toEqual([{ q: -2, r: 0, destroyed: true, before: { kind: BuildingKind.FARM, level: 1 } }]);
     expect(report.units).toEqual([{ unitId: 'u', owner: 0, q: -2, r: 1, damage: 20, died: false, type: UnitType.WARRIOR, shipLevel: undefined, hpBefore: 50 }]);
   });
 

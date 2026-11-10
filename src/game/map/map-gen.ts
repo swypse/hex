@@ -128,8 +128,8 @@ function baseMapRadius(playerCount: number): number {
   throw new Error(`Unsupported player count: ${playerCount}`);
 }
 
-/** Extra rings added to the base radius of every player count. */
-const MAP_RADIUS_BONUS = 1;
+/** Rings added (negative: removed) to the base radius of every player count. */
+const MAP_RADIUS_BONUS = -1;
 
 export function mapRadiusFor(playerCount: number): number {
   return baseMapRadius(playerCount) + MAP_RADIUS_BONUS;

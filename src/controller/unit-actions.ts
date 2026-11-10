@@ -1,4 +1,5 @@
 import { type BuilderBuildKind } from '@/game/economy/buildings';
+import { extinguishCells } from '@/game/weather/fire';
 import { type Command, Simulator } from '@/game/simulator';
 import { stormEligible } from '@/game/units/storm';
 import { canDisband, type Unit } from '@/game/units/units';
@@ -175,6 +176,13 @@ export class UnitActions {
     if (!selection || !this.sim) return;
     const unit = tileAt(this.sim.map, selection.q, selection.r)?.unit;
     if (!unit || unit.owner !== store.localPlayerIndex) return;
+    // A single burning tile in reach needs no selection: extinguish it right away.
+    const cells = extinguishCells(this.sim.map, unit);
+    if (cells.length === 1) {
+      this.pendingExtinguish = { unitId: unit.id };
+      this.extinguishOn(cells[0]!.q, cells[0]!.r);
+      return;
+    }
     this.pendingExtinguish = { unitId: unit.id };
     this.pendingPlacement = null;
     this.pendingTrap = null;

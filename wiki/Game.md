@@ -43,7 +43,7 @@ only it can spawn (no skill needed — the tribe is the gate). Details on each t
 
 ## Map
 
-- Hex grid. Playable radius by player count: 2 → 8, 3 → 9, 4 → 10, 5 → 11, 6 → 12, 7 → 13, plus a 2-hex water border.
+- Hex grid. Playable radius by player count: 2 → 6, 3 → 7, 4 → 8, 5 → 9, 6 → 10, 7 → 11, plus a 2-hex water border.
 - Perlin-noise terrain in 5 biomes (Grassland, Desert, Tundra, Taiga, Rainforest); terrain types land, forest, mountain
   and water (30% of the generated tiles, the border comes on top).
 - Each player starts with a capital (with a warrior) and a nearby free (neutral) village. Villages are at least 3 hexes
@@ -254,7 +254,7 @@ Five resources: **money**, **wood**, **stone**, **ore**, **food**. Money belongs
 **villages**. Villages joined by roads or port routes form a **network** and pool their stock (the same network shares
 food); an unconnected village uses only its own stock.
 
-**Start:** 8 money for the player; the capital has 3 wood, 2 stone, 0 ore and 25 food; other villages start empty.
+**Start:** 12 money for the player; the capital has 3 wood, 2 stone, 0 ore and 25 food; other villages start empty.
 
 **Who pays:** an action on a village's territory (building, repair, spawn, upgrade, wall, port, ship upgrade, bridge,
 road, trap) draws wood/stone/ore/food from that village's network — first what its sawmills and mines hold, then the

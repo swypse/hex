@@ -7,7 +7,7 @@ The Villagers are the builders' tribe: they start with extra money and have the 
 | Property      | Value |
 |---------------|-------|
 | Colour        | brown |
-| Start bonus   | **+8 money** at the start (16 instead of 8) |
+| Start bonus   | **+8 money** at the start (20 instead of 12) |
 | Special unit  | [Builder](#builder) |
 
 Otherwise the tribe plays by the common rules in [Game](../Game.md): the same units, skills, buildings and economy, the

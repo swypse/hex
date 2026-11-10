@@ -87,7 +87,7 @@ describe('SkillTree zoom and pan', () => {
     const before = { x: ring.position.x, y: ring.position.y };
     const down = winListeners['pointerdown']![0]!;
     down({ pointerId: 7, pointerType: 'mouse', button: 0, clientX: 100, clientY: 100 } as never);
-    const move = winListeners['pointermove']![0]!;
+    const move = winListeners['pointermove']![winListeners['pointermove']!.length - 1]!;
     move({ pointerId: 7, clientX: 160, clientY: 130 });
     expect(ring.position.x).toBeCloseTo(before.x + 60, 5);
     expect(ring.position.y).toBeCloseTo(before.y + 30, 5);

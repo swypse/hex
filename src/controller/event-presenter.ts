@@ -605,7 +605,7 @@ export class EventPresenter {
             break;
           }
           case GameEventType.WEATHER_STARTED:
-            await this.presentWeatherStarted(e.weather, this.lightningVictims(events, i, e.weather));
+            await this.presentWeatherStarted(e.weather, this.lightningVictims(events, i, e.weather), this.quakeRuins(events, i, e.weather));
             break;
           case GameEventType.WEATHER_ENDED:
             await this.presentWeatherEnded(e.weather);
@@ -1450,12 +1450,25 @@ export class EventPresenter {
     return out;
   }
 
-  private async presentWeatherStarted(weather: WeatherEvent, victims: Map<string, Unit> = new Map()): Promise<void> {
+  /** Buildings this earthquake destroys, as they stood before it: they stay drawn until the shake has played. */
+  private quakeRuins(events: GameEvent[], index: number, weather: WeatherEvent): Map<string, Building> {
+    const out = new Map<string, Building>();
+    if (weather.type !== WeatherType.EARTHQUAKE) return out;
+    for (const next of events.slice(index + 1)) {
+      if (next.type !== GameEventType.WEATHER_DAMAGE || next.weather.id !== weather.id) continue;
+      for (const hit of next.buildings) if (hit.destroyed && hit.before) out.set(axialKey(hit), hit.before);
+      break;
+    }
+    return out;
+  }
+
+  private async presentWeatherStarted(weather: WeatherEvent, victims: Map<string, Unit> = new Map(), ruins: Map<string, Building> = new Map()): Promise<void> {
     const sim = this.host.sim();
     if (!sim) return;
     this.syncWeatherStore();
     // The sim already holds the strike's outcome (fire, dead units): draw it
     // only after the bolt has played.
+    if (ruins.size > 0) this.host.mapView()?.setBuildingOverrides(new Map([...this.towerStage, ...ruins]));
     if (weather.type !== WeatherType.LIGHTNING) this.host.render();
     const local = useGameStore.getState().localPlayerIndex;
     let shakeMs = 0;
@@ -1499,6 +1512,7 @@ export class EventPresenter {
     }
     // Messages queue in the store; only the shake has to play out first.
     if (shakeMs > 0) await sleep(shakeMs);
+    if (ruins.size > 0) this.host.mapView()?.setBuildingOverrides(this.towerStage.size > 0 ? this.towerStage : null);
   }
 
   private async presentWeatherEnded(weather: WeatherEvent): Promise<void> {

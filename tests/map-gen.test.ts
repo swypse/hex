@@ -9,26 +9,26 @@ import { UnitType } from '@enums';
 
 describe('map generation', () => {
   it('chooses radius by player count', () => {
-    expect(mapRadiusFor(2)).toBe(8);
-    expect(mapRadiusFor(3)).toBe(9);
-    expect(mapRadiusFor(4)).toBe(10);
-    expect(mapRadiusFor(5)).toBe(11);
-    expect(mapRadiusFor(6)).toBe(12);
-    expect(mapRadiusFor(7)).toBe(13);
+    expect(mapRadiusFor(2)).toBe(6);
+    expect(mapRadiusFor(3)).toBe(7);
+    expect(mapRadiusFor(4)).toBe(8);
+    expect(mapRadiusFor(5)).toBe(9);
+    expect(mapRadiusFor(6)).toBe(10);
+    expect(mapRadiusFor(7)).toBe(11);
     expect(() => mapRadiusFor(1)).toThrow();
     expect(() => mapRadiusFor(8)).toThrow();
   });
 
   it('generates a map of the base radius plus the water border', () => {
     const map = generateMap(2, 42);
-    expect(mapRadiusFor(2)).toBe(8);
-    expect(map.radius).toBe(10);
+    expect(mapRadiusFor(2)).toBe(6);
+    expect(map.radius).toBe(8);
     expect(generateMap(6, 42).radius).toBe(mapRadiusFor(6) + 2);
   });
 
   it('generates the expected number of tiles', () => {
     const map = generateMap(2, 42);
-    expect(map.tiles).toHaveLength(allTiles(10).length);
+    expect(map.tiles).toHaveLength(allTiles(8).length);
   });
 
   it('keeps starting villages at least 2 tiles from the map edge', () => {

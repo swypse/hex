@@ -8,7 +8,7 @@ export interface Resources {
   food: number;
 }
 
-export const START_RESOURCES: Resources = { wood: 3, stone: 2, money: 8, ore: 0, food: 25 };
+export const START_RESOURCES: Resources = { wood: 3, stone: 2, money: 12, ore: 0, food: 25 };
 
 /** What one village holds: the materials of `Resources`. Money is the player's
  *  own; wood, stone, ore and food live in villages and are pooled by each

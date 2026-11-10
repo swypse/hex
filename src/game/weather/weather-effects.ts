@@ -40,9 +40,10 @@ export function hurtBuilding(tile: MapTile, damage: number): WeatherBuildingHit 
   const building = tile.building!;
   const hp = buildingHp(building) - damage;
   const destroyed = hp <= 0;
+  const before = destroyed ? { ...building } : undefined;
   if (destroyed) tile.building = null;
   else building.hp = hp;
-  return { q: tile.q, r: tile.r, destroyed };
+  return { q: tile.q, r: tile.r, destroyed, before };
 }
 
 /** A storm's end-of-turn damage: every ship (pirate ships included) in scope
