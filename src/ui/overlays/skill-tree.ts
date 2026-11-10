@@ -659,35 +659,41 @@ export class SkillTree {
 
     const content = popup.content;
     let y = 0;
-    // The skill medallion, centred above the description.
+    // A row: the skill medallion at the left (with room for its stroke), the description at the right.
     const MEDALLION_DETAIL_SIZE = 72;
+    const MEDALLION_PAD = 8;
+    const ROW_GAP = 12;
     const medallion = makeSkillMedallion({
       skill: id,
       opened,
       size: MEDALLION_DETAIL_SIZE,
       app: host.app,
     });
-    medallion.position.set(popup.contentWidth / 2, MEDALLION_DETAIL_SIZE / 2);
+    const iconBox = MEDALLION_DETAIL_SIZE + MEDALLION_PAD * 2;
+    medallion.position.set(MEDALLION_PAD + MEDALLION_DETAIL_SIZE / 2, MEDALLION_PAD + MEDALLION_DETAIL_SIZE / 2);
     content.addChild(medallion);
-    y = MEDALLION_DETAIL_SIZE + 12;
-    const desc = makeRichLabel(info.description, { fontSize: FontSize.SMALL, fill: 0xcccccc, width: popup.contentWidth });
-    desc.position.set(0, y);
+    const textX = iconBox + ROW_GAP;
+    const textW = popup.contentWidth - textX;
+    const desc = makeRichLabel(info.description, { fontSize: FontSize.SMALL, fill: 0xcccccc, width: textW });
+    desc.position.set(textX, 0);
     content.addChild(desc);
-    y += desc.height + 12;
-
+    // Status / cost sit under the description, in the same text column.
+    y = desc.height + 12;
     if (opened) {
-      const state = makeLabel(t('skill.opened'), { fontSize: FontSize.SMALL, fill: 0xeeeeee, wordWrap: true, wordWrapWidth: popup.contentWidth });
-      state.position.set(0, y);
+      const state = makeLabel(t('skill.opened'), { fontSize: FontSize.SMALL, fill: 0xeeeeee, wordWrap: true, wordWrapWidth: textW });
+      state.position.set(textX, y);
       content.addChild(state);
+      y += state.height;
     } else {
       const label = makeLabel(t('skill.costLabel'), { fontSize: FontSize.SMALL, fill: 0xeeeeee });
-      label.position.set(0, y);
+      label.position.set(textX, y);
       const coin = makeIcon('gold-32', 18);
       coin.anchor.set(0, 0.5);
-      coin.position.set(label.width + 6, y + label.height / 2);
+      coin.position.set(textX + label.width + 6, y + label.height / 2);
       const price = makeLabel(String(skillCost(id, human.skills.length)), { fontSize: FontSize.SMALL, fill: 0xeeeeee });
       price.position.set(coin.x + 22, y);
       content.addChild(label, coin, price);
+      y += label.height;
     }
 
     this.el.addChild(popup.el);
