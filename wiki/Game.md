@@ -254,7 +254,7 @@ Five resources: **money**, **wood**, **stone**, **ore**, **food**. Money belongs
 **villages**. Villages joined by roads or port routes form a **network** and pool their stock (the same network shares
 food); an unconnected village uses only its own stock.
 
-**Start:** 12 money for the player; the capital has 3 wood, 2 stone, 0 ore and 25 food; other villages start empty.
+**Start:** 20 money for the player; the capital has 5 wood, 5 stone, 3 ore and 25 food; other villages start empty.
 
 **Who pays:** an action on a village's territory (building, repair, spawn, upgrade, wall, port, ship upgrade, bridge,
 road, trap) draws wood/stone/ore/food from that village's network — first what its sawmills and mines hold, then the

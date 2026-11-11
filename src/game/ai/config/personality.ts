@@ -57,6 +57,7 @@ function hashName(name: string): number {
 const PERSONALITY_IDS = Object.values(AiPersonalityId);
 
 /** The play style of an AI player: stable per name (names are drawn per game, so a tribe plays differently from game to game). */
-export function personalityFor(player: Player): AiPersonality {
+export function personalityFor(player: Pick<Player, 'name' | 'personality'>): AiPersonality {
+  if (player.personality) return AI_PERSONALITIES[player.personality];
   return AI_PERSONALITIES[PERSONALITY_IDS[hashName(player.name) % PERSONALITY_IDS.length]!]!;
 }

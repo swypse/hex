@@ -13,6 +13,7 @@ import { makeUnit, unitMaxHp, unitSpawnCost } from '../../units/units';
 import { flagsFor } from '../config/flags';
 import { personalityFor } from '../config/personality';
 import { enemyReach, enemyReachSum } from '../situation/enemy-reach';
+import { bestAssaultType } from './assault-type';
 import { knightsWanted } from './knights-wanted';
 
 const SPAWN_ORDER: Record<SpawnPreference, UnitType[]> = {
@@ -143,6 +144,10 @@ export function bestSpawnableUnitType(
   if (map && prefer === SpawnPreference.OFFENSE && flagsFor(player).finishers && armyNeedsFinisher(map, player)) {
     const finisher = candidates.find((type) => FINISHER_TYPES.has(type));
     if (finisher) return finisher;
+  }
+  if (map && prefer === SpawnPreference.OFFENSE && flagsFor(player).assaultType) {
+    const pick = bestAssaultType(map, player.index, candidates);
+    if (pick) return pick;
   }
   if (!map || (prefer !== SpawnPreference.OFFENSE && prefer !== SpawnPreference.DEFENSE) || !flagsFor(player).composition) return candidates[0]!;
   const enemies = visibleEnemyComposition(map, player.index);

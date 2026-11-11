@@ -1376,11 +1376,14 @@ export class EventPresenter {
     const sim = this.host.sim();
     const village = sim ? tileAt(sim.map, e.villageQ, e.villageR) : undefined;
     const store = useGameStore.getState();
+    // The stalker is shown now (it is hidden for the whole batch otherwise), so the alert never precedes it.
+    const stalker = this.findUnitById(e.unitId);
+    this.host.hiddenUnitIds().delete(e.unitId);
     this.host.render();
     // Only the village owner is told.
     if (village?.settlement?.owner !== store.localPlayerIndex) return;
+    await this.host.centerOnCell(stalker?.q ?? e.villageQ, stalker?.r ?? e.villageR);
     store.setCenterMessage(t('msg.stalkerInYourVillage'));
-    await this.host.centerOnCell(e.villageQ, e.villageR);
   }
 
   private showCaptureMessage(village: MapTile, capturer: Player): void {

@@ -79,6 +79,7 @@ Chosen on the setup screen; independent of personality.
 | Plan interval (turns) | 6 | 4 | 2 |
 | Muster factor / assault ratio | 0.6 / 1.8 | 1.0 / 1.3 | 1.5 / 1.0 |
 | Production buildings before economy goal ends | 1 | 2 | 2 |
+| Bonus money per AI turn (the economy is tight, about 5 per turn) | 0 | 0 | 6 |
 
 ## Personalities
 

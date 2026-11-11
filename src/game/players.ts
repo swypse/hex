@@ -1,4 +1,4 @@
-import { AchievementId, AiDifficulty, AiEngine, SkillId } from '@enums';
+import { AchievementId, AiDifficulty, AiEngine, AiPersonalityId, SkillId } from '@enums';
 import { SeededRandom } from '../util/random';
 import { DEFAULT_AI_DIFFICULTY } from './ai/config/difficulty';
 import type { AiFlags } from './ai/config/flags';
@@ -22,6 +22,8 @@ export interface Player {
   knownTribes?: Tribe[];
   stats?: PlayerStats;
   difficulty?: AiDifficulty;
+  /** Forces the AI play style (default: derived from the name). Used by the audit bench. */
+  personality?: AiPersonalityId;
   /** AI planning engine: 'live' (default) applies each step before planning the next; 'batch' plans the whole turn on a frozen board (legacy, kept for benchmarking). */
   aiEngine?: AiEngine;
   /** Per-behaviour AI switches (default: all on). */

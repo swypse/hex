@@ -8,6 +8,7 @@ import { canOpenSkill, hasSkill, skillCost } from '../../../skills';
 import { flagsFor } from '../../config/flags';
 import { personalityFor } from '../../config/personality';
 import { towerSkillWanted } from '../../defense/tower-skill-wanted';
+import { openingSkillPending } from '../../economy/opening-skill-pending';
 import { AI_SKILL_ORDER, MILITARY_SKILL_ORDER } from '../../economy/skill-orders';
 import type { Candidate } from './candidate';
 import type { CandidateContext } from './candidate-context';
@@ -77,6 +78,10 @@ export function skillCandidates(ctx: CandidateContext, candidates: Candidate[]):
   if (towerSkill && !state.opened.has(towerSkill) && canOpenSkill(player, towerSkill, map)) {
     candidates.push({ score: 330 + jitter(), action: { type: AiActionType.OPEN_SKILL, skill: towerSkill } });
   }
+
+  // The capital's opening is waiting for a skill: only that skill is bought, so cheaper skills of other plans do not eat its money.
+  const openingSkill = situation?.endangered ? null : openingSkillPending(map, player, state);
+  if (openingSkill) return Math.max(foodSkillReserve, skillCost(openingSkill, player.skills.length));
 
   // A directive skill chain (economy/naval strategy) is opened before the
   // generic economy skill order so the AI commits to its plan's tech path.

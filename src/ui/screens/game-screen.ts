@@ -3,7 +3,7 @@ import { Container, Graphics } from 'pixi.js';
 import { gameController } from '../../controller/game-controller';
 import { type OverlayState, useGameStore } from '../../store/game-store';
 import { t } from '../../i18n';
-import { advanceCheatBuffer, triggeredCheat, SKILLS_CHEAT_WORD, RESOURCE_CHEAT_WORD, FOG_CHEAT_WORD, PIRATES_CHEAT_WORD, WIN_CHEAT_WORD, SEASON_CHEAT_WORDS, WEATHER_CHEAT_WORDS } from '../../game/cheats';
+import { advanceCheatBuffer, triggeredCheat, SKILLS_CHEAT_WORD, RESOURCE_CHEAT_WORD, FOG_CHEAT_WORD, PIRATES_CHEAT_WORD, WIN_CHEAT_WORD, AI_DEBUG_CHEAT_WORD, SEASON_CHEAT_WORDS, WEATHER_CHEAT_WORDS } from '../../game/cheats';
 import { type ScreenController, type UIHost, type Widget } from '../host';
 import { HudScore } from '../hud/hud-score';
 import { HudPlayers } from '../hud/hud-players';
@@ -126,6 +126,8 @@ export class GameScreen implements ScreenController {
       useGameStore.getState().setCenterMessage(t('msg.cheatPirates'));
     } else if (cheat === WIN_CHEAT_WORD && gameController.cheats.cheatWin()) {
       useGameStore.getState().setCenterMessage(t('msg.cheatWin'));
+    } else if (cheat === AI_DEBUG_CHEAT_WORD) {
+      useGameStore.getState().setCenterMessage(t(gameController.cheats.cheatToggleAiDebug() ? 'msg.cheatAiDebugOn' : 'msg.cheatAiDebugOff'));
     } else if ((SEASON_CHEAT_WORDS as readonly string[]).includes(cheat)) {
       void gameController.cheats.cheatSetSeason(cheat as Season);
     } else if (WEATHER_CHEAT_WORDS.includes(cheat)) {

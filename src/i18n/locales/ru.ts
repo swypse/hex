@@ -173,6 +173,8 @@ export default {
 'net.hostMessage': 'Не удалось обработать сообщение от хоста.',
   'msg.cheatPirates': '5 пиратских кораблей у племён ИИ (чит)',
   'msg.cheatWin': 'Все враги устранены — завершите ход, чтобы победить (чит)',
+  'msg.cheatAiDebugOn': 'Лог ИИ ВКЛ: смотрите консоль браузера (чит)',
+  'msg.cheatAiDebugOff': 'Лог ИИ ВЫКЛ (чит)',
 
   // Achievements
   'ach.title': 'Достижения',

@@ -3,11 +3,15 @@ import { foodNetworkStates, networkStateOfTile } from '../../economy/food';
 import type { GameMap, MapTile } from '../../map/map-gen';
 import type { Player } from '../../players';
 import { flagsFor } from '../config/flags';
+import { ownUnitCount } from '../situation/army-power';
 import { landEnemyCanReach } from '../situation/enemy-reach';
 import { isClaimedBy } from '../situation/is-claimed-by';
 import { nearestEnemyDistanceFrom } from '../situation/nearest-distances';
 import type { AiSituation } from '../situation/situation';
 import type { AiAction } from '../types/action';
+
+/** Land units the AI always fields before the stone focus may hold spawns back. */
+export const ARMY_FLOOR_UNITS = 3;
 
 /** Whether `action` must wait for a mine: it spends money (spawn, upgrade,
  *  building, road) and the AI is not in danger, or it is a building other than
@@ -23,6 +27,7 @@ export function blockedByStone(map: GameMap, player: Player, action: AiAction, s
     case AiActionType.SPAWN: {
       const v = tile;
       const danger = v !== undefined && (landEnemyCanReach(map, v, player.index) || (situation?.navalEnemies.length ?? 0) > 0 || situation?.stance === AiStance.DEFEND);
+      if (flagsFor(player).armyFloor && ownUnitCount(map, player.index) < ARMY_FLOOR_UNITS) return false;
       return !danger;
     }
     case AiActionType.UPGRADE: {

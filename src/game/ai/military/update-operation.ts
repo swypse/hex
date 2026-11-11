@@ -88,10 +88,11 @@ export function updateOperation(
   if (!targetTile) return clear();
   const targetField = walkDistances(map, player, [goal]);
   const squad = squadTiles(map, player, targetField);
-  if (squad.length < MIN_SQUAD) return clear();
+  const nearPower = enemyForceNear(map, player, goal, NEAR_TARGET_RADIUS);
+  const minSquad = flagsFor(player).smallSquads ? (nearPower === 0 ? 1 : 2) : MIN_SQUAD;
+  if (squad.length < minSquad) return clear();
 
   const squadPower = squad.reduce((s, t) => s + attackDamage(t.unit!), 0);
-  const nearPower = enemyForceNear(map, player, goal, NEAR_TARGET_RADIUS);
   // A weakly held village is rushed at once: waiting to mass up only gives the
   // defender time. Gathering and the advance leash are for contested targets.
   const contested = nearPower * CONTESTED_RATIO > squadPower;

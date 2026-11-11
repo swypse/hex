@@ -1,3 +1,4 @@
+import { aiDebug } from '@/game/ai/util/ai-debug';
 import { RESOURCE_CHEAT_AMOUNT } from '@/game/cheats';
 import { type GameEvent } from '@/game/events';
 import { hexDistance } from '@/game/map/hex';
@@ -26,6 +27,12 @@ export interface CheatHost {
 /** Single-player debug cheats (the hidden key combos in the game screen). */
 export class CheatController {
   constructor(private readonly host: CheatHost) {}
+
+  /** Cheat: toggles the console log of AI turns (works in any mode). Returns the new state. */
+  cheatToggleAiDebug(): boolean {
+    aiDebug.enabled = !aiDebug.enabled;
+    return aiDebug.enabled;
+  }
 
   /** Cheat (single-player only): grants the local player +100 of every
    *  resource. Returns true when granted. */

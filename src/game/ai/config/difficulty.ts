@@ -22,6 +22,8 @@ export interface AiDifficultyProfile {
   navalThreatRadius: number;
   /** Whether every planned step gets a one-step safety review before it is executed. */
   lookahead: boolean;
+  /** Money added to the AI's treasury at the start of each of its turns (the game economy is tight: about 5 money per turn). */
+  incomeBonus: number;
   /** Strategic-plan steering (plan depth, muster strictness, thresholds). */
   strategy: AiStrategyProfile;
 }
@@ -29,9 +31,9 @@ export interface AiDifficultyProfile {
 export const DEFAULT_AI_DIFFICULTY: AiDifficulty = AiDifficulty.NORMAL;
 
 export const AI_DIFFICULTY_PROFILES: Record<AiDifficulty, AiDifficultyProfile> = {
-  easy: { lookahead: false, mistakeChance: 0.25, guardWindow: 1, warRatio: 2.5, checkTrades: false, spawnReserve: 8, navalThreatRadius: 6, strategy: { planIntervalTurns: 6, musterFactor: 0.6, assaultRatio: 1.8, economyCap: 1 } },
-  normal: { lookahead: false, mistakeChance: 0, guardWindow: 2, warRatio: 1.5, checkTrades: true, spawnReserve: 4, navalThreatRadius: 10, strategy: { planIntervalTurns: 4, musterFactor: 1.0, assaultRatio: 1.3, economyCap: 2 } },
-  hard: { lookahead: true, mistakeChance: 0, guardWindow: 3, warRatio: 1.0, checkTrades: true, spawnReserve: 0, navalThreatRadius: 14, strategy: { planIntervalTurns: 2, musterFactor: 1.5, assaultRatio: 1.0, economyCap: 2 } },
+  easy: { incomeBonus: 0, lookahead: false, mistakeChance: 0.25, guardWindow: 1, warRatio: 2.5, checkTrades: false, spawnReserve: 8, navalThreatRadius: 6, strategy: { planIntervalTurns: 6, musterFactor: 0.6, assaultRatio: 1.8, economyCap: 1 } },
+  normal: { incomeBonus: 0, lookahead: false, mistakeChance: 0, guardWindow: 2, warRatio: 1.5, checkTrades: true, spawnReserve: 4, navalThreatRadius: 10, strategy: { planIntervalTurns: 4, musterFactor: 1.0, assaultRatio: 1.3, economyCap: 2 } },
+  hard: { incomeBonus: 6, lookahead: true, mistakeChance: 0, guardWindow: 3, warRatio: 1.0, checkTrades: true, spawnReserve: 0, navalThreatRadius: 14, strategy: { planIntervalTurns: 2, musterFactor: 1.5, assaultRatio: 1.0, economyCap: 2 } },
 };
 
 export function difficultyFor(player: { difficulty?: AiDifficulty }): AiDifficulty {

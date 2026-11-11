@@ -61,6 +61,26 @@ export interface AiFlags {
   trade: boolean;
   /** Villages pressed by 3+ enemy units get a tower (and the Shields → Defense → Tower skills) between them and the enemy. */
   towers: boolean;
+  /** While the army is below `ARMY_FLOOR_UNITS` land units, spawns are not held back by the stone focus (a missing mine), so the AI always fields a minimum force. */
+  armyFloor: boolean;
+  /** The capital's opening build order gates only buildings on the capital's own land; other villages (captured ones) build their mine and sawmill at once. */
+  localOpening: boolean;
+  /** An army goal with a target moves choose -> muster -> assault (it used to stay in `choose`, so its muster directive never applied). */
+  musterPhase: boolean;
+  /** Farms are built while the food balance is below `FOOD_HEADROOM` (room for about two more units), not only once it is nearly negative: units eat food, so the army is capped by farms. */
+  /** A farm may be built during the capital's opening as soon as food is under any pressure (not only urgent), instead of waiting for the opening's granary stage. */
+  earlyFoodFarm: boolean; // 120 games: attacks per game +18% in 12/12 seat cells, starvation hits -9%.
+  /** Wounded idle units (below half hp) that no enemy can hit rest in place and heal instead of scouting or marching. */
+  /** While the capital's opening waits for a skill (e.g. Smithery for the mine), other skill plans (naval chain, generic order) do not spend the money. */
+  openingSkillFirst: boolean;
+  /** Healthy idle units walk to enemy villages that stand empty and capture them (after the solo hunts, before building raids). */
+  emptyRaid: boolean;
+  /** A squad operation starts with 1 unit against an undefended target and 2 against a defended one (3 before): armies are small, so a squad of 3 almost never formed. */
+  smallSquads: boolean;
+  /** Offensive spawns pick the type with the best net edge against the visible enemy village garrisons (defense bonus included), per unit of cost. */
+  assaultType: boolean;
+  recoverWounded: boolean; // Off by default: 120 games, captures and starvation hits unchanged, attacks slightly down.
+  foodHeadroom: boolean; // Off by default: 120 games, aggressive wins 29/60 vs 36/60 without it, fewer captures.
 }
 
 /** Shipped defaults. `multiSpecial` stays off: a 160-game benchmark showed no gain (44% wins,
@@ -68,11 +88,11 @@ export interface AiFlags {
  *  the solo-hunt/naval patterns so it only ever claims units those left idle — an earlier
  *  placement ahead of them regressed the AI (44% wins, fewer enemy villages captured) by pulling
  *  units off easy solo kills to wait for the group. */
-const DEFAULT_AI_FLAGS: AiFlags = { militarySkills: true, berserkerHold: true, stunnerHunt: true, multiSpecial: false, operations: true, composition: false, stoneFocus: true, march: true, finishers: true, raidBuildings: true, lookahead: true, siege: false, attackPlan: true, trade: true, towers: true, armyFirst: true, earlyFarm: false, killChains: true, garrisonReserve: false, networkLinks: true };
+const DEFAULT_AI_FLAGS: AiFlags = { militarySkills: true, berserkerHold: true, stunnerHunt: true, multiSpecial: false, operations: true, composition: false, stoneFocus: true, march: true, finishers: true, raidBuildings: true, lookahead: true, siege: false, attackPlan: true, trade: true, towers: true, armyFirst: true, earlyFarm: false, killChains: true, garrisonReserve: false, networkLinks: true, armyFloor: true, localOpening: true, musterPhase: true, foodHeadroom: false, earlyFoodFarm: true, recoverWounded: false, openingSkillFirst: false, emptyRaid: false, smallSquads: false, assaultType: false };
 
-export const ALL_AI_FLAGS_ON: AiFlags = { militarySkills: true, berserkerHold: true, stunnerHunt: true, multiSpecial: true, operations: true, composition: true, stoneFocus: true, march: true, finishers: true, raidBuildings: true, lookahead: true, siege: false, attackPlan: true, trade: true, towers: true, armyFirst: true, earlyFarm: true, killChains: true, garrisonReserve: true, networkLinks: true };
+export const ALL_AI_FLAGS_ON: AiFlags = { militarySkills: true, berserkerHold: true, stunnerHunt: true, multiSpecial: true, operations: true, composition: true, stoneFocus: true, march: true, finishers: true, raidBuildings: true, lookahead: true, siege: false, attackPlan: true, trade: true, towers: true, armyFirst: true, earlyFarm: true, killChains: true, garrisonReserve: true, networkLinks: true, armyFloor: true, localOpening: true, musterPhase: true, foodHeadroom: true, earlyFoodFarm: true, recoverWounded: true, openingSkillFirst: true, emptyRaid: true, smallSquads: true, assaultType: true };
 
-export const ALL_AI_FLAGS_OFF: AiFlags = { militarySkills: false, berserkerHold: false, stunnerHunt: false, multiSpecial: false, operations: false, composition: false, stoneFocus: false, march: false, finishers: false, raidBuildings: false, lookahead: false, siege: false, attackPlan: false, trade: false, towers: false, armyFirst: false, earlyFarm: false, killChains: false, garrisonReserve: false, networkLinks: false };
+export const ALL_AI_FLAGS_OFF: AiFlags = { militarySkills: false, berserkerHold: false, stunnerHunt: false, multiSpecial: false, operations: false, composition: false, stoneFocus: false, march: false, finishers: false, raidBuildings: false, lookahead: false, siege: false, attackPlan: false, trade: false, towers: false, armyFirst: false, earlyFarm: false, killChains: false, garrisonReserve: false, networkLinks: false, armyFloor: false, localOpening: false, musterPhase: false, foodHeadroom: false, earlyFoodFarm: false, recoverWounded: false, openingSkillFirst: false, emptyRaid: false, smallSquads: false, assaultType: false };
 
 export function flagsFor(player: Pick<Player, 'aiFlags'>): AiFlags {
   return player.aiFlags ? { ...DEFAULT_AI_FLAGS, ...player.aiFlags } : DEFAULT_AI_FLAGS;

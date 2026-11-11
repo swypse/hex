@@ -86,6 +86,7 @@ export function deriveDirectives(
       const mustered = countOwnUnitsNear(map, player, target, 5);
       const minUnits = Math.round(personality.musterMinUnits * difficulty.strategy.musterFactor);
       const assaultReady = situation.ownPower >= situation.enemyPower * difficulty.strategy.assaultRatio;
+      if (flagsFor(player).musterPhase) g.phase = assaultReady || mustered >= minUnits ? 'assault' : 'muster';
       if (g.phase === 'muster' && mustered < minUnits && !assaultReady) {
         d.muster = { tile: null, minUnits, target };
       }

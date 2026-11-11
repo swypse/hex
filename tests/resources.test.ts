@@ -8,8 +8,8 @@ import {
 } from '../src/game/economy/resources';
 
 describe('resources', () => {
-  it('starts with 3 wood, 2 stone, 12 money, 0 ore, 25 food', () => {
-    expect(START_RESOURCES).toEqual({ wood: 3, stone: 2, money: 12, ore: 0, food: 25 });
+  it('starts with 5 wood, 5 stone, 20 money, 3 ore, 25 food', () => {
+    expect(START_RESOURCES).toEqual({ wood: 5, stone: 5, money: 20, ore: 3, food: 25 });
   });
 
   it('upgrade cost is 2 wood, 1 stone, 2 money, 0 ore', () => {
@@ -33,6 +33,6 @@ describe('resources', () => {
   });
 
   it('pay subtracts the cost', () => {
-    expect(pay(START_RESOURCES, UPGRADE_COST)).toEqual({ wood: 1, stone: 1, money: 10, ore: 0, food: 25 });
+    expect(pay(START_RESOURCES, UPGRADE_COST)).toEqual({ wood: 3, stone: 4, money: 18, ore: 3, food: 25 });
   });
 });

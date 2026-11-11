@@ -3,6 +3,8 @@ import { foodPressure } from '../../economy/food';
 import { capitalOf } from '../../economy/stock';
 import type { GameMap } from '../../map/map-gen';
 import type { Player } from '../../players';
+import { flagsFor } from '../config/flags';
+import { isClaimedBy } from '../situation/is-claimed-by';
 import { nearestEnemyDistanceFrom } from '../situation/nearest-distances';
 import type { AiSituation } from '../situation/situation';
 import type { AiAction } from '../types/action';
@@ -22,10 +24,15 @@ export function blockedByOpening(map: GameMap, player: Player, action: AiAction,
     return !(front && nearestEnemyDistanceFrom(map, player.index, front) <= 4);
   }
   if (action.type === AiActionType.BUILD) {
+    // Land of another village is not part of the capital's opening: only that village's own settle order applies.
+    const site = map.tiles.find((t) => t.q === action.q && t.r === action.r);
+    if (flagsFor(player).localOpening && v !== null && site && !isClaimedBy(site, v)) return blockedBySettle(map, player, action, situation, planned);
     if (STAGE_BUILDING[stage] === action.kind) return false;
     if (action.kind === BuildingKind.PORT && situation?.navalThreat) return false;
     // Hunger overrides the order: a farm or granary may come early.
-    return !((action.kind === BuildingKind.FARM || action.kind === BuildingKind.GRANARY) && foodPressure(map, player) === FoodPressure.URGENT);
+    const pressure = foodPressure(map, player);
+    if (flagsFor(player).earlyFoodFarm && action.kind === BuildingKind.FARM && pressure !== FoodPressure.NONE) return false;
+    return !((action.kind === BuildingKind.FARM || action.kind === BuildingKind.GRANARY) && pressure === FoodPressure.URGENT);
   }
   return false;
 }

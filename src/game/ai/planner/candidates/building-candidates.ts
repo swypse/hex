@@ -4,10 +4,14 @@ import { foodPressure, networkStateOfTile } from '../../../economy/food';
 import { canAffordAt } from '../../../economy/stock';
 import { axialKey } from '../../../map/hex';
 import { hasSkill } from '../../../skills';
+import { flagsFor } from '../../config/flags';
 import { reserveLastSlotForMine } from '../../economy/mine-slot';
 import { key } from '../../util/tile-key';
 import type { Candidate } from './candidate';
 import type { CandidateContext } from './candidate-context';
+
+/** Food balance a network should have spare (about two more units) before the AI stops adding farms. */
+const FOOD_HEADROOM = 6;
 
 /** Sawmill, mine, farm, granary, university, port and temple options on every own tile. */
 export function buildingCandidates(ctx: CandidateContext, candidates: Candidate[]): void {
@@ -32,7 +36,7 @@ export function buildingCandidates(ctx: CandidateContext, candidates: Candidate[
       const net = networkStateOfTile(foodStates, tile);
       const roadFirst = net !== undefined && foodPlan.linkFirst.has(axialKey(net.villages[0]!));
       const pressure = net?.pressure ?? foodPressure(map, player);
-      const baseScore = roadFirst ? 0 : pressure === FoodPressure.URGENT ? 650 : pressure === FoodPressure.LOW ? 450 : (net?.balance ?? 0) < 2 ? 260 : 0;
+      const baseScore = roadFirst ? 0 : pressure === FoodPressure.URGENT ? 650 : pressure === FoodPressure.LOW ? 450 : (net?.balance ?? 0) < (flagsFor(player).foodHeadroom ? FOOD_HEADROOM : 2) ? 260 : 0;
       // A network that needs a granary needs a farm to put it next to.
       const farmForGranary = !roadFirst && !granarySite && hasSkill(player, SkillId.GRANARY) && net !== undefined && storage.needy.has(axialKey(net.villages[0]!));
       const farmScore = farmForGranary ? Math.max(storageScore - 10, baseScore) : baseScore;

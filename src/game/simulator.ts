@@ -1,7 +1,8 @@
 import { SeededRandom } from '@/util';
-import { AchievementId,AiActionType,AiEngine,BuilderExtraKind,BuildingKind,CommandType,GameEventType,GameMode,ResourceKind,Season,SkillId,UnitType,VeteranBonus,VillageUpgradeBonus,WeatherType } from '@enums';
+import { AchievementId,AiActionType,AiEngine,BuilderExtraKind,BuildingKind,CommandType,GameEventType,GameMode,ResourceKind,Season,SiegeTargetKind,SkillId,UnitType,VeteranBonus,VillageUpgradeBonus,WeatherType } from '@enums';
 import { randomSeed } from '../util/random';
 import { awardAchievementScores,currentlyMetIds,evaluateAchievements } from './achievements';
+import { profileFor } from './ai/config/difficulty';
 import { flagsFor } from './ai/config/flags';
 import { runAiTrading } from './ai/economy/run-ai-trading';
 import { planAiActions } from './ai/planner/plan-ai-actions';
@@ -15,7 +16,7 @@ buildBuilding,buildBuildingIgnoringSkill,builderBuildable,type BuilderBuildKind,
 burnBuilding,burnRoad,
 canUsePort,
 demolish,
-destroyBuilding,repairBuilding,
+destroyBuilding,isEnemyTowerTile,repairBuilding,
 storeBuildingGains
 } from './economy/buildings';
 import { captureVillage,villageIncome,villageIncomeTotal } from './economy/capture';
@@ -30,7 +31,7 @@ import { type GameEvent } from './events';
 import { captureWinnerIndex,computeWinner,quickCaptureScore,quickCaptureTurnsCount } from './game-mode';
 import { touchBottle } from './map/bottles';
 import { exploreUnitPath } from './map/explore';
-import { hexDistance,hexNeighbors } from './map/hex';
+import { type Axial,hexDistance,hexNeighbors } from './map/hex';
 import type { GameMap,MapTile } from './map/map-gen';
 import { tileAt } from './map/tile-index';
 import { TileType } from './map/tile-types';
@@ -48,7 +49,7 @@ import { emptyTradeState,Trading } from './trade';
 import { attackableTargets,missChanceFor,performAttack,performSiege } from './units/combat';
 import { LIGHTNING_COOLDOWN_TURNS,LIGHTNING_COST,lightningReady,lightningStrikeCell,lightningVillages } from './units/lightning';
 import { cannotEnterTower,moveUnit,pathBetween,reachableTargets } from './units/selection';
-import { gainShipAbility,revertShip,upgradeShip } from './units/ship';
+import { gainShipAbility,isShip,revertShip,upgradeShip } from './units/ship';
 import { spawnUnit } from './units/spawn';
 import { adjacentEnemyVillages } from './units/stalker';
 import { STORM_COOLDOWN_TURNS,stormDamage,stormEligible,stormReady,stormTargetShips } from './units/storm';
@@ -839,6 +840,8 @@ export class Simulator {
             : target.roadOwner !== null && target.roadOwner !== undefined && target.roadOwner !== attacker.owner && !(target.building && target.ownedBy !== null && target.ownedBy !== attacker.owner) ? target.roadOwner
               : target.ownedBy !== null ? target.ownedBy ?? PIRATE_OWNER
                 : PIRATE_OWNER;
+      const wasEnemyTower = isEnemyTowerTile(target, attacker.owner);
+      const attackerFrom = { q: attacker.q, r: attacker.r };
       const outcome = performSiege(attacker, target, this.rng, missChanceFor(attackerPlayer));
       // Hitting a building gives a stealthed stalker away.
       if (attacker.isStealthed) this.revealStalker(attacker);
@@ -853,6 +856,7 @@ export class Simulator {
         ...(outcome.buildingHp !== undefined ? { buildingHp: outcome.buildingHp } : {}),
         ...(outcome.towerHit ? { towerHit: outcome.towerHit } : {}),
       });
+      if (wasEnemyTower && outcome.destroyed === SiegeTargetKind.BUILDING) this.advanceOntoRazedTower(attacker, attackerFrom, target);
       return true;
     }
     if (target.unit.owner === attacker.owner) return false;
@@ -917,6 +921,8 @@ export class Simulator {
     }
     if (target.unit === attacker) {
       exploreUnitPath(this.map, [{ q: attacker.q, r: attacker.r }], attacker, attacker.owner);
+      // Stepping onto the dead unit's tile is an arrival: a bonus there is claimable only from the next turn on.
+      this.bonuses.touchBonus(target, attacker);
     }
     this.emit({
       type: GameEventType.ATTACK,
@@ -961,6 +967,20 @@ export class Simulator {
       }
     }
     return true;
+  }
+
+  /** A melee unit that razed a tower steps onto its now empty cell (like after a melee kill). */
+  private advanceOntoRazedTower(attacker: Unit, from: Axial, tile: MapTile): void {
+    if (tile.unit || tile.building || attacker.hp <= 0 || isShip(attacker)) return;
+    if (attacker.type === UnitType.ARCHER || attacker.type === UnitType.CATAPULT || attacker.type === UnitType.PIRATE) return;
+    if (hexDistance(from, tile) !== 1) return;
+    const fromTile = tileAt(this.map, from.q, from.r);
+    moveUnit(this.map, attacker, tile);
+    exploreUnitPath(this.map, [{ q: tile.q, r: tile.r }], attacker, attacker.owner);
+    if (fromTile) this.clearAbandonedReady(fromTile, attacker.owner);
+    this.bonuses.touchBonus(tile, attacker);
+    this.emit({ type: GameEventType.UNIT_MOVED, unitId: attacker.id, from, path: [{ q: tile.q, r: tile.r }], to: { q: tile.q, r: tile.r } });
+    if (tile.trap && tile.trap.owner !== attacker.owner) this.triggerTrap(attacker, tile);
   }
 
   private doCapture(q: number, r: number, unitId: string): boolean {
@@ -1055,6 +1075,8 @@ export class Simulator {
     if (!tile) return false;
     const player = this.currentPlayer;
     if (!repairBuilding(this.map, tile, player)) return false;
+    // Mending takes the whole turn of the unit standing on the building.
+    if (tile.unit && tile.unit.owner === player.index) this.consumeUnitTurn(tile.unit);
     this.emit({ type: GameEventType.BUILDING_REPAIRED, q, r, playerIndex: player.index });
     return true;
   }
@@ -1423,6 +1445,7 @@ export class Simulator {
 
   private *runAiTurnSteps(playerIndex: number): Generator<void, void, void> {
     const ai = this.players[playerIndex]!;
+    ai.resources.money += profileFor(ai).incomeBonus;
     this.resolveVeteransFor(playerIndex);
     this.bonuses.doClaimBonus();
     this.bonuses.collectAiBottles(playerIndex);

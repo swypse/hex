@@ -27,16 +27,16 @@ describe('buildMultiplayerPlayers', () => {
     const players = buildPlayers(Tribe.Villagers, 2, new SeededRandom(1));
     for (const p of players) {
       const info = TRIBES.find((t) => t.id === p.tribe)!;
-      expect(p.resources.money).toBe(12 + (info.startMoneyBonus ?? 0));
+      expect(p.resources.money).toBe(20 + (info.startMoneyBonus ?? 0));
       expect(p.skills).toEqual(info.startSkill ? [info.startSkill] : []);
       expect(p.isActive).toBe(true);
       expect(p.score).toBe(0);
     }
   });
 
-  it('gives Villagers 20 starting money', () => {
+  it('gives Villagers 28 starting money', () => {
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(42));
-    expect(players[0]!.resources.money).toBe(20);
+    expect(players[0]!.resources.money).toBe(28);
   });
 
   it('throws for invalid totals', () => {
@@ -111,9 +111,9 @@ describe('buildPlayers', () => {
     expect(new Set(players.map((p) => p.tribe)).size).toBe(6);
   });
 
-  it('gives Villagers 20 starting money', () => {
+  it('gives Villagers 28 starting money', () => {
     const players = buildPlayers(Tribe.Villagers, 1, new SeededRandom(42));
-    expect(players[0]!.resources.money).toBe(20);
+    expect(players[0]!.resources.money).toBe(28);
   });
 
   it('seeds every player with their own known tribe', () => {

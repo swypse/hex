@@ -173,6 +173,8 @@ export default {
 'net.hostMessage': 'Failed to process a message from the host.',
   'msg.cheatPirates': '5 pirate ships spawned near AI tribes (cheat)',
   'msg.cheatWin': 'All enemies eliminated — end your turn to win (cheat)',
+  'msg.cheatAiDebugOn': 'AI debug log ON: see the browser console (cheat)',
+  'msg.cheatAiDebugOff': 'AI debug log OFF (cheat)',
 
   // Achievements
   'ach.title': 'Achievements',

@@ -1,13 +1,15 @@
 import { AiActionType, SkillId } from '@enums';
 import { canOpenSkill, hasSkill } from '../../../skills';
+import { openingSkillPending } from '../../economy/opening-skill-pending';
 import type { AiAction } from '../../types/action';
 import type { AiPattern } from '../pattern-types';
 
 export const NAVAL_OPEN_SKILLS_PATTERN: AiPattern = {
     id: 'naval-open-skills',
     priority: 78,
-    evaluate({ player, state, situation }): AiAction[] | null {
+    evaluate({ map, player, state, situation }): AiAction[] | null {
       if (!situation || !situation.navalThreat) return null;
+      if (!situation.endangered && openingSkillPending(map, player, state)) return null;
       const chain: SkillId[] = [SkillId.WATER, SkillId.NAVIGATION, SkillId.CATAPULT];
       for (const skill of chain) {
         if (state.opened.has(skill)) continue;

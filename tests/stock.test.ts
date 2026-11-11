@@ -241,7 +241,7 @@ describe('capturing a village', () => {
     village.unit = capturer;
     captureVillage(map, village, capturer);
     addStock(village, { wood: -3 });
-    expect(START_STOCK.wood).toBe(3);
+    expect(START_STOCK.wood).toBe(5);
   });
 });
 
