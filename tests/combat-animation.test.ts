@@ -215,7 +215,7 @@ describe('combat animation ordering', () => {
     h?.mapView.destroy();
   });
 
-  it('skips the attack animation for a kill-and-advance and walks the attacker onto the killed cell', async () => {
+  it('plays the strike first for a kill-and-advance, then the attacker walks onto the killed cell as the victim vanishes', async () => {
     const map = makeOpenMap();
     const players = [player(0, Tribe.Cats), player(1, Tribe.Barbarians)];
     h = setup(map, players);
@@ -239,12 +239,12 @@ describe('combat animation ordering', () => {
     };
     const p = h.gc.presentEvents([attack], h.gc.exploredKeysFor(0));
 
-    // Kill-and-advance skips the lunge: the attacker is drawn on its original
-    // tile and the victim's tile is already cleared (not kept visible).
+    // The strike plays first: the attacker is drawn on its original tile and
+    // the victim is still standing on its own.
     await waitFor(() => {
       const a = h.tileViews().get(axialKey({ q: 0, r: 0 }))!;
       const t = h.tileViews().get(axialKey({ q: 1, r: 0 }))!;
-      return a?.unitSprite?.visible === true && t?.unitSprite === null;
+      return a?.unitSprite?.visible === true && t?.unitSprite?.visible === true;
     });
 
     // The advance slide runs on the ticker too; step it until the

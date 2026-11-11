@@ -12,19 +12,21 @@ interface TribeSlot {
 }
 
 /** `columns` is the first row's width (default: half the tribes, rounded up);
- *  `rowStep` is the distance between row centres. */
+ *  `rowStep` is the distance between row centres. With `leftAlign` every row starts at the
+ *  left edge of the first (widest) row, like grid cells, instead of being centred on its own. */
 export function tribeSlots(
   count: number,
   gap = TRIBE_GAP,
   columns = Math.ceil(count / 2),
   rowStep = TRIBE_ROW_STEP,
+  leftAlign = false,
 ): { slots: TribeSlot[]; rows: number } {
   const step = TRIBE_DIAM + gap;
   const top = Math.min(columns, count);
   const rowSizes = top >= count ? [count] : [top, count - top];
   const slots: TribeSlot[] = [];
   rowSizes.forEach((size, r) => {
-    const rowW = size * TRIBE_DIAM + (size - 1) * gap;
+    const rowW = (leftAlign ? top : size) * TRIBE_DIAM + ((leftAlign ? top : size) - 1) * gap;
     const y = r * rowStep;
     for (let c = 0; c < size; c += 1) {
       slots.push({ x: -rowW / 2 + TRIBE_DIAM / 2 + c * step, y });

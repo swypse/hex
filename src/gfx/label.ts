@@ -16,6 +16,8 @@ export function makeLabel(
     anchor?: [number, number];
     wordWrap?: boolean;
     wordWrapWidth?: number;
+    /** Line alignment of wrapped multi-line text. */
+    align?: 'left' | 'center' | 'right';
     /** Line height as a multiple of the font size (see `BODY_LINE_HEIGHT`). */
     lineHeight?: number;
     /** Bakes the glyphs this many times larger and scales the label back down,
@@ -35,6 +37,7 @@ export function makeLabel(
     fill: opts.fill ?? THEME.text,
   };
   if (opts.lineHeight) style.lineHeight = Math.round(fontSize * opts.lineHeight);
+  if (opts.align) style.align = opts.align;
   if (opts.wordWrap) {
     style.wordWrap = true;
     style.wordWrapWidth = (opts.wordWrapWidth ?? 200) * bake;

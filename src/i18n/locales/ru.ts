@@ -17,7 +17,7 @@ export default {
 
   // Setup screen
   'setup.enemies': 'Враги',
-  'setup.difficulty': 'Сложность ИИ',
+  'setup.quickCapture': 'Закончите игру за {turns} ходов на 3 звезды',
   'setup.start': 'Начать',
   'mode.capture': 'Захват карты',
   'mode.turns30': '30 ходов',

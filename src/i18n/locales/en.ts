@@ -17,7 +17,7 @@ export default {
 
   // Setup screen
   'setup.enemies': 'Enemies',
-  'setup.difficulty': 'AI difficulty',
+  'setup.quickCapture': 'End game in {turns} turns for 3 stars',
   'setup.start': 'Start',
   'mode.capture': 'Capture the map',
   'mode.turns30': '30 Turns',

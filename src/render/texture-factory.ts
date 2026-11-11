@@ -19,6 +19,7 @@ import { VillageBuildTextureService } from './village-build-texture';
 import { SLICE_BUDGET_MS, yieldToMain } from '../util/time-slice';
 import { BridgeDir, IcePhase, PortDirection, Season, TileAnchor, TileLayer, UnitType, WeatherType } from '@enums';
 import { tileMapByKey } from '../game/map/tile-index';
+import { BONUS_BAKE_SCALE, BONUS_COLORS, BONUS_SIDE } from './bonus-marker';
 
 const TEXTURE_BASE = `${import.meta.env.BASE_URL}textures/`;
 
@@ -330,6 +331,46 @@ function makeUnitImageTexture(
 const GLOW_PADDING = 4;
 /** Baked-px blur radius of the unit selection glow. */
 const GLOW_BLUR = 12;
+
+/** Blur strength and frame padding (baked px) of the bonus marker's white glow. */
+const BONUS_GLOW_BLUR = 20;
+const BONUS_GLOW_PAD = 48;
+
+/** Bonus marker: a 32px square turned 45 degrees, cut by its diagonals into four triangles
+ *  (left, top, right, bottom of the unrotated square), over a soft white glow. Baked ×`BONUS_BAKE_SCALE`. */
+function makeBonusTexture(app: Application): TileTexture {
+  const h = (BONUS_SIDE / 2) * BONUS_BAKE_SCALE;
+  const g = new Graphics();
+  const tri = (a: [number, number], b: [number, number], color: number): void => {
+    g.poly([a[0], a[1], b[0], b[1], 0, 0]).fill(color);
+  };
+  tri([-h, -h], [-h, h], BONUS_COLORS.left);
+  tri([-h, -h], [h, -h], BONUS_COLORS.top);
+  tri([h, -h], [h, h], BONUS_COLORS.right);
+  tri([-h, h], [h, h], BONUS_COLORS.bottom);
+  g.rotation = Math.PI / 4;
+  // Permanent white glow: a blurred white copy of the diamond baked underneath it.
+  const glow = new Graphics();
+  glow.poly([-h, -h, h, -h, h, h, -h, h]).fill(0xffffff);
+  glow.rotation = Math.PI / 4;
+  glow.scale.set(1.08);
+  glow.filters = [new BlurFilter({ strength: BONUS_GLOW_BLUR, quality: 4 })];
+  const container = new Container();
+  container.addChild(glow, g);
+  const d = Math.ceil(h * Math.SQRT2) + BONUS_GLOW_PAD;
+  // Supersampled and mipmapped: shown far smaller than baked, a plain linear sample of the 4x texture looks pixelated
+  // when zoomed out. The mip chain has to exist from the first render, so it is requested at bake time.
+  const texture = app.renderer.generateTexture({
+    target: container,
+    frame: new Rectangle(-d, -d, d * 2, d * 2),
+    resolution: 1,
+    antialias: true,
+    textureSourceOptions: { autoGenerateMipmaps: true, scaleMode: 'linear', mipmapFilter: 'linear' },
+  });
+  texture.source.updateMipmaps();
+  container.destroy({ children: true });
+  return { texture, anchorY: 0.5 };
+}
 
 /** Bakes a glow that hugs the non-empty pixels of a unit texture: the
  *  art is flattened to pure color, blurred outward by `GLOW_BLUR`, and baked
@@ -664,8 +705,7 @@ export async function createTextures(
     villageBuilds,
     freeVillageTexture:
       makeUnitImageTexture(bakeApp, buildingTileTexture('village-empty'), hexSize) ?? blankTile(1),
-    bonusTexture:
-      makeUnitImageTexture(bakeApp, terrainFrameTexture('bonus'), hexSize) ?? blankTile(1),
+    bonusTexture: makeBonusTexture(bakeApp),
     bottleTexture:
       makeUnitImageTexture(bakeApp, terrainFrameTexture('bottle-on-water'), hexSize) ?? blankTile(0.5),
     unitTextures,

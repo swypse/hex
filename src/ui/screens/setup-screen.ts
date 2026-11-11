@@ -5,7 +5,7 @@ import { loadSettings } from '@/storage/settings';
 import { useGameStore } from '@/store/game-store';
 import { mixColor } from '@/util';
 import { AiDifficulty, ButtonStyle, FontSize, GameMode, Screen, TextStyle } from '@enums';
-import { BitmapText, Container, FillGradient, Graphics, RendererType } from 'pixi.js';
+import { BitmapText, Container, Graphics } from 'pixi.js';
 import { type ScreenController, type UIHost } from '../host';
 import { Button } from '../kit/button';
 import { KeyHints, placeKeyHints } from '../kit/key-hints';
@@ -21,9 +21,8 @@ import { useResultsStore } from '../../results/results-store';
 import { markDirty } from '../../gfx/render-gate';
 import { isTouchDevice } from '../kit/touch';
 import { ScreenScroll } from '../kit/vertical-scroll';
-import {
-  BG_FADE_MS, makeTribeBackgroundShader, TRIBE_BG_DEPTH, type TribeBackgroundShader, tribeBackgroundTexture
-} from './tribe-bg-shader';
+import { BG_FADE_MS } from './tribe-bg-shader';
+import { quickCaptureTurnsCount } from '../../game/game-mode';
 import { clamp } from '../../util/math';
 
 const ENEMY_OPTIONS = [1, 2, 3, 4, 5, 6];
@@ -43,32 +42,22 @@ const RADIUS = 28;
 /** Tribe grid: 4 tribes per row, wide gaps, large stars and a games line. */
 const GRID_COLUMNS = 4;
 const GRID_GAP = TRIBE_GAP * 3;
+/** Narrower horizontal gap between tribe icons on small screens. */
+const SMALL_SCREEN_WIDTH = 600;
+const SMALL_GRID_GAP = TRIBE_GAP * 1.5;
+/** Room under the enemies selector for the quick-capture hint. */
+const HINT_H = 22;
+/** Gap between the enemies selector and the hint under it. */
+const HINT_TOP = 12;
 const GRID_ROW_PAD = 20;
 /** Vertical margin above and below the tribe icons block. */
 const GRID_MARGIN_Y = 24;
-const GRID_OPTION_EXTRAS = { starSize: 20, showGames: true, nameSize: FontSize.NORMAL } as const;
+const GRID_OPTION_EXTRAS = { starSize: 20, showGames: true, nameSize: FontSize.NORMAL, plainSelection: true } as const;
 // Vertical gap between the tribe grid and the description below it.
-const DESC_GAP = 8;
+const DESC_GAP = 20;
 
-/** A vertical tribe-color (top) → screen-bg (bottom) gradient that matches the
- *  WebGL shader in tribe-bg-shader.ts. FillGradient's local-space coordinates
- *  are normalized to the shape (0-1), so ending at `TRIBE_BG_DEPTH` puts the
- *  full blend in the top `TRIBE_BG_DEPTH` of the screen and clamps to solid bg
- *  below — the same curve as the shader's `t = clamp(vUV.y / depth, 0.0, 1.0)`.
- *  Pixi's native gradient fill runs on any backend, so the WebGPU renderer
- *  (which cannot run the WebGL-only custom shader) paints an identical
- *  background through it. */
-function tribeGradientFill(topColor: number): FillGradient {
-  const gradient = new FillGradient({
-    type: 'linear',
-    start: { x: 0, y: 0 },
-    end: { x: 0, y: TRIBE_BG_DEPTH },
-    textureSpace: 'local',
-  });
-  gradient.addColorStop(0, topColor);
-  gradient.addColorStop(1, THEME.bg);
-  return gradient;
-}
+/** Height of the solid tribe-colour strip along the top of the screen. */
+const TOP_BAR_H = 20;
 
 export class SetupScreen implements ScreenController {
   private root: Container | null = null;
@@ -81,7 +70,7 @@ export class SetupScreen implements ScreenController {
   private tribeTitle: BitmapText | null = null;
   private enemiesTitle: BitmapText | null = null;
   private modeTitle: BitmapText | null = null;
-  private difficultyTitle: BitmapText | null = null;
+  private quickHint: BitmapText | null = null;
   private tribeItems: TribeOption[] = [];
   private unsubResults: (() => void) | null = null;
   private tribeDesc: BitmapText | null = null;
@@ -94,7 +83,6 @@ export class SetupScreen implements ScreenController {
   private hints: KeyHints | null = null;
   private stars: MenuStars | null = null;
   private bg: Graphics | null = null;
-  private bgShader: TribeBackgroundShader | null = null;
   private bgTweenRemove: (() => void) | null = null;
   private bgColor: number | null = null;
 
@@ -112,10 +100,10 @@ export class SetupScreen implements ScreenController {
     this.tribeTitle.anchor.set(0.5, 0.5);
     this.enemiesTitle = makeLabel(t('setup.enemies'), { fontSize: FontSize.NORMAL, fill: 0xffffff });
     this.enemiesTitle.anchor.set(0.5, 0.5);
+    this.quickHint = makeLabel('', { fontSize: FontSize.SMALL, fill: 0x888888 });
+    this.quickHint.anchor.set(0.5, 0.5);
     this.modeTitle = makeLabel(t('common.mode'), { fontSize: FontSize.NORMAL, fill: 0xffffff });
     this.modeTitle.anchor.set(0.5, 0.5);
-    this.difficultyTitle = makeLabel(t('setup.difficulty'), { fontSize: FontSize.NORMAL, fill: 0xffffff });
-    this.difficultyTitle.anchor.set(0.5, 0.5);
 
     for (const tr of TRIBES) {
       const opt = makeTribeOption(
@@ -123,6 +111,7 @@ export class SetupScreen implements ScreenController {
         `${tr.code}-icon.png`,
         () => {
           this.setTribe(tr.id);
+          opt.bounce();
           this.selector = TRIBE_ROW;
           this.refresh();
         },
@@ -200,8 +189,8 @@ export class SetupScreen implements ScreenController {
     this.scroll!.content.addChild(
       this.tribeTitle,
       this.enemiesTitle,
+      this.quickHint,
       this.modeTitle,
-      this.difficultyTitle,
       this.startBtn,
       this.backBtn,
     );
@@ -253,77 +242,40 @@ export class SetupScreen implements ScreenController {
     if (color !== this.bgColor) this.changeBackground(color);
   }
 
-  /** First background paint: no transition, just draw the current tribe tint. */
+  /** First background paint: no transition, just draw the current tribe strip. */
   private paintBackground(): void {
     const host = this.host;
     if (!host) return;
-    const w = host.app.screen.width;
-    const h = host.app.screen.height;
     const color = tribeById(this.tribe)?.color ?? THEME.bg;
     this.bgColor = color;
-    // The tribe-gradient shader is WebGL-only; on WebGPU, painting a Graphics
-    // with a GL-only customShader throws in the renderer (`shader.gpuProgram`
-    // is undefined), so WebGPU draws a native gradient fill instead.
-    const webGPU = host.app.renderer?.type === RendererType.WEBGPU;
-    if (!webGPU) {
-      const shader = this.bgShader ?? makeTribeBackgroundShader();
-      shader.setTop(color);
-      this.bgShader = shader;
-    }
     const bg = this.bg ?? new Graphics();
     bg.eventMode = 'none';
-    if (!webGPU) bg.context.customShader = this.bgShader!.shader;
     if (!this.bg) {
-      if (webGPU) {
-        bg.clear().rect(0, 0, w, h).fill(tribeGradientFill(color));
-      } else {
-        // A 1×1 white texture fill (textureSpace 'local') makes the batcher emit
-        // real UVs across the rect, so the custom fragment's `vUV.y` runs 0→1
-        // down the screen and paints the tribe→bg gradient.
-        bg.clear().rect(0, 0, w, h).fill({ texture: tribeBackgroundTexture(), textureSpace: 'local' });
-      }
       this.bg = bg;
       // Insert behind the scroll pad/content (mount adds it after ScreenScroll).
       this.root!.addChildAt(bg, 0);
-    } else if (webGPU) {
-      this.bg.clear().rect(0, 0, w, h).fill(tribeGradientFill(color));
-    } else {
-      this.bg.clear().rect(0, 0, w, h).fill({ texture: tribeBackgroundTexture(), textureSpace: 'local' });
     }
+    this.drawBar(color);
   }
 
-  /** Cross-fades the full-screen background from the current tribe tint to the
-   *  new one over `BG_FADE_MS`. WebGL animates the shader's `uTopColor` uniform
-   *  in place; WebGPU rebuilds a small native gradient fill each tick (the fade
-   *  is short, and the gradient texture is a tiny canvas). Driven on the app
-   *  ticker so the render gate keeps drawing frames while the tint animates. */
+  private drawBar(color: number): void {
+    const w = this.host?.app.screen.width ?? 0;
+    this.bg?.clear().rect(0, 0, w, TOP_BAR_H).fill(color);
+  }
+
+  /** Cross-fades the top strip from the current colour to `color` over `BG_FADE_MS`,
+   *  driven on the app ticker so the render gate keeps drawing frames meanwhile. */
   private changeBackground(color: number): void {
     const host = this.host;
-    if (!host) return;
+    if (!host || !this.bg) return;
     if (this.bgTweenRemove) this.bgTweenRemove();
-
-    const webGPU = host.app.renderer?.type === RendererType.WEBGPU;
-    const shader = webGPU ? null : this.bgShader;
-    if (webGPU && !this.bg) return;
-    if (!webGPU && !shader) return;
-
     const from = this.bgColor ?? color;
-    const to = color;
     const start = performance.now();
     const ticker = host.app.ticker;
-
-    shader?.setTop(from);
     const fn = (): void => {
       const t = Math.min(1, (performance.now() - start) / BG_FADE_MS);
-      const mixed = mixColor(from, to, t);
-      this.bgColor = mixed;
-      if (webGPU) {
-        const h = host.app.screen.height;
-        const w = host.app.screen.width;
-        this.bg?.clear().rect(0, 0, w, h).fill(tribeGradientFill(mixed));
-      } else {
-        shader!.setTop(mixed);
-      }
+      this.bgColor = mixColor(from, color, t);
+      this.drawBar(this.bgColor);
       if (t >= 1) {
         this.bgTweenRemove = null;
         ticker.remove(fn);
@@ -354,7 +306,9 @@ export class SetupScreen implements ScreenController {
   private change(dir: number): void {
     if (this.selector === TRIBE_ROW) {
       const i = TRIBES.findIndex((t) => t.id === this.tribe);
-      this.setTribe(TRIBES[(i + dir + TRIBES.length) % TRIBES.length]!.id);
+      const next = (i + dir + TRIBES.length) % TRIBES.length;
+      this.setTribe(TRIBES[next]!.id);
+      this.tribeItems[next]?.bounce();
     } else if (this.selector === MODE_ROW) {
       this.cycleMode(dir);
       return;
@@ -385,6 +339,7 @@ export class SetupScreen implements ScreenController {
       fill: 0xcccccc,
       wordWrap: true,
       wordWrapWidth: wrapW,
+      align: 'center' as const,
     };
     let maxH = 0;
     for (const tr of TRIBES) {
@@ -421,7 +376,10 @@ export class SetupScreen implements ScreenController {
     this.startBtn!.selected = this.selector === START_ROW;
     this.modeTitle!.style.fill = this.selector === MODE_ROW ? 0xffffff : 0x888888;
     this.enemiesTitle!.style.fill = this.selector === ENEMIES_ROW ? 0xffffff : 0x888888;
-    this.difficultyTitle!.style.fill = this.selector === DIFFICULTY_ROW ? 0xffffff : 0x888888;
+    // Capture mode: the 3-star turn budget grows with the player count (enemies + you).
+    const capture = useGameStore.getState().mode === GameMode.CAPTURE;
+    this.quickHint!.visible = capture;
+    this.quickHint!.text = t('setup.quickCapture', { turns: quickCaptureTurnsCount(this.enemies + 1) });
     this.refreshTribeStats();
     this.layout();
   }
@@ -454,7 +412,8 @@ export class SetupScreen implements ScreenController {
     // Distance from a circle's centre to the bottom of its caption block.
     const optionDrop = 34 + labelH;
     const rowStep = optionDrop + RADIUS + GRID_ROW_PAD;
-    const grid = tribeSlots(this.tribeItems.length, GRID_GAP, GRID_COLUMNS, rowStep);
+    const gap = w < SMALL_SCREEN_WIDTH ? SMALL_GRID_GAP : GRID_GAP;
+    const grid = tribeSlots(this.tribeItems.length, gap, GRID_COLUMNS, rowStep, true);
     const buttonH = this.enemyGroup?.buttonHeight ?? 36;
     const startH = this.startBtn?.height ?? 0;
     const backH = this.backBtn?.boxHeight ?? 0;
@@ -468,8 +427,9 @@ export class SetupScreen implements ScreenController {
     const descTop = gridBottom + DESC_GAP;
     const cy1 = descTop + this.tribeDescH + BLOCK_GAP + titleHalf;
     const cy2 = cy1 + buttonDrop + BLOCK_GAP + titleHalf;
-    const cy3 = cy2 + buttonDrop + BLOCK_GAP + titleHalf;
-    const startTop = cy3 + buttonDrop + 30;
+    // The difficulty buttons have no title: `cy3` is their top.
+    const cy3 = cy2 + buttonDrop + HINT_TOP + HINT_H + BLOCK_GAP;
+    const startTop = cy3 + buttonH + 30;
     const backTop = startTop + startH + 16;
     const end = backTop + backH;
     // The column starts half a title above the title centre.
@@ -488,7 +448,8 @@ export class SetupScreen implements ScreenController {
     };
     place(this.modeTitle, this.modeGroup, cy1);
     place(this.enemiesTitle, this.enemyGroup, cy2);
-    place(this.difficultyTitle, this.difficultyGroup, cy3);
+    this.quickHint?.position.set(cx, y(cy2) + buttonDrop + HINT_TOP + HINT_H / 2);
+    this.difficultyGroup?.position.set(cx - this.difficultyGroup.groupWidth / 2, y(cy3));
     this.startBtn!.position.set(cx - this.startBtn!.width / 2, y(startTop));
     this.backBtn!.position.set(cx - this.backBtn!.boxWidth / 2, y(backTop));
   }
@@ -500,8 +461,6 @@ export class SetupScreen implements ScreenController {
     window.removeEventListener('resize', this.onResize);
     if (this.bgTweenRemove) this.bgTweenRemove();
     this.bgTweenRemove = null;
-    this.bgShader?.destroy();
-    this.bgShader = null;
     this.stars?.destroy();
     this.stars = null;
     this.scroll?.destroy();
@@ -518,7 +477,7 @@ export class SetupScreen implements ScreenController {
     this.tribeTitle = null;
     this.enemiesTitle = null;
     this.modeTitle = null;
-    this.difficultyTitle = null;
+    this.quickHint = null;
     this.startBtn = null;
     this.backBtn = null;
     this.hints = null;

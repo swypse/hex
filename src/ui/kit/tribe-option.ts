@@ -5,11 +5,15 @@ import { makeLabel } from '../../gfx/label';
 import { TRIBE_STARS_HEIGHT } from './tribe-layout';
 import { FontSize } from '@enums';
 import { t } from '../../i18n';
+import { markDirty } from '../../gfx/render-gate';
+import { RUBBER_BOUNCE_MS, rubberPose } from '../../gfx/rubber-bounce';
 import { MAX_STARS } from '../../results/result-validation';
 
 export interface TribeOption {
   el: Container;
   setSelected(selected: boolean): void;
+  /** Rubber-ball hop of the icon: squash, jump, land, squash, settle. */
+  bounce(): void;
   /** Best result for the tribe: filled/empty stars under the name; null hides them. */
   setStars(stars: number | null): void;
   /** Games count under the stars (needs `games` in the options); null hides it. */
@@ -25,6 +29,8 @@ const LINE_GAP = 2;
 const STAR_SIZE = 14;
 const GAMES_GAP = 4;
 const GAMES_HEIGHT = 16;
+/** Name alpha of unselected options when `plainSelection` is on. */
+const DIM_NAME_ALPHA = 0.5;
 
 export interface TribeOptionExtras {
   /** Star size in px (default 14). */
@@ -33,6 +39,8 @@ export interface TribeOptionExtras {
   nameSize?: FontSize;
   /** Reserve and show a "Games: N" line under the stars. */
   showGames?: boolean;
+  /** The selected name is full white, the others dimmed. */
+  plainSelection?: boolean;
 }
 const NAME_TOP = RADIUS + 6;
 
@@ -113,6 +121,9 @@ function makeRays(): Container {
 }
 const NAME_LINE = 14;
 
+/** Peak lift (px) of the icon hop. */
+const BOUNCE_LIFT = 22;
+
 /** Supersampling of the baked mask circle. */
 const MASK_SCALE = 4;
 let circleMask: Texture | null = null;
@@ -174,13 +185,15 @@ export function makeTribeOption(
   icon.mask = clip;
   const lines = nameLines(name);
   const labels = lines.map((text, i) => {
-    const label = makeLabel(text, { fontSize: nameSize, fill: 0xeeeeee });
+    const label = makeLabel(text, { fontSize: nameSize, fill: 0xffffff });
     label.anchor.set(0.5, 0);
     label.position.set(0, NAME_TOP + i * (nameLine + LINE_GAP));
     el.addChild(label);
     return label;
   });
   el.addChild(circle, clip, icon);
+  // These hop and squash about the circle's bottom edge; the name and stars stay put.
+  const body = [circle, clip, icon];
   el.eventMode = 'static';
   el.cursor = 'pointer';
   el.on('pointertap', onClick);
@@ -189,8 +202,31 @@ export function makeTribeOption(
   const setSelected = (s: boolean): void => {
     circle.clear().circle(0, 0, RADIUS).fill(0xffffff);
     if (s) circle.stroke({ width: 4, color, alignment: 0 });
+    if (extras.plainSelection) for (const label of labels) label.alpha = s ? 1 : DIM_NAME_ALPHA;
   };
   setSelected(selected);
+  let raf: number | null = null;
+  // Rest scales are read when a hop starts from rest (an icon's scale settles once its texture loads);
+  // a hop restarted mid-air keeps them rather than treating a squashed scale as the rest scale.
+  let base = body.map((part) => ({ x: part.scale.x, y: part.scale.y }));
+  const bounce = (): void => {
+    if (typeof requestAnimationFrame !== 'function') return;
+    if (raf !== null && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(raf);
+    if (raf === null) base = body.map((part) => ({ x: part.scale.x, y: part.scale.y }));
+    const start = performance.now();
+    const step = (now: number): void => {
+      if (circle.destroyed) return;
+      const p = Math.min(1, (now - start) / RUBBER_BOUNCE_MS);
+      const pose = rubberPose(p);
+      body.forEach((part, i) => {
+        part.position.set(0, RADIUS * (1 - pose.sy) - pose.lift * BOUNCE_LIFT);
+        part.scale.set(base[i]!.x * pose.sx, base[i]!.y * pose.sy);
+      });
+      markDirty();
+      raf = p < 1 ? requestAnimationFrame(step) : null;
+    };
+    raf = requestAnimationFrame(step);
+  };
   const namesHeight = labels.length * nameLine + (labels.length - 1) * LINE_GAP;
   // The star row sits under the last name line; its room is always reserved.
   const starRow = new Container();
@@ -232,5 +268,5 @@ export function makeTribeOption(
   };
   setGames(null);
   const gamesHeight = extras.showGames ? GAMES_GAP + GAMES_HEIGHT : 0;
-  return { el, setSelected, setStars, setGames, label: labels[0]!, labelHeight: namesHeight + starsHeight + gamesHeight };
+  return { el, setSelected, bounce, setStars, setGames, label: labels[0]!, labelHeight: namesHeight + starsHeight + gamesHeight };
 }

@@ -1,4 +1,4 @@
-import { Application, BitmapText, Circle, Container, Graphics, ImageSource, Sprite, Texture } from 'pixi.js';
+import { Application, BitmapText, Circle, ColorMatrixFilter, Container, Graphics, ImageSource, Sprite, Texture } from 'pixi.js';
 import { FONT_OUTLINED, FONT_REGULAR } from '../gfx/bitmap-fonts';
 import {
   type Axial, axialKey, compareTileY, hexCorners, HEX_TILT, hexDistance, hexEdge, hexEdgeNeighbor, hexNeighbors, hexToPixel, splitHexBorder
@@ -28,11 +28,13 @@ import { LoopingWeatherEffect, spawnStormEffect } from './storm-effect';
 import { TornadoEffect, type TornadoPoint } from './tornado-effect';
 import { isForestType } from '../game/map/tile-types';
 import { roadStripOutline } from './road-path';
+import { BONUS_BAKE_SCALE } from './bonus-marker';
 import { IMAGE_H, IMAGE_HEX_CENTER_Y, IMAGE_HEX_W, type TextureSet, type TileTexture } from './texture-factory';
 import { villageTextureFor, villageOwnerTribe } from './village-texture';
 import { acquireVillageBuildTexture, releaseVillageBuildTexture } from './village-build-texture';
 import { tileSignature, tileInView, granaryFarmCount, farmIsIdle, type Viewport } from './tile-signature';
 import { t } from '../i18n';
+import { RUBBER_BOUNCE_MS, rubberPose } from '../gfx/rubber-bounce';
 import { Tooltip } from '../gfx/tooltip';
 import { THEME } from '../gfx/theme';
 import { villageLabelTextColor } from './village-label-color';
@@ -66,13 +68,36 @@ const PICK_MARKER_COLOR = 0xffd54a;
 /** Alpha of the other placement cells while the keyboard cursor stands on one. */
 const UNPICKED_MARKER_ALPHA = 0.45;
 /** Village name label text size (px). */
+/** Village capacity squares under the name: side, gap between them and gap below the plate (px). */
+/** Village name plate and capacity row are raised by this many px above their anchor. */
+const VILLAGE_LABEL_LIFT = 10;
+const CAPACITY_SLOT = 8;
+const CAPACITY_GAP = 2;
+const CAPACITY_MARGIN = 3;
 const VILLAGE_LABEL_FONT_SIZE = FontSize.VERY_SMALL;
 /** Overlay stacking: village labels sit below the unit standing on the village,
  *  and both sit below everything else (hp bars, fire, markers) at zIndex 0. */
 /** Full up-down cycle of a ship's bob, a bonus marker's (a little faster), and their half-height in px. */
 const SHIP_BOB_MS = 2600;
 const BONUS_BOB_MS = 1900;
+/** The bonus marker (glow and rays included) rests this many px above the cell centre. */
+const BONUS_LIFT = 10;
 const BOB_AMPLITUDE = 2.5;
+/** A bonus marker flashes every `BONUS_BLINK_PERIOD_MS` for `BONUS_BLINK_MS`: it brightens and white rays burst out. */
+const BONUS_BLINK_PERIOD_MS = 6000;
+const BONUS_BLINK_MS = 600;
+const BONUS_BLINK_BRIGHTNESS = 1.3;
+const BONUS_RAY_COUNT = 8;
+const BONUS_RAY_ALPHA = 0.6;
+
+/** A bonus marker's blink state: its sprite, ray graphics, phase offset, brighten filter and whether a flash is showing. */
+interface BonusBlink {
+  sprite: Sprite;
+  rays: Graphics;
+  offsetMs: number;
+  filter: ColorMatrixFilter | null;
+  active: boolean;
+}
 
 /** A sprite that bobs up and down around `baseY`; ships also move their selection glow. */
 interface BobEntry {
@@ -143,6 +168,8 @@ interface TileView {
   buildingSprite: Sprite | null;
   bridgeSprite: Sprite | null;
   bonusSprite: Sprite | null;
+  /** White rays that burst around the bonus marker while it blinks. */
+  bonusRays: Graphics | null;
   bottleSprite: Sprite | null;
   unitSprite: Sprite | null;
   /** Own thorn trap standing on the tile (trap.png from the buildings atlas). */
@@ -199,9 +226,6 @@ export class MapView {
   private tutorialMarkerParts: { g: Graphics; points: { x: number; y: number }[] }[] = [];
   private attackPulseParts: { g: Graphics; x: number; y: number; base: number }[] = [];
   private movePulseParts: { g: Graphics; x: number; y: number; base: number; color: number }[] = [];
-  private bounceRemove: (() => void) | null = null;
-  private bounceSprite: Sprite | null = null;
-  private bounceBaseY = 0;
   private hexBounceRemove: (() => void) | null = null;
   /** Last drawn adjacent-farm count of each visible granary, to bounce it when
    *  a farm built/destroyed next to it swaps its texture. */
@@ -214,6 +238,11 @@ export class MapView {
    *  container); they bounce together with the hex on selection. */
   private selectedBorderParts: { g: Graphics; baseY: number }[] = [];
   private lastBouncedKey = '';
+  /** Cell whose next selection change must not play the hop (the game re-selects it after an attack). */
+  private skipHopKey: string | null = null;
+  /** Rubber hop of the selected unit's sprite: its stop callback and the sprite's rest pose. */
+  private rubberRemove: (() => void) | null = null;
+  private rubberRest: { sprite: Sprite; y: number; sx: number; sy: number } | null = null;
   private highlights: Graphics[] = [];
   private readonly pool = new ObjectPool();
   private hpOverrides = new Map<string, number>();
@@ -222,6 +251,8 @@ export class MapView {
   /** Staged buildings (a tower mid-fight): shown instead of the sim's, `null` = none. */
   private buildingOverrides: Map<string, Building | null> = new Map();
   private shipBobs: BobEntry[] = [];
+  private bonusBlinks: BonusBlink[] = [];
+  private bonusBlinkRemove: (() => void) | null = null;
   private shipBobRemove: (() => void) | null = null;
   private shipBusy = new Set<string>();
   /** True while the camera is being moved (drag / zoom / pan); the decorative
@@ -311,6 +342,7 @@ export class MapView {
   destroy(): void {
     this.clearFireEffects();
     this.stopShipBob();
+    this.stopBonusBlink();
     this.unitFacings.clear();
     if (this.dealTooltip) {
       this.dealTooltip.destroy();
@@ -331,8 +363,8 @@ export class MapView {
     this.markerRevealTimes.clear();
     this.markerRevealEls.clear();
     this.markerRevealSig = '';
-    this.stopBounce();
     this.stopHexBounce();
+    this.stopRubber();
     this.hpLayer.stopTick();
     // Release every village build texture this view still references so the
     // service can destroy them once no tile holds them.
@@ -424,6 +456,7 @@ export class MapView {
     const granaryLabels: { tile: MapTile; owner: number; world: { x: number; y: number } }[] = [];
     const exclamations: { el: Container; world: { x: number; y: number } }[] = [];
     const shipBobs: BobEntry[] = [];
+    const bonusBlinks: BonusBlink[] = [];
     const stormCells: { x: number; y: number; key: string }[] = [];
     const droughtCells: { x: number; y: number; key: string }[] = [];
 
@@ -475,7 +508,9 @@ export class MapView {
       }
       // Bonus markers bob like ships, a little faster.
       if (tile.bonus && explored && tv.bonusSprite) {
-        shipBobs.push({ sprite: tv.bonusSprite, key: axialKey(tile), baseY: y, periodMs: BONUS_BOB_MS, amplitude: BOB_AMPLITUDE, ship: false });
+        shipBobs.push({ sprite: tv.bonusSprite, key: axialKey(tile), baseY: y - BONUS_LIFT, periodMs: BONUS_BOB_MS, amplitude: BOB_AMPLITUDE, ship: false });
+        // Each marker flashes on its own phase so they do not all blink at once.
+        if (tv.bonusRays) bonusBlinks.push({ sprite: tv.bonusSprite, rays: tv.bonusRays, offsetMs: Math.abs(tile.q * 397 + tile.r * 131) % BONUS_BLINK_PERIOD_MS, filter: null, active: false });
       }
       // Damaged buildings (hp < max) show an hp bar + text like a unit's.
       const building = tile.building;
@@ -580,6 +615,8 @@ export class MapView {
     this.drawHighlights(map, selection, reachableKeys, attackableKeys, reachableColor, localPlayerIndex, tutorialMarkerKeys, localTurn, placementKeys, pickedKey);
     this.shipBobs = shipBobs;
     this.startShipBob();
+    this.bonusBlinks = bonusBlinks;
+    this.startBonusBlink();
     this.startExclamationAnimation();
     this.startFireAnimation();
     this.updateSelectedBounce(selection, localPlayerIndex);
@@ -741,6 +778,7 @@ export class MapView {
         buildingSprite: null,
         bridgeSprite: null,
         bonusSprite: null,
+        bonusRays: null,
         bottleSprite: null,
         unitSprite: null,
         trapSprite: null,
@@ -816,8 +854,20 @@ export class MapView {
     this.drawRoad(tv, tile, explored);
 
     const bonusTex = tile.bonus ? this.textures.bonusTexture : null;
-    this.syncSprite(tv, 'bonusSprite', bonusTex ? bonusTex.texture : null, p.x, y, bonusTex?.anchorY ?? 0.5);
+    this.syncSprite(tv, 'bonusSprite', bonusTex ? bonusTex.texture : null, p.x, y - BONUS_LIFT, bonusTex?.anchorY ?? 0.5);
     if (tv.bonusSprite) tv.bonusSprite.visible = explored;
+    if (tile.bonus && explored && tv.bonusSprite) {
+      if (!tv.bonusRays) {
+        tv.bonusRays = new Graphics();
+        tv.bonusRays.eventMode = 'none';
+        tv.bonusRays.zIndex = 8.5;
+        tv.el.addChild(tv.bonusRays);
+      }
+    } else if (tv.bonusRays) {
+      tv.el.removeChild(tv.bonusRays);
+      tv.bonusRays.destroy();
+      tv.bonusRays = null;
+    }
 
     const bottleVisible = explored && !!tile.bottle;
     this.syncSprite(tv, 'bottleSprite', bottleVisible ? this.textures.bottleTexture.texture : null, p.x, y, this.textures.bottleTexture.anchorY);
@@ -977,7 +1027,9 @@ export class MapView {
     // Ports are road nodes in the game logic (roads connect up to their tile
     // edge), but the port cell itself never shows a road: no road strokes are
     // drawn from its centre.
-    const owner = tile.roadOwner;
+    // A village is a road node: its cell shows the strips of the roads that reach it, under the village sprite.
+    const isVillage = tile.settlement !== null && tile.settlement.owner !== null;
+    const owner = isVillage ? tile.settlement!.owner : tile.roadOwner;
     const isBridge = tile.bridge !== undefined && tile.bridge !== null;
     const p = hexToPixel(tile, this.hexSize);
     const edgeMidY = (seg: { ay: number; by: number }): number =>
@@ -987,10 +1039,11 @@ export class MapView {
     if (owner !== undefined && owner !== null && !isBridge && !isPort && explored) {
       for (let e = 0; e < 6; e++) {
         const n = this.tileIndex.get(axialKey(hexEdgeNeighbor(tile, e)));
-        const connected =
-          (n?.settlement && n.settlement.owner === owner) ||
-          n?.roadOwner === owner ||
-          (n?.building && n.building.kind === BuildingKind.PORT && n.ownedBy === owner);
+        const connected = isVillage
+          ? n?.roadOwner === owner
+          : (n?.settlement && n.settlement.owner === owner) ||
+            n?.roadOwner === owner ||
+            (n?.building && n.building.kind === BuildingKind.PORT && n.ownedBy === owner);
         if (!connected) continue;
         const seg = hexEdge(tile, e, this.hexSize);
         // A port or bridge cell draws no road itself: the strip runs on through the
@@ -1026,9 +1079,10 @@ export class MapView {
     }
     if (!tv.roadGraphics) {
       tv.roadGraphics = new Graphics();
-      tv.roadGraphics.zIndex = 6;
       tv.el.addChild(tv.roadGraphics);
     }
+    // Above the village sprite (3) on plain road cells, below it on a village cell.
+    tv.roadGraphics.zIndex = isVillage ? 2.8 : 6;
     const g = tv.roadGraphics;
     g.clear();
     const cy = p.y - tileElevation(tile, this.hexSize);
@@ -1096,7 +1150,8 @@ export class MapView {
     if (texture && !current) {
       const sprite = new Sprite(texture);
       sprite.anchor.set(0.5, anchorY);
-      sprite.scale.set(this.spriteScale);
+      // The bonus diamond is baked BONUS_BAKE_SCALE times larger than its on-map size.
+      sprite.scale.set(kind === 'bonusSprite' ? this.spriteScale / BONUS_BAKE_SCALE : this.spriteScale);
       sprite.position.set(x, y);
       sprite.zIndex = zIndex;
       tv.el.addChild(sprite);
@@ -1569,38 +1624,56 @@ export class MapView {
     });
   }
 
-  bounceUnit(q: number, r: number): void {
-    this.stopBounce();
-    if (!this.map) return;
-    const tile = this.tileIndex.get(axialKey({ q, r }));
-    if (!tile || !tile.unit) return;
-    const sprite = this.tileViews.get(axialKey(tile))?.unitSprite ?? null;
-    if (!sprite || sprite.destroyed) return;
-    this.bounceSprite = sprite;
-    this.bounceBaseY = sprite.position.y;
-    const amp = this.hexSize * 0.15;
-    const start = performance.now();
-    const key = axialKey({ q, r });
-    const fn = (): void => {
-      if (!this.bounceSprite || this.bounceSprite.destroyed) {
-        this.stopBounce();
-        return;
-      }
-      const t = Math.min(1, (performance.now() - start) / 300);
-      this.bounceSprite.position.y = this.bounceBaseY - Math.sin(t * Math.PI) * amp;
-      this.syncGlowSprite(key);
-      if (t >= 1) this.stopBounce();
-    };
-    this.app.ticker.add(fn);
-    this.bounceRemove = () => this.app.ticker.remove(fn);
+  /** The next selection of cell (q, r) is the game's own (e.g. keeping the attacker selected after it
+   *  moved onto the killed unit's cell): it skips the selection hop. */
+  skipNextSelectionHop(q: number, r: number): void {
+    this.skipHopKey = axialKey({ q, r });
   }
 
-  private stopBounce(): void {
-    if (this.bounceRemove) {
-      this.bounceRemove();
-      this.bounceRemove = null;
+  /** Rubber-ball hop of the unit standing on (q, r); plays again on every call. */
+  bounceUnit(q: number, r: number): void {
+    if (!this.map) return;
+    const key = axialKey({ q, r });
+    const tv = this.tileViews.get(key);
+    if (tv && this.tileIndex.get(key)?.unit) this.rubberUnit(key, tv);
+  }
+
+  /** Rubber-ball hop of a selected unit's texture on its cell: squashes, jumps, lands and settles
+   *  about the sprite's anchor point (its feet). */
+  private rubberUnit(key: string, tv: TileView): void {
+    this.stopRubber();
+    const sprite = tv.unitSprite;
+    if (!sprite || sprite.destroyed || !sprite.visible) return;
+    const rest = { sprite, y: sprite.position.y, sx: sprite.scale.x, sy: sprite.scale.y };
+    this.rubberRest = rest;
+    const lift = this.hexSize * 0.3;
+    const start = performance.now();
+    const fn = (): void => {
+      if (sprite.destroyed) {
+        this.stopRubber();
+        return;
+      }
+      const p = Math.min(1, (performance.now() - start) / RUBBER_BOUNCE_MS);
+      const pose = rubberPose(p);
+      sprite.position.y = rest.y - pose.lift * lift;
+      sprite.scale.set(rest.sx * pose.sx, rest.sy * pose.sy);
+      this.syncGlowSprite(key);
+      if (p >= 1) this.stopRubber();
+    };
+    this.app.ticker.add(fn);
+    this.rubberRemove = () => this.app.ticker.remove(fn);
+  }
+
+  /** Ends a running rubber hop and puts the sprite back at rest. */
+  private stopRubber(): void {
+    this.rubberRemove?.();
+    this.rubberRemove = null;
+    const rest = this.rubberRest;
+    this.rubberRest = null;
+    if (rest && !rest.sprite.destroyed) {
+      rest.sprite.position.y = rest.y;
+      rest.sprite.scale.set(rest.sx, rest.sy);
     }
-    this.bounceSprite = null;
   }
 
   private updateSelectedBounce(selection: Selection | null, localPlayerIndex: number): void {
@@ -1611,9 +1684,18 @@ export class MapView {
     // Building the farm usually deselects the builder right after the render that
     // changed the granary: do not cancel its bounce just for clearing the selection.
     if (!(this.granaryBounceActive && !key)) this.stopHexBounce();
-    if (!key) return;
+    if (!key) {
+      this.skipHopKey = null;
+      this.stopRubber();
+      return;
+    }
     const tv = this.tileViews.get(key);
     if (!tv) return;
+    // A hop already started on this unit (a click calls `bounceUnit` just before the render) keeps running.
+    const skipHop = this.skipHopKey === key;
+    this.skipHopKey = null;
+    if (!skipHop && selection!.kind === SelectionKind.UNIT && !(tv.unitSprite && this.rubberRest?.sprite === tv.unitSprite)) this.rubberUnit(key, tv);
+    else if (this.rubberRest?.sprite !== tv.unitSprite) this.stopRubber();
     const sprites: Sprite[] = [];
     const delayed = new Set<Sprite>();
     // The whole selected hex moves together: terrain, village and any surface
@@ -1652,6 +1734,8 @@ export class MapView {
       for (const t of this.map.tiles) {
         const sv = t.unit?.spawnVillage;
         if (!t.unit || t.unit.owner !== localPlayerIndex || !sv || sv.q !== tile.q || sv.r !== tile.r) continue;
+        // The selected unit itself hops with the rubber effect: the hex pulse must not move it too.
+        if (t === tile && selection!.kind === SelectionKind.UNIT) continue;
         const unitView = this.tileViews.get(axialKey(t));
         if (!unitView) continue;
         const group = this.hexSurfaceSprites(unitView);
@@ -2043,6 +2127,63 @@ export class MapView {
     this.shipBobRemove = () => ticker.remove(fn);
   }
 
+  /** Bonus flash: every `BONUS_BLINK_PERIOD_MS` the marker's colours brighten like light splashing on it,
+   *  and white rays burst out and fade. */
+  private startBonusBlink(): void {
+    if (this.bonusBlinkRemove || this.bonusBlinks.length === 0) return;
+    const ticker = this.app.ticker;
+    const fn = (): void => {
+      // The animation clock is rewound by the paused time when the camera stops, so a flash advanced
+      // meanwhile would replay: hold it while the camera moves, like the bobs.
+      if (this.cameraBusy) return;
+      if (this.bonusBlinks.length === 0) {
+        ticker.remove(fn);
+        this.bonusBlinkRemove = null;
+        return;
+      }
+      const now = this.animNow();
+      for (const b of this.bonusBlinks) {
+        if (b.sprite.destroyed || b.rays.destroyed) continue;
+        const t = ((now + b.offsetMs) % BONUS_BLINK_PERIOD_MS) / BONUS_BLINK_MS;
+        if (t >= 1) {
+          if (b.active) {
+            b.active = false;
+            b.sprite.filters = null;
+            b.rays.clear();
+          }
+          continue;
+        }
+        b.active = true;
+        const k = Math.sin(t * Math.PI);
+        b.filter ??= new ColorMatrixFilter();
+        b.filter.brightness(1 + (BONUS_BLINK_BRIGHTNESS - 1) * k, false);
+        b.sprite.filters = [b.filter];
+        // Rays follow the (bobbing) marker, grow outward and fade.
+        b.rays.position.set(b.sprite.position.x, b.sprite.position.y);
+        b.rays.clear();
+        const reach = 14 + 20 * (1 - (1 - t) * (1 - t));
+        for (let i = 0; i < BONUS_RAY_COUNT; i++) {
+          const a = (i / BONUS_RAY_COUNT) * Math.PI * 2 + t * 0.5;
+          const long = i % 2 === 0 ? 1 : 0.65;
+          const r0 = 10;
+          const r1 = r0 + reach * long;
+          const w = 0.09;
+          b.rays
+            .poly([Math.cos(a - w) * r0, Math.sin(a - w) * r0, Math.cos(a) * r1, Math.sin(a) * r1, Math.cos(a + w) * r0, Math.sin(a + w) * r0])
+            .fill({ color: 0xffffff, alpha: BONUS_RAY_ALPHA * (1 - t) });
+        }
+      }
+    };
+    ticker.add(fn);
+    this.bonusBlinkRemove = () => ticker.remove(fn);
+  }
+
+  private stopBonusBlink(): void {
+    this.bonusBlinkRemove?.();
+    this.bonusBlinkRemove = null;
+    this.bonusBlinks = [];
+  }
+
   private stopShipBob(): void {
     if (this.shipBobRemove) {
       this.shipBobRemove();
@@ -2323,7 +2464,7 @@ export class MapView {
     const iconSize = 16;
     const gap = 4;
     const plateColor = territoryColor(tribe, this.knownOwners.has(owner));
-    const label = this.pool.takeText(`${tile.settlement!.name ?? ''}${owner === this.lastLocalIndex ? ` ${count}/${capacity}` : ''}`.trim(), {
+    const label = this.pool.takeText((tile.settlement!.name ?? '').trim(), {
       fontSize: VILLAGE_LABEL_FONT_SIZE,
       fill: villageLabelTextColor(tribe, this.knownOwners.has(owner)),
       fontFamily: FONT_REGULAR
@@ -2355,6 +2496,20 @@ export class MapView {
     el.zIndex = OVERLAY_Z_VILLAGE_LABEL;
     el.addChild(labelBg);
     el.addChild(label);
+    // Your own village shows its unit capacity as a row of squares under the name: filled = taken, white = free.
+    if (owner === this.lastLocalIndex) {
+      const slots = this.pool.takeGraphics();
+      slots.zIndex = 1;
+      const rowW = capacity * CAPACITY_SLOT + (capacity - 1) * CAPACITY_GAP;
+      const top = label.height / 2 + 1 + CAPACITY_MARGIN;
+      for (let i = 0; i < capacity; i++) {
+        slots
+          .rect(-rowW / 2 + i * (CAPACITY_SLOT + CAPACITY_GAP), top, CAPACITY_SLOT, CAPACITY_SLOT)
+          .fill(i < count ? tribe.color : 0xffffff)
+          .stroke({ width: 1, color: tribe.color, alignment: 1 });
+      }
+      el.addChild(slots);
+    }
     if (tile.settlement!.starving) {
       // Red "S" on black left of the village plate, like a starving unit's.
       const tag = this.pool.takeText('S', {
@@ -2374,8 +2529,10 @@ export class MapView {
       el.addChild(tagBg);
       el.addChild(tag);
     }
-    el.position.set(world.x, world.y);
+    // The name plate and capacity row sit a little above the village centre.
+    const at = { x: world.x, y: world.y - VILLAGE_LABEL_LIFT };
+    el.position.set(at.x, at.y);
     this.overlay.addChild(el);
-    this.overlayItems.push({ el, world });
+    this.overlayItems.push({ el, world: at });
   }
 }

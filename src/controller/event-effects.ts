@@ -40,6 +40,12 @@ const DEBRIS_BOARD_COLOR = 0xb07a45;
 const DEBRIS_STICK_COLOR = 0x6b4423;
 const DEATH_RISE = 200;
 const DEATH_MS = 3000;
+/** Sword-slash mark on a melee hit: duration, colour and spark count. */
+const SLASH_MS = 320;
+const SLASH_COLOR = 0xfff3c4;
+const SLASH_SPARKS = 6;
+/** Overlay z of the slash: above village-unit mirrors and the rays. */
+const SLASH_OVERLAY_Z = 50;
 const DEATH_STAGGER_MS = 700;
 /** Damage number: text size grows with the damage (each step is a baked `FontSize`).
  *  With an attacker it is thrown from the victim along the attack direction on an
@@ -322,6 +328,73 @@ export class EventEffects {
     const world = hexToPixel(tile, HEX_SIZE);
     // Parented to the camera-transformed map container: the puff stays on its cell while panning/zooming.
     spawnMuzzleSmoke(app, mapView.container, world.x, world.y - tileElevation(tile, HEX_SIZE), 1 / this.host.camera().scale);
+  }
+
+  /** A sword-slash mark across `tile` (a melee hit from the `from` cell): a tapered streak sweeps
+   *  diagonally across the unit, then fades with a few sparks flying off. */
+  spawnSlash(tile: MapTile, from: MapTile): void {
+    const app = this.host.app();
+    const mapView = this.host.mapView();
+    if (!app || !mapView) return;
+    // Screen-space overlay above the map layer: a living unit (and a mirrored village unit) would cover a mark drawn in the map.
+    const overlay = mapView.overlay;
+    const mapRoot = mapView.container;
+    const a = hexToPixel(from, HEX_SIZE);
+    const b = hexToPixel(tile, HEX_SIZE);
+    const anchor = { x: b.x, y: b.y - tileElevation(tile, HEX_SIZE) - HEX_SIZE * 0.2 };
+    // The streak cuts across the line of attack, tilted like a downward sword swing.
+    const angle = Math.atan2(b.y - a.y, b.x - a.x) + Math.PI / 2 + 0.5;
+    const len = HEX_SIZE * 1.1;
+    const dx = Math.cos(angle);
+    const dy = Math.sin(angle);
+    const nx = -dy;
+    const ny = dx;
+    const el = new Container();
+    el.zIndex = SLASH_OVERLAY_Z;
+    const streak = new Graphics();
+    el.addChild(streak);
+    const sparks = Array.from({ length: SLASH_SPARKS }, (_, i) => {
+      const g = new Graphics();
+      g.circle(0, 0, 1.5 + (i % 2)).fill(SLASH_COLOR);
+      el.addChild(g);
+      return { g, dir: angle + (i / SLASH_SPARKS - 0.5) * 2.2 + Math.PI / 2, reach: HEX_SIZE * (0.4 + Math.random() * 0.4) };
+    });
+    overlay.addChild(el);
+    const start = performance.now();
+    const ticker = app.ticker;
+    const fn = (): void => {
+      if (el.destroyed) {
+        ticker.remove(fn);
+        return;
+      }
+      // Follow the cell through camera pan and zoom; the mark is map art and scales with the map.
+      const pos = overlay.toLocal(anchor, mapRoot);
+      el.position.set(pos.x, pos.y);
+      el.scale.set(mapRoot.scale.x);
+      const t = Math.min(1, (performance.now() - start) / SLASH_MS);
+      // The blade sweeps along the streak in the first 40%, then the mark fades.
+      const sweep = Math.min(1, t / 0.4);
+      const width = 5 * (1 - t * 0.6);
+      streak.clear();
+      // Tapered lens: pointed at both ends, widest in the middle.
+      streak
+        .moveTo(-dx * (len / 2), -dy * (len / 2))
+        .quadraticCurveTo(nx * width, ny * width, -dx * (len / 2) + dx * len * sweep, -dy * (len / 2) + dy * len * sweep)
+        .quadraticCurveTo(-nx * width * 0.3, -ny * width * 0.3, -dx * (len / 2), -dy * (len / 2))
+        .fill({ color: SLASH_COLOR, alpha: 1 - Math.max(0, (t - 0.4) / 0.6) });
+      for (const sp of sparks) {
+        const k = Math.max(0, (t - 0.2) / 0.8);
+        sp.g.position.set(Math.cos(sp.dir) * sp.reach * k, Math.sin(sp.dir) * sp.reach * k);
+        sp.g.alpha = 1 - k;
+      }
+      markDirty();
+      if (t >= 1) {
+        ticker.remove(fn);
+        el.parent?.removeChild(el);
+        el.destroy({ children: true });
+      }
+    };
+    ticker.add(fn);
   }
 
   spawnDeath(tile: MapTile): void {

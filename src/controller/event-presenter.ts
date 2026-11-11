@@ -177,6 +177,14 @@ function stealthedMoveEvents(events: GameEvent[], isStealthedNow: (unitId: strin
   return out;
 }
 
+/** Units whose blow is a melee strike that leaves a slash mark. */
+const SLASH_STRIKERS = new Set<UnitType>([UnitType.WARRIOR, UnitType.SWORDSMAN, UnitType.RIDER, UnitType.KNIGHT, UnitType.BUILDER, UnitType.STALKER, UnitType.STORMCALLER, UnitType.BERSERKER]);
+
+/** A slash-capable land unit hitting a unit on the adjacent cell. */
+function isMeleeStriker(pre: AttackUnitPre | undefined, from: MapTile | undefined, to: MapTile | undefined): boolean {
+  return pre !== undefined && pre.shipLevel === undefined && SLASH_STRIKERS.has(pre.type) && from !== undefined && to !== undefined && hexDistance(from, to) === 1;
+}
+
 export class EventPresenter {
   private readonly effects: EventEffects;
   /** Towers shown at their pre-hit state while this batch's hits are presented (see `initialTowerOverrides`). */
@@ -346,9 +354,16 @@ export class EventPresenter {
             hadAttack = true;
             await this.presentSiege(e, events.slice(i + 1));
             break;
-          case GameEventType.SPAWNED:
+          case GameEventType.SPAWNED: {
             if (e.playerIndex === local) sfx.play('spawn');
+            // The new unit hops like a rubber ball where it appears (when it still stands there in the final state).
+            const spawnTile = tileAt(sim.map, e.q, e.r);
+            if (spawnTile && isExploredFor(spawnTile, local) && spawnTile.unit?.owner === e.playerIndex && spawnTile.unit.type === e.unitType) {
+              this.host.render();
+              this.host.mapView()?.bounceUnit(e.q, e.r);
+            }
             break;
+          }
           case GameEventType.CAPTURED:
             await this.presentCaptured(e);
             break;
@@ -795,7 +810,7 @@ export class EventPresenter {
         if (attackerAdvanced) {
           // Kill-and-advance: skip the lunge/strike choreography and play the
           // walk onto the vacated cell directly.
-          await this.presentKillAdvance(e, attackerTile, targetTile, targetVisible, facing, keep);
+          await this.presentKillAdvance(e, attackerTile, targetTile, targetVisible, facing, impact, keep);
         } else {
           await this.presentStagedAttack(e, attackerTile, targetTile, targetVisible, attackerAdvanced, facing, impact, keep, attackerShot);
         }
@@ -821,8 +836,8 @@ export class EventPresenter {
       } else {
         if (e.attackerDamage > 0 && targetTile && attackerVisible) this.effects.spawnHpText(targetTile, `-${e.attackerDamage}`, 0xff4444, attackerTile);
         if (e.targetDamage > 0 && attackerTile && targetVisible) this.effects.spawnHpText(attackerTile, `-${e.targetDamage}`, 0xff4444, targetTile);
-        if (mapView && e.attackerDamage > 0 && targetTile && attackerVisible) this.hitUnit(targetTile);
-        if (mapView && e.targetDamage > 0 && attackerTile && targetVisible) this.hitUnit(attackerTile);
+        if (mapView && e.attackerDamage > 0 && targetTile && attackerVisible) this.hitUnit(targetTile, attackerTile, e.attackerPre);
+        if (mapView && e.targetDamage > 0 && attackerTile && targetVisible) this.hitUnit(attackerTile, targetTile, e.targetPre);
       }
       if (e.targetDied && targetTile && targetVisible) this.effects.spawnDeath(targetTile);
       if (e.attackerDied && attackerTile && attackerVisible) this.effects.spawnDeath(attackerTile);
@@ -835,8 +850,10 @@ export class EventPresenter {
   }
 
   /** Damage reaction: red rays around the unit's cell. */
-  private hitUnit(tile: MapTile): void {
+  private hitUnit(tile: MapTile, from?: MapTile, striker?: AttackUnitPre): void {
     this.effects.spawnRays(tile, RAYS_DAMAGE_COLOR);
+    // A melee blow also leaves a sword-slash mark on the unit it hits.
+    if (from && isMeleeStriker(striker, from, tile)) this.effects.spawnSlash(tile, from);
   }
 
   /** A catapult volley against a structure tile: lob a cannonball at it when
@@ -940,10 +957,12 @@ export class EventPresenter {
     const attacker = this.findUnitById(e.attackerId);
     if (!attacker || attacker.shipLevel !== undefined) return;
     if (attacker.type === UnitType.RIDER && canMove(attacker)) {
+      this.host.mapView()?.skipNextSelectionHop(attacker.q, attacker.r);
       store.setSelection({ kind: SelectionKind.UNIT, q: attacker.q, r: attacker.r });
       return;
     }
     if (attacker.type === UnitType.KNIGHT && canAttack(attacker)) {
+      this.host.mapView()?.skipNextSelectionHop(attacker.q, attacker.r);
       store.setSelection({ kind: SelectionKind.UNIT, q: attacker.q, r: attacker.r });
     }
   }
@@ -989,7 +1008,7 @@ export class EventPresenter {
 
     // Attacker's blow lands on the target first.
     if (e.attackerDamage > 0) {
-      this.hitUnit(targetTile);
+      this.hitUnit(targetTile, attackerTile, e.attackerPre);
       this.effects.spawnHpText(targetTile, `-${e.attackerDamage}`, 0xff4444, attackerTile);
       target.hp = Math.max(0, target.hp - e.attackerDamage);
       this.host.render();
@@ -1018,7 +1037,7 @@ export class EventPresenter {
       } else {
         await mapView.lungeUnit(targetKey, attackerKey, 10 / scale);
       }
-      this.hitUnit(attackerTile);
+      this.hitUnit(attackerTile, targetTile, e.targetPre);
       this.effects.spawnHpText(attackerTile, `-${e.targetDamage}`, 0xff4444, targetTile);
       attacker.hp = Math.max(0, attacker.hp - e.targetDamage);
       this.host.render();
@@ -1045,16 +1064,16 @@ export class EventPresenter {
     }
   }
 
-  /** Kill-and-advance combat presentation: a melee attacker that killed its
-   *  target and moves onto the vacated cell skips the lunge/strike animation
-   *  and goes straight to the walk onto the target tile (the victim's -N text
-   *  and death burst still play). */
+  /** Kill-and-advance combat presentation, in this order: the attacker's strike (lunge, slash, hit)
+   *  plays out with the victim still standing; then, at the same moment, the attacker starts
+   *  walking onto the cell, the victim vanishes and its death burst plays. */
   private async presentKillAdvance(
     e: Extract<GameEvent, { type: 'attack' }>,
     attackerTile: MapTile,
     targetTile: MapTile,
     targetVisible: boolean,
     facing: UnitFacing,
+    impact: AttackImpact | undefined,
     keep: Map<string, Unit>,
   ): Promise<void> {
     const mapView = this.host.mapView();
@@ -1062,18 +1081,28 @@ export class EventPresenter {
     const attackerKey = axialKey(attackerTile);
     const targetKey = axialKey(targetTile);
     const attacker = this.stageUnit(e.attackerPre!, e.attackerId, attackerTile.q, attackerTile.r);
+    const target = this.stageUnit(e.targetPre!, e.targetId, targetTile.q, targetTile.r);
     const staged = new Map<string, Unit | null>(keep);
     staged.set(attackerKey, attacker);
-    staged.set(targetKey, null); // the victim is already dead in the final state
+    staged.set(targetKey, target); // the victim is dead in the final state, but stays until the walk starts
     mapView.setUnitOverrides(staged);
     mapView.faceUnitAtKey(attackerKey, facing);
     this.host.render();
 
-    if (e.attackerDamage > 0 && targetVisible) this.effects.spawnHpText(targetTile, `-${e.attackerDamage}`, 0xff4444, attackerTile);
-    if (targetVisible) this.effects.spawnDeath(targetTile);
-    await sleep(COMBAT_DEATH_GAP_MS);
+    await mapView.lungeUnit(attackerKey, targetKey, 10 / this.host.camera().scale);
+    if (impact) sfx.play(impact);
+    if (e.attackerDamage > 0 && targetVisible) {
+      this.hitUnit(targetTile, attackerTile, e.attackerPre);
+      this.effects.spawnHpText(targetTile, `-${e.attackerDamage}`, 0xff4444, attackerTile);
+      target.hp = Math.max(0, target.hp - e.attackerDamage);
+      this.host.render();
+    }
 
-    // The walk onto the killed unit's cell is the only animation played.
+    // The victim disappears exactly as the attacker steps off toward its cell.
+    staged.set(targetKey, null);
+    mapView.setUnitOverrides(staged);
+    this.host.render();
+    if (targetVisible) this.effects.spawnDeath(targetTile);
     await mapView.slideUnit(attackerKey, targetKey, COMBAT_ADVANCE_MS);
   }
 
