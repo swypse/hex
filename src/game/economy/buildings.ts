@@ -1,4 +1,5 @@
 import { axialKey, hexNeighbors } from '../map/hex';
+import { builderPrice } from './builder-discount';
 import { type GameMap, type MapTile } from '../map/map-gen';
 import { type Player } from '../players';
 import { moneyCost, type Resources } from './resources';
@@ -137,11 +138,11 @@ export const UNIVERSITY_MIN_VILLAGE_LEVEL = 5;
 /** Spawn costs for every kind a builder (Villagers special unit) may construct,
  *  keyed by that kind. */
 const BUILDER_BUILD_COSTS: Record<BuilderBuildableKind, Resources> = {
-  sawmill: BUILDING_COSTS.sawmill,
-  mine: BUILDING_COSTS.mine,
-  port: BUILDING_COSTS.port,
-  bridge: BRIDGE_COST,
-  road: ROAD_COST,
+  sawmill: builderPrice(BUILDING_COSTS.sawmill),
+  mine: builderPrice(BUILDING_COSTS.mine),
+  port: builderPrice(BUILDING_COSTS.port),
+  bridge: builderPrice(BRIDGE_COST),
+  road: builderPrice(ROAD_COST),
 };
 
 /** Whether the given resources cover at least one builder-constructable kind. */
@@ -418,11 +419,11 @@ export function builderBuildStatus(map: GameMap, tile: MapTile, kind: BuilderBui
   const affordable = cells.some((cell) => {
     // Bridges and roads are network nodes: the networks they join may pay.
     if (kind === BuilderExtraKind.BRIDGE || kind === BuilderExtraKind.ROAD) {
-      const cost = kind === BuilderExtraKind.BRIDGE ? BRIDGE_COST : ROAD_COST;
+      const cost = builderPrice(kind === BuilderExtraKind.BRIDGE ? BRIDGE_COST : ROAD_COST);
       return canAffordAt(map, player, cell, cost, villagesJoinedBy(map, player.index, cell));
     }
     const joined = kind === BuildingKind.PORT ? villagesJoinedBy(map, player.index, cell) : [];
-    return canAffordAt(map, player, cell, buildingCostAt(map, player, cell, kind as BuildingKind), joined);
+    return canAffordAt(map, player, cell, builderPrice(buildingCostAt(map, player, cell, kind as BuildingKind)), joined);
   });
   return affordable ? BuilderBuildStatus.AVAILABLE : BuilderBuildStatus.CANNOT_AFFORD;
 }
@@ -536,14 +537,15 @@ export function buildBuilding(
  *  Villagers builder, whose eligibility (terrain/territory/slot) was already
  *  checked by `builderBuildable`. */
 export function buildBuildingIgnoringSkill(map: GameMap, tile: MapTile, kind: BuildingKind, player: Player): boolean {
-  return payAndPlaceBuilding(map, tile, kind, player);
+  return payAndPlaceBuilding(map, tile, kind, player, true);
 }
 
-function payAndPlaceBuilding(map: GameMap, tile: MapTile, kind: BuildingKind, player: Player): boolean {
+function payAndPlaceBuilding(map: GameMap, tile: MapTile, kind: BuildingKind, player: Player, byBuilder = false): boolean {
   // A port is a road/water-cluster node: it may be paid by the networks it
   // would join, just like a road or bridge.
   const joined = kind === BuildingKind.PORT ? villagesJoinedBy(map, player.index, tile) : [];
-  if (!payAt(map, player, tile, buildingCostAt(map, player, tile, kind), joined)) return false;
+  const cost = buildingCostAt(map, player, tile, kind);
+  if (!payAt(map, player, tile, byBuilder ? builderPrice(cost) : cost, joined)) return false;
   tile.building = kind === BuildingKind.GRANARY ? { kind, level: 1, food: 0 } : { kind, level: 1 };
   tile.fireTrail = false;
   return true;

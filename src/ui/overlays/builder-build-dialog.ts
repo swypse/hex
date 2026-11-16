@@ -11,6 +11,7 @@ import { builderBuildStatus, BUILDING_COSTS, type BuilderBuildKind } from '../..
 import { tileAt } from '../../game/map/tile-index';
 import { BRIDGE_COST } from '../../game/economy/bridges';
 import { ROAD_COST } from '../../game/economy/roads';
+import { builderPrice } from '../../game/economy/builder-discount';
 import { type Resources } from '../../game/economy/resources';
 import { BuilderBuildStatus, BuilderExtraKind, BuildingKind, FontSize, OverlayKind } from '@enums';
 
@@ -19,13 +20,13 @@ const CELL_GAP = 20;
 const HINT_GAP = 10;
 const WIDTH = 300;
 
-/** What a builder offers, with the base price (a discount depends on the cell chosen next). */
+/** What a builder offers, with its discounted base price (the Engineering discount depends on the cell chosen next). */
 const BUILD_KINDS: Array<{ kind: BuilderBuildKind; nameKey: string; cost: Resources }> = [
-  { kind: BuildingKind.SAWMILL, nameKey: 'building.sawmill', cost: BUILDING_COSTS.sawmill },
-  { kind: BuildingKind.MINE, nameKey: 'building.mine', cost: BUILDING_COSTS.mine },
-  { kind: BuildingKind.PORT, nameKey: 'building.port', cost: BUILDING_COSTS.port },
-  { kind: BuilderExtraKind.BRIDGE, nameKey: 'hud.selected.bridge', cost: BRIDGE_COST },
-  { kind: BuilderExtraKind.ROAD, nameKey: 'hud.selected.road', cost: ROAD_COST },
+  { kind: BuildingKind.SAWMILL, nameKey: 'building.sawmill', cost: builderPrice(BUILDING_COSTS.sawmill) },
+  { kind: BuildingKind.MINE, nameKey: 'building.mine', cost: builderPrice(BUILDING_COSTS.mine) },
+  { kind: BuildingKind.PORT, nameKey: 'building.port', cost: builderPrice(BUILDING_COSTS.port) },
+  { kind: BuilderExtraKind.BRIDGE, nameKey: 'hud.selected.bridge', cost: builderPrice(BRIDGE_COST) },
+  { kind: BuilderExtraKind.ROAD, nameKey: 'hud.selected.road', cost: builderPrice(ROAD_COST) },
 ];
 
 export class BuilderBuildDialog extends PopupDialog {

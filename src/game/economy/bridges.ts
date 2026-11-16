@@ -1,4 +1,5 @@
 import { type GameMap, type MapTile } from '../map/map-gen';
+import { builderPrice } from './builder-discount';
 import { type Player } from '../players';
 import { type Resources } from './resources';
 import { payAt, villagesJoinedBy } from './stock';
@@ -63,13 +64,13 @@ export function buildBridge(map: GameMap, tile: MapTile, player: Player): boolea
  *  by the Villagers builder, whose eligibility was already checked by
  *  `canBuildBridgeHere` in `builderBuildable`. */
 export function buildBridgeIgnoringSkill(map: GameMap, tile: MapTile, player: Player): boolean {
-  return canBuildBridgeHere(map, tile) && payAndPlaceBridge(map, tile, player);
+  return canBuildBridgeHere(map, tile) && payAndPlaceBridge(map, tile, player, builderPrice(BRIDGE_COST));
 }
 
-function payAndPlaceBridge(map: GameMap, tile: MapTile, player: Player): boolean {
+function payAndPlaceBridge(map: GameMap, tile: MapTile, player: Player, cost: Resources = BRIDGE_COST): boolean {
   const dir = bridgeDirFor(map, tile)!;
   // A bridge is a road node: it may be paid by the networks it connects.
-  if (!payAt(map, player, tile, BRIDGE_COST, villagesJoinedBy(map, player.index, tile))) return false;
+  if (!payAt(map, player, tile, cost, villagesJoinedBy(map, player.index, tile))) return false;
   tile.bridge = { owner: player.index, dir };
   tile.roadOwner = player.index;
   return true;

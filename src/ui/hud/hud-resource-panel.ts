@@ -12,6 +12,7 @@ import { makeIcon } from '../kit/icon';
 import { makeLabel } from '../../gfx/label';
 import { Popup } from '../kit/popup';
 import { Button } from '../kit/button';
+import { RESOURCE_PANEL_TOP_MARGIN } from './layout';
 import { RESOURCE_TOOLTIPS } from './resource-tooltips';
 import { FontSize, ResourceKind } from '@enums';
 import { tileAt } from '../../game/map/tile-index';
@@ -47,7 +48,7 @@ export class HudResourcePanel implements Widget {
   private layout = (): void => {
     if (!this.el || !this.host) return;
     const cx = this.host.app.screen.width / 2;
-    this.el.position.set(cx - this.measured / 2, 0);
+    this.el.position.set(cx - this.measured / 2, RESOURCE_PANEL_TOP_MARGIN);
   };
 
   /** Money is the player's own; wood, stone, ore and food are those of the

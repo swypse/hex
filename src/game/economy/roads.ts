@@ -1,4 +1,5 @@
 import { roadNetworkComponents } from './road-network';
+import { builderPrice } from './builder-discount';
 import { untrackedNetworks } from './network-fingerprint';
 import { axialKey, hexNeighbors } from '../map/hex';
 import { type GameMap, type MapTile } from '../map/map-gen';
@@ -117,11 +118,11 @@ export function buildRoad(map: GameMap, tile: MapTile, player: Player): boolean 
 /** Places a road at its cost without the Roads skill: for the Villagers
  *  builder, whose reachable cells `builderBuildable` already limits. */
 export function buildRoadIgnoringSkill(map: GameMap, tile: MapTile, player: Player): boolean {
-  return canBuildRoadHere(map, tile, player) && payAndPlaceRoad(map, tile, player);
+  return canBuildRoadHere(map, tile, player) && payAndPlaceRoad(map, tile, player, builderPrice(ROAD_COST));
 }
 
-function payAndPlaceRoad(map: GameMap, tile: MapTile, player: Player): boolean {
-  if (!payAt(map, player, tile, ROAD_COST, villagesJoinedBy(map, player.index, tile))) return false;
+function payAndPlaceRoad(map: GameMap, tile: MapTile, player: Player, cost: Resources = ROAD_COST): boolean {
+  if (!payAt(map, player, tile, cost, villagesJoinedBy(map, player.index, tile))) return false;
   tile.roadOwner = player.index;
   return true;
 }

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { BitmapText, Container, Sprite, Text } from 'pixi.js';
+import { RESOURCE_PANEL_TOP_MARGIN } from '../src/ui/hud/layout';
 import { HudResourcePanel } from '../src/ui/hud/hud-resource-panel';
 import { useGameStore } from '../src/store/game-store';
 import { type UIHost } from '../src/ui/host';
@@ -43,11 +44,11 @@ describe('HudResourcePanel placement', () => {
     useGameStore.setState({ screen: Screen.GAME, players: [], localPlayerIndex: 0 });
   });
 
-  it('is docked to the top edge', () => {
+  it('sits below the top edge by the panel margin', () => {
     const money = new HudResourcePanel();
     money.mount(host, root);
     const el = (money as unknown as { el: Container }).el!;
-    expect(el.position.y).toBe(0);
+    expect(el.position.y).toBe(RESOURCE_PANEL_TOP_MARGIN);
     money.destroy();
   });
 

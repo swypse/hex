@@ -23,6 +23,6 @@ Villager that raises sawmills, mines, ports, bridges and roads without their ski
 | 8 | 10 | 0 | 1 | 40 | 15 money | 2 / 3 | 7 |
 
 - **Building.** Consumes its turn to build a sawmill, mine, port, bridge or road on its own cell or an adjacent owned cell.
-- **No skill needed.** No building skill is required (Forestry, Smithery, Water, Bridges, Roads); the usual building costs apply, and placement rules (terrain, the village's building slots, a road must join your road network or a village) are unchanged.
+- **No skill needed.** No building skill is required (Forestry, Smithery, Water, Bridges, Roads); everything it builds costs 20% less (stacks with Engineering on buildings), and placement rules (terrain, the village's building slots, a road must join your road network or a village) are unchanged.
 - **Not at sea.** It cannot build while aboard a ship.
 - **Veteran bonus.** The AI gives a builder veteran the +10 HP bonus.

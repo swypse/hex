@@ -1,3 +1,4 @@
+import { builderPrice } from '../src/game/economy/builder-discount';
 import { buildPlayers } from '@/game/players';
 import { Simulator } from '@/game/simulator';
 import { TileType } from '@/game/map/tile-types';
@@ -130,14 +131,14 @@ describe('builder roads', () => {
     t.claimedByVillage = { q: 0, r: 0 };
   };
 
-  it('builds a road next to a village without the Roads skill, paying the road cost', () => {
+  it('builds a road next to a village without the Roads skill, paying the discounted road cost', () => {
     ownLand(1, 0);
     const builder = place(0, UnitType.BUILDER, 0, 0);
     const before = sim.players[0]!.resources.money;
     const ok = sim.applyCommand({ type: CommandType.BUILD, unitId: builder.id, q: 1, r: 0, kind: BuilderExtraKind.ROAD });
     expect(ok).toBe(true);
     expect(tileAt(map, 1, 0)!.roadOwner).toBe(0);
-    expect(sim.players[0]!.resources.money).toBe(before - ROAD_COST.money);
+    expect(sim.players[0]!.resources.money).toBe(before - builderPrice(ROAD_COST).money);
     expect(findUnit(builder.id).hasMoved).toBe(true);
   });
 

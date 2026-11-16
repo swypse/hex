@@ -1,4 +1,5 @@
 import { AiActionType, BuilderExtraKind, BuildingKind, SkillId, UnitType } from '@enums';
+import { builderPrice } from '../../../economy/builder-discount';
 import { type BuilderBuildableKind, BUILDING_COSTS, builderBuildable } from '../../../economy/buildings';
 import { canAffordAt } from '../../../economy/stock';
 import { hexDistance } from '../../../map/hex';
@@ -31,7 +32,7 @@ export const BUILDER_WORK_PATTERN: AiPattern = {
         if (!kinds.includes(BuildingKind.SAWMILL)) kinds.push(BuildingKind.SAWMILL);
         kinds.push(BuildingKind.PORT);
         for (const kind of kinds) {
-          if (!canAffordAt(map, player, t, BUILDING_COSTS[kind])) continue;
+          if (!canAffordAt(map, player, t, builderPrice(BUILDING_COSTS[kind]))) continue;
           // Already standing where it can build something.
           const local = builderBuildable(map, t, kind, player);
           if (local.length > 0) {

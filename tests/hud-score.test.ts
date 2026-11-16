@@ -12,7 +12,7 @@ import { Tribe } from '../src/game/tribes';
 import { SeededRandom } from '../src/util/random';
 import { Simulator } from '../src/game/simulator';
 import { TileType } from '../src/game/map/tile-types';
-import { SCORE_PAD, SCORE_TOP_OFFSET, SCORE_CHIP_RADIUS } from '../src/ui/hud/layout';
+import { SCORE_PAD, SCORE_TOP_OFFSET, SCORE_CHIP_RADIUS, SCORE_TEXT_Y } from '../src/ui/hud/layout';
 import { BuildingKind, GameMode, Screen } from '@enums';
 import { t } from '../src/i18n';
 
@@ -94,7 +94,7 @@ describe('HudScore buff icons', () => {
     expect(hudAny.tribeChip!.position.x).toBeCloseTo(chipX, 5);
     expect(hudAny.tribeChip!.position.y).toBeCloseTo(chipY, 5);
     expect(hudAny.text!.position.x).toBeCloseTo(host.app.screen.width / 2, 5);
-    expect(hudAny.text!.position.y).toBeCloseTo(48, 5);
+    expect(hudAny.text!.position.y).toBeCloseTo(SCORE_TEXT_Y, 5);
   });
 
   it('shows the real map score at start instead of a stale 0', () => {

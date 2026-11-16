@@ -5,12 +5,15 @@ export const SKILLS_BUTTON_SIZE = 40;
 export const TURN_BAR_GAP = 6;
 export const ACTION_TOOLBAR_MAX_WIDTH = 600;
 
+/** Gap between the screen top and the top-center resources panel. */
+export const RESOURCE_PANEL_TOP_MARGIN = 6;
+
 /** Score chip (top-right) layout constants, shared with HudScore. */
 export const SCORE_PAD = 8;
 export const SCORE_TOP_OFFSET = 6;
 export const SCORE_CHIP_RADIUS = 24;
 /** Vertical centre of the score text (and the season label), below the resource panel row. */
-export const SCORE_TEXT_Y = 48;
+export const SCORE_TEXT_Y = 48 + RESOURCE_PANEL_TOP_MARGIN;
 /** Gap between the chip bottom and the achievements button below it. */
 export const SCORE_ACHIEVEMENTS_CHIP_GAP = 2;
 /** Gap between the stacked achievements and trade buttons. */
