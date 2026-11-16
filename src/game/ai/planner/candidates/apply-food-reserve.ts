@@ -15,7 +15,7 @@ export function applyFoodReserve(ctx: CandidateContext, candidates: Candidate[],
   // discretionary spends of wood/stone, and of money once wood and stone are
   // ready, so the money for the farm is saved.
   const needFood = foodPressure(map, player) !== FoodPressure.NONE || !map.tiles.some((t) => t.ownedBy === player.index && t.building?.kind === BuildingKind.FARM);
-  if ((needFood && (!hasSkill(player, SkillId.AGRICULTURE) || map.tiles.some((t) => canBuildFarm(map, t, player)))) || storageReserve > 0 || universityReserve > 0) {
+  if ((needFood && (!hasSkill(player, SkillId.AGRICULTURE) || map.tiles.some((t) => canBuildFarm(map, t, player)))) || storageReserve > 0 || universityReserve > 0 || foodSkillReserve > 0) {
     for (let i = candidates.length - 1; i >= 0; i--) {
       const action = candidates[i]!.action;
       const first: AiAction = Array.isArray(action) ? action[0]! : action;

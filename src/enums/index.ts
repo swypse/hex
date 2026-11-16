@@ -7,6 +7,7 @@ export * from './ai-operation-phase.enum';
 export * from './ai-pace.enum';
 export * from './ai-personality-id.enum';
 export * from './ai-pick-mode.enum';
+export * from './ai-skill-style.enum';
 export * from './ai-stance.enum';
 export * from './attack-impact.enum';
 export * from './attack-rank.enum';

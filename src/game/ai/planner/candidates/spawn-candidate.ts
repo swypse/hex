@@ -6,6 +6,8 @@ import { hexDistance } from '../../../map/hex';
 import type { MapTile } from '../../../map/map-gen';
 import { UNIT_TYPES, unitSpawnCost } from '../../../units/units';
 import type { AiDifficultyProfile } from '../../config/difficulty';
+import { reinforcementVillages } from '../../military/reinforcement-villages';
+import { flagsFor } from '../../config/flags';
 import { landEnemyCanReach } from '../../situation/enemy-reach';
 import { bestSpawnableUnitType } from '../../spawn/best-spawnable-unit-type';
 import { spawnWouldBeKilled } from '../../spawn/spawn-would-be-killed';
@@ -40,9 +42,14 @@ export function spawnCandidate(ctx: CandidateContext, v: MapTile, candidates: Ca
         isExploredFor(t, player.index) &&
         !state.occupied.has(key(t.q, t.r)),
     );
+    // A committed assault without a clear advantage raises units in the villages nearest its target.
+    const op = player.operation;
+    const reinforcing = !!op && flagsFor(player).focusAssault && op.reinforce && reinforcementVillages(map, player, op).some((r) => r.q === v.q && r.r === v.r);
     const planFor = directives?.spawnPlan.find((p) => p.villageKey === k);
     const prefer =
-      planFor
+      reinforcing
+        ? SpawnPreference.OFFENSE
+        : planFor
         ? planFor.prefer
         : urgent || situation?.stance === AiStance.DEFEND
           ? SpawnPreference.DEFENSE
@@ -59,12 +66,12 @@ export function spawnCandidate(ctx: CandidateContext, v: MapTile, candidates: Ca
         const afterMoney = player.resources.money - cost.money;
         // An economy goal keeps money in reserve for mines/skills, but a
         // free-village grab is expansion income and always worth the spend.
-        const reserveOk = urgent || freeVillageToGrab || afterMoney >= directivesReserve(directives, difficulty);
+        const reserveOk = urgent || freeVillageToGrab || reinforcing || afterMoney >= directivesReserve(directives, difficulty);
         // A unit the food stock cannot carry would only starve: hold back
         // unless the village itself is in danger.
         const foodOk = urgent || canSustainUnit(map, player, type, 6, v);
         if (reserveOk && foodOk) {
-          candidates.push({ score: (urgent ? 500 : 250) + jitter(), action: { type: AiActionType.SPAWN, q: v.q, r: v.r, unitType: type } });
+          candidates.push({ score: (urgent ? 500 : reinforcing ? 400 : 250) + jitter(), action: { type: AiActionType.SPAWN, q: v.q, r: v.r, unitType: type } });
         }
       }
     }

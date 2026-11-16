@@ -50,6 +50,9 @@ personality's weights multiply each goal's score.
 An army goal moves through *muster* (gather near the target until `musterMinUnits × musterFactor` units are there or the
 force is strong enough) and *assault*. Idle units form *squad operations*: gather at a rally hex 3-5 hexes from the
 target, then strike together; called off when the squad is clearly weaker than the defenders.
+With `focusAssault` (on by default) the assault is a commitment: the squad focus-fires the defenders and accepts losses until
+their power exceeds 1.5x the squad's, and the own villages nearest the target raise reinforcements unless the squad has 2x
+the defenders' power.
 
 ## Patterns
 
@@ -96,6 +99,22 @@ tribe, different game: goal weights steer economy vs army, the rest tune spawns,
 | Retreats to heal at | 35% hp | 50% | 60% | 40% |
 | Tech order | Climbing, Smithery, Swordsman, Riding, Knights, ... | default order | Agriculture, Science, Geology, Smithery, Roads, ... | Climbing, Riding, Smithery, Swordsman, Knights, Catapult |
 | Trade price (× fair value) | 1.3 | 1.15 | 1.0 | 1.25 |
+
+## Skill styles
+
+Each AI draws one tech style at game start (stable per name), weighted by tribe and personality (cats lean defense, aqua
+water, barbarians swordsman; aggressive/raider lean melee, builder defense/ranged). The generic skill order then opens the
+first two economy skills, the style's own skills, and the rest of the economy skills; skills of other styles are never
+opened by it (no archers when water-focused). Emergency responses (towers under pressure, anti-catapult, the water skills
+against ships) still apply. A water-style AI also keeps boarding land units onto up to 3 ships.
+
+| Style | Skills |
+|---|---|
+| water | water, navigation, water temples |
+| defense | shields, defense, tower, medicine |
+| swordsman | swordsman |
+| knight | riding, knights |
+| ranged | archer, catapult |
 
 ## Flags
 

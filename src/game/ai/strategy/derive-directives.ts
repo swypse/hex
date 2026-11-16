@@ -4,6 +4,7 @@ import type { GameMap } from '../../map/map-gen';
 import type { Player } from '../../players';
 import { hasSkill } from '../../skills';
 import type { AiDifficultyProfile } from '../config/difficulty';
+import { styleAllowsSkill } from '../config/skill-style';
 import { flagsFor } from '../config/flags';
 import { AI_PERSONALITIES } from '../config/personality';
 import type { AiSituation } from '../situation/situation';
@@ -14,12 +15,14 @@ function economySkillChain(player: Player): SkillId[] | null {
   const chain: SkillId[] = flagsFor(player).militarySkills
     ? [SkillId.FORESTRY, SkillId.AGRICULTURE, SkillId.CLIMBING, SkillId.SMITHERY, SkillId.SWORDSMAN, SkillId.SCIENCE, SkillId.GEOLOGY, SkillId.RIDING, SkillId.KNIGHTS]
     : [SkillId.FORESTRY, SkillId.AGRICULTURE, SkillId.CLIMBING, SkillId.SMITHERY, SkillId.GEOLOGY, SkillId.SCIENCE];
-  for (const s of chain) if (!hasSkill(player, s)) return chain.slice(chain.indexOf(s));
+  const styled = chain.filter((s) => styleAllowsSkill(player, s));
+  for (const s of styled) if (!hasSkill(player, s)) return styled.slice(styled.indexOf(s));
   return null;
 }
 
 function navalSkillChain(player: Player): SkillId[] | null {
-  const chain: SkillId[] = [SkillId.WATER, SkillId.NAVIGATION, SkillId.ARCHER, SkillId.CATAPULT];
+  // Defending against ships always allows the water skills; the rest follows the tech style.
+  const chain = [SkillId.WATER, SkillId.NAVIGATION, SkillId.ARCHER, SkillId.CATAPULT].filter((s) => s === SkillId.WATER || s === SkillId.NAVIGATION || styleAllowsSkill(player, s));
   for (const s of chain) if (!hasSkill(player, s)) return chain.slice(chain.indexOf(s));
   return null;
 }

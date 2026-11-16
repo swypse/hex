@@ -7,6 +7,7 @@ import { axialKey } from '../../../map/hex';
 import { canOpenSkill, hasSkill, skillCost } from '../../../skills';
 import { flagsFor } from '../../config/flags';
 import { personalityFor } from '../../config/personality';
+import { skillStyleFor, styledSkillOrder } from '../../config/skill-style';
 import { towerSkillWanted } from '../../defense/tower-skill-wanted';
 import { openingSkillPending } from '../../economy/opening-skill-pending';
 import { AI_SKILL_ORDER, MILITARY_SKILL_ORDER } from '../../economy/skill-orders';
@@ -33,11 +34,26 @@ export function skillCandidates(ctx: CandidateContext, candidates: Candidate[]):
     candidates.push({ score: storageScore + 10 + jitter(), action: { type: AiActionType.OPEN_SKILL, skill: SkillId.GRANARY } });
   }
 
+  // Separate villages cannot share food: with one network hungry and another existing, Roads
+  // (Forestry first) is learned before anything else and its price is saved.
+  let roadsReserve = 0;
+  const wantsRoads = flagsFor(player).foodLinks && foodStates.length > 1 && !hasSkill(player, SkillId.ROADS);
+  if (wantsRoads) {
+    const hungry = hasSkill(player, SkillId.AGRICULTURE) && foodStates.some((n) => n.pressure !== FoodPressure.NONE) && foodStates.some((n) => n.balance > 0);
+    for (const id of [SkillId.ROADS, SkillId.FORESTRY]) {
+      if (hasSkill(player, id) || state.opened.has(id)) continue;
+      if (!canOpenSkill(player, id, map)) continue;
+      if (hungry) roadsReserve = skillCost(id, player.skills.length);
+      candidates.push({ score: (hungry ? 545 : 320) + jitter(), action: { type: AiActionType.OPEN_SKILL, skill: id } });
+      break;
+    }
+  }
+
   // Farms cost wood and stone: with food under pressure and no income of one of
   // them, head for the skill whose building produces it (Forestry -> sawmill,
   // Climbing + Smithery -> mine) so the first farm can be paid for.
   // Money the AI must keep to afford the food-path skill it is waiting for.
-  let foodSkillReserve = 0;
+  let foodSkillReserve = roadsReserve;
   if (hasSkill(player, SkillId.AGRICULTURE) && (foodPressure(map, player) !== FoodPressure.NONE || storage.needy.size > 0)) {
     const wanted: SkillId[] = [];
     // Roads (and granaries) need stone: a planned road link with no stone in
@@ -94,7 +110,8 @@ export function skillCandidates(ctx: CandidateContext, candidates: Candidate[]):
       }
     }
   } else if (!situation?.navalThreat) {
-    const order = personalityFor(player).skillOrder ?? (flagsFor(player).militarySkills ? MILITARY_SKILL_ORDER : AI_SKILL_ORDER);
+    const baseOrder = personalityFor(player).skillOrder ?? (flagsFor(player).militarySkills ? MILITARY_SKILL_ORDER : AI_SKILL_ORDER);
+    const order = flagsFor(player).skillStyles ? styledSkillOrder(baseOrder, skillStyleFor(player)) : baseOrder;
     for (const id of order) {
       if (state.opened.has(id)) continue;
       if (canOpenSkill(player, id, map)) {

@@ -9,4 +9,8 @@ export interface AiOperation {
   startTurn: number;
   /** While true, no squad member may advance more than 2 hexes past the rearmost. */
   leash: boolean;
+  /** Focused assault in progress (`AiFlags.focusAssault`): the squad fights on through losses until aborted. */
+  committed: boolean;
+  /** The squad lacks a clear advantage over the target's defenders: own villages near it raise reinforcements. */
+  reinforce: boolean;
 }

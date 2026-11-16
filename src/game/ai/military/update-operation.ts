@@ -13,6 +13,7 @@ import { enemyVillageAt } from '../situation/enemy-village-at';
 import type { AiSituation } from '../situation/situation';
 import { type WalkField, walkDistance, walkDistances } from '../situation/walk-distances';
 import type { AiOperation } from '../types/operation';
+import { assaultFailing, assaultFeasible, needsReinforcement } from './assault-outlook';
 import { squadTiles } from './squad-members';
 
 /** Fewest idle units for which the AI bothers running a squad operation. */
@@ -66,6 +67,14 @@ function chooseRally(map: GameMap, player: Player, target: MapTile, squad: MapTi
   return best ? { q: best.q, r: best.r } : { q: target.q, r: target.r };
 }
 
+/** The gathering squad is massed enough to start the assault. */
+function gatherReady(map: GameMap, player: Player, op: AiOperation, squad: MapTile[], targetField: WalkField, contested: boolean, turn: number): boolean {
+  const rallyField = walkDistances(map, player, [op.rally]);
+  const atRally = squad.filter((t) => walkDistance(rallyField, t) <= 3).length;
+  const allClose = squad.every((t) => walkDistance(targetField, t) <= 6);
+  return !contested || atRally >= Math.ceil(squad.length * RALLY_QUORUM) || allClose || turn - op.startTurn > LEASH_TURNS;
+}
+
 /** Rebuilds the player's operation once per AI turn from the strategy target
  *  (army goal, else the war-stance front). Returns null, and clears any stored
  *  operation, when no worthwhile squad plan exists. */
@@ -107,15 +116,23 @@ export function updateOperation(
         phase: contested ? AiOperationPhase.GATHER : AiOperationPhase.ASSAULT,
         startTurn: turn,
         leash: contested,
+        committed: false,
+        reinforce: false,
       };
   op.leash = contested && turn - op.startTurn <= LEASH_TURNS;
 
-  if (op.phase === AiOperationPhase.GATHER) {
-    const rallyField = walkDistances(map, player, [op.rally]);
-    const atRally = squad.filter((t) => walkDistance(rallyField, t) <= 3).length;
-    const allClose = squad.every((t) => walkDistance(targetField, t) <= 6);
-    const ready = !contested || atRally >= Math.ceil(squad.length * RALLY_QUORUM) || allClose || turn - op.startTurn > LEASH_TURNS;
-    if (ready && squadPower >= nearPower * ABORT_POWER_RATIO) op.phase = AiOperationPhase.ASSAULT;
+  const focus = flagsFor(player).focusAssault;
+  if (focus) {
+    // Committed assault: fights on through losses while the defenders do not outweigh the squad.
+    if (op.phase === AiOperationPhase.ASSAULT && assaultFailing(squadPower, nearPower)) {
+      op = { ...op, phase: AiOperationPhase.GATHER, rally: chooseRally(map, player, targetTile, squad, targetField), startTurn: turn, leash: true };
+    } else if (op.phase === AiOperationPhase.GATHER && gatherReady(map, player, op, squad, targetField, contested, turn) && assaultFeasible(squadPower, nearPower)) {
+      op.phase = AiOperationPhase.ASSAULT;
+    }
+    op.committed = op.phase === AiOperationPhase.ASSAULT;
+    op.reinforce = needsReinforcement(squadPower, nearPower);
+  } else if (op.phase === AiOperationPhase.GATHER) {
+    if (gatherReady(map, player, op, squad, targetField, contested, turn) && squadPower >= nearPower * ABORT_POWER_RATIO) op.phase = AiOperationPhase.ASSAULT;
   } else if (squadPower < nearPower * ABORT_POWER_RATIO) {
     op = { ...op, phase: AiOperationPhase.GATHER, rally: chooseRally(map, player, targetTile, squad, targetField), startTurn: turn, leash: true };
   }

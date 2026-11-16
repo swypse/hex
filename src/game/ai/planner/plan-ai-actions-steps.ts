@@ -90,7 +90,7 @@ export function* planAiActionsSteps(
     for (const pattern of patterns) {
       next = pattern.evaluate(ctx);
       if (next) {
-        const by = seasonVetoed(map, turn, next) ? 'season' : tornadoVetoed(map, next) ? 'tornado' : review && stepVetoed(map, player, next, state) ? 'lookahead' : null;
+        const by = seasonVetoed(map, turn, next) ? 'season' : tornadoVetoed(map, next) ? 'tornado' : review && stepVetoed(map, player, next, state, operation) ? 'lookahead' : null;
         if (by) {
           if (dbg) logVeto(map, pattern.id, next, by);
           next = null;
@@ -107,7 +107,7 @@ export function* planAiActionsSteps(
     if (!next) break;
     if (dbg && sourceId === 'fallback') sourceId = `fallback/${source.kind}`;
     aiStepTrace.hook?.(sourceId, next);
-    if (seasonVetoed(map, turn, next) || tornadoVetoed(map, next) || (review && stepVetoed(map, player, next, state))) {
+    if (seasonVetoed(map, turn, next) || tornadoVetoed(map, next) || (review && stepVetoed(map, player, next, state, operation))) {
       // The fallback pick is unsafe too: keep its unit where it stands.
       for (const a of next) if (a.type === AiActionType.MOVE) state.moved.add(a.unitId);
       continue;

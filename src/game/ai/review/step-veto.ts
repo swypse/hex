@@ -3,6 +3,8 @@ import type { GameMap, MapTile } from '../../map/map-gen';
 import { tileAt } from '../../map/tile-index';
 import type { Player } from '../../players';
 import { isLikelyLethal, landEnemyCanReach } from '../situation/enemy-reach';
+import { hexDistance } from '../../map/hex';
+import type { AiOperation } from '../types/operation';
 import type { AiAction } from '../types/action';
 import type { AiPlannerState } from '../types/planner-state';
 import { key } from '../util/tile-key';
@@ -17,7 +19,7 @@ import { key } from '../util/tile-key';
  *  - a move (without an attack) from a safe tile onto a tile where the enemy
  *    force alone would likely kill the unit, unless the destination is an own
  *    village (defending it) or the step captures. */
-export function stepVetoed(map: GameMap, player: Player, step: AiAction[], state: AiPlannerState): boolean {
+export function stepVetoed(map: GameMap, player: Player, step: AiAction[], state: AiPlannerState, operation?: AiOperation | null): boolean {
   const move = step.find((a): a is Extract<AiAction, { type: AiActionType.MOVE }> => a.type === AiActionType.MOVE);
   if (!move) return false;
   const from = findUnitTile(map, player.index, move.unitId);
@@ -33,7 +35,9 @@ export function stepVetoed(map: GameMap, player: Player, step: AiAction[], state
   const attacks = step.some((a) => a.type === AiActionType.ATTACK);
   const capture = dest.settlement !== null && dest.settlement.owner !== player.index;
   const ownVillage = dest.settlement?.owner === player.index;
-  if (!attacks && !capture && !ownVillage && !isLikelyLethal(map, from, player.index, unit) && isLikelyLethal(map, dest, player.index, unit)) return true;
+  // A committed assault accepts the risk near its target.
+  const committed = operation?.committed === true && hexDistance(dest, operation.target) <= 4;
+  if (!committed && !attacks && !capture && !ownVillage && !isLikelyLethal(map, from, player.index, unit) && isLikelyLethal(map, dest, player.index, unit)) return true;
   return false;
 }
 

@@ -1,8 +1,9 @@
-import { BuildingKind } from '@enums';
+import { AiActionType, BuildingKind } from '@enums';
 import { flagsFor } from '../config/flags';
 import { blockedByGarrisonReserve } from '../defense/blocked-by-garrison-reserve';
 import { garrisonReserveVillages } from '../defense/garrison-reserve-villages';
 import { blockedByOpening } from '../economy/blocked-by-opening';
+import { blockedByRoadsSaving, roadsSkillSavings } from '../economy/blocked-by-roads-saving';
 import { blockedByStone } from '../economy/blocked-by-stone';
 import { villagesNeedingMine } from '../economy/villages-needing-mine';
 import { AI_PATTERNS } from '../patterns/all-patterns';
@@ -35,6 +36,10 @@ function withStoneGate<T extends { evaluate(ctx: AiPatternContext): AiAction[] |
       if (steps.some((a) => blockedByOpening(ctx.map, ctx.player, a, ctx.situation, ctx.state))) return null;
       const bare = garrisonReserveVillages(ctx.map, ctx.player);
       if (bare.length > 0 && steps.some((a) => blockedByGarrisonReserve(ctx.map, ctx.player, a, bare))) return null;
+      if (steps.some((a) => a.type === AiActionType.SPAWN)) {
+        const saving = roadsSkillSavings(ctx.map, ctx.player);
+        if (steps.some((a) => blockedByRoadsSaving(ctx.map, ctx.player, a, saving))) return null;
+      }
       if (!flagsFor(ctx.player).stoneFocus) return steps;
       const needy = ctx.state.plannedKinds?.has(BuildingKind.MINE) ? [] : villagesNeedingMine(ctx.map, ctx.player);
       return steps.some((a) => blockedByStone(ctx.map, ctx.player, a, ctx.situation, needy)) ? null : steps;

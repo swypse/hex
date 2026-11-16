@@ -7,7 +7,9 @@ import { CAPTURE_PUSH_PATTERN } from './capture-push';
 import { CAPTURE_READY_VILLAGE_PATTERN } from './capture-ready-village';
 import { COLLECT_BONUS_PATTERN } from './collect-bonus';
 import { EXTINGUISH_FIRE_PATTERN } from './extinguish-fire';
+import { FOOD_LINK_PATTERN } from './food-link';
 import { FOCUS_FIRE_PATTERN } from './focus-fire';
+import { FOCUSED_ASSAULT_PATTERN } from './focused-assault';
 import { REINFORCE_ENDANGERED_VILLAGE_PATTERN } from './reinforce-endangered-village';
 import { RIDER_POST_ATTACK_RETREAT_PATTERN } from './rider-post-attack-retreat';
 import { STALKER_RESTEALTH_PATTERN } from './stalker-restealth';
@@ -18,11 +20,13 @@ import { UPGRADE_SHIP_PATTERN } from './upgrade-ship';
 
 export const OFFENSE_PATTERNS: AiPattern[] = [
   CAPTURE_READY_VILLAGE_PATTERN,
+  FOOD_LINK_PATTERN,
   EXTINGUISH_FIRE_PATTERN,
   RIDER_POST_ATTACK_RETREAT_PATTERN,
   UPGRADE_SHIP_PATTERN,
   STUNNER_PREFER_STUN_PATTERN,
   STUNNER_APPROACH_STUN_PATTERN,
+  FOCUSED_ASSAULT_PATTERN,
   ATTACK_ENEMY_IN_VILLAGE_PATTERN,
   ATTACK_ENEMY_ON_BUILDING_PATTERN,
   ENTER_VILLAGE_PATTERN,
