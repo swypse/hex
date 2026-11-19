@@ -6,7 +6,7 @@ import { BuildingKind } from '@enums';
 import { NetworkMemo } from './network-fingerprint';
 
 /** Connected components of a player's road/port/bridge network: own villages,
- *  own roads and own ports, where ports in the same own-water cluster are
+ *  any roads (whoever built them) and own ports, where ports in the same own-water cluster are
  *  treated as adjacent. Each component is a set of tile keys. */
 export function roadNetworkComponents(
   map: GameMap,
@@ -28,7 +28,7 @@ function computeComponents(map: GameMap, owner: number, waterJumps: Map<string, 
   const byKey = tileMapByKey(map);
   const isNode = (t: MapTile): boolean =>
     (t.settlement !== null && t.settlement.owner === owner) ||
-    t.roadOwner === owner ||
+    (t.roadOwner !== null && t.roadOwner !== undefined) ||
     (t.building?.kind === BuildingKind.PORT && t.ownedBy === owner);
   const visited = new Set<string>();
   const components: Set<string>[] = [];

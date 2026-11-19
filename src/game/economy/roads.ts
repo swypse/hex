@@ -16,7 +16,7 @@ import { tileAt } from '../map/tile-index';
 export const ROAD_COST: Resources = { wood: 5, stone: 2, money: 10, ore: 0, food: 0 };
 
 function isRoadNode(t: MapTile, owner: number): boolean {
-  if (t.roadOwner === owner) return true;
+  if (t.roadOwner !== null && t.roadOwner !== undefined) return true;
   return t.building?.kind === BuildingKind.PORT && t.ownedBy === owner;
 }
 
